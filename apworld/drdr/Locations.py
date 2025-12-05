@@ -138,7 +138,21 @@ location_tables = {
         DRLocationData("Rescue Rich Atkins", "Yogurt", DRLocationCategory.SURVIVOR),
         DRLocationData("Rescue Kindell Johnson", "Apple", DRLocationCategory.SURVIVOR),
         DRLocationData("Rescue Brett Styles", "Milk", DRLocationCategory.SURVIVOR),
-        DRLocationData("Rescue Jonathan Picardson", "Coffee Creamer", DRLocationCategory.SURVIVOR)
+        DRLocationData("Rescue Jonathan Picardson", "Coffee Creamer", DRLocationCategory.SURVIVOR),
+        DRLocationData("Rescue Alyssa Laurent", "Well Done Steak", DRLocationCategory.SURVIVOR)
+    ],
+
+    "Food Court": [
+        # Survivors rescued from the Food Court
+        DRLocationData("Rescue Gil Jiminez", "Milk", DRLocationCategory.SURVIVOR)
+    ],
+
+    "Colby's Movieland": [
+        DRLocationData("Rescue Beth Shrake", "Milk", DRLocationCategory.SURVIVOR),
+        DRLocationData("Rescue Michelle Feltz", "Coffee Creamer", DRLocationCategory.SURVIVOR),
+        DRLocationData("Rescue Nathan Crabbe", "Well Done Steak", DRLocationCategory.SURVIVOR),
+        DRLocationData("Rescue Ray Mathison", "Yogurt", DRLocationCategory.SURVIVOR),
+        DRLocationData("Rescue Cheryl Jones", "Apple", DRLocationCategory.SURVIVOR),
     ],
 
     "Level Ups": [

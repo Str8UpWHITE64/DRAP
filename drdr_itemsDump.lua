@@ -58,7 +58,7 @@ local function find_field_in_hierarchy(obj, field_name)
     return nil
 end
 
--- Pretty JSON ------------------------------------------------------
+-- JSON Formatter ------------------------------------------------------
 
 local function indent(level)
     return string.rep("  ", level)
@@ -73,7 +73,7 @@ local function json_escape(str)
     return str
 end
 
-local function to_pretty_json(items)
+local function to_json_array(items)
     local out = {}
     table.insert(out, "[\n")
 
@@ -104,83 +104,26 @@ re.on_frame(function()
     -- 1) Build itemNo -> name map from MessageManager
     ----------------------------------------------------------------
     local mm = sdk.get_managed_singleton("app.solid.gamemastering.MessageManager")
-    if mm == nil then
-        log("[ItemJsonDump] MessageManager singleton not found")
-        did_run = true
-        return
-    end
-
     local mm_td = mm:get_type_definition()
-    if mm_td == nil then
-        log("[ItemJsonDump] Failed to get MessageManager type definition")
-        did_run = true
-        return
-    end
-
     local ud_list_field = mm_td:get_field("mSolidMessageUserDataList")
-    if ud_list_field == nil then
-        log("[ItemJsonDump] mSolidMessageUserDataList field not found")
-        did_run = true
-        return
-    end
-
     local ud_list = ud_list_field:get_data(mm)
-    if ud_list == nil then
-        log("[ItemJsonDump] mSolidMessageUserDataList is nil")
-        did_run = true
-        return
-    end
-
     local ud_count = get_len(ud_list)
+
     log(string.format("[ItemJsonDump] MessageUserData count: %d", ud_count))
 
-    if ud_count < 3 then
-        log("[ItemJsonDump] Not enough MessageUserData entries (need index 2)")
-        did_run = true
-        return
-    end
-
     local ud2 = idx(ud_list, 2)
-    if ud2 == nil then
-        log("[ItemJsonDump] Failed to get MessageUserData[2]")
-        did_run = true
-        return
-    end
-
     local ud2_td = ud2:get_type_definition()
     local map_field = ud2_td:get_field("mDataMapping")
-    if map_field == nil then
-        log("[ItemJsonDump] mDataMapping not found on MessageUserData[2]")
-        did_run = true
-        return
-    end
-
     local map = map_field:get_data(ud2)
-    if map == nil then
-        log("[ItemJsonDump] mDataMapping is nil")
-        did_run = true
-        return
-    end
-
     local map_td = map:get_type_definition()
+
     log("[ItemJsonDump] mDataMapping type: " ..
         (map_td and map_td:get_full_name() or "?"))
 
     local entries_field = map_td:get_field("_entries")
-    if entries_field == nil then
-        log("[ItemJsonDump] Dictionary has no _entries field")
-        did_run = true
-        return
-    end
-
     local entries = entries_field:get_data(map)
-    if entries == nil then
-        log("[ItemJsonDump] _entries is nil")
-        did_run = true
-        return
-    end
-
     local entries_len = get_len(entries)
+
     log(string.format("[ItemJsonDump] _entries length: %d", entries_len))
 
     local item_names = {}
@@ -243,18 +186,7 @@ re.on_frame(function()
     -- 2) Walk ItemManager.ItemInstanceTable to get game_id + mItemNo
     ----------------------------------------------------------------
     local im = sdk.get_managed_singleton("app.solid.gamemastering.ItemManager")
-    if im == nil then
-        log("[ItemJsonDump] ItemManager singleton not found")
-        did_run = true
-        return
-    end
-
     local im_td = im:get_type_definition()
-    if im_td == nil then
-        log("[ItemJsonDump] Failed to get ItemManager type definition")
-        did_run = true
-        return
-    end
 
     -- Try direct field name first
     local item_table_field = im_td:get_field("ItemInstanceTable")
@@ -281,12 +213,6 @@ re.on_frame(function()
                 end
             end
         end
-    end
-
-    if item_table == nil then
-        log("[ItemJsonDump] Could not locate ItemInstanceTable on ItemManager")
-        did_run = true
-        return
     end
 
     local item_count = get_len(item_table)
@@ -330,7 +256,7 @@ re.on_frame(function()
     ----------------------------------------------------------------
     -- 3) Encode as JSON and output
     ----------------------------------------------------------------
-    local json = to_pretty_json(items_out)
+    local json = to_json_array(items_out)
 
     -- Print to REFramework console
     log("[ItemJsonDump] JSON dump:")
