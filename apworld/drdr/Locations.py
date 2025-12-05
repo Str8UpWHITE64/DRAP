@@ -50,6 +50,8 @@ class DRLocation(Location):
             "Leisure Park",
             "Wonderland Plaza",
             "North Plaza",
+            "Food Court",
+            "Colby's Movieland",
             "Level Ups"
         ]
 
