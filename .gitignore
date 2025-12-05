@@ -39,3 +39,16 @@ luac.out
 *.x86_64
 *.hex
 
+/.idea/.gitignore
+/.idea/DRAP.iml
+/.idea/material_theme_project_new.xml
+/.idea/misc.xml
+/.idea/modules.xml
+/.idea/inspectionProfiles/profiles_settings.xml
+/.idea/vcs.xml
+/.idea/git_toolbox_prj.xml
+/.idea/inspectionProfiles/Project_Default.xml
+/.idea/copilot.data.migration.agent.xml
+/.idea/copilot.data.migration.ask.xml
+/.idea/copilot.data.migration.ask2agent.xml
+/.idea/copilot.data.migration.edit.xml
