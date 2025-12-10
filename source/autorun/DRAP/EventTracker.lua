@@ -1,13 +1,28 @@
--- Dead Rising Deluxe Remaster - Event Tracker
+-- Dead Rising Deluxe Remaster - Event Tracker (module)
 -- Tracks app.solid.gamemastering.GameManager.mEventNo changes
+
+local M = {}
+M.on_event_changed = nil
+
+------------------------------------------------
+-- Logging
+------------------------------------------------
+
+local function log(msg)
+    print("[EventTracker] " .. tostring(msg))
+end
+
+------------------------------------------------
+-- Config
+------------------------------------------------
 
 local GameManager_TYPE_NAME   = "app.solid.gamemastering.GameManager"
 local EVENT_ENUM_TYPE_NAME    = "app.solid.gamemastering.EVENT_NO"
-local EVENT_NONE_ID           = 65535  -- from observation (EVENT_NONE)
+local EVENT_NONE_ID           = 65535
 
 local gm_instance             = nil   -- current GameManager singleton
 local gm_td                   = nil   -- GameManager type definition
-local event_no_field          = nil   -- mEventNo field
+local event_no_field           = nil   -- mEventNo field
 local missing_event_no_warned = false
 
 local event_enum_td           = nil
@@ -16,9 +31,11 @@ local event_enum_built        = false
 
 local last_event_no           = nil   -- last seen mEventNo
 
+local last_check_time         = 0
+local CHECK_INTERVAL          = 1     -- seconds
 
 ------------------------------------------------
--- Enum helpers
+-- Helpers
 ------------------------------------------------
 
 local function build_event_enum_map()
@@ -26,7 +43,7 @@ local function build_event_enum_map()
 
     event_enum_td = sdk.find_type_definition(EVENT_ENUM_TYPE_NAME)
     if not event_enum_td then
-        print("[EventTracker] Could not find EVENT_NO enum type.")
+        log("Could not find EVENT_NO enum type.")
         event_enum_built = true -- avoid spamming
         return
     end
@@ -42,7 +59,7 @@ local function build_event_enum_map()
     end
 
     event_enum_built = true
-    print(string.format("[EventTracker] Built EVENT_NO enum map with ~%d entries.", #fields))
+    log(string.format("Built EVENT_NO enum map with ~%d entries.", #fields))
 end
 
 local function event_no_to_name(event_no)
@@ -57,9 +74,12 @@ local function event_no_to_name(event_no)
     return string.format("UNKNOWN_EVENT_%d", event_no)
 end
 
+-- expose map & helper
+M.EVENT_ID_TO_NAME = EVENT_ID_TO_NAME
+M.event_no_to_name = event_no_to_name
 
 ------------------------------------------------
--- GameManager access 
+-- GameManager access
 ------------------------------------------------
 
 local function reset_gm_cache()
@@ -76,11 +96,11 @@ local function ensure_game_manager()
     -- Detect instance changes (destroyed / recreated)
     if current ~= gm_instance then
         if gm_instance ~= nil and current == nil then
-            print("[EventTracker] GameManager destroyed (likely title screen).")
+            log("GameManager destroyed (likely title screen).")
         elseif gm_instance == nil and current ~= nil then
-            print("[EventTracker] GameManager created (likely entering game).")
+            log("GameManager created (likely entering game).")
         elseif gm_instance ~= nil and current ~= nil then
-            print("[EventTracker] GameManager instance changed (scene load?).")
+            log("GameManager instance changed (scene load?).")
         end
 
         gm_instance = current
@@ -96,34 +116,40 @@ local function ensure_game_manager()
     if not gm_td then
         gm_td = gm_instance:get_type_definition()
         if not gm_td then
-            print("[EventTracker] Failed to get GameManager type definition from instance.")
+            log("Failed to get GameManager type definition from instance.")
             return false
         end
     end
 
     -- Get mEventNo field
     if not event_no_field then
-    event_no_field = gm_td:get_field("mEventNo")
+        event_no_field = gm_td:get_field("mEventNo")
 
         if not event_no_field then
             if not missing_event_no_warned then
-                print("[EventTracker] mEventNo field not found on GameManager (likely title screen).")
+                log("mEventNo field not found on GameManager (likely title screen).")
                 missing_event_no_warned = true
             end
             return false
         else
-            print("[EventTracker] Found mEventNo field.")
+            log("Found mEventNo field.")
         end
     end
     return true
 end
 
-
 ------------------------------------------------
--- Main update loop
+-- Main update entrypoint
 ------------------------------------------------
 
-re.on_frame(function()
+function M.on_frame()
+    -- Throttle checks to reduce performance impact
+    local now = os.clock()
+    if now - last_check_time < CHECK_INTERVAL then
+        return
+    end
+    last_check_time = now
+
     -- Make sure we can access GameManager and mEventNo
     if not ensure_game_manager() then
         return
@@ -144,7 +170,7 @@ re.on_frame(function()
     if last_event_no == nil then
         last_event_no = event_no
         local name = event_no_to_name(event_no)
-        print(string.format("[EventTracker] Initial mEventNo: %s (%d)", name, event_no))
+        log(string.format("Initial mEventNo: %s (%d)", name, event_no))
         return
     end
 
@@ -153,13 +179,20 @@ re.on_frame(function()
         local old_name = event_no_to_name(last_event_no)
         local new_name = event_no_to_name(event_no)
 
-        print(string.format(
-            "[EventTracker] mEventNo changed: %s (%d) -> %s (%d)",
+        log(string.format(
+            "mEventNo changed: %s (%d) -> %s (%d)",
             old_name, last_event_no, new_name, event_no
         ))
 
+        -- AP hook
+        if M.on_event_changed then
+            pcall(M.on_event_changed, last_event_no, event_no, old_name, new_name)
+        end
+
         last_event_no = event_no
     end
-end)
+end
 
-print("[EventTracker] Loaded. Tracking GameManager.mEventNo.")
+log("Module loaded. Tracking GameManager.mEventNo.")
+
+return M

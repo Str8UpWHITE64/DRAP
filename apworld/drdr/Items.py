@@ -205,7 +205,33 @@ _all_items = [DRItemData(row[0], row[1], row[2]) for row in [
     ("Water Gun", 165, DRItemCategory.CONSUMABLE),
     ("CONSUMABLE Cart", 166, DRItemCategory.CONSUMABLE),
     ("White Sedan", 167, DRItemCategory.CONSUMABLE),
-    ("Wine Cask", 168, DRItemCategory.CONSUMABLE)
+    ("Wine Cask", 168, DRItemCategory.CONSUMABLE),
+
+    # Area locks
+    ("Helipad key", 169, DRItemCategory.CONSUMABLE),
+    ("Safe Room key", 170, DRItemCategory.CONSUMABLE),
+    ("Rooftop key", 171, DRItemCategory.CONSUMABLE),
+    ("Warehouse key", 172, DRItemCategory.CONSUMABLE),
+    ("Paradise Plaza key", 173, DRItemCategory.CONSUMABLE),
+    ("Colby's Movie Theater key", 174, DRItemCategory.CONSUMABLE),
+    ("Leisure Park key", 175, DRItemCategory.CONSUMABLE),
+    ("North Plaza key", 176, DRItemCategory.CONSUMABLE),
+    ("Crisip's Hardware Store key", 177, DRItemCategory.CONSUMABLE),
+    ("Food Court key", 178, DRItemCategory.CONSUMABLE),
+    ("Wonderland Plaza key", 179, DRItemCategory.CONSUMABLE),
+    ("Al Fresca Plaza key", 180, DRItemCategory.CONSUMABLE),
+    ("Entrance Plaza key", 181, DRItemCategory.CONSUMABLE),
+    ("Grocery Store key", 182, DRItemCategory.CONSUMABLE),
+    ("Maintenance Tunnel key", 183, DRItemCategory.CONSUMABLE),
+    ("Hideout key", 184, DRItemCategory.CONSUMABLE),
+
+    # Time locks
+    ("DAY2_06_AM", 185, DRItemCategory.CONSUMABLE),
+    ("DAY2_11_AM", 186, DRItemCategory.CONSUMABLE),
+    ("DAY3_00_AM", 187, DRItemCategory.CONSUMABLE),
+    ("DAY3_11_AM", 188, DRItemCategory.CONSUMABLE),
+    ("DAY4_12_PM", 189, DRItemCategory.CONSUMABLE),
+
 ]]
 
 item_descriptions = {}

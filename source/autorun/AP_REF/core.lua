@@ -6,8 +6,9 @@ end
 AP = AP()
 local AP_REF = {}
 AP_REF.AP = AP
+
 -- You should set these values from within your mod
-AP_REF.APGameName = ""
+AP_REF.APGameName = "Dead Rising Deluxe Remaster"
 AP_REF.APItemsHandling = 7 -- shouldn't need to change this
 AP_REF.APTags = {} -- these are reserved for any additional tags, Lua-APClientPP is always applied, and TextOnly when relevant
 
@@ -46,9 +47,9 @@ AP_REF.APTrapColor = "FA8072"
 AP_REF.APLocationColor = "00FF7F"
 AP_REF.APEntranceColor = "6495ED"
 
--- connection config settings
-AP_REF.APHost = "archipelago.gg:12345"
-AP_REF.APSlot = "Player1"
+-- Optional defaults; you already have them in the core
+AP_REF.APHost     = "archipelago.gg:12345"
+AP_REF.APSlot     = "Frank"
 AP_REF.APPassword = ""
 
 function AP_REF.HexToImguiColor(color)
