@@ -26,7 +26,7 @@ AP.TimeGate        = require("DRAP/TimeGate-new")
 -- Auto-register item handlers from JSON
 local function register_spawn_handlers_from_json()
     -- adjust path if needed
-    local item_list_path = "data/drdr_items.json"
+    local item_list_path = "drdr_items.json" -- autorun/data/drdr_items.json
 
     local items = json.load_file(item_list_path)
     if not items then

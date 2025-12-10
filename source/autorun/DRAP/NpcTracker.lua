@@ -11,7 +11,7 @@ M.on_survivor_rescued = nil
 
 local function log(msg)
     print("[SurvivorTracker] " .. tostring(msg))
-end2
+end
 
 ------------------------------------------------
 -- Config
