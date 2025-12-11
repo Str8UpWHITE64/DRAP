@@ -58,6 +58,7 @@ class DRLocation(Location):
             "North Plaza",
             "Food Court",
             "Colby's Movieland",
+            "Service Hallway",
             "Level Ups",
             "PP Stickers",
             "Main Scoops",
@@ -123,7 +124,8 @@ location_tables = {
         # Survivors rescued from Leisure Park
         DRLocationData("Rescue Sophie Richard", "Milk", DRLocationCategory.SURVIVOR)
     ],
-
+    "Service Hallway": [
+    ],
     "Wonderland Plaza": [
         # Survivors rescued from Wonderland Plaza
         DRLocationData("Rescue Greg Simpson", "Milk", DRLocationCategory.SURVIVOR),
