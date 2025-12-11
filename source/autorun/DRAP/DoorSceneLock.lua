@@ -398,11 +398,10 @@ local function rescan_current_area_doors()
                                                 disable_hitdata(li, hitdata)
                                             else
                                                 -- FORCE unlock: set Disabled = false
-                                                -- Disabled logging when doors are unlocked
-                                                --log(string.format(
-                                                --    "    LayoutInfo[%d] in '%s' jumps to '%s' -> UNLOCKED; setting HitData.Disabled = false.",
-                                                --    li_i, list_name, jump_name
-                                                --))
+                                                log(string.format(
+                                                    "    LayoutInfo[%d] in '%s' jumps to '%s' -> UNLOCKED; setting HitData.Disabled = false.",
+                                                    li_i, list_name, jump_name
+                                                ))
                                                 enable_hitdata(li, hitdata)
                                             end
                                         else

@@ -86,6 +86,7 @@ local TRACKED_EVENT_IDS = {
     [136] = 'Get to the Humvee',                                           -- EVENT59
     [144] = 'Fight a tank and win',                                        -- EVENT60
     [134] = 'Ending S: Beat up Brock with your bare fists!',                -- EVENT61
+    [115] = 'Meet Kent day 1',                                        -- EVENT_EM45SET
 }
 
 local TRACKED_SCQ_IDS = {
@@ -103,6 +104,7 @@ local TRACKED_SCQ_IDS = {
     ["0x09"] = "Complete Memories",
     ["0x7F"] = "Witness Special Forces 10pm Day 3",
     ["0x7E"] = "Ending A: Solve all of the cases and be on the helipad at 12pm",
+    ["0x20"] = "Complete Kent's day 1 photoshoot",
 }
 
 ------------------------------------------------

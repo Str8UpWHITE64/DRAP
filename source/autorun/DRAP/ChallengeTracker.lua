@@ -91,12 +91,12 @@ local CHALLENGES = {
     secretForceKill = {
         label   = "Special forces killed",
         targets = { 10 },
-        location_ids = { "Kill 10 Special Forces },
+        location_ids = { "Kill 10 Special Forces" },
     },
 
     foodCourtDishFlag = {
         label   = "Food court dishes destroyed",
-        targets = { 30 },
+        targets = { 262143 },
         location_ids = { "Destroy 30 dishes in the Food Court" },
     },
 
