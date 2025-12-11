@@ -60,7 +60,6 @@ class DRWorld(World):
         regions: Dict[str, Region] = {}
         regions["Menu"] = self.create_region("Menu", [])
         regions.update({region_name: self.create_region(region_name, location_tables[region_name]) for region_name in [
-            "Helipad",
             "Safe Room",
             "Entrance Plaza",
             "Rooftop",
@@ -84,8 +83,7 @@ class DRWorld(World):
             connection.connect(regions[to_region])
             #print(f"Connecting {from_region} to {to_region} Using entrance: " + connection.name)
 
-        create_connection("Menu", "Helipad")
-        create_connection("Helipad", "Safe Room")
+        create_connection("Menu", "Safe Room")
         create_connection("Safe Room", "Rooftop")
         create_connection("Rooftop", "Service Hallway")
         create_connection("Service Hallway", "Paradise Plaza")
