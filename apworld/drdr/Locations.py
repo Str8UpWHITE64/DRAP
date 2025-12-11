@@ -49,6 +49,7 @@ class DRLocation(Location):
 
         table_order = [
             "Rooftop",
+            "Safe Room",
             "Paradise Plaza",
             "Entrance Plaza",
             "Al Fresca Plaza",
@@ -89,7 +90,8 @@ location_tables = {
         DRLocationData("Rescue Jeff Meyer", "Orange Juice", DRLocationCategory.SURVIVOR),
         DRLocationData("Rescue Natalie Meyer", "Uncooked Pizza", DRLocationCategory.SURVIVOR),
     ],
-
+    "Safe Room": [
+    ],
     "Paradise Plaza": [
         # Survivors rescued from Paradise Plaza
         DRLocationData("Rescue Heather Tompkins", "Milk", DRLocationCategory.SURVIVOR),
