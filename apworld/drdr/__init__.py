@@ -65,7 +65,7 @@ class DRWorld(World):
             "Rooftop",
             "Service Hallway",
             "Paradise Plaza",
-            "Colby's Movie Theater",
+            "Colby's Movieland",
             "Leisure Park",
             "Food Court",
             "Al Fresca Plaza",
@@ -88,7 +88,7 @@ class DRWorld(World):
         create_connection("Rooftop", "Service Hallway")
         create_connection("Service Hallway", "Paradise Plaza")
 
-        create_connection("Paradise Plaza", "Colby's Movie Theater")
+        create_connection("Paradise Plaza", "Colby's Movieland")
         create_connection("Paradise Plaza", "Entrance Plaza")
         create_connection("Paradise Plaza", "Leisure Park")
 
