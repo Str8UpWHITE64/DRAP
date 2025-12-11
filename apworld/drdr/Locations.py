@@ -48,8 +48,10 @@ class DRLocation(Location):
         table_offset = 1000
 
         table_order = [
-            "Rooftop",
+            "Helipad",
             "Safe Room",
+            "Rooftop",
+            "Service Hallway",
             "Paradise Plaza",
             "Entrance Plaza",
             "Al Fresca Plaza",
@@ -57,10 +59,7 @@ class DRLocation(Location):
             "Wonderland Plaza",
             "North Plaza",
             "Food Court",
-            "Colby's Movieland",
-            "Service Hallway",
-            "Grocery Store",
-            "Crislip's Hardware Store",
+            "Colby's Movie Theater",
             "Level Ups",
             "PP Stickers",
             "Main Scoops",
@@ -88,13 +87,38 @@ class DRLocation(Location):
 
 # To ensure backwards compatibility, do not reorder locations or insert new ones in the middle of a list.
 location_tables = {
+    "Helipad": [
+        # Events in Helipad
+        DRLocationData("Get bit!", "Milk", DRLocationCategory.OVERTIME_SCOOP),
+
+    ],
+
     "Rooftop": [
         # Survivors rescued from Heliport
         DRLocationData("Rescue Jeff Meyer", "Orange Juice", DRLocationCategory.SURVIVOR),
         DRLocationData("Rescue Natalie Meyer", "Uncooked Pizza", DRLocationCategory.SURVIVOR),
     ],
+
     "Safe Room": [
+        # PP Stickers
+
+        # Events in Safe Room
+        # First events in Entrance Plaza
+        DRLocationData("Entrance Plaza Cutscene 1", "Milk", DRLocationCategory.MAIN_SCOOP),
+        DRLocationData("Help barricade the door!", "Milk", DRLocationCategory.MAIN_SCOOP),
+        DRLocationData("Get to the stairs!", "Milk", DRLocationCategory.MAIN_SCOOP),
+
+
     ],
+
+    "Service Hallway": [
+        # Events in Service Hallway
+        DRLocationData("Stomp the queen", "Milk", DRLocationCategory.MAIN_SCOOP),
+        DRLocationData("Meet Jessie in the Service Hallway", "Milk", DRLocationCategory.MAIN_SCOOP),
+
+    ],
+
+
     "Paradise Plaza": [
         # Survivors rescued from Paradise Plaza
         DRLocationData("Rescue Heather Tompkins", "Milk", DRLocationCategory.SURVIVOR),
@@ -167,7 +191,8 @@ location_tables = {
     ],
     "Crislip's Hardware Store": [
     ],
-    "Colby's Movieland": [
+
+    "Colby's Movie Theater": [
         # Survivors rescued from Colby's Movieland
         DRLocationData("Rescue Beth Shrake", "Milk", DRLocationCategory.SURVIVOR),
         DRLocationData("Rescue Michelle Feltz", "Coffee Creamer", DRLocationCategory.SURVIVOR),
@@ -334,11 +359,7 @@ location_tables = {
     ],
 
     "Main Scoops": [
-        DRLocationData("Entrance Plaza Cutscene 1", "Milk", DRLocationCategory.MAIN_SCOOP),
-        DRLocationData("Help barricade the door!", "Milk", DRLocationCategory.MAIN_SCOOP),
-        DRLocationData("Get to the stairs!", "Milk", DRLocationCategory.MAIN_SCOOP),
-        DRLocationData("Stomp the queen", "Milk", DRLocationCategory.MAIN_SCOOP),
-        DRLocationData("Meet Jessie in the Service Hallway", "Milk", DRLocationCategory.MAIN_SCOOP),
+
         DRLocationData("Complete Backup for Brad", "Milk", DRLocationCategory.MAIN_SCOOP),
         DRLocationData("Escort Brad to see Dr Barnaby", "Milk", DRLocationCategory.MAIN_SCOOP),
         DRLocationData("Complete Temporary Agreement", "Milk", DRLocationCategory.MAIN_SCOOP),
@@ -409,6 +430,7 @@ location_tables = {
         DRLocationData("Meet Jo", "Milk", DRLocationCategory.PSYCHO_SCOOP),
         DRLocationData("Kill Jo", "Milk", DRLocationCategory.PSYCHO_SCOOP),
         DRLocationData("Meet Kent on day 1", "Milk", DRLocationCategory.PSYCHO_SCOOP),
+        DRLocationData("Complete Kent's day 1 photoshoot", "Milk", DRLocationCategory.PSYCHO_SCOOP),
         DRLocationData("Meet Kent on day 2", "Milk", DRLocationCategory.PSYCHO_SCOOP),
         DRLocationData("Kill Kent on day 3", "Milk", DRLocationCategory.PSYCHO_SCOOP),
     ],
