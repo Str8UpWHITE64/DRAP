@@ -60,8 +60,21 @@ class DRWorld(World):
         regions: Dict[str, Region] = {}
         regions["Menu"] = self.create_region("Menu", [])
         regions.update({region_name: self.create_region(region_name, location_tables[region_name]) for region_name in [
+            "Helipad",
+            "Safe Room",
+            "Entrance Plaza",
             "Rooftop",
+            "Service Hallway",
             "Paradise Plaza",
+            "Colby's Movie Theater",
+            "Leisure Park",
+            "Food Court",
+            "Al Fresca Plaza",
+            "Wonderland Plaza",
+            "North Plaza",
+            "Grocery Store",
+            "Crislip's Hardware Store",
+            "Hideout",
             "Level Ups"
         ]})
 
