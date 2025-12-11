@@ -357,7 +357,7 @@ location_tables = {
         DRLocationData("Complete Bomb Collector", "Milk", DRLocationCategory.MAIN_SCOOP),
         DRLocationData("Beat Drivin Carlito", "Milk", DRLocationCategory.MAIN_SCOOP),
         DRLocationData("Meet back at the safe room at 5pm day 3", "Milk", DRLocationCategory.MAIN_SCOOP),
-        DRLocationData("Escort Isabela to the Hideout and have a chat", DRLocationCategory.MAIN_SCOOP),
+        DRLocationData("Escort Isabela to the Hideout and have a chat", "Milk", DRLocationCategory.MAIN_SCOOP),
         DRLocationData("Complete Jessie's Discovery", "Milk", DRLocationCategory.MAIN_SCOOP),
         DRLocationData("Meet Larry", "Milk", DRLocationCategory.MAIN_SCOOP),
         DRLocationData("Complete The Butcher", "Milk", DRLocationCategory.MAIN_SCOOP),
