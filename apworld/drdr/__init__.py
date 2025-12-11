@@ -234,7 +234,9 @@ class DRWorld(World):
             previous_level_location = f"Reach Level {level - 1}"
             set_rule(self.multiworld.get_location(current_level_location, self.player), lambda state, prev=previous_level_location: state.can_reach_location(prev, self.player))
         
-        set_rule(self.multiworld.get_entrance("Safe Room -> Rooftop", self.player), lambda state: state.has("Rooftop Key", self.player))   
+        set_rule(self.multiworld.get_entrance("Safe Room -> Rooftop", self.player), lambda state: state.has("Rooftop Key", self.player))
+
+        set_rule(self.multiworld.get_entrance("Safe Room -> Rooftop", self.player), lambda state: state.has("Rooftop Key", self.player))
 
         self.multiworld.completion_condition[self.player] = lambda state: state.can_reach_location("Reach Level 50", self.player)
                 
