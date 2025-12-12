@@ -89,8 +89,8 @@ class DRLocation(Location):
 # To ensure backwards compatibility, do not reorder locations or insert new ones in the middle of a list.
 location_tables = {
     "Helipad": [
+        DRLocationData("Victory", "Victory", DRLocationCategory.EVENT),
         # Events in Helipad
-        DRLocationData("Get bit!", "Milk", DRLocationCategory.OVERTIME_SCOOP),
         DRLocationData("Get bit!", "Milk", DRLocationCategory.OVERTIME_SCOOP),
         DRLocationData("Ending A: Solve all of the cases and be on the helipad at 12pm", "Milk", DRLocationCategory.MAIN_SCOOP),
         DRLocationData("Ending B: Don't solve all of the cases but be on the helipad at 12pm", "Milk", DRLocationCategory.MAIN_SCOOP),
@@ -475,11 +475,11 @@ location_tables = {
         DRLocationData("Reach Level 47", "Coffee Creamer", DRLocationCategory.LEVEL_UP),
         DRLocationData("Reach Level 48", "Wine", DRLocationCategory.LEVEL_UP),
         DRLocationData("Reach Level 49", "Well Done Steak", DRLocationCategory.LEVEL_UP),
-        DRLocationData("Reach Level 50", "Victory", DRLocationCategory.LEVEL_UP),
+        DRLocationData("Reach Level 50", "Milk", DRLocationCategory.LEVEL_UP),
     ],
 
     "Challenges": [
-        DRLocationData("Reach Level 50", "Milk", DRLocationCategory.CHALLENGE),
+        DRLocationData("Reach max level", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Kill 500 zombies by hand", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Kill 500 zombies by vehicle", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Walk a marathon", "Milk", DRLocationCategory.CHALLENGE),

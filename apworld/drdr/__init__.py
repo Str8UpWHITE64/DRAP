@@ -128,7 +128,7 @@ class DRWorld(World):
         #print("location table size: " + str(len(location_table)))
         for location in location_table:
             #print("Creating location: " + location.name)
-            if location.category in self.enabled_location_categories and location.category not in [DRLocationCategory.SURVIVOR, DRLocationCategory.LEVEL_UP]:
+            if location.category in self.enabled_location_categories:
                 #print("Adding location: " + location.name + " with default item " + location.default_item)
                 new_location = DRLocation(
                     self.player,
@@ -138,19 +138,6 @@ class DRWorld(World):
                     self.location_name_to_id[location.name],
                     new_region
                 )
-                new_region.locations.append(new_location)
-            elif location.category in [DRLocationCategory.SURVIVOR, DRLocationCategory.LEVEL_UP]:
-                print("Adding location: " + location.name + " with default item " + location.default_item)
-                locked_item = self.create_item(location.default_item)
-                new_location = DRLocation(
-                    self.player,
-                    location.name,
-                    location.category,
-                    location.default_item,
-                    self.location_name_to_id[location.name],
-                    new_region
-                )
-                new_location.place_locked_item(locked_item)
                 new_region.locations.append(new_location)
             elif location.category == DRLocationCategory.EVENT:
                 # Remove non-randomized progression items as checks because of the use of a "filler" fake item.
@@ -217,7 +204,7 @@ class DRWorld(World):
         useful_categories = []
         data = self.item_name_to_id[name]
 
-        if name in key_item_names:
+        if name in key_item_names or item_dictionary[name].category == DRItemCategory.LOCK:
             item_classification = ItemClassification.progression
         elif item_dictionary[name].category in useful_categories:
             item_classification = ItemClassification.useful
@@ -249,6 +236,8 @@ class DRWorld(World):
             current_level_location = f"Reach Level {level}"
             previous_level_location = f"Reach Level {level - 1}"
             set_rule(self.multiworld.get_location(current_level_location, self.player), lambda state, prev=previous_level_location: state.can_reach_location(prev, self.player))
+
+        set_rule(self.multiworld.get_location("Victory", self.player), lambda state: state.can_reach_location("Reach Level 50", self.player))
 
         # set_rule(self.multiworld.get_entrance("Helipad -> Safe Room", self.player), lambda state: state.has("Safe Room Key", self.player))
 
@@ -300,7 +289,7 @@ class DRWorld(World):
 
 
 
-        self.multiworld.completion_condition[self.player] = lambda state: state.can_reach_location("Fight a tank and win", self.player)
+        self.multiworld.completion_condition[self.player] = lambda state: state.can_reach_location("Victory", self.player)
                 
     def fill_slot_data(self) -> Dict[str, object]:
         slot_data: Dict[str, object] = {}
