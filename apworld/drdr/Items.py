@@ -226,6 +226,7 @@ _all_items = [DRItemData(row[0], row[1], row[2]) for row in [
     ("Grocery Store key", 1013, DRItemCategory.LOCK),
     ("Maintenance Tunnel key", 1014, DRItemCategory.LOCK),
     ("Hideout key", 1015, DRItemCategory.LOCK),
+    ("Service Hallway key", 1016, DRItemCategory.LOCK),
 
     # Time locks
     ("DAY2_06_AM", 2000, DRItemCategory.LOCK),
