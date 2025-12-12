@@ -13,11 +13,11 @@ AP.ItemSpawner     = require("DRAP/ItemSpawner")
 AP.DoorSceneLock   = require("DRAP/DoorSceneLock")
 AP.ChallengeTracker= require("DRAP/ChallengeTracker")
 AP.LevelTracker    = require("DRAP/LevelTracker")
-AP.EventTracker    = require("DRAP/EventTracker-new")
+AP.EventTracker    = require("DRAP/EventTracker")
 AP.NpcTracker      = require("DRAP/NpcTracker")
 AP.PPStickerTracker= require("DRAP/PPStickerTracker")
 AP.SaveSlot        = require("DRAP/SaveSlot")
-AP.TimeGate        = require("DRAP/TimeGate-new")
+AP.TimeGate        = require("DRAP/TimeGate")
 
 ------------------------------------------------------------
 -- AP item handlers
@@ -233,6 +233,98 @@ AP_BRIDGE.register_item_handler_by_name("DAY4_12_PM", function(net_item, item_na
     AP.TimeGate.unlock_day4_12pm()
 end)
 
+------------------------------------------------------------
+-- Async helpers
+------------------------------------------------------------
+
+local function apply_permanent_effects_from_ap()
+    -- Example: door keys
+    if AP_BRIDGE.has_item_name("Helipad Key") then
+        AP.DoorSceneLock.unlock_scene("s135")
+    end
+
+    if AP_BRIDGE.has_item_name("Safe Room Key") then
+        AP.DoorSceneLock.unlock_scene("s136")
+    end
+
+    if AP_BRIDGE.has_item_name("Rooftop Key") then
+        AP.DoorSceneLock.unlock_scene("s231")
+    end
+
+    if AP_BRIDGE.has_item_name("Service Hallway Key") then
+        AP.DoorSceneLock.unlock_scene("s230")
+    end
+
+    if AP_BRIDGE.has_item_name("Paradise Plaza Key") then
+        AP.DoorSceneLock.unlock_scene("s200")
+    end
+
+    if AP_BRIDGE.has_item_name("Colby's Movie Theater Key") then
+        AP.DoorSceneLock.unlock_scene("s503")
+    end
+
+    if AP_BRIDGE.has_item_name("Leisure Park Key") then
+        AP.DoorSceneLock.unlock_scene("s700")
+    end
+
+    if AP_BRIDGE.has_item_name("North Plaza Key") then
+        AP.DoorSceneLock.unlock_scene("s400")
+    end
+
+    if AP_BRIDGE.has_item_name("Crislip's Hardware Store Key") then
+        AP.DoorSceneLock.unlock_scene("s501")
+    end
+
+    if AP_BRIDGE.has_item_name("Food Court Key") then
+        AP.DoorSceneLock.unlock_scene("sa00")
+    end
+
+    if AP_BRIDGE.has_item_name("Wonderland Plaza Key") then
+        AP.DoorSceneLock.unlock_scene("s300")
+    end
+
+    if AP_BRIDGE.has_item_name("Al Fresca Plaza Key") then
+        AP.DoorSceneLock.unlock_scene("s900")
+    end
+
+    if AP_BRIDGE.has_item_name("Entrance Plaza Key") then
+        AP.DoorSceneLock.unlock_scene("s100")
+    end
+
+    if AP_BRIDGE.has_item_name("Grocery Store Key") then
+        AP.DoorSceneLock.unlock_scene("s500")
+    end
+
+    if AP_BRIDGE.has_item_name("Maintenance Tunnel Key") then
+        AP.DoorSceneLock.unlock_scene("s600")
+    end
+
+    if AP_BRIDGE.has_item_name("Hideout Key") then
+        AP.DoorSceneLock.unlock_scene("s401")
+    end
+
+    -- Time freezes
+    if AP_BRIDGE.has_item_name("DAY2_06_AM") then
+        AP.TimeGate.unlock_day2_6am()
+
+        if AP_BRIDGE.has_item_name("DAY2_11_AM") then
+            AP.TimeGate.unlock_day2_11am()
+
+            if AP_BRIDGE.has_item_name("DAY3_00_AM") then
+                AP.TimeGate.unlock_day3_12am()
+
+                if AP_BRIDGE.has_item_name("DAY3_11_AM") then
+                    AP.TimeGate.unlock_day3_11am()
+
+                    if AP_BRIDGE.has_item_name("DAY4_12_PM") then
+                        AP.TimeGate.unlock_all_time()
+                    end
+                end
+            end
+        end
+    end
+end
+
 
 
 local function ap_is_connected()
@@ -285,11 +377,17 @@ local function send_level_checks_to_ap(old_level, new_level)
 end
 
 ------------------------------------------------------------
--- AP hook wiring
+-- Re-apply items and effects on new game
 ------------------------------------------------------------
 
-local AP_BRIDGE = require("ap_drdr_bridge")
+if AP.TimeGate.is_new_game() then
+    AP_BRIDGE.reapply_all_items()
+    apply_permanent_effects_from_ap()
+end
 
+------------------------------------------------------------
+-- AP hook wiring
+------------------------------------------------------------
 -- Level tracking
 AP.LevelTracker.on_level_changed = function(old_level, new_level)
     print(string.format("[DRAP-AP] Level changed %d -> %d", old_level, new_level))
@@ -301,15 +399,15 @@ AP.LevelTracker.on_level_changed = function(old_level, new_level)
 end
 
 -- Story / game events
-AP.EventTracker.on_event_changed =
-    function(old_id, new_id, old_name, new_name)
+AP.EventTracker.on_tracked_location =
+    function(desc, source, raw_id, extra)
         print(string.format(
-            "[DRAP-AP] Event changed %s (%d) -> %s (%d)",
-            tostring(old_name), old_id or -1, tostring(new_name), new_id or -1
+            "Tracked location reached: %s ",
+            tostring(desc)
         ))
-        event_name = new_name
-        AP_BRIDGE.check(event_name)
+        AP_BRIDGE.check(desc)
     end
+
 
 -- Challenges (SolidSave thresholds)
 AP.ChallengeTracker.on_challenge_threshold =
@@ -325,10 +423,7 @@ AP.ChallengeTracker.on_challenge_threshold =
 -- Survivors rescued
 AP.NpcTracker.on_survivor_rescued =
     function(npc_id, state_index, friendly_name, game_id)
-        print(string.format(
-            "[DRAP-AP] Survivor rescued: id=%s name=%s game_id=%s state=%s",
-            tostring(npc_id), tostring(friendly_name), tostring(game_id), tostring(state_index)
-        ))
+        print(string.format("[DRAP-AP] Survivor rescued: name=%s",tostring(friendly_name)))
         local name = string.format("Rescue %s", friendly_name)
         AP_BRIDGE.check(name)
     end
@@ -365,7 +460,48 @@ end
 -- Main script
 ------------------------------------------------------------
 
+local function is_in_game()
+    -- Fast + reliable: this singleton is nil at title/menu/loading most of the time
+    local ps = sdk.get_managed_singleton("app.solid.PlayerStatusManager")
+    if not ps then return false end
+
+    -- Optional extra guard: can we read PlayerLevel?
+    local td = ps:get_type_definition()
+    if not td then return false end
+
+    local f = td:get_field("PlayerLevel")
+    if not f then return false end
+
+    local ok, lvl = pcall(f.get_data, f, ps)
+    if not ok or lvl == nil then return false end
+
+    return true
+end
+
+local was_in_game = false
+
+local function on_enter_game()
+    print("[DRAP] Entered gameplay; applying AP progression...")
+    if AP.TimeGate and AP.TimeGate.is_new_game and AP.TimeGate.is_new_game() then
+        AP.AP_BRIDGE.reapply_all_items()
+    end
+    apply_permanent_effects_from_ap()
+end
+
+
+
 re.on_frame(function()
+    local now_in_game = is_in_game()
+
+    if now_in_game and not was_in_game then
+        on_enter_game()
+    end
+    was_in_game = now_in_game
+
+    if not now_in_game then
+        return
+    end
+
     AP.ItemSpawner.on_frame()
     AP.DoorSceneLock.on_frame()
     AP.ChallengeTracker.on_frame()

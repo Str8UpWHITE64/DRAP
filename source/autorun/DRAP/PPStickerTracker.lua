@@ -186,8 +186,6 @@ local function ensure_update_hint_method()
         end
         return false
     end
-
-    log("[PPStickerTracker] Found updateUniqueItemHint() on " .. MODEL_TYPE_NAME)
     return true
 end
 

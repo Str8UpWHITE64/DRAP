@@ -186,6 +186,6 @@ function M.apply_for_slot(slot_name, seed)
     end
 end
 
-log("AP-aware save mount redirect module loaded.")
+log("Module loaded.")
 
 return M

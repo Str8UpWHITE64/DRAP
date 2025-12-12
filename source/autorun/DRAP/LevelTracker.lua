@@ -81,8 +81,6 @@ local function ensure_player_status_manager()
                 missing_level_warned = true
             end
             return false
-        else
-            log("Found PlayerLevel field.")
         end
     end
 
@@ -121,30 +119,21 @@ function M.on_frame()
 
     -- Detect changes
     if current_level ~= last_level then
-        log(string.format(
-            "PlayerLevel changed: %d -> %d",
-            last_level, current_level
-        ))
-
         if current_level > last_level then
             local diff = current_level - last_level
-            if diff == 1 then
-                log(string.format("Player leveled up! New level: %d", current_level))
-            else
-                log(string.format("Player jumped up %d levels! New level: %d", diff, current_level))
+            if M.on_level_changed then
+                for lvl = last_level + 1, current_level do
+                    log(string.format("  [AP] Processing level-up step: %d -> %d", lvl - 1, lvl))
+                    pcall(M.on_level_changed, lvl - 1, lvl)
+                end
             end
+
         elseif current_level < last_level then
             log(string.format(
                 "Player level decreased (reset or debug?): %d -> %d",
                 last_level, current_level
             ))
         end
-
-        -- AP hook
-        if M.on_level_changed then
-            pcall(M.on_level_changed, last_level, current_level)
-        end
-
         last_level = current_level
     end
 end

@@ -16,17 +16,35 @@ end
 -- Config
 ------------------------------------------------
 
-local GameManager_TYPE_NAME = "app.solid.gamemastering.GameManager"
+local GameManager_TYPE_NAME      = "app.solid.gamemastering.GameManager"
+local TimeInterp_TYPE_NAME       = "app.solid.gamemastering.TimeInterpolateManager"
 
-local gm_instance        = nil   -- current GameManager singleton
-local gm_missing_warned  = false
+local gm_instance                = nil   -- current GameManager singleton
+local gm_missing_warned          = false
 
--- gate state
-local freeze_enabled     = false -- true = time frozen
-local saved_time_add     = nil   -- original mTimeAdd before freezing
+local ti_instance                = nil   -- current TimeInterpolateManager singleton
+local ti_missing_warned          = false
+
+-- freeze sources
+local manual_freeze_enabled      = false -- controlled by M.enable/disable/set_frozen
+local cap_freeze_enabled         = false -- controlled by time cap logic
+
+local saved_time_add             = nil   -- original mTimeAdd before freezing
+
+-- current time cap; when CurrentSecond >= this, time is frozen
+local time_cap_seconds           = nil
+
+-- Named checkpoints (CurrentSecond values)
+local TIME_CAPS = {
+    DAY2_06_AM = 61200,   -- 6:00am Day 2
+    DAY2_11_AM = 79200,   -- 11:00am Day 2
+    DAY3_00_AM = 126000,  -- 12:00am Day 3
+    DAY3_11_AM = 165600,  -- 11:00am Day 3
+    DAY4_12_PM = 255600,  -- 12:00pm Day 4
+}
 
 ------------------------------------------------
--- GameManager access
+-- Manager access
 ------------------------------------------------
 
 local function ensure_game_manager()
@@ -34,7 +52,7 @@ local function ensure_game_manager()
 
     if current == nil then
         if not gm_missing_warned then
-            log("GameManager singleton not found; timer control unavailable.")
+            log("GameManager singleton not found; timer speed control unavailable.")
             gm_missing_warned = true
         end
         gm_instance = nil
@@ -50,15 +68,38 @@ local function ensure_game_manager()
     return gm_instance
 end
 
+local function ensure_time_interpolator()
+    local current = sdk.get_managed_singleton(TimeInterp_TYPE_NAME)
+
+    if current == nil then
+        if not ti_missing_warned then
+            log("TimeInterpolateManager singleton not found; time caps unavailable.")
+            ti_missing_warned = true
+        end
+        ti_instance = nil
+        return nil
+    end
+
+    if current ~= ti_instance then
+        ti_instance = current
+        ti_missing_warned = false
+        log("TimeInterpolateManager singleton updated.")
+    end
+
+    return ti_instance
+end
+
 ------------------------------------------------
--- Core time control
+-- Core time control (speed via GameManager.mTimeAdd)
 ------------------------------------------------
 
-local function apply_gate_state()
-    local gm = ensure_game_manager()
+local function apply_gate_state(gm)
+    gm = gm or ensure_game_manager()
     if not gm then return end
 
-    if freeze_enabled then
+    local effective_freeze = manual_freeze_enabled or cap_freeze_enabled
+
+    if effective_freeze then
         -- First time enabling: capture current speed
         if saved_time_add == nil then
             saved_time_add = gm.mTimeAdd or 30
@@ -79,25 +120,89 @@ local function apply_gate_state()
     end
 end
 
+------------------------------------------------
+-- Time cap logic (position via TimeInterpolateManager.CurrentSecond)
+------------------------------------------------
+
+local function evaluate_time_cap()
+    if not time_cap_seconds then
+        -- No cap active
+        if cap_freeze_enabled then
+            cap_freeze_enabled = false
+            log("Time cap cleared; cap-based freeze disabled.")
+        end
+        return
+    end
+
+    local ti = ensure_time_interpolator()
+    if not ti then return end
+
+    local clock = ti.CurrentSecond or 0
+
+    if clock >= time_cap_seconds then
+        -- Clamp if we overshot in one tick
+        if clock > time_cap_seconds then
+            ti.CurrentSecond = time_cap_seconds
+        end
+
+        if not cap_freeze_enabled then
+            cap_freeze_enabled = true
+            log(string.format("Time cap reached (%s); freezing time.", tostring(time_cap_seconds)))
+        end
+    else
+        -- Below cap: no cap freeze needed
+        if cap_freeze_enabled then
+            cap_freeze_enabled = false
+            log("Time is below cap; cap-based freeze disabled.")
+        end
+    end
+end
+
 --------------------------------
--- Public API
+-- Public API: status
 --------------------------------
 
 function M.is_enabled()
-    return freeze_enabled
+    -- effective frozen state (manual OR cap)
+    return manual_freeze_enabled or cap_freeze_enabled
 end
 
+function M.is_manual_freeze()
+    return manual_freeze_enabled
+end
+
+function M.is_cap_freeze()
+    return cap_freeze_enabled
+end
+
+------------------------------------------------------------
+-- Detect if the player is at the very start of a new game
+------------------------------------------------------------
+function M.is_new_game()
+
+    local ti = ensure_time_interpolator()
+    if not ti then return end
+    local clock = ti.CurrentSecond or 0
+
+    -- NEW GAME START TIME = 45000 (12:00 PM Day 1)
+    return clock == 45000
+end
+
+--------------------------------
+-- Public API: manual freeze control
+--------------------------------
+
 function M.enable()
-    if freeze_enabled then return end
-    freeze_enabled = true
-    log("Gate enabled; will freeze in-game time.")
+    if manual_freeze_enabled then return end
+    manual_freeze_enabled = true
+    log("Manual gate enabled; will freeze in-game time.")
     apply_gate_state()
 end
 
 function M.disable()
-    if not freeze_enabled then return end
-    freeze_enabled = false
-    log("Gate disabled; restoring in-game time.")
+    if not manual_freeze_enabled then return end
+    manual_freeze_enabled = false
+    log("Manual gate disabled; restoring in-game time (if no cap freeze).")
     apply_gate_state()
 end
 
@@ -111,19 +216,74 @@ function M.set_frozen(frozen)
 end
 
 --------------------------------
+-- Public API: time cap control
+--------------------------------
+
+-- Set a raw time cap in CurrentSecond units.
+-- When CurrentSecond >= cap, time is frozen until the cap is raised or cleared.
+function M.set_time_cap(seconds)
+    time_cap_seconds = seconds
+    cap_freeze_enabled = false  -- will be re-evaluated next frame
+    log(string.format("Time cap set to %s.", tostring(seconds)))
+end
+
+-- Clear the current time cap (removes cap-based freeze).
+function M.clear_time_cap()
+    time_cap_seconds = nil
+    if cap_freeze_enabled then
+        cap_freeze_enabled = false
+        log("Time cap cleared; cap-based freeze disabled.")
+        apply_gate_state()
+    else
+        log("Time cap cleared.")
+    end
+end
+
+-- Completely unlock time (no caps, no manual freeze)
+function M.unlock_all_time()
+    time_cap_seconds = nil
+    cap_freeze_enabled = false
+    manual_freeze_enabled = false
+    log("All time restrictions cleared (no caps, no manual freeze).")
+    apply_gate_state()
+end
+
+-- Named controls
+function M.unlock_day2_6am()
+    M.set_time_cap(TIME_CAPS.DAY2_06_AM)
+end
+
+function M.unlock_day2_11am()
+    M.set_time_cap(TIME_CAPS.DAY2_11_AM)
+end
+
+function M.unlock_day3_12am()
+    M.set_time_cap(TIME_CAPS.DAY3_00_AM)
+end
+
+function M.unlock_day3_11am()
+    M.set_time_cap(TIME_CAPS.DAY3_11_AM)
+end
+
+function M.unlock_day4_12pm()
+    M.set_time_cap(TIME_CAPS.DAY4_12_PM)
+end
+
+--------------------------------
 -- Main update entrypoint
 --------------------------------
 
 function M.on_frame()
-    -- Only touch GameManager when we care about the gate, or have something to restore
-    if freeze_enabled or saved_time_add ~= nil then
-        apply_gate_state()
-    else
-        -- Keep gm_instance pointer fresh
-        ensure_game_manager()
+    -- Evaluate cap based on TimeInterpolateManager.CurrentSecond
+    evaluate_time_cap()
+
+    -- Enforce freeze/unfreeze via GameManager.mTimeAdd
+    local gm = ensure_game_manager()
+    if gm then
+        apply_gate_state(gm)
     end
 end
 
-log("Module loaded. Use M.enable/disable/set_frozen from your AP logic.")
+log("Module loaded. Managing time using TimeInterpolateManager.CurrentSecond and GameManager.mTimeAdd")
 
 return M

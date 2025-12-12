@@ -116,8 +116,6 @@ local function ensure_player_status_manager()
                 missing_inv_warned = true
             end
             return false
-        else
-            print("[ItemSpawner] Found PlayerInventory field.")
         end
     end
 
@@ -138,8 +136,6 @@ local function ensure_inventory()
                 missing_inv_warned = true
             end
             return false
-        else
-            print("[ItemSpawner] Got PlayerInventory instance.")
         end
     end
 
@@ -161,8 +157,6 @@ local function ensure_inventory()
                 missing_method_warned = true
             end
             return false
-        else
-            print("[ItemSpawner] Found Inventory.setEventItem method.")
         end
     end
 

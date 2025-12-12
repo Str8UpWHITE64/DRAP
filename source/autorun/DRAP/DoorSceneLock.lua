@@ -285,8 +285,6 @@ local function disable_hitdata(layout_info, hitdata)
         log("      [HitData] Failed to set 'Disabled' true: " .. tostring(err))
         return false
     end
-
-    log("      [HitData] Disabled -> true")
     patch.disabled = true
     return true
 end
@@ -309,8 +307,6 @@ local function enable_hitdata(layout_info, hitdata)
         log("      [HitData] Failed to set 'Disabled' false: " .. tostring(err))
         return false
     end
-
-    log("      [HitData] Disabled -> false")
     HITDATA_PATCHES[layout_info] = nil
     return true
 end
@@ -321,11 +317,6 @@ end
 
 local function rescan_current_area_doors()
     local area_index, level_path = get_area_info()
-    log(string.format(
-        "Rescanning doors for area_index=%s level_path=%s",
-        tostring(area_index), tostring(level_path)
-    ))
-
     local res_list = get_areahit_resource_list()
     if res_list == nil then
         log("No AreaHitResource list; abort scan.")
@@ -334,11 +325,8 @@ local function rescan_current_area_doors()
 
     local res_count = get_list_count(res_list)
     if res_count <= 0 then
-        log("mAreaHitResource is empty; nothing to scan.")
         return
     end
-
-    log(string.format("Found %d AreaHitResource entries.", res_count))
 
     for r_i = 0, res_count - 1 do
         local res = get_list_item(res_list, r_i)
@@ -363,11 +351,6 @@ local function rescan_current_area_doors()
                     if layout_list_val ~= nil then
                         local layout_count = get_list_count(layout_list_val)
                         if layout_count > 0 then
-                            log(string.format(
-                                "  Scanning '%s' (%d LayoutInfos)",
-                                list_name, layout_count
-                            ))
-
                             for li_i = 0, layout_count - 1 do
                                 local ok_item, li = pcall(sdk.call_object_func, layout_list_val, "get_Item", li_i)
                                 if ok_item and li ~= nil then
@@ -390,26 +373,13 @@ local function rescan_current_area_doors()
                                                 local info = SCENE_INFO[jump_name]
                                                 local desc = info
                                                     and (info.name .. " (idx=" .. info.index .. ")")
-                                                    or "<unknown>"
-                                                log(string.format(
-                                                    "    LayoutInfo[%d] in '%s' jumps to '%s' (%s) -> LOCKED; setting HitData.Disabled = true.",
-                                                    li_i, list_name, jump_name, desc
-                                                ))
                                                 disable_hitdata(li, hitdata)
                                             else
                                                 -- FORCE unlock: set Disabled = false
-                                                log(string.format(
-                                                    "    LayoutInfo[%d] in '%s' jumps to '%s' -> UNLOCKED; setting HitData.Disabled = false.",
-                                                    li_i, list_name, jump_name
-                                                ))
                                                 enable_hitdata(li, hitdata)
                                             end
                                         else
                                             if HITDATA_PATCHES[li] ~= nil then
-                                                log(string.format(
-                                                    "    LayoutInfo[%d] in '%s' has no jump_name; forcing HitData.Disabled = false.",
-                                                    li_i, list_name
-                                                ))
                                                 enable_hitdata(li, hitdata)
                                             end
                                         end
@@ -433,13 +403,6 @@ function M.lock_scene(scene_code)
     LOCKED_SCENES[scene_code] = true
 
     local info = SCENE_INFO[scene_code]
-    if info then
-        log(string.format("Scene '%s' (%s, index=%d) marked LOCKED.",
-            scene_code, info.name, info.index))
-    else
-        log(string.format("Scene '%s' marked LOCKED.", scene_code))
-    end
-
     rescan_current_area_doors()
 end
 
@@ -448,13 +411,6 @@ function M.unlock_scene(scene_code)
     LOCKED_SCENES[scene_code] = nil
 
     local info = SCENE_INFO[scene_code]
-    if info then
-        log(string.format("Scene '%s' (%s, index=%d) marked UNLOCKED.",
-            scene_code, info.name, info.index))
-    else
-        log(string.format("Scene '%s' marked UNLOCKED.", scene_code))
-    end
-
     rescan_current_area_doors()
 end
 
@@ -474,11 +430,6 @@ function M.on_frame()
     local area_index, level_path = get_area_info()
     if area_index ~= nil and level_path ~= nil then
         if area_index ~= last_area_index or level_path ~= last_level_path then
-            log(string.format(
-                "Area change: %s (%s) -> %s (%s)",
-                tostring(last_area_index), tostring(last_level_path),
-                tostring(area_index), tostring(level_path)
-            ))
             last_area_index = area_index
             last_level_path = level_path
 

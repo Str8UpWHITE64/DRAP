@@ -311,8 +311,6 @@ local function ensure_solid_storage()
                 missing_save_warned = true
             end
             return false
-        else
-            log("Found SolidStorage.mSaveWork field.")
         end
     end
 
@@ -335,7 +333,6 @@ local function ensure_challenge_fields(save_obj)
             return false
         end
         save_td = td
-        log("SolidSave type: " .. (save_td:get_full_name() or "<unknown>"))
     end
 
     for field_name, def in pairs(CHALLENGES) do
@@ -362,9 +359,6 @@ local function ensure_challenge_fields(save_obj)
             if not f then
                 state.missing_warned = true
                 log("Field '" .. field_name .. "' not found on SolidSave.")
-            else
-                state.field = f
-                log("Now tracking SolidSave field '" .. field_name .. "'.")
             end
         end
     end
@@ -415,11 +409,6 @@ local function handle_challenge_progress(field_name, def, state, save_obj)
                 else
                     threshold_id = string.format("%s_%d", field_name, target)
                 end
-
-                log(string.format(
-                    "Challenge reached [%s]: %s >= %d (field=%s, %d -> %d)",
-                    threshold_id, label, target, field_name, prev, current
-                ))
                 state.reached[i] = true
 
                 -- AP hook: separate location per threshold via threshold_id
