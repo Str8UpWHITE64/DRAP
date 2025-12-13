@@ -466,7 +466,7 @@ function M.get_all_thresholds()
 end
 
 ------------------------------------------------
--- Main update entrypoint (called by central on_frame)
+-- Main update entrypoint
 ------------------------------------------------
 
 function M.on_frame()

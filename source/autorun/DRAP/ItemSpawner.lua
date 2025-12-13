@@ -4,6 +4,15 @@
 local M = {}
 
 ------------------------------------------------
+-- Logging
+------------------------------------------------
+
+local function log(msg)
+    print("[ItemSpawner] " .. tostring(msg))
+end
+
+
+------------------------------------------------
 -- Type names / constants
 ------------------------------------------------
 
@@ -82,11 +91,11 @@ local function ensure_player_status_manager()
     -- Detect instance changes (destroyed / recreated)
     if current ~= ps_instance then
         if ps_instance ~= nil and current == nil then
-            print("[ItemSpawner] PlayerStatusManager destroyed (likely title screen).")
+            log("PlayerStatusManager destroyed (likely title screen).")
         elseif ps_instance == nil and current ~= nil then
-            print("[ItemSpawner] PlayerStatusManager created (likely entering game).")
+            log("PlayerStatusManager created (likely entering game).")
         elseif ps_instance ~= nil and current ~= nil then
-            print("[ItemSpawner] PlayerStatusManager instance changed (scene load?).")
+            log("PlayerStatusManager instance changed (scene load?).")
         end
 
         ps_instance = current
@@ -101,7 +110,7 @@ local function ensure_player_status_manager()
     if not ps_td then
         ps_td = ps_instance:get_type_definition()
         if not ps_td then
-            print("[ItemSpawner] Failed to get PlayerStatusManager type definition from instance.")
+            log("Failed to get PlayerStatusManager type definition from instance.")
             return false
         end
     end
@@ -112,7 +121,7 @@ local function ensure_player_status_manager()
 
         if not inv_field then
             if not missing_inv_warned then
-                print("[ItemSpawner] PlayerInventory field not found on PlayerStatusManager (likely title screen or wrong context).")
+                log("PlayerInventory field not found on PlayerStatusManager (likely title screen or wrong context).")
                 missing_inv_warned = true
             end
             return false
@@ -132,7 +141,7 @@ local function ensure_inventory()
         inv_instance = inv_field:get_data(ps_instance)
         if not inv_instance then
             if not missing_inv_warned then
-                print("[ItemSpawner] PlayerInventory instance is nil (not in gameplay yet?).")
+                log("PlayerInventory instance is nil (not in gameplay yet?).")
                 missing_inv_warned = true
             end
             return false
@@ -143,7 +152,7 @@ local function ensure_inventory()
     if not inv_td then
         inv_td = inv_instance:get_type_definition()
         if not inv_td then
-            print("[ItemSpawner] Failed to get Inventory type definition from instance.")
+            log("Failed to get Inventory type definition from instance.")
             return false
         end
     end
@@ -153,7 +162,7 @@ local function ensure_inventory()
         set_event_method = inv_td:get_method("setEventItem")
         if not set_event_method then
             if not missing_method_warned then
-                print("[ItemSpawner] Inventory.setEventItem method not found.")
+                log("Inventory.setEventItem method not found.")
                 missing_method_warned = true
             end
             return false
@@ -181,7 +190,7 @@ local function ensure_capacity_fields()
 
     if (not current_items_field) or (not max_slot_field) then
         if not capacity_warned then
-            print("[ItemSpawner] Could not find CurrentItemNumbers/CurrentMaxSlot fields on Inventory.")
+            log("Could not find CurrentItemNumbers/CurrentMaxSlot fields on Inventory.")
             capacity_warned = true
         end
         return false
@@ -237,8 +246,8 @@ local function process_pending_items()
         return
     end
 
-    print(string.format(
-        "[ItemSpawner] Processing queued item: ItemNo=%d (remaining in queue: %d)",
+    log(string.format(
+        "Processing queued item: ItemNo=%d (remaining in queue: %d)",
         next_item, pending_count()
     ))
 
@@ -248,9 +257,9 @@ local function process_pending_items()
     end)
 
     if ok then
-        print("[ItemSpawner] setEventItem succeeded for ItemNo=" .. tostring(next_item))
+        log("setEventItem succeeded for ItemNo=" .. tostring(next_item))
     else
-        print("[ItemSpawner] setEventItem failed for ItemNo=" .. tostring(next_item) ..
+        log("setEventItem failed for ItemNo=" .. tostring(next_item) ..
               " error: " .. tostring(err))
     end
 end
@@ -264,15 +273,15 @@ function M.spawn(item_no)
     if type(item_no) ~= "number" then
         local as_num = tonumber(item_no)
         if not as_num then
-            print("[ItemSpawner] spawn: item_no must be a number or numeric string, got: " .. tostring(item_no))
+            log("spawn: item_no must be a number or numeric string, got: " .. tostring(item_no))
             return
         end
         item_no = as_num
     end
 
     enqueue_item(item_no)
-    print(string.format(
-        "[ItemSpawner] spawn: queued ItemNo=%d (queue size now %d)",
+    log(string.format(
+        "spawn: queued ItemNo=%d (queue size now %d)",
         item_no, pending_count()
     ))
 
@@ -301,6 +310,6 @@ function M.on_frame()
     process_pending_items()
 end
 
-print("[ItemSpawner] Module loaded.")
+log("Module loaded.")
 
 return M

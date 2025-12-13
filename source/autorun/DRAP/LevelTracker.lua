@@ -64,16 +64,26 @@ local function ensure_player_status_manager()
 
     -- Get type definition from the instance
     if not ps_td then
-        ps_td = ps_instance:get_type_definition()
-        if not ps_td then
+        local ok, td = pcall(function()
+            return ps_instance:get_type_definition()
+        end)
+        if not ok or not td then
             log("Failed to get PlayerStatusManager type definition from instance.")
             return false
         end
+        ps_td = td
     end
+
 
     -- Get PlayerLevel field
     if not level_field then
-        level_field = ps_td:get_field("PlayerLevel")
+        local ok, f = pcall(function()
+            return ps_td:get_field("PlayerLevel")
+        end)
+        if not ok then
+            return false
+        end
+        level_field = f
 
         if not level_field then
             if not missing_level_warned then
@@ -83,6 +93,7 @@ local function ensure_player_status_manager()
             return false
         end
     end
+
 
     return true
 end
@@ -104,11 +115,14 @@ function M.on_frame()
         return
     end
 
-    -- Safely read current PlayerLevel
-    local ok_lvl, current_level = pcall(level_field.get_data, level_field, ps_instance)
+    -- Safely read current PlayerLevel (avoid indexing get_data outside pcall)
+    local ok_lvl, current_level = pcall(function()
+        return level_field:get_data(ps_instance)
+    end)
     if not ok_lvl then
         return
     end
+
 
     -- First successful read for this PlayerStatusManager instance:
     if last_level == nil then
