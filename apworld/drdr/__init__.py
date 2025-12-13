@@ -239,62 +239,40 @@ class DRWorld(World):
 
         # Areas unlocked by keys
         set_rule(self.multiworld.get_location("Victory", self.player), lambda state: state.can_reach_location("Ending S: Beat up Brock with your bare fists!", self.player))
-        set_rule(self.multiworld.get_entrance("Safe Room -> Rooftop", self.player), lambda state: state.can_reach_location("Reach Level 2", self.player))
-        # set_rule(self.multiworld.get_entrance("Safe Room -> Helipad", self.player), lambda state: state.can_reach_location("Reach Level 2", self.player))
-        set_rule(self.multiworld.get_entrance("Rooftop -> Service Hallway", self.player), lambda state: state.can_reach_location("Reach Level 2", self.player))
-        set_rule(self.multiworld.get_entrance("Service Hallway -> Paradise Plaza", self.player), lambda state: state.can_reach_location("Reach Level 2", self.player))
-        set_rule(self.multiworld.get_entrance("Paradise Plaza -> Colby's Movie Theater", self.player), lambda state: state.has("Colby's Movie Theater Key", self.player))
-        set_rule(self.multiworld.get_entrance("Paradise Plaza -> Leisure Park", self.player), lambda state: state.has("Leisure Park Key", self.player))
-        set_rule(self.multiworld.get_entrance("Paradise Plaza -> Entrance Plaza", self.player), lambda state: state.has("Entrance Plaza Key", self.player))
-        set_rule(self.multiworld.get_entrance("Leisure Park -> Food Court", self.player), lambda state: state.has("Food Court Key", self.player))
-        set_rule(self.multiworld.get_entrance("Leisure Park -> North Plaza", self.player), lambda state: state.has("North Plaza Key", self.player))
-        set_rule(self.multiworld.get_entrance("Leisure Park -> Maintenance Tunnel", self.player), lambda state: state.has("Maintenance Tunnel Key", self.player))
-        set_rule(self.multiworld.get_entrance("Food Court -> Al Fresca Plaza", self.player), lambda state: state.has("Al Fresca Plaza Key", self.player))
-        set_rule(self.multiworld.get_entrance("Food Court -> Wonderland Plaza", self.player), lambda state: state.has("Wonderland Plaza Key", self.player))
-        set_rule(self.multiworld.get_entrance("Al Fresca Plaza -> Entrance Plaza", self.player), lambda state: state.has("Entrance Plaza Key", self.player))
-        set_rule(self.multiworld.get_entrance("Wonderland Plaza -> North Plaza", self.player), lambda state: state.has("North Plaza Key", self.player))
-        set_rule(self.multiworld.get_entrance("North Plaza -> Grocery Store", self.player), lambda state: state.has("Grocery Store Key", self.player))
-        set_rule(self.multiworld.get_entrance("North Plaza -> Hideout", self.player), lambda state: state.has("Hideout Key", self.player))
-        set_rule(self.multiworld.get_entrance("North Plaza -> Crislip's Hardware Store", self.player), lambda state: state.has("Crislip's Hardware Store Key", self.player))
-
-        # Time locks
-        # set_rule(self.multiworld.get_location("DAY2_11_AM", self.player), lambda state: state.has("DAY2_06_AM", self.player))
-
-        # set_rule(self.multiworld.get_location("DAY3_00_AM", self.player), lambda state: state.has("DAY2_11_AM", self.player))
-
-        # set_rule(self.multiworld.get_location("DAY3_11_AM", self.player), lambda state: state.has("DAY3_00_AM", self.player))
-
-        # set_rule(self.multiworld.get_location("DAY4_12_PM", self.player), lambda state: state.has("DAY3_11_AM", self.player))
+        set_rule(self.multiworld.get_entrance("Safe Room -> Rooftop", self.player), lambda state: state.has("Rooftop key", self.player))
+        set_rule(self.multiworld.get_entrance("Rooftop -> Service Hallway", self.player), lambda state: state.has("Service Hallway key", self.player))
+        set_rule(self.multiworld.get_entrance("Service Hallway -> Paradise Plaza", self.player), lambda state: state.has("Paradise Plaza key", self.player))
+        set_rule(self.multiworld.get_entrance("Paradise Plaza -> Colby's Movie Theater", self.player), lambda state: state.has("Colby's Movie Theater key", self.player))
+        set_rule(self.multiworld.get_entrance("Paradise Plaza -> Leisure Park", self.player), lambda state: state.has("Leisure Park key", self.player))
+        set_rule(self.multiworld.get_entrance("Paradise Plaza -> Entrance Plaza", self.player), lambda state: state.has("Entrance Plaza key", self.player))
+        set_rule(self.multiworld.get_entrance("Leisure Park -> Food Court", self.player), lambda state: state.has("Food Court key", self.player))
+        set_rule(self.multiworld.get_entrance("Leisure Park -> North Plaza", self.player), lambda state: state.has("North Plaza key", self.player))
+        set_rule(self.multiworld.get_entrance("Leisure Park -> Maintenance Tunnel", self.player), lambda state: state.has("Maintenance Tunnel key", self.player))
+        set_rule(self.multiworld.get_entrance("Food Court -> Al Fresca Plaza", self.player), lambda state: state.has("Al Fresca Plaza key", self.player))
+        set_rule(self.multiworld.get_entrance("Food Court -> Wonderland Plaza", self.player), lambda state: state.has("Wonderland Plaza key", self.player))
+        set_rule(self.multiworld.get_entrance("Al Fresca Plaza -> Entrance Plaza", self.player), lambda state: state.has("Entrance Plaza key", self.player))
+        set_rule(self.multiworld.get_entrance("Wonderland Plaza -> North Plaza", self.player), lambda state: state.has("North Plaza key", self.player))
+        set_rule(self.multiworld.get_entrance("North Plaza -> Grocery Store", self.player), lambda state: state.has("Grocery Store key", self.player))
+        set_rule(self.multiworld.get_entrance("North Plaza -> Hideout", self.player), lambda state: state.has("Hideout key", self.player))
+        set_rule(self.multiworld.get_entrance("North Plaza -> Crislip's Hardware Store", self.player), lambda state: state.has("Crislip's Hardware Store key", self.player))
 
         # Events
         set_rule(self.multiworld.get_location("Meet Jessie in the Service Hallway", self.player),
                  lambda state: state.can_reach_region("Service Hallway", self.player))
 
-        set_rule(self.multiworld.get_location("Complete Backup for Brad", self.player),
-                 lambda state: state.can_reach_location("Meet Jessie in Service Hallway") and state.can_reach_region(
-                     "Food Court", self.player) and state.can_reach_region("Leisure Park", self.player) and state.can_reach_region("Paradise Plaza", self.player))
+        set_rule(self.multiworld.get_location("Complete Backup for Brad", self.player), lambda state: state.can_reach_location("Meet Jessie in the Service Hallway", self.player) and state.can_reach_region("Leisure Park", self.player) and state.can_reach_region("Paradise Plaza", self.player))
 
-        set_rule(self.multiworld.get_location("Escort Brad to see Dr Barnaby", self.player),
-                 lambda state: state.can_reach_location("Meet Jessie in Service Hallway") and state.can_reach_region(
-                     "Entrance Plaza", self.player) and state.can_reach_region("Al Fresca Plaza", self.player))
+        set_rule(self.multiworld.get_location("Escort Brad to see Dr Barnaby", self.player), lambda state: state.can_reach_location("Complete Backup for Brad", self.player) and state.can_reach_region("Entrance Plaza", self.player) and state.can_reach_region("Al Fresca Plaza", self.player))
 
-        set_rule(self.multiworld.get_location("Complete Temporary Agreement", self.player),
-                 lambda state: state.can_reach_location("Escort Brad to see Dr Barnaby", self.player))
+        set_rule(self.multiworld.get_location("Complete Temporary Agreement", self.player), lambda state: state.can_reach_location("Escort Brad to see Dr Barnaby", self.player))
 
-        set_rule(self.multiworld.get_location("Meet back at the Safe Room at 6am day 2", self.player),
-                 lambda state: state.has("DAY2_06_AM", self.player))
+        set_rule(self.multiworld.get_location("Meet back at the Safe Room at 6am day 2", self.player), lambda state: state.has("DAY2_06_AM", self.player) and state.can_reach_location("Complete Temporary Agreement", self.player))
 
-        set_rule(self.multiworld.get_location("Complete Image in the Monitor", self.player),
-                 lambda state: state.can_reach_location("Meet back at the Safe Room at 6am day 2", self.player))
+        set_rule(self.multiworld.get_location("Complete Image in the Monitor", self.player), lambda state: state.can_reach_location("Meet back at the Safe Room at 6am day 2", self.player))
 
-        set_rule(self.multiworld.get_location("Complete Rescue the Professor", self.player),
-                 lambda state: state.can_reach_location("Complete Image in the Monitor", self.player))
+        set_rule(self.multiworld.get_location("Complete Rescue the Professor", self.player), lambda state: state.can_reach_location("Complete Image in the Monitor", self.player))
 
-        set_rule(self.multiworld.get_location("Meet Steven", self.player),
-                 lambda state: state.can_reach_location("Complete Rescue the Professor",
-                                                        self.player) and state.can_reach_region("North Plaza",
-                                                                                                self.player) and state.can_reach_region(
-                     "Grocery Store", self.player))
+        set_rule(self.multiworld.get_location("Meet Steven", self.player), lambda state: state.can_reach_location("Complete Rescue the Professor", self.player) and state.can_reach_region("North Plaza", self.player) and state.can_reach_region("Grocery Store", self.player))
 
         set_rule(self.multiworld.get_location("Clean up... Register 6!", self.player),
                  lambda state: state.can_reach_location("Meet Steven", self.player))
@@ -561,7 +539,7 @@ class DRWorld(World):
         set_rule(self.multiworld.get_location("Meet Sean", self.player), lambda state: state.can_reach_region("Colby's Movie Theater", self.player) and state.has("DAY3_00_AM", self.player))
         set_rule(self.multiworld.get_location("Kill Sean", self.player), lambda state: state.can_reach_location("Meet Sean", self.player))
 
-        set_rule(self.multiworld.get_location("Meet Paul", self.player), lambda state: state.can_reach_region("Wonderland", self.player) and state.has("DAY3_00_AM", self.player))
+        set_rule(self.multiworld.get_location("Meet Paul", self.player), lambda state: state.can_reach_region("Wonderland Plaza", self.player) and state.has("DAY3_00_AM", self.player))
         set_rule(self.multiworld.get_location("Defeat Paul", self.player), lambda state: state.can_reach_location("Meet Paul", self.player))
 
         set_rule(self.multiworld.get_location("Meet Kent on day 1", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player))
@@ -589,7 +567,7 @@ class DRWorld(World):
         set_rule(self.multiworld.get_location("Frank the pimp", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player) and state.can_reach_region("Al Fresca", self.player) and state.can_reach_location("Kill Jo", self.player) and state.can_reach_region("Food Court", self.player) and state.can_reach_region("Entrance Plaza", self.player) and state.has("DAY2_11_AM", self.player))
 
         # Simple, until spheres are in place
-        # set_rule(self.multiworld.get_location("Reach Level 7", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player))
+        set_rule(self.multiworld.get_location("Reach Level 7", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player))
 
         self.multiworld.completion_condition[self.player] = lambda state: state.can_reach_location("Victory", self.player)
                 
