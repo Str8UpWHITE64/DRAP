@@ -376,16 +376,28 @@ AP.EventTracker.on_tracked_location =
     end
 
 
--- Challenges (SolidSave thresholds)
+-- Challenges
 AP.ChallengeTracker.on_challenge_threshold =
-    function(field_name, def, idx, target, prev, current)
+    function(field_name, def, idx, target, prev, current, threshold_id)
         local label = def.label or field_name
-        local challenge = (string.format(
-            "[DRAP-AP] Challenge '%s' target #%d reached: %d (from %d to %d)",
-            label, idx, target or -1, prev or -1, current or -1
+
+        -- Prefer the per-threshold id as the AP location name
+        local loc_name = threshold_id or string.format("%s_%d", field_name, target or -1)
+
+        print(string.format(
+            "[DRAP-AP] Challenge reached [%s] '%s' target #%d: %d (from %d to %d)",
+            tostring(loc_name),
+            tostring(label),
+            idx or -1,
+            target or -1,
+            prev or -1,
+            current or -1
         ))
-        AP.AP_BRIDGE.check(challenge)
+
+        -- Send a separate location check per threshold
+        AP.AP_BRIDGE.check(loc_name)
     end
+
 
 -- Survivors rescued
 AP.NpcTracker.on_survivor_rescued =
@@ -440,7 +452,6 @@ local prev = AP_REF.on_slot_connected
 AP_REF.on_slot_connected = function(slot_data)
     if prev then pcall(prev, slot_data) end
 
-    -- your existing logic
     print(string.format("[DRAP-AP] Slot connected: slot=%s seed=%s",
         tostring(AP_REF.APSlot),
         tostring(slot_data.seed_name or slot_data.seed or slot_data.seed_id or "unknown")
@@ -459,15 +470,18 @@ AP_REF.on_slot_connected = function(slot_data)
 
     AP.AP_BRIDGE.set_received_items_filename(slot, seed)
     AP.AP_BRIDGE.load_received_items()
+    local rescued_survivors = AP.NpcTracker.get_rescued_survivors()
+    for id, _ in pairs(rescued_survivors) do
+        local name = string.format("Rescue %s", AP.NpcTracker.get_survivor_friendly_name(id) or tostring(id))
+        AP.AP_BRIDGE.check(name)
+    end
 end
 
 local was_in_game = false
 
 local function on_enter_game()
     print("[DRAP] Entered gameplay.")
-    print("[DRAP] Is new game:", tostring(AP.TimeGate.is_new_game and AP.TimeGate.is_new_game()))
 
-    -- If you want: detect new game via your time-gate check
     if AP.TimeGate and AP.TimeGate.is_new_game and AP.TimeGate.is_new_game() then
         print("[DRAP] New game detected; reapplying AP items.")
         AP.AP_BRIDGE.reapply_all_items()
@@ -476,23 +490,35 @@ local function on_enter_game()
 end
 
 re.on_frame(function()
-    local now_in_game = AP.Scene.isInGame()
-    if not now_in_game then
+    -- Resolve isInGame safely
+    local ok_ig, now_in_game = pcall(AP.Scene.isInGame)
+    if not ok_ig or not now_in_game then
+        was_in_game = false
         return
     end
-    AP.ItemSpawner.on_frame()
-    AP.DoorSceneLock.on_frame()
-    AP.ChallengeTracker.on_frame()
-    AP.LevelTracker.on_frame()
-    AP.EventTracker.on_frame()
-    AP.NpcTracker.on_frame()
-    AP.AP_BRIDGE.on_frame()
-    AP.PPStickerTracker.on_frame()
 
+    -- Helper: safely call module.on_frame()
+    local function safe_on_frame(mod, name)
+        if mod and type(mod.on_frame) == "function" then
+            local ok = pcall(mod.on_frame)
+            if not ok then print("[DRAP] " .. name .. ".on_frame error suppressed") end
+        end
+    end
+
+    safe_on_frame(AP.ItemSpawner,     "ItemSpawner")
+    safe_on_frame(AP.DoorSceneLock,   "DoorSceneLock")
+    safe_on_frame(AP.ChallengeTracker,"ChallengeTracker")
+    safe_on_frame(AP.LevelTracker,    "LevelTracker")
+    safe_on_frame(AP.EventTracker,    "EventTracker")
+    safe_on_frame(AP.NpcTracker,      "NpcTracker")
+    safe_on_frame(AP.AP_BRIDGE,       "AP_BRIDGE")
+    safe_on_frame(AP.PPStickerTracker,"PPStickerTracker")
+
+    -- Enter-game edge
     if now_in_game and not was_in_game then
-        print("[DRAP] Detected transition into game.")
-        on_enter_game()
+        pcall(on_enter_game)
     end
     was_in_game = now_in_game
 end)
+
 print("[DRAP] Main script loaded.")

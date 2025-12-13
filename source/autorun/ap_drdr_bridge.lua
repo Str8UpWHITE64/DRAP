@@ -226,7 +226,7 @@ end
  function M.set_received_items_filename(slot_name, seed)
     local slot = safe_filename(slot_name)
     local sd   = safe_filename(seed)
-    RECEIVED_ITEMS_FILE = string.format("AP_DRDR_items_%s_%s.json", slot, sd)
+    RECEIVED_ITEMS_FILE = string.format("AP_DRDR_Items/AP_DRDR_items_%s_%s.json", slot, sd)
     log("Using received-items file: " .. RECEIVED_ITEMS_FILE)
 end
 
@@ -295,7 +295,6 @@ function M.has_item_name(name)
     return (RECEIVED_ITEMS_BY_NAME[name] or 0) > 0
 end
 
--- Optional: expose all items if you need them
 function M.get_all_received_items()
     return RECEIVED_ITEMS
 end
@@ -326,7 +325,6 @@ end
 
 ------------------------------------------------------------
 -- Core: apply a single item
--- is_replay = true when reapplying for a new save (so we don't re-store)
 ------------------------------------------------------------
 local function handle_net_item(net_item, is_replay)
     local item_id = net_item.item

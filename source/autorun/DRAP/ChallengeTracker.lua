@@ -41,7 +41,7 @@ local CHALLENGES = {
     PlayerLevel = {
         label   = "Reach Level",
         targets = { 50 },
-        location_ids = { "Reach Level 50" },
+        location_ids = { "Reach max level" },
     },
 
     zombieKilledHandTotal = {
@@ -333,6 +333,7 @@ local function ensure_challenge_fields(save_obj)
             return false
         end
         save_td = td
+        log("SolidSave type: " .. (save_td:get_full_name() or "<unknown>"))
     end
 
     for field_name, def in pairs(CHALLENGES) do
@@ -343,6 +344,7 @@ local function ensure_challenge_fields(save_obj)
                 missing_warned = false,
                 last_value     = nil,
                 reached        = {},
+                resolve_tries  = 0,
             }
 
             if def.targets then
@@ -354,11 +356,23 @@ local function ensure_challenge_fields(save_obj)
             challenge_state[field_name] = state
         end
 
-        if not state.field and not state.missing_warned then
+        -- ALWAYS retry resolving the field if it's nil.
+        if not state.field then
+            state.resolve_tries = (state.resolve_tries or 0) + 1
+
             local f = save_td:get_field(field_name)
-            if not f then
-                state.missing_warned = true
-                log("Field '" .. field_name .. "' not found on SolidSave.")
+            if f then
+                state.field = f
+                state.missing_warned = false
+            else
+                -- Only warn sometimes (don’t spam).
+                if (not state.missing_warned) or (state.resolve_tries % 10 == 0) then
+                    log(string.format(
+                        "Field '%s' not found on SolidSave (try=%d). Will retry.",
+                        field_name, state.resolve_tries
+                    ))
+                    state.missing_warned = true
+                end
             end
         end
     end
@@ -366,63 +380,73 @@ local function ensure_challenge_fields(save_obj)
     return true
 end
 
+
 ------------------------------------------------
 -- Challenge evaluation
 ------------------------------------------------
 
+local function build_threshold_id(field_name, def, i, target)
+    if def.location_ids and def.location_ids[i] then
+        return def.location_ids[i]
+    end
+    return string.format("%s_%d", field_name, target)
+end
+
+local function fire_threshold(field_name, def, state, i, target, prev, current)
+    local threshold_id = build_threshold_id(field_name, def, i, target)
+
+    -- mark reached locally (still safe to re-send on baseline; AP is idempotent)
+    state.reached = state.reached or {}
+    state.reached[i] = true
+
+    if M.on_challenge_threshold then
+        pcall(
+            M.on_challenge_threshold,
+            field_name,
+            def,
+            i,
+            target,
+            prev,
+            current,
+            threshold_id
+        )
+    end
+end
+
 local function handle_challenge_progress(field_name, def, state, save_obj)
-    if not state.field then
-        return
-    end
-    if not def.targets or #def.targets == 0 then
-        return
-    end
+    if not state.field then return end
+    if not def.targets or #def.targets == 0 then return end
 
     local ok_val, v = pcall(state.field.get_data, state.field, save_obj)
-    if not ok_val or type(v) ~= "number" then
-        return
-    end
+    if not ok_val or type(v) ~= "number" then return end
 
     local current = v
 
-    -- First sample for this save: just store and bail
+    -- First successful read: store baseline AND send all satisfied thresholds.
     if state.last_value == nil then
         state.last_value = current
+
+        -- Emit all thresholds already met (catch-up for missed AP checks)
+        for i, target in ipairs(def.targets) do
+            if target ~= nil and current >= target then
+                if not (state.reached and state.reached[i]) then
+                    fire_threshold(field_name, def, state, i, target, current, current)
+                end
+            end
+        end
         return
     end
 
     local prev = state.last_value
-    if current == prev then
-        return
-    end
+    if current == prev then return end
 
-    -- Only care about increases for challenge thresholds
+    -- Only care about increases for crossing thresholds
     if current > prev then
         for i, target in ipairs(def.targets) do
-            if target ~= nil and not state.reached[i] and current >= target and prev < target then
-                local label = def.label or field_name
-
-                -- Build a per-threshold id for AP (separate "locations")
-                local threshold_id
-                if def.location_ids and def.location_ids[i] then
-                    threshold_id = def.location_ids[i]
-                else
-                    threshold_id = string.format("%s_%d", field_name, target)
-                end
-                state.reached[i] = true
-
-                -- AP hook: separate location per threshold via threshold_id
-                if M.on_challenge_threshold then
-                    pcall(
-                        M.on_challenge_threshold,
-                        field_name,  -- raw SolidSave field name
-                        def,         -- challenge definition table
-                        i,           -- index within def.targets
-                        target,      -- numeric target value
-                        prev,        -- previous value
-                        current,     -- new value
-                        threshold_id -- unique id for this threshold
-                    )
+            if target ~= nil then
+                local already = (state.reached and state.reached[i]) and true or false
+                if (not already) and (current >= target) and (prev < target) then
+                    fire_threshold(field_name, def, state, i, target, prev, current)
                 end
             end
         end
@@ -431,38 +455,13 @@ local function handle_challenge_progress(field_name, def, state, save_obj)
     state.last_value = current
 end
 
+
 ------------------------------------------------
 -- Public helpers (optional)
 ------------------------------------------------
 
 function M.get_state()
     return challenge_state
-end
-
--- Flatten all thresholds into a list (useful for AP mapping)
-function M.get_all_thresholds()
-    local out = {}
-    for field_name, def in pairs(CHALLENGES) do
-        if def.targets then
-            for i, target in ipairs(def.targets) do
-                local threshold_id
-                if def.location_ids and def.location_ids[i] then
-                    threshold_id = def.location_ids[i]
-                else
-                    threshold_id = string.format("%s_%d", field_name, target)
-                end
-
-                table.insert(out, {
-                    field_name   = field_name,
-                    label        = def.label or field_name,
-                    index        = i,
-                    target       = target,
-                    threshold_id = threshold_id,
-                })
-            end
-        end
-    end
-    return out
 end
 
 ------------------------------------------------

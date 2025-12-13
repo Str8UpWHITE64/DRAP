@@ -65,7 +65,7 @@ local LOCKED_SCENES = {
     ["s300"] = true,
     ["s900"] = true,
     ["s500"] = true,
-    ["s100"] = false,
+    ["s100"] = true,
     ["s600"] = true,
     ["s401"] = true,
 }
@@ -124,6 +124,23 @@ local function get_field_value(obj, variants)
 
     return nil, nil
 end
+
+------------------------------------------------------------
+-- New game helpers
+------------------------------------------------------------
+local function current_event_blocks_s100_lock()
+    local ev = ""
+    if AP and AP.EventTracker and AP.EventTracker.CURRENT_EVENT_NAME then
+        ev = tostring(AP.EventTracker.CURRENT_EVENT_NAME)
+    end
+
+    -- match either exact or embedded (e.g. "EVENT01_something")
+    if string.find(ev, "EVENT01", 1, true) then return true, ev end
+    if string.find(ev, "EVENT04", 1, true) then return true, ev end
+    if string.find(ev, "EVENT06", 1, true) then return true, ev end
+    return false, ev
+end
+
 
 ------------------------------------------------------------
 -- AreaManager (current area info)
@@ -317,6 +334,7 @@ end
 
 local function rescan_current_area_doors()
     local area_index, level_path = get_area_info()
+    local bypass_s100, ev = current_event_blocks_s100_lock()
     local res_list = get_areahit_resource_list()
     if res_list == nil then
         log("No AreaHitResource list; abort scan.")
@@ -368,11 +386,10 @@ local function rescan_current_area_doors()
 
                                         if jump_name ~= "" then
                                             local locked = scene_is_locked(jump_name)
-
-                                            if locked then
+                                            if locked and jump_name == "s100" and bypass_s100 then
+                                                enable_hitdata(li, hitdata)
+                                            elseif locked then
                                                 local info = SCENE_INFO[jump_name]
-                                                local desc = info
-                                                    and (info.name .. " (idx=" .. info.index .. ")")
                                                 disable_hitdata(li, hitdata)
                                             else
                                                 -- FORCE unlock: set Disabled = false

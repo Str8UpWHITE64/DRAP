@@ -360,6 +360,7 @@ end
 ------------------------------------------------
 -- Main update entrypoint
 ------------------------------------------------
+M.CURRENT_EVENT_NAME = nil
 
 function M.on_frame()
     -- Throttle to reduce impact
@@ -379,10 +380,12 @@ function M.on_frame()
 
         local ok_no, event_no = pcall(event_no_field.get_data, event_no_field, gm_instance)
         if ok_no then
+
             if last_event_no == nil then
                 last_event_no = event_no
                 local name = event_no_to_name(event_no)
                 log(string.format("Initial mEventNo: %s (%d)", name, event_no))
+                M.CURRENT_EVENT_NAME = name
             elseif event_no ~= last_event_no then
                 local old_name = event_no_to_name(last_event_no)
                 local new_name = event_no_to_name(event_no)

@@ -1,7 +1,7 @@
 -- Dead Rising Deluxe Remaster - PP Sticker / Unique Photo Tracker (module)
 -- Tracks per-sticker completion using SolidModelAttribute on sticker model(s).
 -- Hooks updateUniqueItemHint() on a specific model type and logs:
---   - When a new PhotoId is first seen (ever)
+--   - When a new PhotoId is first seen
 --   - When isUniqueItemHasBeenFound() transitions false -> true for that PhotoId (once)
 --   - When isUniqueEventTaked() transitions false -> true for that PhotoId (once)
 
@@ -196,16 +196,14 @@ local function ensure_model_attr_field()
                 if ok_has and has then
                     model_attr_field = f
 
-                    -- Cache a safe accessor closure so we never index model_attr_field later
                     get_attr_from_model = function(model_obj)
-                        -- f is upvalue; call via ":" to avoid indexing outside this closure
+
                         return f:get_data(model_obj)
                     end
 
                     log("[PPStickerTracker] Found SolidModelAttribute field on " .. MODEL_TYPE_NAME .. ": " .. f:get_name())
                     return true
                 else
-                    -- Skip weird userdata masquerading as a field
                     log("[PPStickerTracker] Skipping candidate attr field (no callable get_data): " .. tostring(f:get_name()))
                 end
             end
@@ -277,9 +275,8 @@ local function install_hook()
     sdk.hook(
         update_hint_method,
         function(args)
-        -- HARD guard: never let indexing escape
         local ok = pcall(function()
-            local this = args[2] -- don't sdk.to_managed_object here
+            local this = args[2]
             if not this then return end
             if not get_attr_from_model then return end
 
@@ -382,13 +379,8 @@ local function install_hook()
             if ok_item  then st.last_item  = item_found  end
             if ok_event then st.last_event = event_taked end
         end)
-
-        -- Keep silent to avoid spam; enable if debugging:
-        -- if not ok then log("WARN: hook body error suppressed") end
-
         return args
     end,
-
         function(retval)
             return retval
         end
@@ -398,7 +390,6 @@ local function install_hook()
     log("[PPStickerTracker] Hook installed on " .. MODEL_TYPE_NAME .. ".updateUniqueItemHint()")
     return true
 end
-
 
 ------------------------------------------------
 -- Main update entrypoint

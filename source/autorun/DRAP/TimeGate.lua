@@ -30,17 +30,15 @@ local manual_freeze_enabled      = false -- controlled by M.enable/disable/set_f
 local cap_freeze_enabled         = false -- controlled by time cap logic
 
 local saved_time_add             = nil   -- original mTimeAdd before freezing
-
--- current time cap; when CurrentSecond >= this, time is frozen
 local time_cap_seconds           = nil
 
 -- Named checkpoints (CurrentSecond values)
 local TIME_CAPS = {
-    DAY2_06_AM = 61200,   -- 6:00am Day 2 - 1 hour
-    DAY2_11_AM = 79200,   -- 11:00am Day 2 - 1 hour
-    DAY3_00_AM = 126000,  -- 12:00am Day 3 - 1 hour
-    DAY3_11_AM = 165600,  -- 11:00am Day 3 - 1 hour
-    DAY4_12_PM = 255600,  -- 12:00pm Day 4 - 1 hour
+    DAY2_06_AM = 104400,   -- 6:00am Day 2 - 1 hour
+    DAY2_11_AM = 122400,   -- 11:00am Day 2 - 1 hour
+    DAY3_00_AM = 169200,  -- 12:00am Day 3 - 1 hour
+    DAY3_11_AM = 208800,  -- 11:00am Day 3 - 1 hour
+    DAY4_12_PM = 298800,  -- 12:00pm Day 4 - 1 hour
 }
 
 ------------------------------------------------
@@ -168,12 +166,12 @@ function M.is_new_game()
     local clock = ti.CurrentSecond
     local new_game = false
     log("Current time: " .. tostring(clock))
-    if clock == 45000 or clock == 0 then
+    if clock == 43200 or clock == 0 then
         log("Detected new game start time.")
         new_game = true
     end
 
-    -- NEW GAME START TIME = 45000 (12:00 PM Day 1)
+    -- NEW GAME START TIME = 43200 (12:00 PM Day 1)
     return new_game
 end
 
@@ -195,12 +193,12 @@ function M.set_time_cap(seconds)
     log(string.format("Time cap set to %s.", tostring(seconds)))
 end
 
--- Completely unlock time (no caps, no manual freeze)
+-- Completely unlock time
 function M.unlock_all_time()
     time_cap_seconds = nil
     cap_freeze_enabled = false
     manual_freeze_enabled = false
-    log("All time restrictions cleared (no caps, no manual freeze).")
+    log("All time restrictions cleared.")
     apply_gate_state()
 end
 

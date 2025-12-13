@@ -1,16 +1,6 @@
 -- Dead Rising Deluxe Remaster - AP-aware Save Mount Redirect (module)
 -- Uses via.storage.saveService.SaveService to move saves into a per-slot/per-seed tree.
---
--- Public API:
---   SaveSlot.apply_for_slot(slot_name, seed)
---
--- Example:
---   Original SaveMountPath: C:\Users\You\AppData\Local\CAPCOM\DEADRISING\
---   Slot: "DeadRising", Seed: 123456
---   New SaveMountPath:     C:\Users\You\AppData\Local\CAPCOM\DEADRISING_AP_DeadRising_s123456\
---
--- The game then uses that new mount for all save IO.
--- We also attempt to call updateSaveFileDetailTbl() so the UI updates.
+
 
 local M = {}
 
@@ -27,22 +17,11 @@ end
 ------------------------------------------------
 
 local SaveService_TYPE_NAME = "via.storage.saveService.SaveService"
+local base_save_mount = "./win64_save"
 
 ------------------------------------------------
 -- Helpers
 ------------------------------------------------
-
--- Safely convert a managed System.String to a Lua string
-local function as_lua_string(obj)
-    if obj == nil then return nil end
-
-    local ok, s = pcall(sdk.to_string, obj)
-    if ok and s then
-        return s
-    end
-
-    return tostring(obj)
-end
 
 -- Sanitize slot name to be filesystem-friendly-ish
 local function sanitize_slot_name(name)
@@ -62,8 +41,8 @@ end
 
 -- Build the new mount path from original + slot + seed
 local function build_new_mount(orig_mount_str, slot_name, seed)
-    local trimmed = orig_mount_str:gsub("[\\/]+$", "")
 
+    local trimmed = orig_mount_str:gsub("[\\/]+$", "")  -- trim trailing slashes
     local parent, leaf = trimmed:match("^(.*[\\/])([^\\/]+)$")
     local base_leaf
     if parent and leaf then
@@ -114,22 +93,8 @@ local function apply_mount_redirect(slot_name, seed)
         return false
     end
 
-    -- Read original mount
-    local ok, ret = pcall(function()
-        return get_mount_m:call(svc)
-    end)
-    if not ok or not ret then
-        ok, ret = pcall(function()
-            return sdk.call_native_func(svc, td, "get_SaveMountPath")
-        end)
-    end
 
-    if not ok or not ret then
-        log("Failed to call get_SaveMountPath.")
-        return false
-    end
-
-    local orig_mount_str = as_lua_string(ret)
+    local orig_mount_str = base_save_mount
     if not orig_mount_str or orig_mount_str == "" then
         log("Original SaveMountPath is empty/unreadable.")
         return false

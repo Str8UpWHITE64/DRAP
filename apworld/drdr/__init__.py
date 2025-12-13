@@ -237,57 +237,23 @@ class DRWorld(World):
             previous_level_location = f"Reach Level {level - 1}"
             set_rule(self.multiworld.get_location(current_level_location, self.player), lambda state, prev=previous_level_location: state.can_reach_location(prev, self.player))
 
-        set_rule(self.multiworld.get_location("Victory", self.player), lambda state: state.can_reach_location("Reach Level 50", self.player))
-
-        # set_rule(self.multiworld.get_entrance("Helipad -> Safe Room", self.player), lambda state: state.has("Safe Room Key", self.player))
-
-        # set_rule(self.multiworld.get_entrance("Safe Room -> Helipad", self.player), lambda state: state.has("Helipad Key", self.player))
+        set_rule(self.multiworld.get_location("Victory", self.player), lambda state: state.can_reach_location("Ending S: Beat up Brock with your bare fists!", self.player))
         set_rule(self.multiworld.get_entrance("Safe Room -> Rooftop", self.player), lambda state: state.has("Rooftop Key", self.player))
-
         set_rule(self.multiworld.get_entrance("Rooftop -> Service Hallway", self.player), lambda state: state.has("Service Hallway Key", self.player))
-        # set_rule(self.multiworld.get_entrance("Rooftop -> Safe Room", self.player), lambda state: state.has("Safe Room Key", self.player))
-
         set_rule(self.multiworld.get_entrance("Service Hallway -> Paradise Plaza", self.player), lambda state: state.has("Paradise Plaza Key", self.player))
-        # set_rule(self.multiworld.get_entrance("Service Hallway -> Rooftop", self.player), lambda state: state.has("Rooftop Key", self.player))
-
         set_rule(self.multiworld.get_entrance("Paradise Plaza -> Colby's Movie Theater", self.player), lambda state: state.has("Colby's Movie Theater Key", self.player))
         set_rule(self.multiworld.get_entrance("Paradise Plaza -> Leisure Park", self.player), lambda state: state.has("Leisure Park Key", self.player))
         set_rule(self.multiworld.get_entrance("Paradise Plaza -> Entrance Plaza", self.player), lambda state: state.has("Entrance Plaza Key", self.player))
-        # set_rule(self.multiworld.get_entrance("Paradise Plaza -> Service Hallway", self.player),  lambda state: state.has("Service Hallway Key", self.player))
-
         set_rule(self.multiworld.get_entrance("Leisure Park -> Food Court", self.player), lambda state: state.has("Food Court Key", self.player))
         set_rule(self.multiworld.get_entrance("Leisure Park -> North Plaza", self.player), lambda state: state.has("North Plaza Key", self.player))
-        # set_rule(self.multiworld.get_entrance("Leisure Park -> Paradise Plaza", self.player), lambda state: state.has("Paradise Plaza Key", self.player))
         set_rule(self.multiworld.get_entrance("Leisure Park -> Maintenance Tunnel", self.player), lambda state: state.has("Maintenance Tunnel Key", self.player))
-
-        # set_rule(self.multiworld.get_entrance("Maintenance Tunnel -> Leisure Park", self.player), lambda state: state.has("Leisure Park Key", self.player))
-
         set_rule(self.multiworld.get_entrance("Food Court -> Al Fresca Plaza", self.player), lambda state: state.has("Al Fresca Plaza Key", self.player))
         set_rule(self.multiworld.get_entrance("Food Court -> Wonderland Plaza", self.player), lambda state: state.has("Wonderland Plaza Key", self.player))
-        # set_rule(self.multiworld.get_entrance("Food Court -> Leisure Park", self.player), lambda state: state.has("Leisure Park Key", self.player))
-
         set_rule(self.multiworld.get_entrance("Al Fresca Plaza -> Entrance Plaza", self.player), lambda state: state.has("Entrance Plaza Key", self.player))
-        # set_rule(self.multiworld.get_entrance("Al Fresca Plaza -> Food Court", self.player), lambda state: state.has("Food Court Key", self.player))
-
-        # set_rule(self.multiworld.get_entrance("Entrance Plaza -> Paradise Plaza", self.player), lambda state: state.has("Entrance Plaza Key", self.player))
-        # set_rule(self.multiworld.get_entrance("Entrance Plaza -> Al Fresca Plaza", self.player), lambda state: state.has("Al Fresca Plaza Key", self.player))
-
-        # set_rule(self.multiworld.get_entrance("Wonderland Plaza -> Food Court", self.player), lambda state: state.has("Food Court Key", self.player))
         set_rule(self.multiworld.get_entrance("Wonderland Plaza -> North Plaza", self.player), lambda state: state.has("North Plaza Key", self.player))
-
-        # set_rule(self.multiworld.get_entrance("North Plaza -> Wonderland Plaza", self.player), lambda state: state.has("Wonderland Plaza Key", self.player))
         set_rule(self.multiworld.get_entrance("North Plaza -> Grocery Store", self.player), lambda state: state.has("Grocery Store Key", self.player))
         set_rule(self.multiworld.get_entrance("North Plaza -> Hideout", self.player), lambda state: state.has("Hideout Key", self.player))
         set_rule(self.multiworld.get_entrance("North Plaza -> Crislip's Hardware Store", self.player), lambda state: state.has("Crislip's Hardware Store Key", self.player))
-        # set_rule(self.multiworld.get_entrance("North Plaza -> Leisure Park", self.player), lambda state: state.has("Leisure Park Key", self.player))
-
-        # set_rule(self.multiworld.get_entrance("Grocery Store -> North Plaza", self.player), lambda state: state.has("North Plaza Key", self.player))
-
-        # set_rule(self.multiworld.get_entrance("Crislip's Hardware Store -> North Plaza", self.player), lambda state: state.has("North Plaza Key", self.player))
-
-        # set_rule(self.multiworld.get_entrance("Hideout -> North Plaza", self.player), lambda state: state.has("North Plaza Key", self.player))
-
-
 
         self.multiworld.completion_condition[self.player] = lambda state: state.can_reach_location("Victory", self.player)
                 
