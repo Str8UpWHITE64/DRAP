@@ -36,11 +36,11 @@ local time_cap_seconds           = nil
 
 -- Named checkpoints (CurrentSecond values)
 local TIME_CAPS = {
-    DAY2_06_AM = 61200,   -- 6:00am Day 2
-    DAY2_11_AM = 79200,   -- 11:00am Day 2
-    DAY3_00_AM = 126000,  -- 12:00am Day 3
-    DAY3_11_AM = 165600,  -- 11:00am Day 3
-    DAY4_12_PM = 255600,  -- 12:00pm Day 4
+    DAY2_06_AM = 61200,   -- 6:00am Day 2 - 1 hour
+    DAY2_11_AM = 79200,   -- 11:00am Day 2 - 1 hour
+    DAY3_00_AM = 126000,  -- 12:00am Day 3 - 1 hour
+    DAY3_11_AM = 165600,  -- 11:00am Day 3 - 1 hour
+    DAY4_12_PM = 255600,  -- 12:00pm Day 4 - 1 hour
 }
 
 ------------------------------------------------
@@ -90,7 +90,7 @@ local function ensure_time_interpolator()
 end
 
 ------------------------------------------------
--- Core time control (speed via GameManager.mTimeAdd)
+-- Core time control
 ------------------------------------------------
 
 local function apply_gate_state(gm)
@@ -158,23 +158,6 @@ local function evaluate_time_cap()
     end
 end
 
---------------------------------
--- Public API: status
---------------------------------
-
-function M.is_enabled()
-    -- effective frozen state (manual OR cap)
-    return manual_freeze_enabled or cap_freeze_enabled
-end
-
-function M.is_manual_freeze()
-    return manual_freeze_enabled
-end
-
-function M.is_cap_freeze()
-    return cap_freeze_enabled
-end
-
 ------------------------------------------------------------
 -- Detect if the player is at the very start of a new game
 ------------------------------------------------------------
@@ -182,37 +165,22 @@ function M.is_new_game()
 
     local ti = ensure_time_interpolator()
     if not ti then return end
-    local clock = ti.CurrentSecond or 0
+    local clock = ti.CurrentSecond
+    local new_game = false
+    log("Current time: " .. tostring(clock))
+    if clock == 45000 or clock == 0 then
+        log("Detected new game start time.")
+        new_game = true
+    end
 
     -- NEW GAME START TIME = 45000 (12:00 PM Day 1)
-    return clock == 45000
+    return new_game
 end
 
---------------------------------
--- Public API: manual freeze control
---------------------------------
-
-function M.enable()
-    if manual_freeze_enabled then return end
-    manual_freeze_enabled = true
-    log("Manual gate enabled; will freeze in-game time.")
-    apply_gate_state()
-end
-
-function M.disable()
-    if not manual_freeze_enabled then return end
-    manual_freeze_enabled = false
-    log("Manual gate disabled; restoring in-game time (if no cap freeze).")
-    apply_gate_state()
-end
-
--- Convenience wrapper for boolean control
-function M.set_frozen(frozen)
-    if frozen then
-        M.enable()
-    else
-        M.disable()
-    end
+function M.get_current_time()
+    local ti = ensure_time_interpolator()
+    if not ti then return nil end
+    return ti.CurrentSecond or nil
 end
 
 --------------------------------
@@ -225,18 +193,6 @@ function M.set_time_cap(seconds)
     time_cap_seconds = seconds
     cap_freeze_enabled = false  -- will be re-evaluated next frame
     log(string.format("Time cap set to %s.", tostring(seconds)))
-end
-
--- Clear the current time cap (removes cap-based freeze).
-function M.clear_time_cap()
-    time_cap_seconds = nil
-    if cap_freeze_enabled then
-        cap_freeze_enabled = false
-        log("Time cap cleared; cap-based freeze disabled.")
-        apply_gate_state()
-    else
-        log("Time cap cleared.")
-    end
 end
 
 -- Completely unlock time (no caps, no manual freeze)

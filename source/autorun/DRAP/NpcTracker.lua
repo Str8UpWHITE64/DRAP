@@ -399,8 +399,6 @@ function M.on_frame()
 
                 if is_join_to_safe then
                     on_survivor_rescued(npc_id, state_index)
-                else
-                    -- on_state_change(survivor_name, prev_state, state_index, npc_id)
                 end
             end
         end

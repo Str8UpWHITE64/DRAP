@@ -10,6 +10,8 @@ local M = {}
 M.on_sticker_found       = nil
 M.on_sticker_event_taked = nil
 
+local PP_BY_PHOTO_ID = nil
+
 ------------------------------------------------
 -- Logging
 ------------------------------------------------
@@ -53,6 +55,8 @@ local missing_warned         = false
 local last_hook_attempt_time = 0.0
 
 local attr_state             = {}
+local get_attr_from_model = nil  -- function(this) -> attr or nil
+
 
 -- Global de-duplication by PhotoId:
 local seen_photo_ids         = {}    -- [photo_id] = true (ever seen)
@@ -95,6 +99,51 @@ local function get_fields_list(td)
     return fields
 end
 
+local function ensure_pp_map()
+    local PP_JSON_PATH = "PPstickers.json"
+
+    if PP_BY_PHOTO_ID ~= nil then
+        log("PP sticker map already loaded.")
+        log("PP sticker map entries: " .. tostring(#PP_BY_PHOTO_ID))
+        return true
+    end
+
+    PP_BY_PHOTO_ID = {}
+
+    local rows = json.load_file(PP_JSON_PATH)
+    if not rows then
+        log("ERROR: Failed to load PP stickers JSON: " .. PP_JSON_PATH)
+        return false
+    end
+
+    local count = 0
+    for _, row in ipairs(rows) do
+        local pid  = row.PhotoID
+        local item = row.ItemNumber
+        local name = row.LocationName
+
+        if pid ~= nil then
+            -- store under both numeric and string keys to avoid type mismatches
+            local pid_num = tonumber(pid)
+            local pid_str = tostring(pid)
+
+            PP_BY_PHOTO_ID[pid_str] = { item = item, name = name }
+            if pid_num ~= nil then
+                PP_BY_PHOTO_ID[pid_num] = { item = item, name = name }
+            end
+            count = count + 1
+        end
+    end
+    log("Loaded PPstickers.json entries: " .. tostring(count))
+    return count > 0
+end
+
+local function map_photo_id(photo_id)
+    ensure_pp_map()
+    if not PP_BY_PHOTO_ID then return nil end
+    return PP_BY_PHOTO_ID[photo_id]
+end
+
 
 ------------------------------------------------
 -- Model / Attribute access
@@ -127,10 +176,10 @@ local function ensure_model_types()
 end
 
 local function ensure_model_attr_field()
-    if model_attr_field then
+    if get_attr_from_model then
         return true
     end
-    if not model_td or not model_attr_td then
+    if not model_td then
         return false
     end
 
@@ -139,20 +188,35 @@ local function ensure_model_attr_field()
         if f and not f:is_static() then
             local ftype = f:get_type()
             if ftype and ftype:get_full_name() == MODEL_ATTR_TYPE_NAME then
-                model_attr_field = f
-                log("[PPStickerTracker] Found SolidModelAttribute field on " .. MODEL_TYPE_NAME .. ": " .. f:get_name())
-                break
+                -- Validate this really is a Field-like object with callable get_data
+                local ok_has, has = pcall(function()
+                    return type(f.get_data) == "function"
+                end)
+
+                if ok_has and has then
+                    model_attr_field = f
+
+                    -- Cache a safe accessor closure so we never index model_attr_field later
+                    get_attr_from_model = function(model_obj)
+                        -- f is upvalue; call via ":" to avoid indexing outside this closure
+                        return f:get_data(model_obj)
+                    end
+
+                    log("[PPStickerTracker] Found SolidModelAttribute field on " .. MODEL_TYPE_NAME .. ": " .. f:get_name())
+                    return true
+                else
+                    -- Skip weird userdata masquerading as a field
+                    log("[PPStickerTracker] Skipping candidate attr field (no callable get_data): " .. tostring(f:get_name()))
+                end
             end
         end
     end
 
-    if not model_attr_field and not missing_warned then
-        log("[PPStickerTracker] No SolidModelAttribute field found on " .. MODEL_TYPE_NAME)
+    if not missing_warned then
+        log("[PPStickerTracker] No usable SolidModelAttribute field found on " .. MODEL_TYPE_NAME)
         missing_warned = true
-        return false
     end
-
-    return model_attr_field ~= nil
+    return false
 end
 
 local function ensure_attr_fields()
@@ -213,99 +277,119 @@ local function install_hook()
     sdk.hook(
         update_hint_method,
         function(args)
-            -- Pre-hook: inspect this call once per engine call
-            local this = sdk.to_managed_object(args[2])
-            if this and model_attr_field then
-                local ok_attr, attr = pcall(model_attr_field.get_data, model_attr_field, this)
-                if ok_attr and attr ~= nil then
-                    local attr_key = tostring(attr)
-                    local st = attr_state[attr_key]
+        -- HARD guard: never let indexing escape
+        local ok = pcall(function()
+            local this = args[2] -- don't sdk.to_managed_object here
+            if not this then return end
+            if not get_attr_from_model then return end
 
-                    -- Initialize per-attribute state
-                    if not st then
-                        st = {}
-                        attr_state[attr_key] = st
+            local attr = get_attr_from_model(this)
+            if not attr then return end
 
-                        if photo_id_field then
-                            local ok, v = pcall(photo_id_field.get_data, photo_id_field, attr)
-                            if ok then st.photo_id = v end
-                        end
-                        if item_unique_no_field then
-                            local ok, v = pcall(item_unique_no_field.get_data, item_unique_no_field, attr)
-                            if ok then st.item_unique = v end
-                        end
-                        if having_event_field then
-                            local ok, v = pcall(having_event_field.get_data, having_event_field, attr)
-                            if ok then st.having_event = v end
-                        end
+            local attr_key = tostring(attr)
+            local st = attr_state[attr_key]
 
-                        -- Only log once per PhotoId (ever)
-                        local pid = st.photo_id
-                        if pid ~= nil and not seen_photo_ids[pid] then
-                            seen_photo_ids[pid] = true
-                            log(string.format(
-                                "New unique photo target: PhotoId=%s, ItemUniqueNo=%s, HavingEvent=%s",
-                                tostring(st.photo_id),
-                                tostring(st.item_unique),
-                                tostring(st.having_event)
-                            ))
-                        end
-                    end
+            if not st then
+                st = {}
+                attr_state[attr_key] = st
 
-                    -- Query flags via methods
-                    local ok_item, item_found   = pcall(attr.call, attr, "isUniqueItemHasBeenFound")
-                    local ok_event, event_taked = pcall(attr.call, attr, "isUniqueEventTaked")
+                if photo_id_field then
+                    local okv, v = pcall(function()
+                        return photo_id_field:get_data(attr)
+                    end)
+                    if okv then st.photo_id = v end
+                end
 
-                    local pid = st.photo_id
+                if item_unique_no_field then
+                    local okv, v = pcall(function()
+                        return item_unique_no_field:get_data(attr)
+                    end)
+                    if okv then st.item_unique = v end
+                end
 
-                    -- First time FOUND for this PhotoId
-                    if ok_item and item_found == true and pid ~= nil then
-                        if not found_photo_ids[pid] and (st.last_item == false or st.last_item == nil) then
-                            found_photo_ids[pid] = true
-                            log(string.format(
-                                "Sticker FOUND: PhotoId=%s, ItemUniqueNo=%s, HavingEvent=%s",
-                                tostring(st.photo_id),
-                                tostring(st.item_unique),
-                                tostring(st.having_event)
-                            ))
+                if having_event_field then
+                    local okv, v = pcall(function()
+                        return having_event_field:get_data(attr)
+                    end)
+                    if okv then st.having_event = v end
+                end
 
-                            -- AP hook
-                            if M.on_sticker_found then
-                                pcall(M.on_sticker_found,
-                                    st.photo_id, st.item_unique, st.having_event)
-                            end
-                        end
-                    end
-
-                    -- First time EVENT TAKED for this PhotoId
-                    if ok_event and event_taked == true and pid ~= nil then
-                        if not event_taked_photo_ids[pid] and (st.last_event == false or st.last_event == nil) then
-                            event_taked_photo_ids[pid] = true
-                            log(string.format(
-                                "Sticker CAPTURED: PhotoId=%s, ItemUniqueNo=%s, HavingEvent=%s",
-                                tostring(st.photo_id),
-                                tostring(st.item_unique),
-                                tostring(st.having_event)
-                            ))
-
-                            -- AP hook
-                            if M.on_sticker_event_taked then
-                                pcall(M.on_sticker_event_taked,
-                                    st.photo_id, st.item_unique, st.having_event)
-                            end
-                        end
-                    end
-
-                    -- Remember last-known states for this attribute instance
-                    if ok_item  then st.last_item  = item_found  end
-                    if ok_event then st.last_event = event_taked end
+                local pid = st.photo_id
+                if pid ~= nil and not seen_photo_ids[pid] then
+                    seen_photo_ids[pid] = true
+                    log(string.format(
+                        "New unique photo target: PhotoId=%s, ItemUniqueNo=%s, HavingEvent=%s",
+                        tostring(st.photo_id),
+                        tostring(st.item_unique),
+                        tostring(st.having_event)
+                    ))
                 end
             end
 
-            return args
-        end,
+            -- Query flags via methods (lookup+call inside pcall)
+            local ok_item, item_found = pcall(function()
+                return attr:call("isUniqueItemHasBeenFound")
+            end)
+
+            local ok_event, event_taked = pcall(function()
+                return attr:call("isUniqueEventTaked")
+            end)
+
+            local pid = st.photo_id
+
+            if ok_item and item_found == true and pid ~= nil then
+                if not found_photo_ids[pid] and (st.last_item == false or st.last_item == nil) then
+                    found_photo_ids[pid] = true
+                    log(string.format(
+                        "Sticker FOUND: PhotoId=%s, ItemUniqueNo=%s, HavingEvent=%s",
+                        tostring(st.photo_id),
+                        tostring(st.item_unique),
+                        tostring(st.having_event)
+                    ))
+                end
+            end
+
+            if ok_event and event_taked == true and pid ~= nil then
+                if not event_taked_photo_ids[pid] and (st.last_event == false or st.last_event == nil) then
+                    event_taked_photo_ids[pid] = true
+                    log(string.format(
+                        "Sticker CAPTURED: PhotoId=%s, ItemUniqueNo=%s, HavingEvent=%s",
+                        tostring(st.photo_id),
+                        tostring(st.item_unique),
+                        tostring(st.having_event)
+                    ))
+
+                    -- AP hook / mapping
+                    local row = map_photo_id(st.photo_id)
+                    if row and row.name then
+                        if M.on_sticker_event_taked then
+                            pcall(M.on_sticker_event_taked, row.name, row.item, st.photo_id, st.item_unique, st.having_event)
+                        end
+                    elseif row and row.item then
+                        local loc = "Photograph PP Sticker " .. tostring(row.item)
+                        if M.on_sticker_event_taked then
+                            pcall(M.on_sticker_event_taked, loc, row.item, st.photo_id, st.item_unique, st.having_event)
+                        end
+                    else
+                        log("WARN: PhotoId not in PPstickers.json: " .. tostring(st.photo_id))
+                        if M.on_sticker_event_taked then
+                            pcall(M.on_sticker_event_taked, "Photograph PP Sticker " .. tostring(st.photo_id), nil, st.photo_id, st.item_unique, st.having_event)
+                        end
+                    end
+                end
+            end
+
+            if ok_item  then st.last_item  = item_found  end
+            if ok_event then st.last_event = event_taked end
+        end)
+
+        -- Keep silent to avoid spam; enable if debugging:
+        -- if not ok then log("WARN: hook body error suppressed") end
+
+        return args
+    end,
+
         function(retval)
-            -- Post-hook: no modification
             return retval
         end
     )
