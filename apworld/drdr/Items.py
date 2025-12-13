@@ -247,11 +247,11 @@ _all_items = [DRItemData(row[0], row[1], row[2]) for row in [
     ("Book [Horror Novel 2]", 203, DRItemCategory.CONSUMABLE),
 
     # Area locks
-    ("Helipad key", 1000, DRItemCategory.LOCK),
-    ("Safe Room key", 1001, DRItemCategory.LOCK),
-    ("Rooftop key", 1002, DRItemCategory.LOCK),
-    ("Warehouse key", 1003, DRItemCategory.LOCK),
-    ("Paradise Plaza key", 1004, DRItemCategory.LOCK),
+    # ("Helipad key", 1000, DRItemCategory.LOCK),
+    # ("Safe Room key", 1001, DRItemCategory.LOCK),
+    # ("Rooftop key", 1002, DRItemCategory.LOCK),
+    # ("Warehouse key", 1003, DRItemCategory.LOCK),
+    # ("Paradise Plaza key", 1004, DRItemCategory.LOCK),
     ("Colby's Movie Theater key", 1005, DRItemCategory.LOCK),
     ("Leisure Park key", 1006, DRItemCategory.LOCK),
     ("North Plaza key", 1007, DRItemCategory.LOCK),
@@ -263,7 +263,7 @@ _all_items = [DRItemData(row[0], row[1], row[2]) for row in [
     ("Grocery Store key", 1013, DRItemCategory.LOCK),
     ("Maintenance Tunnel key", 1014, DRItemCategory.LOCK),
     ("Hideout key", 1015, DRItemCategory.LOCK),
-    ("Service Hallway key", 1016, DRItemCategory.LOCK),
+    # ("Service Hallway key", 1016, DRItemCategory.LOCK),
 
     # Time locks
     ("DAY2_06_AM", 2000, DRItemCategory.LOCK),
