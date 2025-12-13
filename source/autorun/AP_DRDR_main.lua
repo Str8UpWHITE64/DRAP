@@ -18,6 +18,7 @@ AP.NpcTracker      = require("DRAP/NpcTracker")
 AP.PPStickerTracker= require("DRAP/PPStickerTracker")
 AP.SaveSlot        = require("DRAP/SaveSlot")
 AP.TimeGate        = require("DRAP/TimeGate")
+AP.Scene           = require("DRAP/Scene")
 
 ------------------------------------------------------------
 -- AP item handlers
@@ -25,7 +26,6 @@ AP.TimeGate        = require("DRAP/TimeGate")
 
 -- Auto-register item handlers from JSON
 local function register_spawn_handlers_from_json()
-    -- adjust path if needed
     local item_list_path = "drdr_items.json" -- autorun/data/drdr_items.json
 
     local items = json.load_file(item_list_path)
@@ -34,7 +34,9 @@ local function register_spawn_handlers_from_json()
         return
     end
 
+    local x = 0
     for _, def in ipairs(items) do
+
         -- We only care about entries that have a visible name
         if def.name and def.name ~= "" and def.item_number then
             -- Capture in locals so closures don’t all share the last values
@@ -54,10 +56,10 @@ local function register_spawn_handlers_from_json()
                 -- Your existing item spawn logic:
                 AP.ItemSpawner.spawn(item_no)
             end)
+            x = x + 1
         end
     end
-
-    print("[DRAP-AP] Auto-registered spawn handlers for JSON items.")
+    print(string.format(("[DRAP-AP] Auto-registered %s spawn handlers for JSON items."), tostring(x)))
 end
 
 register_spawn_handlers_from_json()
@@ -236,7 +238,13 @@ end)
 ------------------------------------------------------------
 -- Async helpers
 ------------------------------------------------------------
-
+local TIME_CAPS = {
+    DAY2_06_AM = 61200,   -- 6:00am Day 2 - 1 hour
+    DAY2_11_AM = 79200,   -- 11:00am Day 2 - 1 hour
+    DAY3_00_AM = 126000,  -- 12:00am Day 3 - 1 hour
+    DAY3_11_AM = 165600,  -- 11:00am Day 3 - 1 hour
+    DAY4_12_PM = 255600,  -- 12:00pm Day 4 - 1 hour
+}
 local function apply_permanent_effects_from_ap()
     -- Example: door keys
     if AP_BRIDGE.has_item_name("Helipad Key") then
@@ -318,61 +326,20 @@ local function apply_permanent_effects_from_ap()
 
                     if AP_BRIDGE.has_item_name("DAY4_12_PM") then
                         AP.TimeGate.unlock_all_time()
+                    else
+                        AP.TimeGate.set_time_cap(TIME_CAPS.DAY4_12_PM)
                     end
+                else
+                    AP.TimeGate.set_time_cap(TIME_CAPS.DAY3_11_AM)
                 end
+            else
+                AP.TimeGate.set_time_cap(TIME_CAPS.DAY3_00_AM)
             end
-        end
-    end
-end
-
-
-
-local function ap_is_connected()
-    if not AP_REF.APClient then
-        return false
-    end
-
-    local state = AP_REF.APClient:get_state()
-    return state ~= AP.State.DISCONNECTED
-end
-
-local function send_level_checks_to_ap(old_level, new_level)
-    if not ap_is_connected() then
-        print(string.format(
-            "[DRAP-AP] Not connected to AP; skipping level checks (%d -> %d).",
-            old_level or -1, new_level or -1
-        ))
-        return
-    end
-
-    -- Collect all location IDs for levels gained
-    local locs = {}
-
-    -- Safeguard (old_level should always be < new_level here, but just in case)
-    local start_level = (old_level or (new_level - 1))
-
-    for lvl = start_level + 1, new_level do
-        local loc_id = LEVEL_TO_AP_LOCATION_ID[lvl]
-        if loc_id then
-            table.insert(locs, loc_id)
-            print(string.format(
-                "[DRAP-AP] Queuing AP location check for level %d (loc_id=%d)",
-                lvl, loc_id
-            ))
         else
-            print(string.format(
-                "[DRAP-AP] No AP location mapped for level %d; skipping.",
-                lvl
-            ))
+            AP.TimeGate.set_time_cap(TIME_CAPS.DAY2_11_AM)
         end
-    end
-
-    if #locs > 0 then
-        AP_REF.APClient:LocationChecks(locs)
-        print(string.format(
-            "[DRAP-AP] Sent %d level-based location check(s) to AP.",
-            #locs
-        ))
+    else
+        AP.TimeGate.set_time_cap(TIME_CAPS.DAY2_06_AM)
     end
 end
 
@@ -381,7 +348,7 @@ end
 ------------------------------------------------------------
 
 if AP.TimeGate.is_new_game() then
-    AP_BRIDGE.reapply_all_items()
+    AP.AP_BRIDGE.reapply_all_items()
     apply_permanent_effects_from_ap()
 end
 
@@ -393,8 +360,8 @@ AP.LevelTracker.on_level_changed = function(old_level, new_level)
     print(string.format("[DRAP-AP] Level changed %d -> %d", old_level, new_level))
 
     if new_level > old_level then
-        local loc_name = string.format("Reach Level %02d", new_level)
-        AP_BRIDGE.check(loc_name)
+        local loc_name = string.format("Reach Level %d", new_level)
+        AP.AP_BRIDGE.check(loc_name)
     end
 end
 
@@ -405,7 +372,7 @@ AP.EventTracker.on_tracked_location =
             "Tracked location reached: %s ",
             tostring(desc)
         ))
-        AP_BRIDGE.check(desc)
+        AP.AP_BRIDGE.check(desc)
     end
 
 
@@ -417,7 +384,7 @@ AP.ChallengeTracker.on_challenge_threshold =
             "[DRAP-AP] Challenge '%s' target #%d reached: %d (from %d to %d)",
             label, idx, target or -1, prev or -1, current or -1
         ))
-        AP_BRIDGE.check(challenge)
+        AP.AP_BRIDGE.check(challenge)
     end
 
 -- Survivors rescued
@@ -425,18 +392,20 @@ AP.NpcTracker.on_survivor_rescued =
     function(npc_id, state_index, friendly_name, game_id)
         print(string.format("[DRAP-AP] Survivor rescued: name=%s",tostring(friendly_name)))
         local name = string.format("Rescue %s", friendly_name)
-        AP_BRIDGE.check(name)
+        AP.AP_BRIDGE.check(name)
     end
 
 -- PP Stickers
 AP.PPStickerTracker.on_sticker_event_taked =
-    function(photo_id, item_unique_no, having_event)
+    function(location_name, item_number, photo_id, item_unique_no, having_event)
         print(string.format(
-            "[DRAP-AP] PP sticker EVENT TAKED: PhotoId=%s ItemUniqueNo=%s HavingEvent=%s",
-            tostring(photo_id), tostring(item_unique_no), tostring(having_event)
+            "[DRAP-AP] PP sticker EVENT TAKED: Location=%s ItemNumber=%s PhotoId=%s ItemUniqueNo=%s HavingEvent=%s",
+            tostring(location_name), tostring(item_number), tostring(photo_id),
+            tostring(item_unique_no), tostring(having_event)
         ))
-        AP_BRIDGE.check("Photograph PP Sticker " .. photo_id)
+        AP.AP_BRIDGE.check(location_name)
     end
+
 
 ------------------------------------------------------------
 -- Console Helpers
@@ -460,55 +429,70 @@ end
 -- Main script
 ------------------------------------------------------------
 
-local function is_in_game()
-    -- Fast + reliable: this singleton is nil at title/menu/loading most of the time
-    local ps = sdk.get_managed_singleton("app.solid.PlayerStatusManager")
-    if not ps then return false end
 
-    -- Optional extra guard: can we read PlayerLevel?
-    local td = ps:get_type_definition()
-    if not td then return false end
+local AP_REF = AP.AP_BRIDGE.AP_REF
 
-    local f = td:get_field("PlayerLevel")
-    if not f then return false end
+local function extract_seed(slot_data)
+    return slot_data and (slot_data.seed_name or slot_data.seed or slot_data.seed_id) or "unknown"
+end
 
-    local ok, lvl = pcall(f.get_data, f, ps)
-    if not ok or lvl == nil then return false end
+local prev = AP_REF.on_slot_connected
+AP_REF.on_slot_connected = function(slot_data)
+    if prev then pcall(prev, slot_data) end
 
-    return true
+    -- your existing logic
+    print(string.format("[DRAP-AP] Slot connected: slot=%s seed=%s",
+        tostring(AP_REF.APSlot),
+        tostring(slot_data.seed_name or slot_data.seed or slot_data.seed_id or "unknown")
+    ))
+
+    -- Load saveslot
+    if AP.SaveSlot and AP.SaveSlot.apply_for_slot then
+        print("[DRAP-AP] Applying AP save redirect for slot.")
+        AP.SaveSlot.apply_for_slot(AP_REF.APSlot, slot_data.seed_name or slot_data.seed or slot_data.seed_id)
+    else
+        print("[DRAP-AP] AP.SaveSlot.apply_ap_save_dir not available.")
+    end
+
+    local slot = AP_REF.APSlot or (AP_REF.APClient and AP_REF.APClient:get_player_alias(AP_REF.APClient:get_player_number())) or "unknown"
+    local seed = extract_seed(slot_data)
+
+    AP.AP_BRIDGE.set_received_items_filename(slot, seed)
+    AP.AP_BRIDGE.load_received_items()
 end
 
 local was_in_game = false
 
 local function on_enter_game()
-    print("[DRAP] Entered gameplay; applying AP progression...")
+    print("[DRAP] Entered gameplay.")
+    print("[DRAP] Is new game:", tostring(AP.TimeGate.is_new_game and AP.TimeGate.is_new_game()))
+
+    -- If you want: detect new game via your time-gate check
     if AP.TimeGate and AP.TimeGate.is_new_game and AP.TimeGate.is_new_game() then
+        print("[DRAP] New game detected; reapplying AP items.")
         AP.AP_BRIDGE.reapply_all_items()
     end
     apply_permanent_effects_from_ap()
 end
 
-
-
 re.on_frame(function()
-    local now_in_game = is_in_game()
-
-    if now_in_game and not was_in_game then
-        on_enter_game()
-    end
-    was_in_game = now_in_game
-
+    local now_in_game = AP.Scene.isInGame()
     if not now_in_game then
         return
     end
-
     AP.ItemSpawner.on_frame()
     AP.DoorSceneLock.on_frame()
     AP.ChallengeTracker.on_frame()
     AP.LevelTracker.on_frame()
     AP.EventTracker.on_frame()
     AP.NpcTracker.on_frame()
+    AP.AP_BRIDGE.on_frame()
     AP.PPStickerTracker.on_frame()
-end)
 
+    if now_in_game and not was_in_game then
+        print("[DRAP] Detected transition into game.")
+        on_enter_game()
+    end
+    was_in_game = now_in_game
+end)
 print("[DRAP] Main script loaded.")

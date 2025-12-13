@@ -1,0 +1,1247 @@
+[
+  {
+    "name": "",
+    "game_id": "ITEM_NO_NONE",
+    "item_number": 0
+  },
+  {
+    "name": "Pylon",
+    "game_id": "ITEM_NO_PYLON",
+    "item_number": 1
+  },
+  {
+    "name": "Shopping Cart",
+    "game_id": "ITEM_NO_SHOPPING_CART",
+    "item_number": 2
+  },
+  {
+    "name": "",
+    "game_id": "ITEM_NO_VULCAN",
+    "item_number": 3
+  },
+  {
+    "name": "Baseball Bat",
+    "game_id": "ITEM_NO_BASEBALL_BAT",
+    "item_number": 4
+  },
+  {
+    "name": "Garbage Can",
+    "game_id": "ITEM_NO_GARBAGE_CAN",
+    "item_number": 5
+  },
+  {
+    "name": "Chair",
+    "game_id": "ITEM_NO_CHAIR_0",
+    "item_number": 6
+  },
+  {
+    "name": "Shovel",
+    "game_id": "ITEM_NO_SHOVEL",
+    "item_number": 7
+  },
+  {
+    "name": "Push Broom",
+    "game_id": "ITEM_NO_PUSH_BROOM",
+    "item_number": 8
+  },
+  {
+    "name": "Push Broom Handle",
+    "game_id": "ITEM_NO_PUSH_BROOM_HANDLE",
+    "item_number": 9
+  },
+  {
+    "name": "",
+    "game_id": "ITEM_NO_SCRUBBRUSH_HEAD",
+    "item_number": 10
+  },
+  {
+    "name": "Laser Sword",
+    "game_id": "ITEM_NO_BEAM_SWORD",
+    "item_number": 12
+  },
+  {
+    "name": "Paint Can",
+    "game_id": "ITEM_NO_PAINT_CAN",
+    "item_number": 14
+  },
+  {
+    "name": "",
+    "game_id": "ITEM_NO_DRINK_CAN",
+    "item_number": 15
+  },
+  {
+    "name": "Hockey Stick",
+    "game_id": "ITEM_NO_HOCKEY_STICK",
+    "item_number": 16
+  },
+  {
+    "name": "Handbag",
+    "game_id": "ITEM_NO_HANDBAG",
+    "item_number": 17
+  },
+  {
+    "name": "Chair",
+    "game_id": "ITEM_NO_CHAIR_6",
+    "item_number": 18
+  },
+  {
+    "name": "Cleaver",
+    "game_id": "ITEM_NO_CLEAVER",
+    "item_number": 19
+  },
+  {
+    "name": "Skateboard",
+    "game_id": "ITEM_NO_SKATEBOARD",
+    "item_number": 20
+  },
+  {
+    "name": "Toy Cube",
+    "game_id": "ITEM_NO_TOY_CUBE",
+    "item_number": 21
+  },
+  {
+    "name": "Gems",
+    "game_id": "ITEM_NO_GEMS",
+    "item_number": 22
+  },
+  {
+    "name": "Battle Axe",
+    "game_id": "ITEM_NO_BATTLE_AXE",
+    "item_number": 23
+  },
+  {
+    "name": "Store Display",
+    "game_id": "ITEM_NO_STORE_DISPLAY_0",
+    "item_number": 24
+  },
+  {
+    "name": "Store Display",
+    "game_id": "ITEM_NO_STORE_DISPLAY_1",
+    "item_number": 25
+  },
+  {
+    "name": "Bass Guitar",
+    "game_id": "ITEM_NO_BASS_GUITAR",
+    "item_number": 26
+  },
+  {
+    "name": "Acoustic Guitar",
+    "game_id": "ITEM_NO_ACOUSTIC_GUITAR",
+    "item_number": 27
+  },
+  {
+    "name": "Store Display",
+    "game_id": "ITEM_NO_STORE_DISPLAY_2",
+    "item_number": 28
+  },
+  {
+    "name": "Grenade",
+    "game_id": "ITEM_NO_GRENADE",
+    "item_number": 29
+  },
+  {
+    "name": "Water Gun",
+    "game_id": "ITEM_NO_WATER_GUN",
+    "item_number": 30
+  },
+  {
+    "name": "Toy Laser Sword",
+    "game_id": "ITEM_NO_TOY_LASER_SWORD",
+    "item_number": 32
+  },
+  {
+    "name": "Pick Ax",
+    "game_id": "ITEM_NO_PICK_AX",
+    "item_number": 33
+  },
+  {
+    "name": "Chair",
+    "game_id": "ITEM_NO_CHAIR_7",
+    "item_number": 35
+  },
+  {
+    "name": "Golf Club",
+    "game_id": "ITEM_NO_GOLF_CLUB",
+    "item_number": 36
+  },
+  {
+    "name": "Soccer Ball",
+    "game_id": "ITEM_NO_SOCCER_BALL",
+    "item_number": 37
+  },
+  {
+    "name": "Snack",
+    "game_id": "ITEM_NO_SNACK",
+    "item_number": 38
+  },
+  {
+    "name": "Raw Meat",
+    "game_id": "ITEM_NO_RAW_MEAT",
+    "item_number": 42
+  },
+  {
+    "name": "Well Done Steak",
+    "game_id": "ITEM_NO_WELL_DONE_STEAK",
+    "item_number": 43
+  },
+  {
+    "name": "Spoiled Meat",
+    "game_id": "ITEM_NO_SPOILED_MEAT",
+    "item_number": 44
+  },
+  {
+    "name": "Fire Extinguisher",
+    "game_id": "ITEM_NO_FIRE_EXTINGUISHER",
+    "item_number": 46
+  },
+  {
+    "name": "Book [Camera 2]",
+    "game_id": "ITEM_NO_BOOK_CAMERA_2",
+    "item_number": 47
+  },
+  {
+    "name": "Parasol",
+    "game_id": "ITEM_NO_PARASOL",
+    "item_number": 48
+  },
+  {
+    "name": "Fire Ax",
+    "game_id": "ITEM_NO_FIRE_AX",
+    "item_number": 49
+  },
+  {
+    "name": "Sledgehammer",
+    "game_id": "ITEM_NO_SLEDGEHAMMER",
+    "item_number": 50
+  },
+  {
+    "name": "Frying Pan",
+    "game_id": "ITEM_NO_FRYING_PAN",
+    "item_number": 51
+  },
+  {
+    "name": "Katana",
+    "game_id": "ITEM_NO_KATANA",
+    "item_number": 52
+  },
+  {
+    "name": "Chainsaw",
+    "game_id": "ITEM_NO_CHAINSAW",
+    "item_number": 53
+  },
+  {
+    "name": "Dumbbell",
+    "game_id": "ITEM_NO_DUMBBELL",
+    "item_number": 54
+  },
+  {
+    "name": "Hanger",
+    "game_id": "ITEM_NO_HANGER",
+    "item_number": 55
+  },
+  {
+    "name": "Book [Survival]",
+    "game_id": "ITEM_NO_BOOK_SURVIVAL",
+    "item_number": 56
+  },
+  {
+    "name": "Potted Plant",
+    "game_id": "ITEM_NO_POTTED_PLANT",
+    "item_number": 57
+  },
+  {
+    "name": "Real Mega Buster",
+    "game_id": "ITEM_NO_MEGA_MAN_BUSTER",
+    "item_number": 58
+  },
+  {
+    "name": "Shotgun",
+    "game_id": "ITEM_NO_SHOTGUN",
+    "item_number": 60
+  },
+  {
+    "name": "Sickle",
+    "game_id": "ITEM_NO_SICKLE",
+    "item_number": 64
+  },
+  {
+    "name": "",
+    "game_id": "ITEM_NO_JEWELS_ONE",
+    "item_number": 65
+  },
+  {
+    "name": "Vase",
+    "game_id": "ITEM_NO_VASE",
+    "item_number": 66
+  },
+  {
+    "name": "Painting",
+    "game_id": "ITEM_NO_PAINTING",
+    "item_number": 67
+  },
+  {
+    "name": "Book [Brainwashing Tips]",
+    "game_id": "ITEM_NO_BOOK_CULT_INITIATION_GUIDE",
+    "item_number": 68
+  },
+  {
+    "name": "Queen",
+    "game_id": "ITEM_NO_QUEEN",
+    "item_number": 69
+  },
+  {
+    "name": "Lawn Mower",
+    "game_id": "ITEM_NO_LAWN_MOWER",
+    "item_number": 70
+  },
+  {
+    "name": "Bowling Ball",
+    "game_id": "ITEM_NO_BOWING_BALL",
+    "item_number": 71
+  },
+  {
+    "name": "Stun Gun",
+    "game_id": "ITEM_NO_STUN_GUN",
+    "item_number": 72
+  },
+  {
+    "name": "Hedge Trimmer",
+    "game_id": "ITEM_NO_HEDGE_TRIMMER",
+    "item_number": 74
+  },
+  {
+    "name": "Handgun",
+    "game_id": "ITEM_NO_HANDGUN",
+    "item_number": 75
+  },
+  {
+    "name": "Hunting Knife",
+    "game_id": "ITEM_NO_KNIFE",
+    "item_number": 76
+  },
+  {
+    "name": "Propane Tank",
+    "game_id": "ITEM_NO_PROPANE_TANK",
+    "item_number": 77
+  },
+  {
+    "name": "Lead Pipe",
+    "game_id": "ITEM_NO_LEAD_PIPE",
+    "item_number": 79
+  },
+  {
+    "name": "Sign",
+    "game_id": "ITEM_NO_SIGN_1",
+    "item_number": 80
+  },
+  {
+    "name": "TV",
+    "game_id": "ITEM_NO_TV",
+    "item_number": 81
+  },
+  {
+    "name": "Submachine Gun",
+    "game_id": "ITEM_NO_SUBMACHINE_GUN",
+    "item_number": 82
+  },
+  {
+    "name": "Mannequin",
+    "game_id": "ITEM_NO_MANNEQUIN_M",
+    "item_number": 83
+  },
+  {
+    "name": "Mannequin Torso",
+    "game_id": "ITEM_NO_MANNEQUIN_LIMB_M_0",
+    "item_number": 84
+  },
+  {
+    "name": "Mannequin Limb",
+    "game_id": "ITEM_NO_MANNEQUIN_LIMB_M_1",
+    "item_number": 85
+  },
+  {
+    "name": "Mannequin Limb",
+    "game_id": "ITEM_NO_MANNEQUIN_LIMB_M_2",
+    "item_number": 86
+  },
+  {
+    "name": "Mannequin Limb",
+    "game_id": "ITEM_NO_MANNEQUIN_LIMB_M_3",
+    "item_number": 87
+  },
+  {
+    "name": "Mannequin Limb",
+    "game_id": "ITEM_NO_MANNEQUIN_LIMB_M_4",
+    "item_number": 88
+  },
+  {
+    "name": "Mannequin ",
+    "game_id": "ITEM_NO_MANNEQUIN_F",
+    "item_number": 89
+  },
+  {
+    "name": "Mannequin Torso",
+    "game_id": "ITEM_NO_MANNEQUIN_LIMB_F_0",
+    "item_number": 90
+  },
+  {
+    "name": "Mannequin Limb",
+    "game_id": "ITEM_NO_MANNEQUIN_LIMB_F_1",
+    "item_number": 91
+  },
+  {
+    "name": "Mannequin Limb",
+    "game_id": "ITEM_NO_MANNEQUIN_LIMB_F_2",
+    "item_number": 92
+  },
+  {
+    "name": "Mannequin Limb",
+    "game_id": "ITEM_NO_MANNEQUIN_LIMB_F_3",
+    "item_number": 93
+  },
+  {
+    "name": "Mannequin Limb",
+    "game_id": "ITEM_NO_MANNEQUIN_LIMB_F_4",
+    "item_number": 94
+  },
+  {
+    "name": "Potted Plant",
+    "game_id": "ITEM_NO_POTTED_PLANT_0",
+    "item_number": 95
+  },
+  {
+    "name": "Potted Plant",
+    "game_id": "ITEM_NO_POTTED_PLANT_1",
+    "item_number": 96
+  },
+  {
+    "name": "Cactus",
+    "game_id": "ITEM_NO_CACTUS",
+    "item_number": 97
+  },
+  {
+    "name": "Potted Plant",
+    "game_id": "ITEM_NO_POTTED_PLANT_3",
+    "item_number": 98
+  },
+  {
+    "name": "Potted Plant",
+    "game_id": "ITEM_NO_POTTED_PLANT_4",
+    "item_number": 99
+  },
+  {
+    "name": "Potted Plant",
+    "game_id": "ITEM_NO_POTTED_PLANT_5",
+    "item_number": 100
+  },
+  {
+    "name": "Barbell",
+    "game_id": "ITEM_NO_BARBELL",
+    "item_number": 101
+  },
+  {
+    "name": "Wine Cask",
+    "game_id": "ITEM_NO_WINE_CASK",
+    "item_number": 102
+  },
+  {
+    "name": "Gumball Machine",
+    "game_id": "ITEM_NO_GUMBALL_MACHINE",
+    "item_number": 105
+  },
+  {
+    "name": "Mega Buster",
+    "game_id": "ITEM_NO_MEGA_MAN_BUSTER_TOY",
+    "item_number": 106
+  },
+  {
+    "name": "",
+    "game_id": "ITEM_NO_MEGAMANBUSTER_BALL",
+    "item_number": 107
+  },
+  {
+    "name": "HDTV",
+    "game_id": "ITEM_NO_PLASMA_TV",
+    "item_number": 108
+  },
+  {
+    "name": "Microwave Pizza",
+    "game_id": "ITEM_NO_MICROWAVE_PIZZA",
+    "item_number": 109
+  },
+  {
+    "name": "Uncooked Pizza",
+    "game_id": "ITEM_NO_UNCOOKED_PIZZA",
+    "item_number": 110
+  },
+  {
+    "name": "Golden Brown Pizza",
+    "game_id": "ITEM_NO_GOLDEN_BROWN_PIZZA",
+    "item_number": 111
+  },
+  {
+    "name": "Rotten Pizza",
+    "game_id": "ITEM_NO_ROTTEN_PIZZA",
+    "item_number": 112
+  },
+  {
+    "name": "Pie",
+    "game_id": "ITEM_NO_PIE",
+    "item_number": 113
+  },
+  {
+    "name": "Nail Gun",
+    "game_id": "ITEM_NO_NAILGUN",
+    "item_number": 114
+  },
+  {
+    "name": "Smokestack",
+    "game_id": "ITEM_NO_SMOKESTACK",
+    "item_number": 115
+  },
+  {
+    "name": "Chair",
+    "game_id": "ITEM_NO_CHAIR_8",
+    "item_number": 116
+  },
+  {
+    "name": "Stepladder",
+    "game_id": "ITEM_NO_STEPLADDER",
+    "item_number": 117
+  },
+  {
+    "name": "Toolbox",
+    "game_id": "ITEM_NO_TOOLBOX",
+    "item_number": 118
+  },
+  {
+    "name": "Excavator",
+    "game_id": "ITEM_NO_EXCAVATOR",
+    "item_number": 119
+  },
+  {
+    "name": "Small Chainsaw",
+    "game_id": "ITEM_NO_SMALL_CHAINSAW",
+    "item_number": 127
+  },
+  {
+    "name": "",
+    "game_id": "ITEM_NO_BALLOON",
+    "item_number": 131
+  },
+  {
+    "name": "Chair",
+    "game_id": "ITEM_NO_CHAIR_9",
+    "item_number": 132
+  },
+  {
+    "name": "Chair",
+    "game_id": "ITEM_NO_CHAIR_10",
+    "item_number": 133
+  },
+  {
+    "name": "Machinegun",
+    "game_id": "ITEM_NO_MACHINEGUN",
+    "item_number": 134
+  },
+  {
+    "name": "Sniper Rifle",
+    "game_id": "ITEM_NO_SNIPER_RIFLE",
+    "item_number": 135
+  },
+  {
+    "name": "2\" x 4\"",
+    "game_id": "ITEM_NO_2X4",
+    "item_number": 136
+  },
+  {
+    "name": "Boomerang",
+    "game_id": "ITEM_NO_BOOMERANG",
+    "item_number": 137
+  },
+  {
+    "name": "Bucket",
+    "game_id": "ITEM_NO_BUCKET",
+    "item_number": 138
+  },
+  {
+    "name": "Nightstick",
+    "game_id": "ITEM_NO_NIGHTSTICK",
+    "item_number": 139
+  },
+  {
+    "name": "Wine",
+    "game_id": "ITEM_NO_WINE",
+    "item_number": 140
+  },
+  {
+    "name": "Electric Guitar",
+    "game_id": "ITEM_NO_ELECTRIC_GUITAR",
+    "item_number": 141
+  },
+  {
+    "name": "King Salmon",
+    "game_id": "ITEM_NO_KING_SALMON",
+    "item_number": 143
+  },
+  {
+    "name": "",
+    "game_id": "ITEM_NO_REAL_SMALL_CHAINSAW",
+    "item_number": 144
+  },
+  {
+    "name": "Zucchini",
+    "game_id": "ITEM_NO_ZUCCHINI",
+    "item_number": 145
+  },
+  {
+    "name": "Meat Cleaver",
+    "game_id": "ITEM_NO_CHINESE_CLEAVER",
+    "item_number": 147
+  },
+  {
+    "name": "Book [Japanese Conversation]",
+    "game_id": "ITEM_NO_BOOK_JAPANESE_CONVERSATION",
+    "item_number": 149
+  },
+  {
+    "name": "Oil Bucket",
+    "game_id": "ITEM_NO_OIL_BUCKET",
+    "item_number": 152
+  },
+  {
+    "name": "Cash Register",
+    "game_id": "ITEM_NO_CASH_REGISTER",
+    "item_number": 153
+  },
+  {
+    "name": "Propane Tank",
+    "game_id": "ITEM_NO_PROPANE_TANK_S",
+    "item_number": 154
+  },
+  {
+    "name": "Book [Wrestling]",
+    "game_id": "ITEM_NO_BOOK_WRESTLING",
+    "item_number": 155
+  },
+  {
+    "name": "",
+    "game_id": "ITEM_NO_ROCKET_R",
+    "item_number": 157
+  },
+  {
+    "name": "",
+    "game_id": "ITEM_NO_NONE158",
+    "item_number": 158
+  },
+  {
+    "name": "Rock",
+    "game_id": "ITEM_NO_ROCK",
+    "item_number": 159
+  },
+  {
+    "name": "Dishes",
+    "game_id": "ITEM_NO_DISHES",
+    "item_number": 160
+  },
+  {
+    "name": "",
+    "game_id": "ITEM_NO_PLATE_ONE",
+    "item_number": 161
+  },
+  {
+    "name": "",
+    "game_id": "ITEM_NO_RC_BOMB",
+    "item_number": 165
+  },
+  {
+    "name": "Weapon Cart",
+    "game_id": "ITEM_NO_WEAPON_CART",
+    "item_number": 166
+  },
+  {
+    "name": "Sword",
+    "game_id": "ITEM_NO_SWORD",
+    "item_number": 168
+  },
+  {
+    "name": "",
+    "game_id": "ITEM_NO_DYNAMITE",
+    "item_number": 169
+  },
+  {
+    "name": "First Aid Kit",
+    "game_id": "ITEM_NO_BOOK_TOY",
+    "item_number": 170
+  },
+  {
+    "name": "First Aid Kit",
+    "game_id": "ITEM_NO_BOOK_FIREWORK",
+    "item_number": 171
+  },
+  {
+    "name": "First Aid Kit",
+    "game_id": "ITEM_NO_BOOK_HYPNOSIS",
+    "item_number": 172
+  },
+  {
+    "name": "First Aid Kit",
+    "game_id": "ITEM_NO_BOOK_FOCUS",
+    "item_number": 173
+  },
+  {
+    "name": "First Aid Kit",
+    "game_id": "ITEM_NO_BOOK_BLENDER",
+    "item_number": 174
+  },
+  {
+    "name": "First Aid Kit",
+    "game_id": "ITEM_NO_BOOK_MONSTER_PITCHER",
+    "item_number": 175
+  },
+  {
+    "name": "First Aid Kit",
+    "game_id": "ITEM_NO_BOOK_RECYCLE",
+    "item_number": 176
+  },
+  {
+    "name": "First Aid Kit",
+    "game_id": "ITEM_NO_BOOK_MARTIAL_ART",
+    "item_number": 177
+  },
+  {
+    "name": "First Aid Kit",
+    "game_id": "ITEM_NO_BOOK_FASHION",
+    "item_number": 178
+  },
+  {
+    "name": "First Aid Kit",
+    "game_id": "ITEM_NO_BOOK_FIREARMS",
+    "item_number": 179
+  },
+  {
+    "name": "First Aid Kit",
+    "game_id": "ITEM_NO_BOOK_INFINITE_DURABILITY",
+    "item_number": 180
+  },
+  {
+    "name": "Cardboard Box",
+    "game_id": "ITEM_NO_CARDBORD_BOX",
+    "item_number": 181
+  },
+  {
+    "name": "Shower Head",
+    "game_id": "ITEM_NO_SHOWER_HEAD",
+    "item_number": 184
+  },
+  {
+    "name": "Antimaterial Rifle",
+    "game_id": "ITEM_NO_ANTIMATERIAL_RIFLE",
+    "item_number": 186
+  },
+  {
+    "name": "Pipe Bomb",
+    "game_id": "ITEM_NO_SMALLBOMB",
+    "item_number": 187
+  },
+  {
+    "name": "",
+    "game_id": "ITEM_NO_SMALLBOMB_CLIFF",
+    "item_number": 188
+  },
+  {
+    "name": "Machete",
+    "game_id": "ITEM_NO_COMBAT_KNIFE",
+    "item_number": 189
+  },
+  {
+    "name": "Molotov Cocktail",
+    "game_id": "ITEM_NO_MOLOTOVCOCKTAIL",
+    "item_number": 190
+  },
+  {
+    "name": "",
+    "game_id": "ITEM_NO_ICEHOCKEY_PAC",
+    "item_number": 192
+  },
+  {
+    "name": "Book [Hobby]",
+    "game_id": "ITEM_NO_BOOK_HOBBY",
+    "item_number": 193
+  },
+  {
+    "name": "",
+    "game_id": "ITEM_NO_COFFIN",
+    "item_number": 194
+  },
+  {
+    "name": "Ceremonial Sword",
+    "game_id": "ITEM_NO_CEREMONIAL_SWORD",
+    "item_number": 195
+  },
+  {
+    "name": "Novelty Mask (Bear)",
+    "game_id": "ITEM_NO_NOVELTY_MASK_0",
+    "item_number": 196
+  },
+  {
+    "name": "Novelty Mask (Ghoul)",
+    "game_id": "ITEM_NO_NOVELTY_MASK_1",
+    "item_number": 197
+  },
+  {
+    "name": "Novelty Mask (Horse)",
+    "game_id": "ITEM_NO_NOVELTY_MASK_2",
+    "item_number": 198
+  },
+  {
+    "name": "Novelty Mask (Servbot)",
+    "game_id": "ITEM_NO_NOVELTY_MASK_3",
+    "item_number": 199
+  },
+  {
+    "name": "Painting",
+    "game_id": "ITEM_NO_PAINTING_4",
+    "item_number": 200
+  },
+  {
+    "name": "Bench",
+    "game_id": "ITEM_NO_BENCH",
+    "item_number": 202
+  },
+  {
+    "name": "Steel Rack",
+    "game_id": "ITEM_NO_STEEL_RACK",
+    "item_number": 203
+  },
+  {
+    "name": "Shelf",
+    "game_id": "ITEM_NO_SHELF",
+    "item_number": 204
+  },
+  {
+    "name": "Sausage Rack",
+    "game_id": "ITEM_NO_SAUSAGE_RACK",
+    "item_number": 205
+  },
+  {
+    "name": "Corn",
+    "game_id": "ITEM_NO_CORN",
+    "item_number": 208
+  },
+  {
+    "name": "Squash",
+    "game_id": "ITEM_NO_SQUASH",
+    "item_number": 209
+  },
+  {
+    "name": "Cabbage",
+    "game_id": "ITEM_NO_CABBAGE",
+    "item_number": 210
+  },
+  {
+    "name": "Japanese Radish",
+    "game_id": "ITEM_NO_JAPANESE_RADISH",
+    "item_number": 211
+  },
+  {
+    "name": "Lettuce",
+    "game_id": "ITEM_NO_LETTUCE",
+    "item_number": 212
+  },
+  {
+    "name": "Red Cabbage",
+    "game_id": "ITEM_NO_RED_CABBAGE",
+    "item_number": 213
+  },
+  {
+    "name": "Baguette",
+    "game_id": "ITEM_NO_BAGUETTE",
+    "item_number": 214
+  },
+  {
+    "name": "Melon",
+    "game_id": "ITEM_NO_MELON",
+    "item_number": 215
+  },
+  {
+    "name": "Grapefruit",
+    "game_id": "ITEM_NO_GRAPEFRUIT",
+    "item_number": 216
+  },
+  {
+    "name": "Orange",
+    "game_id": "ITEM_NO_ORANGE",
+    "item_number": 217
+  },
+  {
+    "name": "Orange Juice",
+    "game_id": "ITEM_NO_ORANGE_JUICE",
+    "item_number": 218
+  },
+  {
+    "name": "Milk",
+    "game_id": "ITEM_NO_MILK_L",
+    "item_number": 219
+  },
+  {
+    "name": "Coffee Creamer",
+    "game_id": "ITEM_NO_COFFEE_CREAMER",
+    "item_number": 220
+  },
+  {
+    "name": "Yogurt",
+    "game_id": "ITEM_NO_YOGURT",
+    "item_number": 221
+  },
+  {
+    "name": "Cheese",
+    "game_id": "ITEM_NO_CHEESE",
+    "item_number": 222
+  },
+  {
+    "name": "",
+    "game_id": "ITEM_NO_P90",
+    "item_number": 225
+  },
+  {
+    "name": "",
+    "game_id": "ITEM_NO_FLARE",
+    "item_number": 227
+  },
+  {
+    "name": "Shampoo",
+    "game_id": "ITEM_NO_SHAMPOO",
+    "item_number": 228
+  },
+  {
+    "name": "Pet Food",
+    "game_id": "ITEM_NO_PET_FOOD",
+    "item_number": 229
+  },
+  {
+    "name": "Cookies",
+    "game_id": "ITEM_NO_COOKIES",
+    "item_number": 230
+  },
+  {
+    "name": "Baking Ingredients",
+    "game_id": "ITEM_NO_BAKING_INGREDIENTS",
+    "item_number": 231
+  },
+  {
+    "name": "Cooking Oil",
+    "game_id": "ITEM_NO_COOKING_OIL",
+    "item_number": 232
+  },
+  {
+    "name": "Condiment",
+    "game_id": "ITEM_NO_CONDIMENT",
+    "item_number": 233
+  },
+  {
+    "name": "Canned Sauce",
+    "game_id": "ITEM_NO_CANNED_SAUCE",
+    "item_number": 234
+  },
+  {
+    "name": "Canned Food",
+    "game_id": "ITEM_NO_CANNED_FOOD",
+    "item_number": 235
+  },
+  {
+    "name": "Can Drinks",
+    "game_id": "ITEM_NO_DRINK_CANS",
+    "item_number": 236
+  },
+  {
+    "name": "Frozen Vegetables",
+    "game_id": "ITEM_NO_FROZEN_VEGETABLES",
+    "item_number": 237
+  },
+  {
+    "name": "Apple",
+    "game_id": "ITEM_NO_APPLE",
+    "item_number": 238
+  },
+  {
+    "name": "Ice Pops",
+    "game_id": "ITEM_NO_ICE_POPS",
+    "item_number": 239
+  },
+  {
+    "name": "Milk",
+    "game_id": "ITEM_NO_MILK_S",
+    "item_number": 240
+  },
+  {
+    "name": "Rat Stick",
+    "game_id": "ITEM_NO_RAT_STICK",
+    "item_number": 241
+  },
+  {
+    "name": "Rat Saucer",
+    "game_id": "ITEM_NO_RAT_SAUCER",
+    "item_number": 242
+  },
+  {
+    "name": "Painting",
+    "game_id": "ITEM_NO_PAINTING_3",
+    "item_number": 243
+  },
+  {
+    "name": "Saw Blade",
+    "game_id": "ITEM_NO_SAW_BLADE",
+    "item_number": 244
+  },
+  {
+    "name": "",
+    "game_id": "ITEM_NO_WELDINGBURNER",
+    "item_number": 245
+  },
+  {
+    "name": "Skylight",
+    "game_id": "ITEM_NO_SKYLIGHT",
+    "item_number": 246
+  },
+  {
+    "name": "Fence",
+    "game_id": "ITEM_NO_FENCE",
+    "item_number": 247
+  },
+  {
+    "name": "Painting",
+    "game_id": "ITEM_NO_PAINTING_2",
+    "item_number": 248
+  },
+  {
+    "name": "",
+    "game_id": "ITEM_NO_BEAMRIFLE",
+    "item_number": 250
+  },
+  {
+    "name": "Stuffed Bear",
+    "game_id": "ITEM_NO_STUFFED_BEAR",
+    "item_number": 251
+  },
+  {
+    "name": "Mailbox",
+    "game_id": "ITEM_NO_MAILBOX",
+    "item_number": 252
+  },
+  {
+    "name": "Mailbox Post",
+    "game_id": "ITEM_NO_MAILBOX_POST",
+    "item_number": 254
+  },
+  {
+    "name": "Painting",
+    "game_id": "ITEM_NO_PAINTING_1",
+    "item_number": 255
+  },
+  {
+    "name": "Sign",
+    "game_id": "ITEM_NO_SIGN_2",
+    "item_number": 256
+  },
+  {
+    "name": "Hunk of Meat",
+    "game_id": "ITEM_NO_SEVERED_ARM",
+    "item_number": 257
+  },
+  {
+    "name": "Plywood Panel",
+    "game_id": "ITEM_NO_PLYWOOD_PANEL",
+    "item_number": 260
+  },
+  {
+    "name": "CDs",
+    "game_id": "ITEM_NO_CD",
+    "item_number": 264
+  },
+  {
+    "name": "Heavy Machine Gun",
+    "game_id": "ITEM_NO_HEAVY_MACHINE_GUN_2",
+    "item_number": 265
+  },
+  {
+    "name": "Perfume Prop",
+    "game_id": "ITEM_NO_PERFUME_PROP",
+    "item_number": 269
+  },
+  {
+    "name": "Lipstick Prop",
+    "game_id": "ITEM_NO_LIPSTICK_PROP",
+    "item_number": 270
+  },
+  {
+    "name": "",
+    "game_id": "ITEM_NO_CD_ONE",
+    "item_number": 271
+  },
+  {
+    "name": "Book [Cooking]",
+    "game_id": "ITEM_NO_BOOK_COOKING",
+    "item_number": 272
+  },
+  {
+    "name": "Book [Lifestyle Magazine]",
+    "game_id": "ITEM_NO_BOOK_LIFESTYLE_MAGAZINE",
+    "item_number": 273
+  },
+  {
+    "name": "Book [Engineering]",
+    "game_id": "ITEM_NO_BOOK_TOOLS",
+    "item_number": 274
+  },
+  {
+    "name": "Book [Sports]",
+    "game_id": "ITEM_NO_BOOK_SPORTS",
+    "item_number": 275
+  },
+  {
+    "name": "Book [Criminal Biography]",
+    "game_id": "ITEM_NO_BOOK_CRIMINAL_BIOGRAPHY",
+    "item_number": 276
+  },
+  {
+    "name": "Book [Travel]",
+    "game_id": "ITEM_NO_BOOK_TRAVEL",
+    "item_number": 277
+  },
+  {
+    "name": "Book [Interior Design]",
+    "game_id": "ITEM_NO_BOOK_INTERIOR_DESIGN",
+    "item_number": 278
+  },
+  {
+    "name": "Book [Entertainment]",
+    "game_id": "ITEM_NO_BOOK_ENTERTAINMENT",
+    "item_number": 279
+  },
+  {
+    "name": "Book [Camera 1]",
+    "game_id": "ITEM_NO_BOOK_CAMERA_1",
+    "item_number": 280
+  },
+  {
+    "name": "Book [Skateboarding]",
+    "game_id": "ITEM_NO_BOOK_SKATEBOARDING",
+    "item_number": 281
+  },
+  {
+    "name": "Book [Wartime Photography]",
+    "game_id": "ITEM_NO_BOOK_WARTIME_PHOTOGRAPHY",
+    "item_number": 282
+  },
+  {
+    "name": "Book [Weekly Photo Magazine]",
+    "game_id": "ITEM_NO_BOOK_WEEKLY_PHOTO_MAGAZINE",
+    "item_number": 283
+  },
+  {
+    "name": "Book [Horror Novel 1]",
+    "game_id": "ITEM_NO_BOOK_HORROR_NOVRL_1",
+    "item_number": 284
+  },
+  {
+    "name": "Book [World News]",
+    "game_id": "ITEM_NO_BOOK_WORLD_NEWS",
+    "item_number": 285
+  },
+  {
+    "name": "Book [Health 1]",
+    "game_id": "ITEM_NO_BOOK_HEALTH_1",
+    "item_number": 286
+  },
+  {
+    "name": "Book [Cycling]",
+    "game_id": "ITEM_NO_BOOK_CYCLING",
+    "item_number": 287
+  },
+  {
+    "name": "Book [Health 2]",
+    "game_id": "ITEM_NO_BOOK_HEALTH_2",
+    "item_number": 288
+  },
+  {
+    "name": "Book [Horror Novel 2]",
+    "game_id": "ITEM_NO_BOOK_HORROR_NOVEL_2",
+    "item_number": 289
+  },
+  {
+    "name": "Electric Guitar",
+    "game_id": "ITEM_NO_ELECTRIC_GUITAR_2",
+    "item_number": 290
+  },
+  {
+    "name": "Chair",
+    "game_id": "ITEM_NO_CHAIR_1",
+    "item_number": 291
+  },
+  {
+    "name": "Chair",
+    "game_id": "ITEM_NO_CHAIR_2",
+    "item_number": 292
+  },
+  {
+    "name": "Chair",
+    "game_id": "ITEM_NO_CHAIR_3",
+    "item_number": 293
+  },
+  {
+    "name": "Stool",
+    "game_id": "ITEM_NO_STOOL",
+    "item_number": 294
+  },
+  {
+    "name": "Chair",
+    "game_id": "ITEM_NO_CHAIR_5",
+    "item_number": 295
+  },
+  {
+    "name": "Quickstep Smoothie",
+    "game_id": "ITEM_NO_JUICE_QUICK_STEP",
+    "item_number": 302
+  },
+  {
+    "name": "Randomizer Smoothie",
+    "game_id": "ITEM_NO_JUICE_RANDOMIZER",
+    "item_number": 303
+  },
+  {
+    "name": "Untouchable Smoothie",
+    "game_id": "ITEM_NO_JUICE_UNTOUCHABLE",
+    "item_number": 304
+  },
+  {
+    "name": "Spitfire Smoothie",
+    "game_id": "ITEM_NO_JUICE_SPITFIRE",
+    "item_number": 305
+  },
+  {
+    "name": "Nectar Smoothie",
+    "game_id": "ITEM_NO_JUICE_NECTAR",
+    "item_number": 306
+  },
+  {
+    "name": "Energizer Smoothie",
+    "game_id": "ITEM_NO_JUICE_ENERGIZER",
+    "item_number": 307
+  },
+  {
+    "name": "Zombait Smoothie",
+    "game_id": "ITEM_NO_JUICE_ZOMBAIT",
+    "item_number": 308
+  },
+  {
+    "name": "Melted Ice Pops",
+    "game_id": "ITEM_NO_MELTED_ICE_POPS",
+    "item_number": 312
+  },
+  {
+    "name": "Thawed Vegetables",
+    "game_id": "ITEM_NO_THAWED_VEGETABLES",
+    "item_number": 313
+  }
+]

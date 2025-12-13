@@ -91,7 +91,6 @@ location_tables = {
     "Helipad": [
         # Events in Helipad
         DRLocationData("Get bit!", "Milk", DRLocationCategory.OVERTIME_SCOOP),
-        DRLocationData("Get bit!", "Milk", DRLocationCategory.OVERTIME_SCOOP),
         DRLocationData("Ending A: Solve all of the cases and be on the helipad at 12pm", "Milk", DRLocationCategory.MAIN_SCOOP),
         DRLocationData("Ending B: Don't solve all of the cases but be on the helipad at 12pm", "Milk", DRLocationCategory.MAIN_SCOOP),
         DRLocationData("Ending C: Solve all of the cases but don't meet Isabela at 10am", "Milk", DRLocationCategory.MAIN_SCOOP),

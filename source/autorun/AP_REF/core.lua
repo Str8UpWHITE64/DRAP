@@ -96,10 +96,8 @@ local disconnect_client = false
 
 local DEBUG = false
 
-local function debug_print(str)
-	if DEBUG then
-		log.debug(str)
-	end
+local function log(msg)
+    print("[core] " .. tostring(msg))
 end
 
 local function callback_passthrough()
@@ -107,20 +105,20 @@ local function callback_passthrough()
 end
 
 local function callback_passthrough_one_arg(pass)
-	debug_print(pass)
+	log(pass)
 	a = 1 + 1
 end
 
 local function callback_passthrough_two_arg(pass1, pass2)
-	debug_print(pass1)
-	debug_print(pass2)
+	log(pass1)
+	log(pass2)
 	a = 1 + 1
 end
 
 local function callback_passthrough_three_arg(pass1, pass2, pass3)
-	debug_print(pass1)
-	debug_print(pass2)
-	debug_print(pass3)
+	log(pass1)
+	log(pass2)
+	log(pass3)
 	a = 1 + 1
 end
 
@@ -203,29 +201,29 @@ AP_REF.on_set_reply = callback_passthrough_one_arg
 
 local function set_socket_connected_handler(callback)
 	function socket_connected()
-		debug_print("Socket connected")
+		log("Socket connected")
 		callback()
 	end
 	AP_REF.APClient:set_socket_connected_handler(socket_connected)
 end
 local function set_socket_error_handler(callback)
 	function socket_error_handler(msg)
-		debug_print("Socket error")
-		debug_print(msg)
+		log("Socket error")
+		log(msg)
 		callback(msg)
 	end
 	AP_REF.APClient:set_socket_error_handler(socket_error_handler)
 end
 local function set_socket_disconnected_handler(callback)
 	function socket_disconnected_handler()
-		debug_print("Socket disconnected")
+		log("Socket disconnected")
 		callback()
 	end
 	AP_REF.APClient:set_socket_disconnected_handler(socket_disconnected_handler)
 end
 local function set_room_info_handler(callback)
 	function room_info_handler()
-		debug_print("Room info")
+		log("Room info")
 		callback()
 		
 		AP_REF.APClient:ConnectSlot(AP_REF.APSlot, AP_REF.APPassword, AP_REF.APItemsHandling, {"Lua-APClientPP"}, {0, 6, 3})
@@ -234,7 +232,7 @@ local function set_room_info_handler(callback)
 end
 local function set_slot_connected_handler(callback)
 	function slot_connected_handler(slot_data)
-		debug_print("Slot connected")
+		log("Slot connected")
 
         local tags = {"Lua-APClientPP"}
 
@@ -258,7 +256,7 @@ end
 local function set_slot_refused_handler(callback)
 	function slot_refused_handler(reasons)
         table.insert(textLog, {{text = table.concat(reasons, ", ")}})
-		debug_print("Slot refused: " .. table.concat(reasons, ", "))
+		log("Slot refused: " .. table.concat(reasons, ", "))
 		callback(reasons)
 		disconnect_client = true
 	end
@@ -266,44 +264,44 @@ local function set_slot_refused_handler(callback)
 end
 local function set_items_received_handler(callback)
 	function items_received_handler(items)
-		debug_print("Items received")
+		log("Items received")
 		callback(items)
 	end
 	AP_REF.APClient:set_items_received_handler(items_received_handler)
 end
 local function set_location_info_handler(callback)
 	function location_info_handler(items)
-		debug_print("Locations info")
+		log("Locations info")
 		callback(items)
 	end
 	AP_REF.APClient:set_location_info_handler(location_info_handler)
 end
 local function set_location_checked_handler(callback)
 	function location_checked_handler(locations)
-		debug_print("Locations checked")
+		log("Locations checked")
 		callback(locations)
 	end
 	AP_REF.APClient:set_location_checked_handler(location_checked_handler)
 end
 local function set_data_package_changed_handler(callback)
 	function data_package_changed_handler(data_package)
-		debug_print("Data package changed")
+		log("Data package changed")
 		callback(data_package)
 	end
 	AP_REF.APClient:set_data_package_changed_handler(data_package_changed_handler)
 end
 local function set_print_handler(callback)
 	function print_handler(msg)
-		debug_print("Print")
+		log("Print")
 		callback(msg)
 		table.insert(textLog, {{text = msg}})
-		--debug_print(msg)
+		--log(msg)
 	end
 	AP_REF.APClient:set_print_handler(print_handler)
 end
 local function set_print_json_handler(callback)
 	function print_json_handler(msg, extra)
-		debug_print("Print json")
+		log("Print json")
 		callback(msg, extra)
 		message = {}
 		for i, val in ipairs(msg) do
@@ -315,21 +313,21 @@ local function set_print_json_handler(callback)
 end
 local function set_bounced_handler(callback)
 	function bounced_handler(bounce)
-		debug_print("Bounce")
+		log("Bounce")
 		callback(bounce)
 	end
 	AP_REF.APClient:set_bounced_handler(bounced_handler)
 end
 local function set_retrieved_handler(callback)
 	function retrieved_handler(map, keys, extra)
-		debug_print("Retrieved")
+		log("Retrieved")
 		callback(map, keys, extra)
 	end
 	AP_REF.APClient:set_retrieved_handler(retrieved_handler)
 end
 local function set_set_reply_handler(callback)
 	function set_reply_handler(message)
-		debug_print("Set Reply")
+		log("Set Reply")
 		callback(message)
 	end
 	AP_REF.APClient:set_set_reply_handler(set_reply_handler)
@@ -339,7 +337,7 @@ function APConnect(host)
     local uuid = ""
     AP_REF.APClient = AP(uuid, AP_REF.APGameName, host)
     table.insert(textLog, {{ text = "Connecting..." }})
-    debug_print("Connecting")
+    log("Connecting")
     set_socket_connected_handler(AP_REF.on_socket_connected)
     set_socket_error_handler(AP_REF.on_socket_error)
     set_socket_disconnected_handler(AP_REF.on_socket_disconnected)
