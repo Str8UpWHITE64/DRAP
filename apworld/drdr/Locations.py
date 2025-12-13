@@ -422,7 +422,7 @@ location_tables = {
     "Tunnels": [
         DRLocationData("Get to the humvee", "Milk", DRLocationCategory.OVERTIME_SCOOP),
         DRLocationData("Fight a tank and win", "Milk", DRLocationCategory.OVERTIME_SCOOP),
-        DRLocationData("Ending S: Beat up Brock with your bare fists!", "Milk", DRLocationCategory.OVERTIME_SCOOP),
+        DRLocationData("Ending S: Beat up Brock with your bare fists!", "Victory", DRLocationCategory.EVENT),
     ],
 
     "Level Ups": [
