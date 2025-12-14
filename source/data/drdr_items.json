@@ -150,7 +150,7 @@
     "item_number": 32
   },
   {
-    "name": "Pick Ax",
+    "name": "Pickaxe",
     "game_id": "ITEM_NO_PICK_AX",
     "item_number": 33
   },
@@ -785,17 +785,17 @@
     "item_number": 196
   },
   {
-    "name": "Novelty Mask (Ghoul)",
+    "name": "Novelty Mask (Horse)",
     "game_id": "ITEM_NO_NOVELTY_MASK_1",
     "item_number": 197
   },
   {
-    "name": "Novelty Mask (Horse)",
+    "name": "Novelty Mask (Servbot)",
     "game_id": "ITEM_NO_NOVELTY_MASK_2",
     "item_number": 198
   },
   {
-    "name": "Novelty Mask (Servbot)",
+    "name": "Novelty Mask (Ghoul)",
     "game_id": "ITEM_NO_NOVELTY_MASK_3",
     "item_number": 199
   },
@@ -1060,7 +1060,7 @@
     "item_number": 264
   },
   {
-    "name": "Heavy Machine Gun",
+    "name": "Heavy Machinegun",
     "game_id": "ITEM_NO_HEAVY_MACHINE_GUN_2",
     "item_number": 265
   },
