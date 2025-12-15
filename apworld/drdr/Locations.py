@@ -267,7 +267,7 @@ location_tables = {
         DRLocationData("Rescue Tonya Waters", "Well Done Steak", DRLocationCategory.SURVIVOR),
         DRLocationData("Rescue Ross Folk", "Yogurt", DRLocationCategory.SURVIVOR),
         DRLocationData("Rescue Kay Nelson", "Apple", DRLocationCategory.SURVIVOR),
-        DRLocationData("Rescue Lilly Deadon", "Milk", DRLocationCategory.SURVIVOR),
+        DRLocationData("Rescue Lilly Deacon", "Milk", DRLocationCategory.SURVIVOR),
         DRLocationData("Rescue Kelly Carpenter", "Coffee Creamer", DRLocationCategory.SURVIVOR),
         DRLocationData("Rescue Janet Star", "Wine", DRLocationCategory.SURVIVOR),
         DRLocationData("Rescue Sally Mills", "Well Done Steak", DRLocationCategory.SURVIVOR),

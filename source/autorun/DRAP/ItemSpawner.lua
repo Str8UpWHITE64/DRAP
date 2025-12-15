@@ -172,6 +172,9 @@ local function ensure_inventory()
     return true
 end
 
+function M.inventory_system_running()
+    return ensure_inventory()
+end
 ------------------------------------------------
 -- Inventory capacity helpers
 ------------------------------------------------
@@ -225,13 +228,19 @@ end
 ------------------------------------------------
 -- Process queue
 ------------------------------------------------
-
+local current_time = nil
 local function process_pending_items()
     if pending_count() == 0 then
         return
     end
 
     if not ensure_inventory() then
+        return
+    end
+
+    current_time = AP.TimeGate.get_current_time()
+
+    if current_time <= 43200 then
         return
     end
 

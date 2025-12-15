@@ -166,7 +166,8 @@ function M.is_new_game()
     local clock = ti.CurrentSecond
     local new_game = false
     log("Current time: " .. tostring(clock))
-    if clock == 43200 or clock == 0 then
+    local current_event = AP.EventTracker.CURRENT_EVENT_NAME
+    if clock <= 43200  and current_event == "EVENT01" then -- or clock == 0 then
         log("Detected new game start time.")
         new_game = true
     end

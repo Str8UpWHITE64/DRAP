@@ -18,6 +18,7 @@ end
 
 local SaveService_TYPE_NAME = "via.storage.saveService.SaveService"
 local base_save_mount = "./win64_save"
+-- local base_save_mount = "C:/Program Files (x86)/Steam/userdata/68435245/2527390/remote/win64_save"
 
 ------------------------------------------------
 -- Helpers
@@ -39,28 +40,72 @@ local function sanitize_slot_name(name)
     return name
 end
 
--- Build the new mount path from original + slot + seed
-local function build_new_mount(orig_mount_str, slot_name, seed)
+local function clean_string(input)
+    if input == nil then return "" end
 
-    local trimmed = orig_mount_str:gsub("[\\/]+$", "")  -- trim trailing slashes
-    local parent, leaf = trimmed:match("^(.*[\\/])([^\\/]+)$")
-    local base_leaf
-    if parent and leaf then
-        base_leaf = leaf
-    else
-        parent    = trimmed .. "\\"
-        base_leaf = "DRDR"
+    -- If it's already a Lua string
+    if type(input) == "string" then
+        return input:gsub("%z", "")
     end
 
-    local safe_slot = sanitize_slot_name(slot_name)
-    local seed_part = seed and ("_s" .. tostring(seed)) or ""
+    -- Try to convert managed string properly
+    local mo = sdk.to_managed_object(input)
+    if mo ~= nil then
+        local ok, s = pcall(sdk.to_string, mo)
+        if ok and type(s) == "string" then
+            return s:gsub("%z", "")
+        end
+    end
 
-    local new_leaf  = base_leaf .. "_AP_" .. safe_slot .. seed_part
-    local new_mount = parent .. new_leaf .. "\\"
-
-    log(("Original mount '%s' -> new mount '%s'"):format(trimmed, new_mount))
-    return new_mount
+    -- Fallback
+    local s = tostring(input):gsub("%z", "")
+    return s
 end
+
+local function clean_path(p)
+    p = clean_string(p)
+    -- keep only reasonable path chars
+    p = p:gsub("[%c\128-\255]", "")
+    p = p:gsub("\\", "/")
+    p = p:gsub("/+$", "")
+    return p
+end
+
+local function clean_token(s)
+    s = clean_string(s)
+    s = s:gsub("%z", "")
+    s = s:gsub("[%c\128-\255]", "")
+    s = s:gsub("[^%w%-%_%.]", "_")  -- replace, don’t delete
+    s = s:gsub("_+", "_"):gsub("^_+", ""):gsub("_+$", "")
+    return s
+end
+
+
+
+-- Build the new mount path from original + slot + seed
+local function build_redirect_path(current_path, slot_name, seed)
+    local norm_path = clean_path(current_path)
+
+    local safe_slot = clean_token(slot_name)
+    local safe_seed = clean_token(seed)
+
+    local seed_part = (safe_seed ~= "" and safe_seed ~= "nil") and ("_s" .. safe_seed) or ""
+    local folder_suffix = "_AP_" .. safe_slot .. seed_part
+
+    if norm_path:find(folder_suffix, 1, true) then
+        return norm_path
+    end
+
+    local existing_ap_idx = norm_path:find("_AP_", 1, true)
+    if existing_ap_idx then
+        norm_path = norm_path:sub(1, existing_ap_idx - 1):gsub("/+$", "")
+    end
+
+    return norm_path .. folder_suffix
+end
+
+
+
 
 ------------------------------------------------
 -- GameManager access
@@ -100,10 +145,15 @@ local function apply_mount_redirect(slot_name, seed)
         return false
     end
 
-    log("Original SaveMountPath: " .. orig_mount_str)
+    -- Read current path
+    local current_path_obj = get_mount_m:call(svc)
+    local current_path_str = clean_path(current_path_obj)
+
+    -- log("Original SaveMountPath: " .. orig_mount_str)
 
     -- Build new mount for this AP slot/seed
-    local new_mount = build_new_mount(orig_mount_str, slot_name, seed)
+    local new_mount = build_redirect_path(current_path_str, slot_name, seed)
+
 
     -- Apply new mount
     local ok_set, err = pcall(function()
@@ -124,7 +174,7 @@ local function apply_mount_redirect(slot_name, seed)
             upd_m:call(svc)
         end)
         if ok_upd then
-            log("updateSaveFileDetailTbl() called successfully.")
+            print("updateSaveFileDetailTbl() called successfully.")
         else
             log("updateSaveFileDetailTbl() call failed: " .. tostring(err_upd))
         end
@@ -141,8 +191,9 @@ end
 
 -- Call this once after you've connected and know slot/seed
 function M.apply_for_slot(slot_name, seed)
-    log(("Applying AP save mount for slot='%s', seed='%s'")
-        :format(tostring(slot_name), tostring(seed)))
+    local clean_slot = clean_token(slot_name)
+    local clean_seed = clean_token(seed)
+    log("Applying redirect -> Slot: " .. clean_slot .. " | Seed: " .. clean_seed)
     local ok = apply_mount_redirect(slot_name, seed)
     if not ok then
         log("AP save mount redirect FAILED.")

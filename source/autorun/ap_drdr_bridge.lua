@@ -6,64 +6,12 @@ local M = {}
 ------------------------------------------------------------
 -- Logging helper
 ------------------------------------------------------------
-local function sanitize(s)
-    s = tostring(s or "")
-    s = s:gsub("[%c\128-\255]", ".")
-    return s
-end
 
 local function log(msg)
-    print("[AP-DRDR-Bridge] " .. sanitize(msg))
+    print("[AP-DRDR-Bridge] " .. tostring(msg))
 end
-
 
 local dumped = false
-
-local function dump_apclient_methods_once()
-    if dumped or not AP_REF.APClient then return end
-    dumped = true
-
-    log("Dumping APClient methods (metatable __index):")
-    local mt = debug.getmetatable(AP_REF.APClient)
-    if not mt then
-        log("  (no metatable)")
-        return
-    end
-
-    local idx = mt.__index
-    if type(idx) ~= "table" then
-        log("  (__index is not a table)")
-        return
-    end
-
-    local names = {}
-    for k, v in pairs(idx) do
-        if type(v) == "function" then
-            table.insert(names, tostring(k))
-        end
-    end
-    table.sort(names)
-
-    for _, n in ipairs(names) do
-        -- keep output readable
-        if n:lower():find("data") or n:lower():find("sync") or n:lower():find("package") or n:lower():find("room") then
-            log("  " .. n)
-        end
-    end
-end
-
-local function try_call_method(name, ...)
-    local fn = AP_REF.APClient and AP_REF.APClient[name]
-    if type(fn) ~= "function" then
-        print("[AP-DRDR-Bridge] APClient has no method: " .. name)
-        return false, nil
-    end
-    local ok, res = pcall(fn, AP_REF.APClient, ...)
-    print(string.format("[AP-DRDR-Bridge] %s() -> ok=%s type=%s",
-        name, tostring(ok), tostring(type(res))
-    ))
-    return ok, res
-end
 
 ------------------------------------------------------------
 -- Data Package
@@ -206,15 +154,14 @@ end
 -- Item tracking + persistence
 ------------------------------------------------------------
 
--- File to persist received items between sessions
-local RECEIVED_ITEMS_FILE = "AP_DRDR_items.json"
-
 -- list of { index, item_id, item_name, sender, flags }
 local RECEIVED_ITEMS        = {}
 -- name -> count
 local RECEIVED_ITEMS_BY_NAME = {}
 -- highest AP index we've processed
 local last_item_index = -1
+
+local RECEIVED_ITEMS_FILE = nil
 
 local function safe_filename(s)
     s = tostring(s or "unknown")
@@ -223,12 +170,13 @@ local function safe_filename(s)
     return s
 end
 
- function M.set_received_items_filename(slot_name, seed)
-    local slot = safe_filename(slot_name)
-    local sd   = safe_filename(seed)
-    RECEIVED_ITEMS_FILE = string.format("AP_DRDR_Items/AP_DRDR_items_%s_%s.json", slot, sd)
-    log("Using received-items file: " .. RECEIVED_ITEMS_FILE)
+function M.set_received_items_filename(slot_name, seed)
+    local slot = safe_filename(tostring(slot_name or ""))
+    local sd   = safe_filename(tostring(seed or ""))
+    RECEIVED_ITEMS_FILE = string.format("./AP_DRDR_Items/AP_DRDR_items_%s_%s.json", slot, sd)
+    -- log(string.format("Using received-items file: %q", RECEIVED_ITEMS_FILE))
 end
+
 
 local function reset_received_items_state()
     RECEIVED_ITEMS = {}
@@ -258,11 +206,11 @@ function M.load_received_items()
     last_item_index = data.last_item_index or -1
     rebuild_name_counts()
 
-    log(string.format(
-        "Loaded received-items file '%s': %d items, last_index=%d",
-        tostring(RECEIVED_ITEMS_FILE),
-        #RECEIVED_ITEMS, last_item_index
-    ))
+    -- log(string.format(
+    --     "Loaded received-items file '%s': %d items, last_index=%d",
+    --     tostring(RECEIVED_ITEMS_FILE),
+    --     #RECEIVED_ITEMS, last_item_index
+    -- ))
 end
 
 
@@ -338,6 +286,7 @@ local function handle_net_item(net_item, is_replay)
         "Applying AP item index=%d id=%d (%s) from %s (replay=%s)",
         index, item_id, tostring(item_name), tostring(sender_name), tostring(is_replay)
     ))
+
 
     -- Store only for *new* items
     if not is_replay then
