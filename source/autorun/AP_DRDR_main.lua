@@ -478,16 +478,37 @@ AP_REF.on_slot_connected = function(slot_data)
 end
 
 local was_in_game = false
+local pending_reapply_check = false
+local reapply_done = false
 
 local function on_enter_game()
     print("[DRAP] Entered gameplay.")
+    pending_reapply_check = true
+    reapply_done = false
+end
 
+local function try_reapply_items_if_ready()
+    if not pending_reapply_check or reapply_done then
+        return
+    end
+
+    -- Wait until inventory system is actually alive
+    if not AP.ItemSpawner.inventory_system_running() then
+        return
+    end
+
+    -- Now inventory exists; safe to check time
     if AP.TimeGate and AP.TimeGate.is_new_game and AP.TimeGate.is_new_game() then
-        print("[DRAP] New game detected; reapplying AP items.")
+        print("[DRAP] New game confirmed; reapplying AP items.")
         AP.AP_BRIDGE.reapply_all_items()
     end
+
     apply_permanent_effects_from_ap()
+
+    reapply_done = true
+    pending_reapply_check = false
 end
+
 
 re.on_frame(function()
     -- Resolve isInGame safely
@@ -519,6 +540,7 @@ re.on_frame(function()
         pcall(on_enter_game)
     end
     was_in_game = now_in_game
+    try_reapply_items_if_ready()
 end)
 
 print("[DRAP] Main script loaded.")
