@@ -247,67 +247,67 @@ local TIME_CAPS = {
 }
 local function apply_permanent_effects_from_ap()
     -- Example: door keys
-    if AP_BRIDGE.has_item_name("Helipad Key") then
+    if AP_BRIDGE.has_item_name("Helipad key") then
         AP.DoorSceneLock.unlock_scene("s135")
     end
 
-    if AP_BRIDGE.has_item_name("Safe Room Key") then
+    if AP_BRIDGE.has_item_name("Safe Room key") then
         AP.DoorSceneLock.unlock_scene("s136")
     end
 
-    if AP_BRIDGE.has_item_name("Rooftop Key") then
+    if AP_BRIDGE.has_item_name("Rooftop key") then
         AP.DoorSceneLock.unlock_scene("s231")
     end
 
-    if AP_BRIDGE.has_item_name("Service Hallway Key") then
+    if AP_BRIDGE.has_item_name("Service Hallway key") then
         AP.DoorSceneLock.unlock_scene("s230")
     end
 
-    if AP_BRIDGE.has_item_name("Paradise Plaza Key") then
+    if AP_BRIDGE.has_item_name("Paradise Plaza key") then
         AP.DoorSceneLock.unlock_scene("s200")
     end
 
-    if AP_BRIDGE.has_item_name("Colby's Movie Theater Key") then
+    if AP_BRIDGE.has_item_name("Colby's Movie Theater key") then
         AP.DoorSceneLock.unlock_scene("s503")
     end
 
-    if AP_BRIDGE.has_item_name("Leisure Park Key") then
+    if AP_BRIDGE.has_item_name("Leisure Park key") then
         AP.DoorSceneLock.unlock_scene("s700")
     end
 
-    if AP_BRIDGE.has_item_name("North Plaza Key") then
+    if AP_BRIDGE.has_item_name("North Plaza key") then
         AP.DoorSceneLock.unlock_scene("s400")
     end
 
-    if AP_BRIDGE.has_item_name("Crislip's Hardware Store Key") then
+    if AP_BRIDGE.has_item_name("Crislip's Hardware Store key") then
         AP.DoorSceneLock.unlock_scene("s501")
     end
 
-    if AP_BRIDGE.has_item_name("Food Court Key") then
+    if AP_BRIDGE.has_item_name("Food Court key") then
         AP.DoorSceneLock.unlock_scene("sa00")
     end
 
-    if AP_BRIDGE.has_item_name("Wonderland Plaza Key") then
+    if AP_BRIDGE.has_item_name("Wonderland Plaza key") then
         AP.DoorSceneLock.unlock_scene("s300")
     end
 
-    if AP_BRIDGE.has_item_name("Al Fresca Plaza Key") then
+    if AP_BRIDGE.has_item_name("Al Fresca Plaza key") then
         AP.DoorSceneLock.unlock_scene("s900")
     end
 
-    if AP_BRIDGE.has_item_name("Entrance Plaza Key") then
+    if AP_BRIDGE.has_item_name("Entrance Plaza key") then
         AP.DoorSceneLock.unlock_scene("s100")
     end
 
-    if AP_BRIDGE.has_item_name("Grocery Store Key") then
+    if AP_BRIDGE.has_item_name("Grocery Store key") then
         AP.DoorSceneLock.unlock_scene("s500")
     end
 
-    if AP_BRIDGE.has_item_name("Maintenance Tunnel Key") then
+    if AP_BRIDGE.has_item_name("Maintenance Tunnel key") then
         AP.DoorSceneLock.unlock_scene("s600")
     end
 
-    if AP_BRIDGE.has_item_name("Hideout Key") then
+    if AP_BRIDGE.has_item_name("Hideout key") then
         AP.DoorSceneLock.unlock_scene("s401")
     end
 
