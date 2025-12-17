@@ -251,6 +251,16 @@ local function ensure_update_hint_method()
     return true
 end
 
+------------------------------------------------
+-- Custom logic
+------------------------------------------------
+
+function M.on_pp_sticker_area_progress()
+    local loc = ("Photograph PP Sticker 100")
+    if AP and AP.AP_BRIDGE and AP.AP_BRIDGE.check then
+        AP.AP_BRIDGE.check(loc)
+    end
+end
 
 ------------------------------------------------
 -- Hook install
