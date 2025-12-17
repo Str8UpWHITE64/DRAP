@@ -355,9 +355,6 @@ local function apply_permanent_effects_from_ap()
     end
 end
 
-local function check_latest_timecap()
-
-
 ------------------------------------------------------------
 -- Re-apply items and effects on new game
 ------------------------------------------------------------
