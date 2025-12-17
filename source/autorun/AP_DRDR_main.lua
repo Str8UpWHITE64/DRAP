@@ -67,7 +67,7 @@ register_spawn_handlers_from_json()
 -- Register remaining items
 -- Area unlocks:
 AP_BRIDGE.register_item_handler_by_name("Helipad key", function(net_item, item_name, sender_name)
-    print(string.format("[DRAP-AP] Applying progression item '%s' from %s: unlock security room",
+    print(string.format("[DRAP-AP] Applying progression item '%s' from %s.",
         tostring(item_name), tostring(sender_name or "?")
     ))
 
@@ -75,7 +75,7 @@ AP_BRIDGE.register_item_handler_by_name("Helipad key", function(net_item, item_n
 end)
 
 AP_BRIDGE.register_item_handler_by_name("Safe Room key", function(net_item, item_name, sender_name)
-    print(string.format("[DRAP-AP] Applying progression item '%s' from %s: unlock security room",
+    print(string.format("[DRAP-AP] Applying progression item '%s' from %s.",
         tostring(item_name), tostring(sender_name or "?")
     ))
 
@@ -83,7 +83,7 @@ AP_BRIDGE.register_item_handler_by_name("Safe Room key", function(net_item, item
 end)
 
 AP_BRIDGE.register_item_handler_by_name("Rooftop key", function(net_item, item_name, sender_name)
-    print(string.format("[DRAP-AP] Applying progression item '%s' from %s: unlock security room",
+    print(string.format("[DRAP-AP] Applying progression item '%s' from %s.",
         tostring(item_name), tostring(sender_name or "?")
     ))
 
@@ -91,7 +91,7 @@ AP_BRIDGE.register_item_handler_by_name("Rooftop key", function(net_item, item_n
 end)
 
 AP_BRIDGE.register_item_handler_by_name("Service Hallway key", function(net_item, item_name, sender_name)
-    print(string.format("[DRAP-AP] Applying progression item '%s' from %s: unlock security room",
+    print(string.format("[DRAP-AP] Applying progression item '%s' from %s.",
         tostring(item_name), tostring(sender_name or "?")
     ))
 
@@ -99,7 +99,7 @@ AP_BRIDGE.register_item_handler_by_name("Service Hallway key", function(net_item
 end)
 
 AP_BRIDGE.register_item_handler_by_name("Paradise Plaza key", function(net_item, item_name, sender_name)
-    print(string.format("[DRAP-AP] Applying progression item '%s' from %s: unlock security room",
+    print(string.format("[DRAP-AP] Applying progression item '%s' from %s.",
         tostring(item_name), tostring(sender_name or "?")
     ))
 
@@ -107,7 +107,7 @@ AP_BRIDGE.register_item_handler_by_name("Paradise Plaza key", function(net_item,
 end)
 
 AP_BRIDGE.register_item_handler_by_name("Colby's Movie Theater key", function(net_item, item_name, sender_name)
-    print(string.format("[DRAP-AP] Applying progression item '%s' from %s: unlock security room",
+    print(string.format("[DRAP-AP] Applying progression item '%s' from %s.",
         tostring(item_name), tostring(sender_name or "?")
     ))
 
@@ -115,7 +115,7 @@ AP_BRIDGE.register_item_handler_by_name("Colby's Movie Theater key", function(ne
 end)
 
 AP_BRIDGE.register_item_handler_by_name("Leisure Park key", function(net_item, item_name, sender_name)
-    print(string.format("[DRAP-AP] Applying progression item '%s' from %s: unlock security room",
+    print(string.format("[DRAP-AP] Applying progression item '%s' from %s.",
         tostring(item_name), tostring(sender_name or "?")
     ))
 
@@ -123,7 +123,7 @@ AP_BRIDGE.register_item_handler_by_name("Leisure Park key", function(net_item, i
 end)
 
 AP_BRIDGE.register_item_handler_by_name("North Plaza key", function(net_item, item_name, sender_name)
-    print(string.format("[DRAP-AP] Applying progression item '%s' from %s: unlock security room",
+    print(string.format("[DRAP-AP] Applying progression item '%s' from %s.",
         tostring(item_name), tostring(sender_name or "?")
     ))
 
@@ -131,7 +131,7 @@ AP_BRIDGE.register_item_handler_by_name("North Plaza key", function(net_item, it
 end)
 
 AP_BRIDGE.register_item_handler_by_name("Crislip's Hardware Store key", function(net_item, item_name, sender_name)
-    print(string.format("[DRAP-AP] Applying progression item '%s' from %s: unlock security room",
+    print(string.format("[DRAP-AP] Applying progression item '%s' from %s.",
         tostring(item_name), tostring(sender_name or "?")
     ))
 
@@ -139,7 +139,7 @@ AP_BRIDGE.register_item_handler_by_name("Crislip's Hardware Store key", function
 end)
 
 AP_BRIDGE.register_item_handler_by_name("Food Court key", function(net_item, item_name, sender_name)
-    print(string.format("[DRAP-AP] Applying progression item '%s' from %s: unlock security room",
+    print(string.format("[DRAP-AP] Applying progression item '%s' from %s.",
         tostring(item_name), tostring(sender_name or "?")
     ))
 
@@ -147,7 +147,7 @@ AP_BRIDGE.register_item_handler_by_name("Food Court key", function(net_item, ite
 end)
 
 AP_BRIDGE.register_item_handler_by_name("Wonderland Plaza key", function(net_item, item_name, sender_name)
-    print(string.format("[DRAP-AP] Applying progression item '%s' from %s: unlock security room",
+    print(string.format("[DRAP-AP] Applying progression item '%s' from %s.",
         tostring(item_name), tostring(sender_name or "?")
     ))
 
@@ -155,7 +155,7 @@ AP_BRIDGE.register_item_handler_by_name("Wonderland Plaza key", function(net_ite
 end)
 
 AP_BRIDGE.register_item_handler_by_name("Al Fresca Plaza key", function(net_item, item_name, sender_name)
-    print(string.format("[DRAP-AP] Applying progression item '%s' from %s: unlock security room",
+    print(string.format("[DRAP-AP] Applying progression item '%s' from %s.",
         tostring(item_name), tostring(sender_name or "?")
     ))
 
@@ -163,7 +163,7 @@ AP_BRIDGE.register_item_handler_by_name("Al Fresca Plaza key", function(net_item
 end)
 
 AP_BRIDGE.register_item_handler_by_name("Entrance Plaza key", function(net_item, item_name, sender_name)
-    print(string.format("[DRAP-AP] Applying progression item '%s' from %s: unlock security room",
+    print(string.format("[DRAP-AP] Applying progression item '%s' from %s.",
         tostring(item_name), tostring(sender_name or "?")
     ))
 
@@ -171,7 +171,7 @@ AP_BRIDGE.register_item_handler_by_name("Entrance Plaza key", function(net_item,
 end)
 
 AP_BRIDGE.register_item_handler_by_name("Grocery Store key", function(net_item, item_name, sender_name)
-    print(string.format("[DRAP-AP] Applying progression item '%s' from %s: unlock security room",
+    print(string.format("[DRAP-AP] Applying progression item '%s' from %s.",
         tostring(item_name), tostring(sender_name or "?")
     ))
 
@@ -179,7 +179,7 @@ AP_BRIDGE.register_item_handler_by_name("Grocery Store key", function(net_item, 
 end)
 
 AP_BRIDGE.register_item_handler_by_name("Maintenance Tunnel key", function(net_item, item_name, sender_name)
-    print(string.format("[DRAP-AP] Applying progression item '%s' from %s: unlock security room",
+    print(string.format("[DRAP-AP] Applying progression item '%s' from %s.",
         tostring(item_name), tostring(sender_name or "?")
     ))
 
@@ -187,7 +187,7 @@ AP_BRIDGE.register_item_handler_by_name("Maintenance Tunnel key", function(net_i
 end)
 
 AP_BRIDGE.register_item_handler_by_name("Hideout key", function(net_item, item_name, sender_name)
-    print(string.format("[DRAP-AP] Applying progression item '%s' from %s: unlock security room",
+    print(string.format("[DRAP-AP] Applying progression item '%s' from %s.",
         tostring(item_name), tostring(sender_name or "?")
     ))
 
@@ -196,7 +196,7 @@ end)
 
 -- Time Locks
 AP_BRIDGE.register_item_handler_by_name("DAY2_06_AM", function(net_item, item_name, sender_name)
-    print(string.format("[DRAP-AP] Applying progression item '%s' from %s: unlock security room",
+    print(string.format("[DRAP-AP] Applying progression item '%s' from %s.",
         tostring(item_name), tostring(sender_name or "?")
     ))
 
@@ -204,7 +204,7 @@ AP_BRIDGE.register_item_handler_by_name("DAY2_06_AM", function(net_item, item_na
 end)
 
 AP_BRIDGE.register_item_handler_by_name("DAY2_11_AM", function(net_item, item_name, sender_name)
-    print(string.format("[DRAP-AP] Applying progression item '%s' from %s: unlock security room",
+    print(string.format("[DRAP-AP] Applying progression item '%s' from %s.",
         tostring(item_name), tostring(sender_name or "?")
     ))
 
@@ -212,7 +212,7 @@ AP_BRIDGE.register_item_handler_by_name("DAY2_11_AM", function(net_item, item_na
 end)
 
 AP_BRIDGE.register_item_handler_by_name("DAY3_00_AM", function(net_item, item_name, sender_name)
-    print(string.format("[DRAP-AP] Applying progression item '%s' from %s: unlock security room",
+    print(string.format("[DRAP-AP] Applying progression item '%s' from %s.",
         tostring(item_name), tostring(sender_name or "?")
     ))
 
@@ -220,7 +220,7 @@ AP_BRIDGE.register_item_handler_by_name("DAY3_00_AM", function(net_item, item_na
 end)
 
 AP_BRIDGE.register_item_handler_by_name("DAY3_11_AM", function(net_item, item_name, sender_name)
-    print(string.format("[DRAP-AP] Applying progression item '%s' from %s: unlock security room",
+    print(string.format("[DRAP-AP] Applying progression item '%s' from %s.",
         tostring(item_name), tostring(sender_name or "?")
     ))
 
@@ -228,7 +228,7 @@ AP_BRIDGE.register_item_handler_by_name("DAY3_11_AM", function(net_item, item_na
 end)
 
 AP_BRIDGE.register_item_handler_by_name("DAY4_12_PM", function(net_item, item_name, sender_name)
-    print(string.format("[DRAP-AP] Applying progression item '%s' from %s: unlock security room",
+    print(string.format("[DRAP-AP] Applying progression item '%s' from %s.",
         tostring(item_name), tostring(sender_name or "?")
     ))
 
@@ -245,6 +245,49 @@ local TIME_CAPS = {
     DAY3_11_AM = 165600,  -- 11:00am Day 3 - 1 hour
     DAY4_12_PM = 255600,  -- 12:00pm Day 4 - 1 hour
 }
+
+local TIME_LOCK_CHAIN = {
+    { key="DAY2_06_AM", cap=TIME_CAPS.DAY2_06_AM, unlock=function() AP.TimeGate.unlock_day2_6am() end },
+    { key="DAY2_11_AM", cap=TIME_CAPS.DAY2_11_AM, unlock=function() AP.TimeGate.unlock_day2_11am() end },
+    { key="DAY3_00_AM", cap=TIME_CAPS.DAY3_00_AM, unlock=function() AP.TimeGate.unlock_day3_12am() end },
+    { key="DAY3_11_AM", cap=TIME_CAPS.DAY3_11_AM, unlock=function() AP.TimeGate.unlock_day3_11am() end },
+    { key="DAY4_12_PM", cap=TIME_CAPS.DAY4_12_PM, unlock=function() AP.TimeGate.unlock_all_time() end },
+}
+
+local function apply_time_locks_from_ap()
+    if not (AP.TimeGate and AP.TimeGate.set_time_cap) then return end
+    if not (AP_BRIDGE and AP_BRIDGE.has_item_name) then return end
+
+    -- Walk forward while the chain is contiguous.
+    local last_unlocked_index = 0
+
+    for i, step in ipairs(TIME_LOCK_CHAIN) do
+        if AP_BRIDGE.has_item_name(step.key) then
+            -- Only valid to unlock if contiguous (i == last_unlocked_index + 1)
+            if i == last_unlocked_index + 1 then
+                step.unlock()
+                last_unlocked_index = i
+            else
+                -- Has a later key without earlier ones: do not skip ahead.
+                break
+            end
+        else
+            break
+        end
+    end
+
+    -- If we unlocked everything (last step calls unlock_all_time), we're done.
+    if last_unlocked_index >= #TIME_LOCK_CHAIN then
+        return
+    end
+
+    -- Set cap to the *next* step we do NOT have contiguously.
+    local next_step = TIME_LOCK_CHAIN[last_unlocked_index + 1]
+    if next_step and next_step.cap then
+        AP.TimeGate.set_time_cap(next_step.cap)
+    end
+end
+
 local function apply_permanent_effects_from_ap()
     -- Example: door keys
     if AP_BRIDGE.has_item_name("Helipad key") then
@@ -310,38 +353,10 @@ local function apply_permanent_effects_from_ap()
     if AP_BRIDGE.has_item_name("Hideout key") then
         AP.DoorSceneLock.unlock_scene("s401")
     end
-
-    -- Time freezes
-    if AP_BRIDGE.has_item_name("DAY2_06_AM") then
-        AP.TimeGate.unlock_day2_6am()
-
-        if AP_BRIDGE.has_item_name("DAY2_11_AM") then
-            AP.TimeGate.unlock_day2_11am()
-
-            if AP_BRIDGE.has_item_name("DAY3_00_AM") then
-                AP.TimeGate.unlock_day3_12am()
-
-                if AP_BRIDGE.has_item_name("DAY3_11_AM") then
-                    AP.TimeGate.unlock_day3_11am()
-
-                    if AP_BRIDGE.has_item_name("DAY4_12_PM") then
-                        AP.TimeGate.unlock_all_time()
-                    else
-                        AP.TimeGate.set_time_cap(TIME_CAPS.DAY4_12_PM)
-                    end
-                else
-                    AP.TimeGate.set_time_cap(TIME_CAPS.DAY3_11_AM)
-                end
-            else
-                AP.TimeGate.set_time_cap(TIME_CAPS.DAY3_00_AM)
-            end
-        else
-            AP.TimeGate.set_time_cap(TIME_CAPS.DAY2_11_AM)
-        end
-    else
-        AP.TimeGate.set_time_cap(TIME_CAPS.DAY2_06_AM)
-    end
 end
+
+local function check_latest_timecap()
+
 
 ------------------------------------------------------------
 -- Re-apply items and effects on new game
@@ -504,6 +519,7 @@ local function try_reapply_items_if_ready()
     end
 
     apply_permanent_effects_from_ap()
+    apply_time_locks_from_ap()
 
     reapply_done = true
     pending_reapply_check = false

@@ -413,6 +413,13 @@ local function fire_threshold(field_name, def, state, i, target, prev, current)
     end
 end
 
+local function fire_ppsticker_area_check(prev, current, level_path)
+    -- Call into PPStickerTracker to send a special location check
+    if AP and AP.PPStickerTracker and AP.PPStickerTracker.on_pp_sticker_area_progress then
+        pcall(AP.PPStickerTracker.on_pp_sticker_area_progress, prev, current, level_path)
+    end
+end
+
 local function handle_challenge_progress(field_name, def, state, save_obj)
     if not state.field then return end
     if not def.targets or #def.targets == 0 then return end
@@ -442,6 +449,15 @@ local function handle_challenge_progress(field_name, def, state, save_obj)
 
     -- Only care about increases for crossing thresholds
     if current > prev then
+
+        --Special check for rooftop PP Sticker
+        if field_name == "PPPhotoCount" then
+            local level_path = (AP and AP.DoorSceneLock and AP.DoorSceneLock.CurrentLevelPath) or nil
+            if level_path == "s231" then
+                fire_ppsticker_area_check()
+            end
+        end
+
         for i, target in ipairs(def.targets) do
             if target ~= nil then
                 local already = (state.reached and state.reached[i]) and true or false
