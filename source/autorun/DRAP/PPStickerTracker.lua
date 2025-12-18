@@ -255,7 +255,7 @@ end
 -- Custom logic
 ------------------------------------------------
 
-function M.on_pp_sticker_area_progress()
+function M.send_pp_sticker_100()
     local loc = ("Photograph PP Sticker 100")
     if AP and AP.AP_BRIDGE and AP.AP_BRIDGE.check then
         AP.AP_BRIDGE.check(loc)

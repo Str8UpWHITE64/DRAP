@@ -26,7 +26,7 @@ local BASEINFO_STATE_FIELD_NAME      = "mLiveState"
 local SURVIVOR_JSON_PATH             = "survivors.json" -- autorun/data/survivors.json
 
 local last_check_time = 0
-local CHECK_INTERVAL  = 1  -- seconds
+local CHECK_INTERVAL  = .5  -- seconds
 
 
 ------------------------------------------------

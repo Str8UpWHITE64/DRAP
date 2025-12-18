@@ -413,10 +413,10 @@ local function fire_threshold(field_name, def, state, i, target, prev, current)
     end
 end
 
-local function fire_ppsticker_area_check(prev, current, level_path)
+local function send_pp_sticker_100()
     -- Call into PPStickerTracker to send a special location check
-    if AP and AP.PPStickerTracker and AP.PPStickerTracker.on_pp_sticker_area_progress then
-        pcall(AP.PPStickerTracker.on_pp_sticker_area_progress, prev, current, level_path)
+    if AP and AP.PPStickerTracker and AP.PPStickerTracker.send_pp_sticker_100 then
+        pcall(AP.PPStickerTracker.send_pp_sticker_100)
     end
 end
 
@@ -453,8 +453,9 @@ local function handle_challenge_progress(field_name, def, state, save_obj)
         --Special check for rooftop PP Sticker
         if field_name == "PPPhotoCount" then
             local level_path = (AP and AP.DoorSceneLock and AP.DoorSceneLock.CurrentLevelPath) or nil
-            if level_path == "s231" then
-                fire_ppsticker_area_check()
+            local area_index = (AP and AP.DoorSceneLock and AP.DoorSceneLock.CurrentAreaIndex) or nil
+            if level_path == "s231" or area_index == 535 then
+                send_pp_sticker_100()
             end
         end
 

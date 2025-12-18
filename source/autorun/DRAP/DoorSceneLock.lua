@@ -25,6 +25,7 @@ local level_path_f = nil
 local am_warned    = false
 
 M.CurrentLevelPath = nil
+M.CurrentAreaIndex = nil
 
 ------------------------------------------------------------
 -- Scene metadata (for logs only)
@@ -338,6 +339,7 @@ local function rescan_current_area_doors()
     local area_index, level_path = get_area_info()
     local bypass_s100, ev = current_event_blocks_s100_lock()
     M.CurrentLevelPath = level_path
+    M.CurrentAreaIndex = area_index
     local res_list = get_areahit_resource_list()
     if res_list == nil then
         log("No AreaHitResource list; abort scan.")
