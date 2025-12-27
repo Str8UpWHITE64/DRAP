@@ -9,5 +9,4 @@ class GuaranteedItemsOption(ItemDict):
 @dataclass
 class DROption(PerGameCommonOptions):
     guaranteed_items: GuaranteedItemsOption
-
-
+    death_link: DeathLink

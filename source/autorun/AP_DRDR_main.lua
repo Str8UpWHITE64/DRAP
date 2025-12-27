@@ -19,6 +19,7 @@ AP.PPStickerTracker= require("DRAP/PPStickerTracker")
 AP.SaveSlot        = require("DRAP/SaveSlot")
 AP.TimeGate        = require("DRAP/TimeGate")
 AP.Scene           = require("DRAP/Scene")
+AP.DeathLink       = require("DRAP/DeathLink")
 
 ------------------------------------------------------------
 -- AP item handlers
@@ -194,50 +195,11 @@ AP_BRIDGE.register_item_handler_by_name("Hideout key", function(net_item, item_n
     AP.DoorSceneLock.unlock_scene("s401")
 end)
 
--- Time Locks
-AP_BRIDGE.register_item_handler_by_name("DAY2_06_AM", function(net_item, item_name, sender_name)
-    print(string.format("[DRAP-AP] Applying progression item '%s' from %s.",
-        tostring(item_name), tostring(sender_name or "?")
-    ))
-
-    AP.TimeGate.unlock_day2_6am()
-end)
-
-AP_BRIDGE.register_item_handler_by_name("DAY2_11_AM", function(net_item, item_name, sender_name)
-    print(string.format("[DRAP-AP] Applying progression item '%s' from %s.",
-        tostring(item_name), tostring(sender_name or "?")
-    ))
-
-    AP.TimeGate.unlock_day2_11am()
-end)
-
-AP_BRIDGE.register_item_handler_by_name("DAY3_00_AM", function(net_item, item_name, sender_name)
-    print(string.format("[DRAP-AP] Applying progression item '%s' from %s.",
-        tostring(item_name), tostring(sender_name or "?")
-    ))
-
-    AP.TimeGate.unlock_day3_12am()
-end)
-
-AP_BRIDGE.register_item_handler_by_name("DAY3_11_AM", function(net_item, item_name, sender_name)
-    print(string.format("[DRAP-AP] Applying progression item '%s' from %s.",
-        tostring(item_name), tostring(sender_name or "?")
-    ))
-
-    AP.TimeGate.unlock_day3_11am()
-end)
-
-AP_BRIDGE.register_item_handler_by_name("DAY4_12_PM", function(net_item, item_name, sender_name)
-    print(string.format("[DRAP-AP] Applying progression item '%s' from %s.",
-        tostring(item_name), tostring(sender_name or "?")
-    ))
-
-    AP.TimeGate.unlock_day4_12pm()
-end)
-
 ------------------------------------------------------------
 -- Async helpers
 ------------------------------------------------------------
+
+-- Time Locks
 local TIME_CAPS = {
     DAY2_06_AM = 61200,   -- 6:00am Day 2 - 1 hour
     DAY2_11_AM = 79200,   -- 11:00am Day 2 - 1 hour
@@ -258,17 +220,16 @@ local function apply_time_locks_from_ap()
     if not (AP.TimeGate and AP.TimeGate.set_time_cap) then return end
     if not (AP_BRIDGE and AP_BRIDGE.has_item_name) then return end
 
-    -- Walk forward while the chain is contiguous.
     local last_unlocked_index = 0
 
     for i, step in ipairs(TIME_LOCK_CHAIN) do
         if AP_BRIDGE.has_item_name(step.key) then
-            -- Only valid to unlock if contiguous (i == last_unlocked_index + 1)
             if i == last_unlocked_index + 1 then
                 step.unlock()
                 last_unlocked_index = i
+                print(string.format("[DRAP-AP] Time chain unlocked: %s (step %d/%d)", step.key, i, #TIME_LOCK_CHAIN))
             else
-                -- Has a later key without earlier ones: do not skip ahead.
+                print(string.format("[DRAP-AP] Time chain blocked: have %s but missing earlier step.", step.key))
                 break
             end
         else
@@ -276,17 +237,32 @@ local function apply_time_locks_from_ap()
         end
     end
 
-    -- If we unlocked everything (last step calls unlock_all_time), we're done.
     if last_unlocked_index >= #TIME_LOCK_CHAIN then
+        print("[DRAP-AP] Time chain fully unlocked.")
         return
     end
 
-    -- Set cap to the *next* step we do NOT have contiguously.
     local next_step = TIME_LOCK_CHAIN[last_unlocked_index + 1]
     if next_step and next_step.cap then
         AP.TimeGate.set_time_cap(next_step.cap)
+        print(string.format("[DRAP-AP] Time cap set to next required step: %s (cap=%s)", next_step.key, tostring(next_step.cap)))
     end
 end
+
+
+local function on_time_item_received(net_item, item_name, sender_name)
+    print(string.format("[DRAP-AP] Received progression item '%s' from %s; re-evaluating time locks.",
+        tostring(item_name), tostring(sender_name or "?")
+    ))
+    apply_time_locks_from_ap()
+end
+
+AP_BRIDGE.register_item_handler_by_name("DAY2_06_AM", on_time_item_received)
+AP_BRIDGE.register_item_handler_by_name("DAY2_11_AM", on_time_item_received)
+AP_BRIDGE.register_item_handler_by_name("DAY3_00_AM", on_time_item_received)
+AP_BRIDGE.register_item_handler_by_name("DAY3_11_AM", on_time_item_received)
+AP_BRIDGE.register_item_handler_by_name("DAY4_12_PM", on_time_item_received)
+
 
 local function apply_permanent_effects_from_ap()
     -- Example: door keys
@@ -430,6 +406,23 @@ AP.PPStickerTracker.on_sticker_event_taked =
         AP.AP_BRIDGE.check(location_name)
     end
 
+------------------------------------------------------------
+-- DeathLink wiring
+------------------------------------------------------------
+
+AP.DeathLink.on_death_detected = function()
+    if not (AP and AP.DeathLinkEnabled) then
+        return
+    end
+
+    local player_name = tostring(AP_REF and AP_REF.APSlot or "DRDR Player")
+
+    if AP.AP_BRIDGE and AP.AP_BRIDGE.send_deathlink then
+        AP.AP_BRIDGE.send_deathlink({
+            cause = player_name .. " died."
+        })
+    end
+end
 
 ------------------------------------------------------------
 -- Console Helpers
@@ -448,6 +441,8 @@ _G.list_rescued = function()
         print("Rescued survivor ID:", id, "game_id:", AP.NpcTracker.get_survivor_game_id(id))
     end
 end
+
+_G.death_link = function(code) AP.DeathLink.kill_player("manual") end
 
 ------------------------------------------------------------
 -- Main script
@@ -469,6 +464,16 @@ AP_REF.on_slot_connected = function(slot_data)
         tostring(slot_data.seed_name or slot_data.seed or slot_data.seed_id or "unknown")
     ))
 
+    -- DeathLink option
+    local deathlink_enabled = (type(slot_data) == "table" and slot_data.death_link == true) or false
+    AP.DeathLinkEnabled = deathlink_enabled
+
+    if AP.AP_BRIDGE and AP.AP_BRIDGE.set_deathlink_enabled then
+        AP.AP_BRIDGE.set_deathlink_enabled(deathlink_enabled)
+    end
+
+    print("[DRAP-AP] DeathLink enabled=" .. tostring(deathlink_enabled))
+
     -- Load saveslot
     if AP.SaveSlot and AP.SaveSlot.apply_for_slot then
         print("[DRAP-AP] Applying AP save redirect for slot.")
@@ -482,12 +487,14 @@ AP_REF.on_slot_connected = function(slot_data)
 
     AP.AP_BRIDGE.set_received_items_filename(slot, seed)
     AP.AP_BRIDGE.load_received_items()
+
     local rescued_survivors = AP.NpcTracker.get_rescued_survivors()
     for id, _ in pairs(rescued_survivors) do
         local name = string.format("Rescue %s", AP.NpcTracker.get_survivor_friendly_name(id) or tostring(id))
         AP.AP_BRIDGE.check(name)
     end
 end
+
 
 local was_in_game = false
 local pending_reapply_check = false
@@ -545,6 +552,7 @@ re.on_frame(function()
     safe_on_frame(AP.LevelTracker,    "LevelTracker")
     safe_on_frame(AP.EventTracker,    "EventTracker")
     safe_on_frame(AP.NpcTracker,      "NpcTracker")
+    safe_on_frame(AP.DeathLink,      "DeathLink")
     safe_on_frame(AP.AP_BRIDGE,       "AP_BRIDGE")
     safe_on_frame(AP.PPStickerTracker,"PPStickerTracker")
 

@@ -23,7 +23,6 @@ local function count_pairs(t)
     return n
 end
 
-
 local AP_ITEMS_BY_NAME     = {}
 local AP_LOCATIONS_BY_NAME = {}
 
@@ -45,7 +44,6 @@ AP_REF.on_data_package_changed = function(data_package)
         log("?" .. tostring(k) .. " (" .. tostring(type(v)) .. ")")
     end
 
-    -- If there’s a nested "location" table, dump its keys too
     if type(game_pkg.location) == "table" then
         log("game_pkg.location keys:")
         for k, v in pairs(game_pkg.location) do
@@ -68,7 +66,6 @@ AP_REF.on_data_package_changed = function(data_package)
         count_pairs(AP_ITEMS_BY_NAME),
         count_pairs(AP_LOCATIONS_BY_NAME)
     ))
-
 end
 
 function M.get_item_id(name)     return AP_ITEMS_BY_NAME[name]     end
@@ -83,13 +80,149 @@ local function is_connected()
     return st ~= AP.State.DISCONNECTED
 end
 
--- Rebind APClient handlers to the CURRENT AP_REF.on_* functions
+function M.is_connected()
+    return is_connected()
+end
+
+------------------------------------------------------------
+-- DeathLink
+------------------------------------------------------------
+
+-- Default OFF until slot_data says otherwise
+M.deathlink_enabled = false
+
+function M.set_deathlink_enabled(v)
+    M.deathlink_enabled = (v == true)
+    log("DeathLink enabled set to " .. tostring(M.deathlink_enabled))
+end
+
+
+local function has_tag(tags, needle)
+    if not tags then return false end
+
+    if type(tags) == "table" then
+        for _, v in pairs(tags) do
+            if v == needle then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+-- Receive handler for "Bounced"/Bounce packets
+local function handle_bounced(json_rows)
+    -- {
+    --  "data" : { "source": "...", "cause": "...", "time": ... },
+    --  "cmd": "Bounced",
+    --  "tags": { "DeathLink" }
+    -- }
+
+    if not M.deathlink_enabled then
+        return
+    end
+
+    if not json_rows or type(json_rows) ~= "table" then
+        return
+    end
+
+    local tags = json_rows["tags"]
+    if not has_tag(tags, "DeathLink") then
+        return
+    end
+
+    local data = json_rows["data"] or {}
+    local source = data["source"] or data["player"] or data["slot"] or "Unknown"
+    local cause  = data["cause"]  or ("DeathLink from " .. tostring(source))
+
+    log("DeathLink received: " .. tostring(cause))
+
+    -- Kill the player using your DeathLink module
+    if _G.AP and _G.AP.DeathLink and _G.AP.DeathLink.kill_player then
+        pcall(_G.AP.DeathLink.kill_player, "DeathLink: " .. tostring(cause))
+    else
+        log("DeathLink received, but AP.DeathLink.kill_player is not available.")
+    end
+end
+
+-- Public: Send a DeathLink bounce
+function M.send_deathlink(data)
+    if not M.deathlink_enabled then
+        return false
+    end
+
+    if not AP_REF.APClient then
+        log("send_deathlink: APClient is nil")
+        return false
+    end
+
+    if not is_connected() then
+        log("send_deathlink: not connected")
+        return false
+    end
+
+    local server_time = nil
+    if AP_REF.APClient.get_server_time then
+        local ok, t = pcall(AP_REF.APClient.get_server_time, AP_REF.APClient)
+        if ok then server_time = t end
+    end
+    local time_of_death = math.floor(tonumber(server_time or os.time()) or os.time())
+
+    local my_alias = nil
+    if AP_REF.APClient.get_player_alias and AP_REF.APClient.get_slot then
+        local ok_slot, slot = pcall(AP_REF.APClient.get_slot, AP_REF.APClient)
+        if ok_slot and slot ~= nil then
+            local ok_alias, alias = pcall(AP_REF.APClient.get_player_alias, AP_REF.APClient, slot)
+            if ok_alias then my_alias = alias end
+        end
+    end
+    my_alias = tostring((data and data.source) or my_alias or "DRDR Player")
+
+    local deathLinkData = {
+        time   = (data and data.time)  or time_of_death,
+        cause  = (data and data.cause) or (my_alias .. " died."),
+        source = my_alias
+    }
+
+    if type(AP_REF.APClient.Bounce) == "function" then
+        local ok, err = pcall(AP_REF.APClient.Bounce, AP_REF.APClient, deathLinkData, nil, nil, { "DeathLink" })
+        if ok then
+            log("Sent DeathLink bounce: " .. tostring(deathLinkData.cause))
+            return true
+        end
+        log("send_deathlink: Bounce failed: " .. tostring(err))
+        return false
+    end
+
+    log("send_deathlink: APClient.Bounce is not available")
+    return false
+end
+
+------------------------------------------------------------
+-- Allow user/main to chain additional bounced handling
+------------------------------------------------------------
+local user_on_bounced = nil
+
+function M.set_on_bounced(fn)
+    user_on_bounced = fn
+end
+
+AP_REF.on_bounced = function(json_rows)
+    pcall(handle_bounced, json_rows)
+
+    if user_on_bounced then
+        pcall(user_on_bounced, json_rows)
+    end
+end
+
+------------------------------------------------------------
+-- Rebind APClient handlers
+------------------------------------------------------------
 function M.bind_client()
     if not AP_REF.APClient then
         return false
     end
 
-    -- wrap so APClient always calls the *latest* AP_REF handlers
     AP_REF.APClient:set_items_received_handler(function(items)
         if AP_REF.on_items_received then AP_REF.on_items_received(items) end
     end)
@@ -109,7 +242,6 @@ function M.bind_client()
     log("Rebound APClient handlers to bridge callbacks.")
     return true
 end
-
 
 ------------------------------------------------------------
 -- Location checks
@@ -177,7 +309,6 @@ function M.set_received_items_filename(slot_name, seed)
     -- log(string.format("Using received-items file: %q", RECEIVED_ITEMS_FILE))
 end
 
-
 local function reset_received_items_state()
     RECEIVED_ITEMS = {}
     RECEIVED_ITEMS_BY_NAME = {}
@@ -205,14 +336,7 @@ function M.load_received_items()
     RECEIVED_ITEMS  = data.items or {}
     last_item_index = data.last_item_index or -1
     rebuild_name_counts()
-
-    -- log(string.format(
-    --     "Loaded received-items file '%s': %d items, last_index=%d",
-    --     tostring(RECEIVED_ITEMS_FILE),
-    --     #RECEIVED_ITEMS, last_item_index
-    -- ))
 end
-
 
 local function save_received_items()
     local data = {
@@ -286,7 +410,6 @@ local function handle_net_item(net_item, is_replay)
         "Applying AP item index=%d id=%d (%s) from %s (replay=%s)",
         index, item_id, tostring(item_name), tostring(sender_name), tostring(is_replay)
     ))
-
 
     -- Store only for *new* items
     if not is_replay then
