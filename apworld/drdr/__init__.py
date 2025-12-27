@@ -594,6 +594,7 @@ class DRWorld(World):
         set_rule(self.multiworld.get_location("Reach Level 7", self.player), lambda state: state.can_reach_region("Rooftop", self.player))
         set_rule(self.multiworld.get_location("Reach Level 10", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player))
         set_rule(self.multiworld.get_location("Reach Level 30", self.player), lambda state: state.can_reach_location("Ending S: Beat up Brock with your bare fists!", self.player))
+        set_rule(self.multiworld.get_location("Survive until 6pm on day 1", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player))
 
         self.multiworld.completion_condition[self.player] = lambda state: state.can_reach_location("Victory", self.player)
                 
