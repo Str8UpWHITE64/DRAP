@@ -344,7 +344,7 @@ class DRWorld(World):
                  lambda state: state.can_reach_location("Ending A: Solve all of the cases and be on the helipad at 12pm", self.player))
 
         set_rule(self.multiworld.get_location("Gather the suppressants and generator and talk to Isabela", self.player),
-                 lambda state: state.can_reach_location("Get bit!", self.player))
+                 lambda state: state.can_reach_location("Get bit!", self.player) and (state.can_reach_region("Paradise Plaza", self.player) and state.can_reach_region("Entrance Plaza", self.player) and state.can_reach_region("Al Fresca Plaza", self.player) and state.can_reach_region("Leisure Park", self.player) and state.can_reach_region("Food Court", self.player) and state.can_reach_region("Maintenance Tunnel", self.player)))
 
         set_rule(self.multiworld.get_location("See the crashed helicopter", self.player),
                  lambda state: state.can_reach_location("Get bit!", self.player))
@@ -597,47 +597,43 @@ class DRWorld(World):
         set_rule(self.multiworld.get_location("Survive until 6pm on day 1", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player))
 
         self.multiworld.completion_condition[self.player] = lambda state: state.can_reach_location("Victory", self.player)
-                
+
     def fill_slot_data(self) -> Dict[str, object]:
         slot_data: Dict[str, object] = {}
 
-
         name_to_dr_code = {item.name: item.dr_code for item in item_dictionary.values()}
-        # Create the mandatory lists to generate the player's output file
         items_id = []
         items_address = []
         locations_id = []
         locations_address = []
         locations_target = []
         hints = {}
-        
+
         for location in self.multiworld.get_filled_locations():
-
-
             if location.item.player == self.player:
-                #we are the receiver of the item
                 items_id.append(location.item.code)
                 items_address.append(name_to_dr_code[location.item.name])
 
-
             if location.player == self.player:
-                #we are the sender of the location check
                 locations_address.append(item_dictionary[location_dictionary[location.name].default_item].dr_code)
                 locations_id.append(location.address)
                 if location.item.player == self.player:
                     locations_target.append(name_to_dr_code[location.item.name])
                 else:
                     locations_target.append(0)
-       
+
+        death_link_enabled = bool(self.options.death_link.value)
 
         slot_data = {
             "options": {
                 "guaranteed_items": self.options.guaranteed_items.value,
+                "death_link": death_link_enabled,  # optional (debug/UI)
             },
+            "death_link": death_link_enabled,  # IMPORTANT: what Lua will read
             "hints": hints,
-            "seed": self.multiworld.seed_name,  # to verify the server's multiworld
-            "slot": self.multiworld.player_name[self.player],  # to connect to server
-            "base_id": self.base_id,  # to merge location and items lists
+            "seed": self.multiworld.seed_name,
+            "slot": self.multiworld.player_name[self.player],
+            "base_id": self.base_id,
             "locationsId": locations_id,
             "locationsAddress": locations_address,
             "locationsTarget": locations_target,

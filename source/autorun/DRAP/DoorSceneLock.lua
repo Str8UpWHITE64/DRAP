@@ -137,11 +137,15 @@ local function current_event_blocks_s100_lock()
         ev = tostring(AP.EventTracker.CURRENT_EVENT_NAME)
     end
 
-    -- match either exact or embedded (e.g. "EVENT01_something")
-    if string.find(ev, "EVENT01", 1, true) then return true, ev end
-    if string.find(ev, "EVENT04", 1, true) then return true, ev end
-    if string.find(ev, "EVENT06", 1, true) then return true, ev end
-    return false, ev
+    if M.CurrentLevelPath == "SCN_s136" then
+        -- match either exact or embedded (e.g. "EVENT01_something")
+        if string.find(ev, "EVENT01", 1, true) then return true, ev end
+        if string.find(ev, "EVENT04", 1, true) then return true, ev end
+        if string.find(ev, "EVENT06", 1, true) then return true, ev end
+        if string.find(ev, "EVENT_NONE", 1, true) then return true, ev end
+    else
+        return false, ev
+    end
 end
 
 
@@ -337,9 +341,9 @@ end
 
 local function rescan_current_area_doors()
     local area_index, level_path = get_area_info()
-    local bypass_s100, ev = current_event_blocks_s100_lock()
     M.CurrentLevelPath = level_path
     M.CurrentAreaIndex = area_index
+    local bypass_s100, ev = current_event_blocks_s100_lock()
     local res_list = get_areahit_resource_list()
     if res_list == nil then
         log("No AreaHitResource list; abort scan.")
@@ -382,9 +386,18 @@ local function rescan_current_area_doors()
                                     })
                                     jump_name = jump_name and tostring(jump_name) or ""
 
+                                    local event_name, _ = get_field_value(li, {
+                                        "EVENT_NAME", "<EVENT_NAME>k__BackingField",
+                                    })
+                                    event_name = event_name and tostring(event_name) or ""
+
                                     local mHitData_val, _ = get_field_value(li, {
                                         "mHitData", "<mHitData>k__BackingField",
                                     })
+
+                                    if jump_name == "" and event_name == "evm12" then
+                                        jump_name = "sa00"
+                                    end
 
                                     if mHitData_val ~= nil then
                                         local hitdata = mHitData_val
