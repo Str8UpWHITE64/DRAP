@@ -60,7 +60,7 @@ local function reset_ps_cache()
     max_slot_field         = nil
     capacity_warned        = false
 
-    pending_items          = {}
+    --pending_items          = {}
 end
 
 local function enqueue_item(item_no)
@@ -294,7 +294,7 @@ function M.spawn(item_no)
         item_no, pending_count()
     ))
 
-    -- Optional: try to process immediately if possible
+    -- Try to process immediately if possible
     if ensure_inventory() and can_accept_more_items() then
         process_pending_items()
     end

@@ -42,8 +42,8 @@ local function register_spawn_handlers_from_json()
         if def.name and def.name ~= "" and def.item_number then
             -- Capture in locals so closures don’t all share the last values
             local ap_item_name = def.name          -- must match AP item name
-            local item_no      = def.item_number   -- your in-game item_number
-            local game_id      = def.game_id       -- optional, if you ever need it
+            local item_no      = def.item_number   -- in-game item_number
+            local game_id      = def.game_id       -- optional
 
             AP_BRIDGE.register_item_handler_by_name(ap_item_name, function(net_item, item_name, sender_name)
                 print(string.format(
@@ -54,7 +54,6 @@ local function register_spawn_handlers_from_json()
                     item_no
                 ))
 
-                -- Your existing item spawn logic:
                 AP.ItemSpawner.spawn(item_no)
             end)
             x = x + 1
