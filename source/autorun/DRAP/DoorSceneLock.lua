@@ -55,7 +55,7 @@ local SCENE_INFO = {
 ------------------------------------------------------------
 
 local LOCKED_SCENES = {
-    ["s135"] = true,
+    ["s135"] = false,
     ["s136"] = false,
     ["s231"] = true,
     ["s230"] = true,
