@@ -63,6 +63,11 @@ Currently, there is only one goal, to get Ending S and beat Brock. We may add mo
 - Door locks and time locks gate your progress.  If you can't get to an area, you likely need to find the key for it. If you notice time isn't progressing towards a main scoop, you likely need an item.
 - If you disconnect while playing, you will send challenge and level locations on reconnect, but events and PP stickers wont go automatically.  I will try to add this in the future.
 
+## Known Bugs
+Some users are experiencing an issue where they are unable to save after connecting to the APWorld.  If you have this issue, close the game, open the AP_DRDR_main.lua file in a text file editor and change ``local redirect_save_path = true`` to ``local redirect_save_path = false``.  This will make it so the AP saves will use your default save directory, so make sure you are only loading saves for the APWorld. 
+
+PP Stickers are a little iffy.  They usually send without issue, but I have seen them not send until you leave the area and re-enter it.  I have also seen them send the wrong one, too.  Nothing too major, just keep it in mind.
+
 ## Final note
 I spent countless hours playing the original game when I was younger, and spent plenty playing this version when it came out.  I hope you enjoy this implementation, and I look forward to seeing how people play it!
 
