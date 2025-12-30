@@ -5,6 +5,8 @@ if game_name ~= "dd2" then
     return
 end
 
+local redirect_save_path = true
+
 local AP_BRIDGE = require("ap_drdr_bridge")
 
 AP = AP or {}
@@ -474,7 +476,7 @@ AP_REF.on_slot_connected = function(slot_data)
     print("[DRAP-AP] DeathLink enabled=" .. tostring(deathlink_enabled))
 
     -- Load saveslot
-    if AP.SaveSlot and AP.SaveSlot.apply_for_slot then
+    if AP.SaveSlot and AP.SaveSlot.apply_for_slot and redirect_save_path then
         print("[DRAP-AP] Applying AP save redirect for slot.")
         AP.SaveSlot.apply_for_slot(AP_REF.APSlot, slot_data.seed_name or slot_data.seed or slot_data.seed_id)
     else

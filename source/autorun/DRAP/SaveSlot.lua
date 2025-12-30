@@ -18,7 +18,6 @@ end
 
 local SaveService_TYPE_NAME = "via.storage.saveService.SaveService"
 local base_save_mount = "./win64_save"
--- local base_save_mount = "C:/Program Files (x86)/Steam/userdata/68435245/2527390/remote/win64_save"
 
 ------------------------------------------------
 -- Helpers
