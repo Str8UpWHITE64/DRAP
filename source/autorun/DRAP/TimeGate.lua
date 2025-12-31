@@ -207,7 +207,7 @@ function M.is_new_game()
         tostring(md), day, hour, minute, tostring(current_event)))
 
     -- Keep your heuristic (tweak as desired)
-    if day == 1 and hour == 12 and minute >= 05 and current_event == "EVENT01" then
+    if day == 1 and hour == 12 and minute <= 05 and current_event == "EVENT01" then
         return true
     end
 

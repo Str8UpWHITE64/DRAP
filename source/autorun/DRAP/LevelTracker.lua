@@ -4,7 +4,7 @@
 local M = {}
 M.on_level_changed = nil
 
-local ARMED_AFTER_GAME_TIME = 43400   -- your known-safe time
+local ARMED_AFTER_GAME_TIME = 11200   -- known-safe time
 local armed = false
 
 local next_try_at = 0.0              -- os.clock() timestamp for next attempt
@@ -130,8 +130,8 @@ function M.on_frame()
 
     -- Arm using GAME time (much more reliable than waiting 3 seconds real time)
     if not armed then
-        if AP and AP.TimeGate and AP.TimeGate.get_current_time then
-            local ok, t = pcall(AP.TimeGate.get_current_time)
+        if AP and AP.TimeGate and AP.TimeGate.get_current_mdate then
+            local ok, t = pcall(AP.TimeGate.get_current_mdate)
             if not ok or not t or t <= ARMED_AFTER_GAME_TIME then
                 return
             end

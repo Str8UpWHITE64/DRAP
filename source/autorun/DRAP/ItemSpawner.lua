@@ -238,9 +238,9 @@ local function process_pending_items()
         return
     end
 
-    current_time = AP.TimeGate.get_current_time()
+    current_time = AP.TimeGate.get_current_mdate()
 
-    if current_time <= 43200 then
+    if current_time <= 11200 then
         return
     end
 
