@@ -202,11 +202,11 @@ end)
 
 -- Time Locks
 local TIME_CAPS = {
-    DAY2_06_AM = 61200,   -- 6:00am Day 2 - 1 hour
-    DAY2_11_AM = 79200,   -- 11:00am Day 2 - 1 hour
-    DAY3_00_AM = 126000,  -- 12:00am Day 3 - 1 hour
-    DAY3_11_AM = 165600,  -- 11:00am Day 3 - 1 hour
-    DAY4_12_PM = 255600,  -- 12:00pm Day 4 - 1 hour
+    DAY2_06_AM = 20500, -- Day 2 06:00 - 1 hour
+    DAY2_11_AM = 21000, -- Day 2 11:00 - 1 hour
+    DAY3_00_AM = 21100, -- Day 3 00:00 - 1 hour
+    DAY3_11_AM = 31000, -- Day 3 11:00 - 1 hour
+    DAY4_12_PM = 41100, -- Day 4 12:00 - 1 hour
 }
 
 local TIME_LOCK_CHAIN = {
@@ -445,6 +445,10 @@ end
 
 _G.death_link = function(code) AP.DeathLink.kill_player("manual") end
 
+_G.freeze = function() AP.TimeGate.enable() end
+
+_G.cap = function(code) AP.TimeGate.set_time_cap_mdate(code) end
+
 ------------------------------------------------------------
 -- Main script
 ------------------------------------------------------------
@@ -553,7 +557,8 @@ re.on_frame(function()
     safe_on_frame(AP.LevelTracker,    "LevelTracker")
     safe_on_frame(AP.EventTracker,    "EventTracker")
     safe_on_frame(AP.NpcTracker,      "NpcTracker")
-    safe_on_frame(AP.DeathLink,      "DeathLink")
+    safe_on_frame(AP.TimeGate,        "TimeGate")
+    safe_on_frame(AP.DeathLink,       "DeathLink")
     safe_on_frame(AP.AP_BRIDGE,       "AP_BRIDGE")
     safe_on_frame(AP.PPStickerTracker,"PPStickerTracker")
 
