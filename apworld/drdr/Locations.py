@@ -107,7 +107,7 @@ location_tables = {
 
         # Main Events
         DRLocationData("Complete Temporary Agreement", "Milk", DRLocationCategory.MAIN_SCOOP),
-        DRLocationData("Survive until 6pm on day 1", "Milk", DRLocationCategory.MAIN_SCOOP),
+        DRLocationData("Survive until 7pm on day 1", "Milk", DRLocationCategory.MAIN_SCOOP),
         DRLocationData("Meet back at the Safe Room at 6am day 2", "Milk", DRLocationCategory.MAIN_SCOOP),
         DRLocationData("Complete Image in the Monitor", "Milk", DRLocationCategory.MAIN_SCOOP),
         DRLocationData("Complete Medicine Run", "Milk", DRLocationCategory.MAIN_SCOOP),
