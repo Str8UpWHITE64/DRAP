@@ -1,0 +1,5 @@
+-Allow time speed up from the start --Done
+-Progressive time locks
+-More time locks (potentially even hourly)
+-PP, skill, and stat rewards
+-yaml options for all of the above so people can pick what they want to include

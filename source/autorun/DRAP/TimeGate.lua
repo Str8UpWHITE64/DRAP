@@ -282,6 +282,35 @@ function M.unlock_day3_11am() M.set_time_cap_mdate(TIME_CAPS.DAY3_11_AM) end
 function M.unlock_day4_12pm() M.set_time_cap_mdate(TIME_CAPS.DAY4_12_PM) end
 
 --------------------------------
+-- SpeedUp unlock hook
+--------------------------------
+
+local speed_up_unlock_hooked = false
+local function speed_up_unlock_hook()
+    if speed_up_unlock_hooked then return end
+
+    local t = sdk.find_type_definition("app.solid.gamemastering.GameManager")
+    if not t then return end
+
+    local m = t:get_method("isSpeedUpTimeUnlock()")
+    if not m then
+        m = t:get_method("isSpeedUpTimeUnlock")
+    end
+    if not m then return end
+
+    log("Hooking GameManager.isSpeedUpTimeUnlock (skip original, return true)")
+
+    sdk.hook(
+        m,
+        function(args)
+            return sdk.PreHookResult.SKIP_ORIGINAL, true
+        end
+    )
+    speed_up_unlock_hooked = true
+    log("isSpeedUpTimeUnlock Hook installed.")
+end
+
+--------------------------------
 -- Main update entrypoint
 --------------------------------
 function M.on_frame()
@@ -290,6 +319,9 @@ function M.on_frame()
     local gm = ensure_game_manager()
     if gm then
         apply_gate_state(gm)
+    end
+    if not speed_up_unlock_hooked then
+        pcall(speed_up_unlock_hook)
     end
 end
 
