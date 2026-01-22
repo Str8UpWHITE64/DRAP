@@ -1,46 +1,33 @@
 -- DRAP/Scene.lua
 -- DRDR "scene" helper: detects when we've loaded into gameplay.
 
-local Scene = {}
+local Shared = require("DRAP/Shared")
 
-local GM_TYPE = "app.solid.gamemastering.GameManager"
-local PS_TYPE = "app.solid.PlayerStatusManager"
+local Scene = Shared.create_module("Scene")
 
-Scene.gameManager = nil
-Scene.statusManager = nil
+-- Singleton managers
+local gm_mgr = Scene:add_singleton("gm", "app.solid.gamemastering.GameManager")
+local ps_mgr = Scene:add_singleton("ps", "app.solid.PlayerStatusManager")
 
 ------------------------------------------------------------
--- Safe singleton getter with caching + change detection
+-- Public API
 ------------------------------------------------------------
-local function get_singleton(type_name, cached)
-    local cur = sdk.get_managed_singleton(type_name)
-    if cur ~= cached then
-        cached = cur
-    end
-    return cached, cur
-end
 
 function Scene.getGameManager()
-    Scene.gameManager = get_singleton(GM_TYPE, Scene.gameManager)
-    return Scene.gameManager
+    return gm_mgr:get()
 end
 
 function Scene.getPlayerStatusManager()
-    Scene.statusManager = get_singleton(PS_TYPE, Scene.statusManager)
-    return Scene.statusManager
+    return ps_mgr:get()
 end
 
-------------------------------------------------------------
--- "Loaded into game" detection
-------------------------------------------------------------
+--- Checks if we're currently in gameplay
+--- @return boolean True if in game
 function Scene.isInGame()
-    local ps = Scene.getPlayerStatusManager()
+    local ps = ps_mgr:get()
     if not ps then return false end
 
-    local td = ps:get_type_definition()
-    if not td then return false end
-
-    local f = td:get_field("PlayerLevel")
+    local f = ps_mgr:get_field("PlayerLevel")
     if not f then return false end
 
     local ok, lvl = pcall(f.get_data, f, ps)
@@ -49,8 +36,10 @@ function Scene.isInGame()
     return true
 end
 
+--- Checks if the game is currently loading
+--- @return boolean|nil True if loading, nil if unknown
 function Scene.isGameLoading()
-    local gm = Scene.getGameManager()
+    local gm = gm_mgr:get()
     if not gm then return nil end
 
     local candidates = {
