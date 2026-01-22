@@ -32,6 +32,7 @@ M.CurrentAreaIndex = nil
 ------------------------------------------------------------
 
 local SCENE_INFO = {
+    s140 = { name = "Title Screen",            index = 292  },
     s135 = { name = "Helipad",                 index = 287  },
     s136 = { name = "Safe Room",               index = 288  },
     s231 = { name = "Rooftop",                 index = 535  },
@@ -55,6 +56,7 @@ local SCENE_INFO = {
 ------------------------------------------------------------
 
 local LOCKED_SCENES = {
+    ["s140"] = false,
     ["s135"] = false,
     ["s136"] = false,
     ["s231"] = true,
@@ -451,6 +453,10 @@ end
 
 function M.is_scene_locked(scene_code)
     return scene_is_locked(tostring(scene_code))
+end
+
+function M.is_on_title_screen()
+    return M.CurrentLevelPath == "SCN_s140"
 end
 
 

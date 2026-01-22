@@ -98,6 +98,7 @@ local TRACKED_EVENT_IDS = {
     [72] = 'Kill Cletus',
     [57] = 'Meet Cliff',                                                   -- EVENT_EM46
     [71] = 'Kill Cliff',                                                   -- EVENT_EEM46_DIE
+    [67] = 'Witness Sean in Paradise Plaza',                               -- EVENT_EM43
     [58] = 'Meet Sean',                                                    -- EVENT_EM44
     [73] = 'Kill Sean',                                                    -- EVENT_EM44_DIE
     [59] = 'Meet Adam',                                                    -- EVENT_EM48

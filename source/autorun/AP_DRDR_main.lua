@@ -543,6 +543,11 @@ re.on_frame(function()
         return
     end
 
+    --if AP.DoorSceneLock.is_on_title_screen() then
+    --    was_in_game = false
+    --    return
+    --end
+
     -- Helper: safely call module.on_frame()
     local function safe_on_frame(mod, name)
         if mod and type(mod.on_frame) == "function" then
