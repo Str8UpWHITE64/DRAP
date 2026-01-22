@@ -1,92 +1,35 @@
--- Dead Rising Deluxe Remaster - AP-aware Save Mount Redirect (module)
+-- DRAP/SaveSlot.lua
+-- AP-aware Save Mount Redirect
 -- Uses via.storage.saveService.SaveService to move saves into a per-slot/per-seed tree.
 
+local Shared = require("DRAP/Shared")
 
-local M = {}
+local M = Shared.create_module("APSaveRedirect")
 
-------------------------------------------------
--- Logging
-------------------------------------------------
-
-local function log(msg)
-    print("[APSaveRedirect] " .. tostring(msg))
-end
-
-------------------------------------------------
--- Config
-------------------------------------------------
+------------------------------------------------------------
+-- Configuration
+------------------------------------------------------------
 
 local SaveService_TYPE_NAME = "via.storage.saveService.SaveService"
-local base_save_mount = "./win64_save"
+local BASE_SAVE_MOUNT = "./win64_save"
 
-------------------------------------------------
+------------------------------------------------------------
 -- Helpers
-------------------------------------------------
-
--- Sanitize slot name to be filesystem-friendly-ish
-local function sanitize_slot_name(name)
-    if not name or name == "" then
-        return "slot"
-    end
-    name = tostring(name)
-    -- replace non-alphanumeric with underscore
-    name = name:gsub("[^%w]+", "_")
-    -- trim leading/trailing underscores
-    name = name:gsub("^_+", ""):gsub("_+$", "")
-    if name == "" then
-        name = "slot"
-    end
-    return name
-end
-
-local function clean_string(input)
-    if input == nil then return "" end
-
-    -- If it's already a Lua string
-    if type(input) == "string" then
-        return input:gsub("%z", "")
-    end
-
-    -- Try to convert managed string properly
-    local mo = sdk.to_managed_object(input)
-    if mo ~= nil then
-        local ok, s = pcall(sdk.to_string, mo)
-        if ok and type(s) == "string" then
-            return s:gsub("%z", "")
-        end
-    end
-
-    -- Fallback
-    local s = tostring(input):gsub("%z", "")
-    return s
-end
+------------------------------------------------------------
 
 local function clean_path(p)
-    p = clean_string(p)
-    -- keep only reasonable path chars
+    p = Shared.clean_string(p)
     p = p:gsub("[%c\128-\255]", "")
     p = p:gsub("\\", "/")
     p = p:gsub("/+$", "")
     return p
 end
 
-local function clean_token(s)
-    s = clean_string(s)
-    s = s:gsub("%z", "")
-    s = s:gsub("[%c\128-\255]", "")
-    s = s:gsub("[^%w%-%_%.]", "_")  -- replace, don’t delete
-    s = s:gsub("_+", "_"):gsub("^_+", ""):gsub("_+$", "")
-    return s
-end
-
-
-
--- Build the new mount path from original + slot + seed
 local function build_redirect_path(current_path, slot_name, seed)
     local norm_path = clean_path(current_path)
 
-    local safe_slot = clean_token(slot_name)
-    local safe_seed = clean_token(seed)
+    local safe_slot = Shared.sanitize_token(slot_name)
+    local safe_seed = Shared.sanitize_token(seed)
 
     local seed_part = (safe_seed ~= "" and safe_seed ~= "nil") and ("_s" .. safe_seed) or ""
     local folder_suffix = "_AP_" .. safe_slot .. seed_part
@@ -103,18 +46,14 @@ local function build_redirect_path(current_path, slot_name, seed)
     return norm_path .. folder_suffix
 end
 
+------------------------------------------------------------
+-- Core Logic
+------------------------------------------------------------
 
-
-
-------------------------------------------------
--- GameManager access
-------------------------------------------------
-
--- Core function that actually changes SaveMountPath + updates save table
 local function apply_mount_redirect(slot_name, seed)
     local td = sdk.find_type_definition(SaveService_TYPE_NAME)
     if not td then
-        log("SaveService type definition not found; are you in-game yet?")
+        M.log("SaveService type definition not found; are you in-game yet?")
         return false
     end
 
@@ -125,7 +64,7 @@ local function apply_mount_redirect(slot_name, seed)
     end
 
     if not svc then
-        log("SaveService singleton not found; are you in-game yet?")
+        M.log("SaveService singleton not found; are you in-game yet?")
         return false
     end
 
@@ -133,14 +72,13 @@ local function apply_mount_redirect(slot_name, seed)
     local set_mount_m = td:get_method("set_SaveMountPath")
 
     if not get_mount_m or not set_mount_m then
-        log("Missing get_SaveMountPath/set_SaveMountPath on SaveService.")
+        M.log("Missing get_SaveMountPath/set_SaveMountPath on SaveService.")
         return false
     end
 
-
-    local orig_mount_str = base_save_mount
+    local orig_mount_str = BASE_SAVE_MOUNT
     if not orig_mount_str or orig_mount_str == "" then
-        log("Original SaveMountPath is empty/unreadable.")
+        M.log("Original SaveMountPath is empty/unreadable.")
         return false
     end
 
@@ -148,11 +86,8 @@ local function apply_mount_redirect(slot_name, seed)
     local current_path_obj = get_mount_m:call(svc)
     local current_path_str = clean_path(current_path_obj)
 
-    -- log("Original SaveMountPath: " .. orig_mount_str)
-
     -- Build new mount for this AP slot/seed
     local new_mount = build_redirect_path(current_path_str, slot_name, seed)
-
 
     -- Apply new mount
     local ok_set, err = pcall(function()
@@ -160,11 +95,11 @@ local function apply_mount_redirect(slot_name, seed)
     end)
 
     if not ok_set then
-        log("Failed to set SaveMountPath: " .. tostring(err))
+        M.log("Failed to set SaveMountPath: " .. tostring(err))
         return false
     end
 
-    log("SaveMountPath successfully redirected.")
+    M.log("SaveMountPath successfully redirected.")
 
     -- Try to call updateSaveFileDetailTbl() if it exists, so UI refreshes
     local upd_m = td:get_method("updateSaveFileDetailTbl")
@@ -173,34 +108,35 @@ local function apply_mount_redirect(slot_name, seed)
             upd_m:call(svc)
         end)
         if ok_upd then
-            print("updateSaveFileDetailTbl() called successfully.")
+            M.log("updateSaveFileDetailTbl() called successfully.")
         else
-            log("updateSaveFileDetailTbl() call failed: " .. tostring(err_upd))
+            M.log("updateSaveFileDetailTbl() call failed: " .. tostring(err_upd))
         end
     else
-        log("updateSaveFileDetailTbl() not found; you may need to call it manually.")
+        M.log("updateSaveFileDetailTbl() not found; you may need to call it manually.")
     end
 
     return true
 end
 
 ------------------------------------------------------------
--- PUBLIC API
+-- Public API
 ------------------------------------------------------------
 
--- Call this once after you've connected and know slot/seed
+--- Applies the save redirect for a specific AP slot/seed
+--- @param slot_name string The slot name
+--- @param seed string The seed identifier
 function M.apply_for_slot(slot_name, seed)
-    local clean_slot = clean_token(slot_name)
-    local clean_seed = clean_token(seed)
-    log("Applying redirect -> Slot: " .. clean_slot .. " | Seed: " .. clean_seed)
+    local clean_slot = Shared.sanitize_token(slot_name)
+    local clean_seed = Shared.sanitize_token(seed)
+    M.log("Applying redirect -> Slot: " .. clean_slot .. " | Seed: " .. clean_seed)
+
     local ok = apply_mount_redirect(slot_name, seed)
     if not ok then
-        log("AP save mount redirect FAILED.")
+        M.log("AP save mount redirect FAILED.")
     else
-        log("AP save mount redirect OK.")
+        M.log("AP save mount redirect OK.")
     end
 end
-
-log("Module loaded.")
 
 return M
