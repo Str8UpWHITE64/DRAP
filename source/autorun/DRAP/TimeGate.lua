@@ -22,7 +22,7 @@ local scq_mgr = M:add_singleton("scq", "app.solid.gamemastering.SCQManager")
 local TIME_CAPS = {
     DAY2_06_AM = 20500, -- Day 2 06:00 - 1 hour
     DAY2_11_AM = 21000, -- Day 2 11:00 - 1 hour
-    DAY3_00_AM = 21100, -- Day 3 00:00 - 1 hour
+    DAY3_00_AM = 22300, -- Day 3 00:00 - 1 hour
     DAY3_11_AM = 31000, -- Day 3 11:00 - 1 hour
     DAY4_12_PM = 41100, -- Day 4 12:00 - 1 hour
 }
