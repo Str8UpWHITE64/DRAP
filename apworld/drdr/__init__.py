@@ -106,13 +106,13 @@ class DRWorld(World):
         create_connection("Al Fresca Plaza", "Entrance Plaza")
         create_connection("Food Court", "Al Fresca Plaza")
         create_connection("Food Court", "Wonderland Plaza")
-        create_connection("Wonderland Plaza", "North Plaza") 
+        create_connection("Wonderland Plaza", "North Plaza")
 
         create_connection("Leisure Park", "Food Court")
         create_connection("Leisure Park", "North Plaza")
         create_connection("Leisure Park", "Maintenance Tunnel")
 
-        create_connection("North Plaza", "Grocery Store")   
+        create_connection("North Plaza", "Grocery Store")
         create_connection("North Plaza", "Crislip's Hardware Store")
         create_connection("North Plaza", "Hideout")
 
@@ -120,16 +120,13 @@ class DRWorld(World):
         create_connection("Leisure Park", "Tunnels")
 
         create_connection("Menu", "Level Ups")
-        
-        
+
+
     # For each region, add the associated locations retrieved from the corresponding location_table
     def create_region(self, region_name, location_table) -> Region:
         new_region = Region(region_name, self.player, self.multiworld)
-        #print("location table size: " + str(len(location_table)))
         for location in location_table:
-            #print("Creating location: " + location.name)
             if location.category in self.enabled_location_categories:
-                #print("Adding location: " + location.name + " with default item " + location.default_item)
                 new_location = DRLocation(
                     self.player,
                     location.name,
@@ -140,64 +137,68 @@ class DRWorld(World):
                 )
                 new_region.locations.append(new_location)
             elif location.category == DRLocationCategory.EVENT:
-                # Remove non-randomized progression items as checks because of the use of a "filler" fake item.
-                # Replace events with event items for spoiler log readability.
-                event_item = self.create_item(location.default_item)
-                #if event_item.classification != ItemClassification.progression:
-                #    continue
-                #print("Adding Location: " + location.name + " as an event with default item " + location.default_item)
-                new_location = DRLocation(
-                    self.player,
-                    location.name,
-                    location.category,
-                    location.default_item,
-                    None,
-                    new_region
-                )
-                event_item.code = None
-                new_location.place_locked_item(event_item)
-                #print("Placing event: " + event_item.name + " in location: " + location.name)
-                new_region.locations.append(new_location)
+                # Skip Victory here - we'll handle it explicitly in create_items
+                if location.name == "Ending S: Beat up Brock with your bare fists!":
+                    # Create the location but don't place an item yet
+                    new_location = DRLocation(
+                        self.player,
+                        location.name,
+                        location.category,
+                        location.default_item,
+                        None,
+                        new_region
+                    )
+                    new_region.locations.append(new_location)
+                else:
+                    # Replace events with event items for spoiler log readability.
+                    event_item = self.create_item(location.default_item)
+                    new_location = DRLocation(
+                        self.player,
+                        location.name,
+                        location.category,
+                        location.default_item,
+                        None,
+                        new_region
+                    )
+                    event_item.code = None
+                    new_location.place_locked_item(event_item)
+                    new_region.locations.append(new_location)
 
-        #print("created " + str(len(new_region.locations)) + " locations")
         self.multiworld.regions.append(new_region)
-        #print("adding region: " + region_name)
         return new_region
+
+    def create_event(self, name: str) -> DRItem:
+        """Create an event item (no code/ID, progression classification)"""
+        return DRItem(name, ItemClassification.progression, None, self.player)
 
 
     def create_items(self):
         itempool: List[DRItem] = []
         itempoolSize = 0
-        #print("Creating items")
+
         for location in self.multiworld.get_locations(self.player):
-                #print("found item in category: " + str(location.category))
                 item_data = item_dictionary[location.default_item_name]
                 if item_data.category in [DRItemCategory.SKIP] or \
                         location.category in [DRLocationCategory.EVENT]:
-                    #print(f"Adding vanilla item/event {location.default_item_name} to {location.name}")
+                    # Skip the Ending S location - we handle Victory placement separately
+                    if location.name == "Ending S: Beat up Brock with your bare fists!":
+                        continue
                     item = self.create_item(location.default_item_name)
                     self.multiworld.get_location(location.name, self.player).place_locked_item(item)
                 elif location.category in self.enabled_location_categories:
-                    #print("Adding item: " + location.default_item_name)
                     itempoolSize += 1
-                    #itempool.append(self.create_item(location.default_item_name))
-        
-        #print("Requesting itempool size: " + str(itempoolSize))
+
+        # Place Victory event at the goal location
+        self.get_location("Ending S: Beat up Brock with your bare fists!").place_locked_item(self.create_event("Victory"))
+
         foo = BuildItemPool(self.multiworld, itempoolSize, self.options)
-        #print("Created item pool size: " + str(len(foo)))
-        #for item in foo:
-            #print(f"{item.name}")
 
         for item in foo:
-            #print("Adding regular item: " + item.name)
             itempool.append(self.create_item(item.name))
 
         # Add regular items to itempool
         self.multiworld.itempool += itempool
-        
-        #print("Final Item pool: ")
-        #for item in self.multiworld.itempool:
-        #    print(item.name)
+
 
 
     def create_item(self, name: str) -> Item:
@@ -218,20 +219,20 @@ class DRWorld(World):
 
     def get_filler_item_name(self) -> str:
         return "1 PP"
-    
-    def set_rules(self) -> None:                
-            
+
+    def set_rules(self) -> None:
+
         def set_indirect_rule(self, regionName, rule):
             region = self.multiworld.get_region(regionName, self.player)
             entrance = self.multiworld.get_entrance(regionName, self.player)
             set_rule(entrance, rule)
             self.multiworld.register_indirect_condition(region, entrance)
-         
-        #print("Setting rules")   
+
+        #print("Setting rules")
         for region in self.multiworld.get_regions(self.player):
             for location in region.locations:
                     set_rule(location, lambda state: True)
-        
+
         for level in range(3, 51):
             current_level_location = f"Reach Level {level}"
             previous_level_location = f"Reach Level {level - 1}"
@@ -257,8 +258,7 @@ class DRWorld(World):
         set_rule(self.multiworld.get_entrance("North Plaza -> Crislip's Hardware Store", self.player), lambda state: state.has("Crislip's Hardware Store key", self.player))
 
         # Events
-        set_rule(self.multiworld.get_location("Meet Jessie in the Service Hallway", self.player),
-                 lambda state: state.can_reach_region("Service Hallway", self.player))
+        set_rule(self.multiworld.get_location("Meet Jessie in the Service Hallway", self.player), lambda state: state.can_reach_region("Service Hallway", self.player))
 
         set_rule(self.multiworld.get_location("Complete Backup for Brad", self.player), lambda state: state.can_reach_location("Meet Jessie in the Service Hallway", self.player) and state.can_reach_region("Leisure Park", self.player) and state.can_reach_region("Paradise Plaza", self.player) and state.can_reach_region("Food Court", self.player))
 
@@ -544,7 +544,7 @@ class DRWorld(World):
         set_rule(self.multiworld.get_location("Photograph 30 survivors", self.player), lambda state: state.can_reach_region("Leisure Park", self.player) and state.can_reach_region("Al Fresca Plaza", self.player) and state.can_reach_region("Wonderland Plaza", self.player) and state.can_reach_region("North Plaza", self.player) and state.can_reach_region("Entrance Plaza", self.player) and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.has("DAY3_00_AM", self.player))
         set_rule(self.multiworld.get_location("Build a profile for 87 survivors", self.player), lambda state: state.can_reach_location("Meet Larry", self.player) and state.can_reach_region("Leisure Park", self.player) and state.can_reach_region("Al Fresca Plaza", self.player) and state.can_reach_region("Wonderland Plaza", self.player) and state.can_reach_region("North Plaza", self.player) and state.can_reach_region("Entrance Plaza", self.player) and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.has("DAY3_00_AM", self.player))
         set_rule(self.multiworld.get_location("Photograph all PP Stickers", self.player), lambda state: state.can_reach_region("Leisure Park", self.player) and state.can_reach_region("Al Fresca Plaza", self.player) and state.can_reach_region("Wonderland Plaza", self.player) and state.can_reach_region("North Plaza", self.player) and state.can_reach_region("Entrance Plaza", self.player) and state.can_reach_region("Food Court", self.player) and state.can_reach_region("Paradise Plaza", self.player) and state.can_reach_region("Grocery Store", self.player) and state.can_reach_region("Crislip's Hardware Store", self.player) and state.can_reach_region("Colby's Movie Theater", self.player))
-        set_rule(self.multiworld.get_location("Frank the pimp", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player) and state.can_reach_region("Al Fresca", self.player) and state.can_reach_location("Kill Jo", self.player) and state.can_reach_region("Food Court", self.player) and state.can_reach_region("Entrance Plaza", self.player) and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player))
+        set_rule(self.multiworld.get_location("Frank the pimp", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player) and state.can_reach_region("Al Fresca Plaza", self.player) and state.can_reach_location("Kill Jo", self.player) and state.can_reach_region("Food Court", self.player) and state.can_reach_region("Entrance Plaza", self.player) and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player))
         set_rule(self.multiworld.get_location("Jump a vehicle 50 feet", self.player), lambda state: state.can_reach_region("Maintenance Tunnel", self.player))
         set_rule(self.multiworld.get_location("Bowl over 10 zombies", self.player), lambda state: state.can_reach_region("Entrance Plaza", self.player))
         set_rule(self.multiworld.get_location("Hit a golf ball 100 feet", self.player), lambda state: state.can_reach_region("Entrance Plaza", self.player))
@@ -569,7 +569,7 @@ class DRWorld(World):
         set_rule(self.multiworld.get_location("Survive until 7pm on day 1", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player))
 
 
-        self.multiworld.completion_condition[self.player] = lambda state: state.can_reach_location("Victory", self.player)
+        self.multiworld.completion_condition[self.player] = lambda state: state.has("Victory", self.player)
 
     def fill_slot_data(self) -> Dict[str, object]:
         slot_data: Dict[str, object] = {}
@@ -583,15 +583,19 @@ class DRWorld(World):
         hints = {}
 
         for location in self.multiworld.get_filled_locations():
+            # Skip event locations (they have no address/code)
+            if location.address is None:
+                continue
+
             if location.item.player == self.player:
                 items_id.append(location.item.code)
-                items_address.append(name_to_dr_code[location.item.name])
+                items_address.append(name_to_dr_code.get(location.item.name, 0))
 
             if location.player == self.player:
                 locations_address.append(item_dictionary[location_dictionary[location.name].default_item].dr_code)
                 locations_id.append(location.address)
                 if location.item.player == self.player:
-                    locations_target.append(name_to_dr_code[location.item.name])
+                    locations_target.append(name_to_dr_code.get(location.item.name, 0))
                 else:
                     locations_target.append(0)
 
@@ -600,9 +604,9 @@ class DRWorld(World):
         slot_data = {
             "options": {
                 "guaranteed_items": self.options.guaranteed_items.value,
-                "death_link": death_link_enabled,  # optional (debug/UI)
+                "death_link": death_link_enabled,
             },
-            "death_link": death_link_enabled,  # IMPORTANT: what Lua will read
+            "death_link": death_link_enabled,
             "hints": hints,
             "seed": self.multiworld.seed_name,
             "slot": self.multiworld.player_name[self.player],
