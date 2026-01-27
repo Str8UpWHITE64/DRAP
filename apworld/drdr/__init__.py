@@ -320,7 +320,7 @@ class DRWorld(World):
 
         set_rule(self.multiworld.get_location("Get bit!", self.player), lambda state: state.can_reach_location("Ending A: Solve all of the cases and be on the helipad at 12pm", self.player))
 
-        set_rule(self.multiworld.get_location("Gather the suppressants and generator and talk to Isabela", self.player), lambda state: state.can_reach_location("Get bit!", self.player) and (state.can_reach_region("Paradise Plaza", self.player) and state.can_reach_region("Entrance Plaza", self.player) and state.can_reach_region("Al Fresca Plaza", self.player) and state.can_reach_region("Leisure Park", self.player) and state.can_reach_region("Food Court", self.player) and state.can_reach_region("Maintenance Tunnel", self.player)))
+        set_rule(self.multiworld.get_location("Gather the suppressants and generator and talk to Isabela", self.player), lambda state: state.can_reach_location("Get bit!", self.player) and (state.can_reach_region("Paradise Plaza", self.player) and state.can_reach_region("Entrance Plaza", self.player) and state.can_reach_region("Al Fresca Plaza", self.player) and state.can_reach_region("Leisure Park", self.player) and state.can_reach_region("Food Court", self.player) and state.can_reach_region("Maintenance Tunnel", self.player) and state.can_reach_region("Wonderland Plaza", self.player)))
 
         set_rule(self.multiworld.get_location("See the crashed helicopter", self.player), lambda state: state.can_reach_location("Get bit!", self.player))
 
@@ -569,6 +569,8 @@ class DRWorld(World):
         set_rule(self.multiworld.get_location("Reach Level 15", self.player), lambda state: state.can_reach_region("Leisure Park", self.player))
         set_rule(self.multiworld.get_location("Reach Level 17", self.player), lambda state: state.can_reach_region("Food Court", self.player))
         set_rule(self.multiworld.get_location("Reach Level 20", self.player), lambda state: state.can_reach_region("Entrance Plaza", self.player))
+        set_rule(self.multiworld.get_location("Reach Level 23", self.player), lambda state: state.can_reach_region("Grocery Store", self.player))
+        set_rule(self.multiworld.get_location("Reach Level 25", self.player), lambda state: state.can_reach_region("Wonderland Plaza", self.player))
         set_rule(self.multiworld.get_location("Reach Level 30", self.player), lambda state: state.can_reach_location("Ending S: Beat up Brock with your bare fists!", self.player))
         set_rule(self.multiworld.get_location("Survive until 7pm on day 1", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player))
 
