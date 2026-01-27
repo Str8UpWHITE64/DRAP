@@ -206,6 +206,27 @@ function M.check(loc_name)
 end
 
 ------------------------------------------------------------
+-- Game Item Number Mapping
+------------------------------------------------------------
+
+-- Maps item names to their game item numbers (for spawning)
+local ITEM_NAME_TO_GAME_NO = {}
+
+--- Registers a mapping from item name to game item number
+--- @param item_name string The AP item name
+--- @param game_item_no number The game's internal item number
+function M.register_game_item_number(item_name, game_item_no)
+    ITEM_NAME_TO_GAME_NO[item_name] = game_item_no
+end
+
+--- Gets the game item number for an item name
+--- @param item_name string The AP item name
+--- @return number|nil The game item number or nil
+function M.get_game_item_number(item_name)
+    return ITEM_NAME_TO_GAME_NO[item_name]
+end
+
+------------------------------------------------------------
 -- Item Tracking & Persistence
 ------------------------------------------------------------
 
@@ -305,12 +326,16 @@ local function handle_net_item(net_item, is_replay)
     M.log(string.format("Applying item index=%d id=%d (%s) from %s (replay=%s)",
         index, item_id, tostring(item_name), tostring(sender_name), tostring(is_replay)))
 
+    -- Look up the game item number from our registered mappings
+    local game_item_no = ITEM_NAME_TO_GAME_NO[item_name]
+
     if not is_replay then
         table.insert(RECEIVED_ITEMS, {
             index = index,
             item_id = item_id,
             item_name = item_name,
             sender = sender,
+            game_item_no = game_item_no,  -- Store game item number for spawning
         })
 
         if item_name and item_name ~= "" then
