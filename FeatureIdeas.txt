@@ -3,3 +3,5 @@
 -More time locks (potentially even hourly)
 -PP, skill, and stat rewards
 -yaml options for all of the above so people can pick what they want to include
+-Dispenser randomizer option
+-Traps: clear inv, invert controls, "upset stomach"

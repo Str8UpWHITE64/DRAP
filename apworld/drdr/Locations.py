@@ -93,8 +93,8 @@ location_tables = {
         # Events in Helipad
         DRLocationData("Get bit!", "Milk", DRLocationCategory.OVERTIME_SCOOP),
         DRLocationData("Ending A: Solve all of the cases and be on the helipad at 12pm", "Milk", DRLocationCategory.MAIN_SCOOP),
-        DRLocationData("Ending B: Don't solve all of the cases but be on the helipad at 12pm", "Milk", DRLocationCategory.MAIN_SCOOP),
-        DRLocationData("Ending C: Solve all of the cases but don't meet Isabela at 10am", "Milk", DRLocationCategory.MAIN_SCOOP),
+        # DRLocationData("Ending B: Don't solve all of the cases but be on the helipad at 12pm", "Milk", DRLocationCategory.MAIN_SCOOP),
+        # DRLocationData("Ending C: Solve all of the cases but don't meet Isabela at 10am", "Milk", DRLocationCategory.MAIN_SCOOP),
 
     ],
 
@@ -119,8 +119,8 @@ location_tables = {
         DRLocationData("Meet back at the safe room at 5pm day 3", "Milk", DRLocationCategory.MAIN_SCOOP),
         DRLocationData("Complete Jessie's Discovery", "Milk", DRLocationCategory.MAIN_SCOOP),
         DRLocationData("Head back to the safe room at the end of day 3", "Milk", DRLocationCategory.MAIN_SCOOP),
-        DRLocationData("Ending E: Don't solve all of the cases and don't be on the helipad at 12pm", "Milk", DRLocationCategory.MAIN_SCOOP),
-        DRLocationData("Ending F: Fail to collect all of the bombs in time", "Milk", DRLocationCategory.MAIN_SCOOP),
+        # DRLocationData("Ending E: Don't solve all of the cases and don't be on the helipad at 12pm", "Milk", DRLocationCategory.MAIN_SCOOP),
+        # DRLocationData("Ending F: Fail to collect all of the bombs in time", "Milk", DRLocationCategory.MAIN_SCOOP),
 
         # PP Stickers in Safe Room
         DRLocationData("Photograph PP Sticker 97", "Coffee Creamer", DRLocationCategory.PP_STICKER),
@@ -239,7 +239,7 @@ location_tables = {
 
         # Events in Leisure Park
         DRLocationData("See the crashed helicopter", "Milk", DRLocationCategory.OVERTIME_SCOOP),
-        DRLocationData("Ending D: Be a prisoner when time runs out", "Milk", DRLocationCategory.MAIN_SCOOP),
+        # DRLocationData("Ending D: Be a prisoner when time runs out", "Milk", DRLocationCategory.MAIN_SCOOP),
 
         # PP Stickers in Leisure Park
         DRLocationData("Photograph PP Sticker 86", "Milk", DRLocationCategory.PP_STICKER),

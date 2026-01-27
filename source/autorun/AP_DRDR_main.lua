@@ -22,6 +22,7 @@ local AP_BRIDGE = require("ap_drdr_bridge")
 AP = AP or {}
 AP.AP_BRIDGE        = AP_BRIDGE
 AP.ItemSpawner      = require("DRAP/ItemSpawner")
+AP.ItemRestriction  = require("DRAP/ItemRestriction")
 AP.DoorSceneLock    = require("DRAP/DoorSceneLock")
 AP.ChallengeTracker = require("DRAP/ChallengeTracker")
 AP.LevelTracker     = require("DRAP/LevelTracker")
@@ -53,15 +54,26 @@ local function register_spawn_handlers_from_json()
             local ap_item_name = def.name
             local item_no = def.item_number
 
+            -- Register the game item number mapping for the ItemSpawner UI
+            AP_BRIDGE.register_game_item_number(ap_item_name, item_no)
+
+            -- Register the handler (for non-spawnable items like keys, this does the actual work)
             AP_BRIDGE.register_item_handler_by_name(ap_item_name, function(net_item, item_name, sender_name)
-                log(string.format("Spawning item '%s' from %s -> item_number=%d",
+                log(string.format("Received item '%s' from %s -> item_number=%d",
                     item_name or ap_item_name, tostring(sender_name or "?"), item_no))
-                AP.ItemSpawner.spawn(item_no)
+                -- Items are tracked by the bridge's RECEIVED_ITEMS list
+                -- The ItemSpawner UI reads from bridge.get_all_received_items()
+
+                -- Notify ItemRestriction that new items have been received
+                -- This triggers a rescan so the player can pick up newly allowed items
+                if AP.ItemRestriction and AP.ItemRestriction.on_items_received then
+                    pcall(AP.ItemRestriction.on_items_received)
+                end
             end)
             count = count + 1
         end
     end
-    log(string.format("Auto-registered %d spawn handlers from JSON", count))
+    log(string.format("Auto-registered %d item handlers and game item mappings from JSON", count))
 end
 
 register_spawn_handlers_from_json()
@@ -249,6 +261,18 @@ AP_REF.on_slot_connected = function(slot_data)
     AP_BRIDGE.set_deathlink_enabled(deathlink_enabled)
     log("DeathLink enabled=" .. tostring(deathlink_enabled))
 
+    -- Restricted Item Mode (Hard Mode) option
+    local restricted_item_mode_enabled = (type(slot_data) == "table" and slot_data.restricted_item_mode == true)
+    AP.RestrictedItemModeEnabled = restricted_item_mode_enabled
+    AP.ItemRestriction.set_enabled(restricted_item_mode_enabled)
+    log("Restricted Item Mode enabled=" .. tostring(restricted_item_mode_enabled))
+
+    -- If hard mode is enabled, disable the item spawner's spawn functionality
+    if restricted_item_mode_enabled and AP.ItemSpawner.set_spawning_disabled then
+        AP.ItemSpawner.set_spawning_disabled(true)
+        log("Item spawning disabled due to hard mode")
+    end
+
     -- Save slot redirect
     if AP.SaveSlot and AP.SaveSlot.apply_for_slot and REDIRECT_SAVE_PATH then
         log("Applying AP save redirect for slot")
@@ -320,6 +344,7 @@ re.on_frame(function()
 
     -- Update all modules
     safe_on_frame(AP.ItemSpawner,      "ItemSpawner")
+    safe_on_frame(AP.ItemRestriction,  "ItemRestriction")
     safe_on_frame(AP.DoorSceneLock,    "DoorSceneLock")
     safe_on_frame(AP.ChallengeTracker, "ChallengeTracker")
     safe_on_frame(AP.LevelTracker,     "LevelTracker")
@@ -343,7 +368,7 @@ end)
 -- Console Helpers
 ------------------------------------------------------------
 
-_G.ap_spawn_item = function(item_no) AP.ItemSpawner.spawn(item_no) end
+_G.ap_spawn_item = function(item_no) AP.ItemSpawner.add_received_item(item_no, "Test Item", "Console") end
 _G.lock_scene    = function(code) AP.DoorSceneLock.lock_scene(code) end
 _G.unlock_scene  = function(code) AP.DoorSceneLock.unlock_scene(code) end
 _G.list_rescued  = function()
@@ -354,5 +379,16 @@ end
 _G.death_link = function() AP.DeathLink.kill_player("manual") end
 _G.freeze     = function() AP.TimeGate.enable() end
 _G.cap        = function(code) AP.TimeGate.set_time_cap_mdate(code) end
+_G.show_items = function() AP.ItemSpawner.show_window() end
+_G.hide_items = function() AP.ItemSpawner.hide_window() end
+_G.restricted_item_mode_on  = function() AP.ItemRestriction.enable() end
+_G.restricted_item_mode_off = function() AP.ItemRestriction.disable() end
+_G.rescan_items  = function() AP.ItemRestriction.force_rescan() end
+_G.allowed_items = function()
+    local items = AP.ItemRestriction.get_allowed_items()
+    for item_no, count in pairs(items) do
+        print(string.format("Item %d: %d allowed", item_no, count))
+    end
+end
 
 log("Main script loaded.")
