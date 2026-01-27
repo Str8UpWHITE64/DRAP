@@ -62,6 +62,7 @@ Currently, there is only one goal, to get Ending S and beat Brock. We may add mo
 - Save early and often.  There are crashes that can happen, and you don't want to lose progress.
 - Door locks and time locks gate your progress.  If you can't get to an area, you likely need to find the key for it. If you notice time isn't progressing towards a main scoop, you likely need an item.
 - If you disconnect while playing, you will send challenge and level locations on reconnect, but events and PP stickers wont go automatically.  I will try to add this in the future.
+- To open the ItemSpawner window, go into the REFramework window, scroll down to "Script Generated UI" and check "Show AP Items Window".  This will open a new window where you can spawn items you have received from the APWorld.
 
 ## Known Bugs
 Some users are experiencing an issue where they are unable to save after connecting to the APWorld.  If you have this issue, close the game, open the AP_DRDR_main.lua file in a text file editor and change ``local redirect_save_path = true`` to ``local redirect_save_path = false``.  This will make it so the AP saves will use your default save directory, so make sure you are only loading saves for the APWorld. 
