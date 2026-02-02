@@ -322,6 +322,11 @@ end
 local function is_effect_item(item_name)
     if not item_name then return false end
 
+    -- Special case for "Hockey Stick"
+    if item_name == "Hockey Stick" then
+        return false
+    end
+
     -- Filter out key items
     if string.find(item_name, "key", 1, true) then
         return true
