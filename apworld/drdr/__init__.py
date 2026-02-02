@@ -326,9 +326,9 @@ class DRWorld(World):
 
         set_rule(self.multiworld.get_location("Give Isabela 5 queens", self.player), lambda state: state.can_reach_location("Gather the suppressants and generator and talk to Isabela", self.player))
 
-        set_rule(self.multiworld.get_location("Get to the humvee", self.player), lambda state: state.can_reach_location("Give Isabela 5 queens", self.player) and state.can_reach_region("Tunnels", self.player))
+        set_rule(self.multiworld.get_location("Get to the Humvee", self.player), lambda state: state.can_reach_location("Give Isabela 5 queens", self.player) and state.can_reach_region("Tunnels", self.player))
 
-        set_rule(self.multiworld.get_location("Fight a tank and win", self.player), lambda state: state.can_reach_location("Get to the humvee", self.player))
+        set_rule(self.multiworld.get_location("Fight a tank and win", self.player), lambda state: state.can_reach_location("Get to the Humvee", self.player))
 
         set_rule(self.multiworld.get_location("Ending S: Beat up Brock with your bare fists!", self.player), lambda state: state.can_reach_location("Fight a tank and win", self.player))
 
@@ -457,7 +457,7 @@ class DRWorld(World):
         set_rule(self.multiworld.get_location("Rescue Gordon Stalworth", self.player), lambda state: state.can_reach_region("Al Fresca Plaza", self.player) and state.can_reach_region("Food Court", self.player) and state.can_reach_region("Leisure Park", self.player) and state.has("DAY2_06_AM", self.player))
 
         set_rule(self.multiworld.get_location("Rescue Bill Brenton", self.player), lambda state: state.can_reach_region("Entrance Plaza", self.player) and state.can_reach_region("Al Fresca Plaza", self.player) and state.can_reach_region("Food Court", self.player) and state.can_reach_region("Leisure Park", self.player))
-        set_rule(self.multiworld.get_location("Rescue Wayne Blackwell", self.player), lambda state: state.can_reach_region("Entrance Plaza", self.player) and state.can_reach_region("Al Fresca Plaza", self.player) and state.can_reach_region("Food Court", self.player) and state.can_reach_region("Leisure Park", self.player) and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.can_reach_location("Meet the Hall family", self.player))
+        set_rule(self.multiworld.get_location("Rescue Wayne Blackwell", self.player), lambda state: state.can_reach_region("Entrance Plaza", self.player) and state.can_reach_region("Al Fresca Plaza", self.player) and state.can_reach_region("Food Court", self.player) and state.can_reach_region("Leisure Park", self.player) and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.can_reach_location("Meet the Hall Family", self.player))
         set_rule(self.multiworld.get_location("Rescue Jolie Wu", self.player), lambda state: state.can_reach_region("Entrance Plaza", self.player) and state.can_reach_region("Al Fresca Plaza", self.player) and state.can_reach_region("Food Court", self.player) and state.can_reach_region("Leisure Park", self.player) and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player))
         set_rule(self.multiworld.get_location("Rescue Rachel Decker", self.player), lambda state: state.can_reach_region("Entrance Plaza", self.player) and state.can_reach_region("Al Fresca Plaza", self.player) and state.can_reach_region("Food Court", self.player) and state.can_reach_region("Leisure Park", self.player) and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player))
         set_rule(self.multiworld.get_location("Rescue Floyd Sanders", self.player), lambda state: state.can_reach_region("Entrance Plaza", self.player) and state.can_reach_region("Al Fresca Plaza", self.player) and state.can_reach_region("Food Court", self.player) and state.can_reach_region("Leisure Park", self.player) and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player))
@@ -509,8 +509,8 @@ class DRWorld(World):
         set_rule(self.multiworld.get_location("Meet Jo", self.player), lambda state: state.can_reach_region("Wonderland Plaza", self.player) and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player))
         set_rule(self.multiworld.get_location("Kill Jo", self.player), lambda state: state.can_reach_location("Meet Jo", self.player))
 
-        set_rule(self.multiworld.get_location("Meet the Hall family", self.player), lambda state: state.can_reach_region("Entrance Plaza", self.player) and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player))
-        set_rule(self.multiworld.get_location("Kill Roger and Jack (and Thomas if you want) and chat with Wayne", self.player), lambda state: state.can_reach_location("Meet the Hall family", self.player))
+        set_rule(self.multiworld.get_location("Meet the Hall Family", self.player), lambda state: state.can_reach_region("Entrance Plaza", self.player) and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player))
+        set_rule(self.multiworld.get_location("Kill Roger and Jack (and Thomas if you want) and chat with Wayne", self.player), lambda state: state.can_reach_location("Meet the Hall Family", self.player))
 
         set_rule(self.multiworld.get_location("Witness Sean in Paradise Plaza", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player) and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player))
         set_rule(self.multiworld.get_location("Get grabbed by the raincoats", self.player), lambda state: state.can_reach_location("Witness Sean in Paradise Plaza", self.player))

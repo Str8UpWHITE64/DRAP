@@ -186,7 +186,7 @@ location_tables = {
         # Events in Entrance Plaza
         DRLocationData("Escort Brad to see Dr Barnaby", "Milk", DRLocationCategory.MAIN_SCOOP),
         DRLocationData("Complete Rescue the Professor", "Milk", DRLocationCategory.MAIN_SCOOP),
-        DRLocationData("Meet the Hall family", "Milk", DRLocationCategory.PSYCHO_SCOOP),
+        DRLocationData("Meet the Hall Family", "Milk", DRLocationCategory.PSYCHO_SCOOP),
         DRLocationData("Kill Roger and Jack (and Thomas if you want) and chat with Wayne", "Milk", DRLocationCategory.PSYCHO_SCOOP),
 
         # Survivors rescued from Entrance Plaza
@@ -420,7 +420,7 @@ location_tables = {
     ],
 
     "Tunnels": [
-        DRLocationData("Get to the humvee", "Milk", DRLocationCategory.OVERTIME_SCOOP),
+        DRLocationData("Get to the Humvee", "Milk", DRLocationCategory.OVERTIME_SCOOP),
         DRLocationData("Fight a tank and win", "Milk", DRLocationCategory.OVERTIME_SCOOP),
         DRLocationData("Ending S: Beat up Brock with your bare fists!", "Victory", DRLocationCategory.EVENT),
     ],

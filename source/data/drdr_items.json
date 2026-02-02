@@ -340,67 +340,67 @@
     "item_number": 81
   },
   {
-    "name": "Sub-machine Gun",
+    "name": "Submachine Gun",
     "game_id": "ITEM_NO_SUBMACHINE_GUN",
     "item_number": 82
   },
   {
-    "name": "Mannequin",
+    "name": "Mannequin Male",
     "game_id": "ITEM_NO_MANNEQUIN_M",
     "item_number": 83
   },
   {
-    "name": "Mannequin Torso",
+    "name": "Mannequin Male Torso",
     "game_id": "ITEM_NO_MANNEQUIN_LIMB_M_0",
     "item_number": 84
   },
   {
-    "name": "Mannequin Limb",
+    "name": "Mannequin Male Right Arm",
     "game_id": "ITEM_NO_MANNEQUIN_LIMB_M_1",
     "item_number": 85
   },
   {
-    "name": "Mannequin Limb",
+    "name": "Mannequin Male Left Arm",
     "game_id": "ITEM_NO_MANNEQUIN_LIMB_M_2",
     "item_number": 86
   },
   {
-    "name": "Mannequin Limb",
+    "name": "Mannequin Male Right Leg",
     "game_id": "ITEM_NO_MANNEQUIN_LIMB_M_3",
     "item_number": 87
   },
   {
-    "name": "Mannequin Limb",
+    "name": "Mannequin Male Left Leg",
     "game_id": "ITEM_NO_MANNEQUIN_LIMB_M_4",
     "item_number": 88
   },
   {
-    "name": "Mannequin ",
+    "name": "Mannequin Female",
     "game_id": "ITEM_NO_MANNEQUIN_F",
     "item_number": 89
   },
   {
-    "name": "Mannequin Torso",
+    "name": "Mannequin Female Torso",
     "game_id": "ITEM_NO_MANNEQUIN_LIMB_F_0",
     "item_number": 90
   },
   {
-    "name": "Mannequin Limb",
+    "name": "Mannequin Female Right Arm",
     "game_id": "ITEM_NO_MANNEQUIN_LIMB_F_1",
     "item_number": 91
   },
   {
-    "name": "Mannequin Limb",
+    "name": "Mannequin Female Left Arm",
     "game_id": "ITEM_NO_MANNEQUIN_LIMB_F_2",
     "item_number": 92
   },
   {
-    "name": "Mannequin Limb",
+    "name": "Mannequin Female Right Leg",
     "game_id": "ITEM_NO_MANNEQUIN_LIMB_F_3",
     "item_number": 93
   },
   {
-    "name": "Mannequin Limb",
+    "name": "Mannequin Female Left Leg",
     "game_id": "ITEM_NO_MANNEQUIN_LIMB_F_4",
     "item_number": 94
   },
@@ -585,7 +585,7 @@
     "item_number": 143
   },
   {
-    "name": "Small Chainsaw",
+    "name": "Adam's Small Chainsaw",
     "game_id": "ITEM_NO_REAL_SMALL_CHAINSAW",
     "item_number": 144
   },
