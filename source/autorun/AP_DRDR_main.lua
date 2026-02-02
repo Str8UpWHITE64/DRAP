@@ -24,7 +24,8 @@ AP.AP_BRIDGE        = AP_BRIDGE
 AP.ItemSpawner      = require("DRAP/ItemSpawner")
 AP.ItemRestriction  = require("DRAP/ItemRestriction")
 AP.DoorSceneLock    = require("DRAP/DoorSceneLock")
-AP.DoorRandomizer   = require("DRAP/DoorRandomizer")  -- NEW: Door Randomizer
+--AP.DoorRandomizer   = require("DRAP/DoorRandomizer")
+--AP.NpcCarryover     = require("DRAP/NpcCarryover")
 AP.ChallengeTracker = require("DRAP/ChallengeTracker")
 AP.LevelTracker     = require("DRAP/LevelTracker")
 AP.EventTracker     = require("DRAP/EventTracker")
@@ -165,6 +166,15 @@ end
 for _, step in ipairs(TIME_LOCK_CHAIN) do
     AP_BRIDGE.register_item_handler_by_name(step.key, on_time_item_received)
 end
+
+------------------------------------------------------------
+-- Victory Handler
+------------------------------------------------------------
+
+AP_BRIDGE.register_item_handler_by_name("Victory", function(net_item, item_name, sender_name)
+    log("Victory received! Sending goal completion to server...")
+    AP_BRIDGE.send_goal_complete()
+end)
 
 ------------------------------------------------------------
 -- Apply Permanent Effects
@@ -352,8 +362,8 @@ re.on_frame(function()
     safe_on_frame(AP.ItemSpawner,      "ItemSpawner")
     safe_on_frame(AP.ItemRestriction,  "ItemRestriction")
     safe_on_frame(AP.DoorSceneLock,    "DoorSceneLock")
-    safe_on_frame(AP.DoorRandomizer,   "DoorRandomizer")
-    safe_on_frame(AP.NpcInvestigation, "NpcInvestigation")
+    --safe_on_frame(AP.DoorRandomizer,   "DoorRandomizer")
+    --safe_on_frame(AP.NpcCarryover,     "NpcCarryover")
     safe_on_frame(AP.ChallengeTracker, "ChallengeTracker")
     safe_on_frame(AP.LevelTracker,     "LevelTracker")
     safe_on_frame(AP.EventTracker,     "EventTracker")
@@ -389,212 +399,5 @@ _G.freeze     = function() AP.TimeGate.enable() end
 _G.cap        = function(code) AP.TimeGate.set_time_cap_mdate(code) end
 _G.show_items = function() AP.ItemSpawner.show_window() end
 _G.hide_items = function() AP.ItemSpawner.hide_window() end
-
-------------------------------------------------------------
--- Door Randomizer Console Helpers (NEW)
-------------------------------------------------------------
-
--- Show captured doors summary
-_G.doors = function()
-    AP.DoorRandomizer.print_captured_doors_summary()
-end
-
--- Show recent door transitions
-_G.transitions = function()
-    AP.DoorRandomizer.print_recent_transitions()
-end
-
--- Enable door randomization
-_G.enable_door_rando = function()
-    AP.DoorRandomizer.enable_randomization()
-end
-
--- Disable door randomization
-_G.disable_door_rando = function()
-    AP.DoorRandomizer.disable_randomization()
-end
-
--- Clear all redirects
-_G.clear_redirects = function()
-    AP.DoorRandomizer.clear_all_redirects()
-end
-
--- Get all captured door data (returns table)
-_G.get_doors = function()
-    return AP.DoorRandomizer.get_captured_doors()
-end
-
--- Show door randomizer status
-_G.door_status = function()
-    AP.DoorRandomizer.print_status()
-end
-
--- Retry hook installation if it failed
-_G.retry_door_hook = function()
-    AP.DoorRandomizer.retry_hook_install()
-end
-
--- Print HIT_DATA fields
-_G.hit_data_fields = function()
-    AP.DoorRandomizer.print_hit_data_fields()
-end
-
--- Print full details of the last door transition
-_G.last_door = function()
-    AP.DoorRandomizer.print_last_transition_details()
-end
-
--- Print all active redirects
-_G.redirects = function()
-    AP.DoorRandomizer.print_redirects()
-end
-
--- Quick redirect: redirect("SCN_s136|s135|door0", "s200")
--- This would make the Safe Room -> Helipad door go to Paradise Plaza instead
-_G.redirect = function(source_door_id, target_area)
-    AP.DoorRandomizer.set_redirect(source_door_id, target_area)
-end
-
--- Copy redirect from another door's destination
-_G.redirect_like = function(source_door_id, template_door_id)
-    AP.DoorRandomizer.set_redirect_from_door(source_door_id, template_door_id)
-end
-
--- Show/hide door randomizer GUI window
-_G.show_doors_gui = function()
-    AP.DoorRandomizer.show_window()
-end
-
-_G.hide_doors_gui = function()
-    AP.DoorRandomizer.hide_window()
-end
-
-_G.toggle_doors_gui = function()
-    AP.DoorRandomizer.toggle_window()
-end
-
--- Save/load door data manually
-_G.save_doors = function()
-    AP.DoorRandomizer.save_doors()
-end
-
-_G.load_doors = function()
-    AP.DoorRandomizer.load_doors()
-end
-
-_G.save_redirects = function()
-    AP.DoorRandomizer.save_redirects()
-end
-
-_G.load_redirects = function()
-    AP.DoorRandomizer.load_redirects()
-end
-
--- Set description for a door
--- Usage: describe_door("SCN_s136|s200|door0", "Safe Room to Paradise Plaza main door")
-_G.describe_door = function(door_id, description)
-    AP.DoorRandomizer.set_door_description(door_id, description)
-end
-
--- Print doors grouped by area (compact view)
-_G.doors_by_area = function()
-    AP.DoorRandomizer.print_doors_by_area()
-end
-
--- Export doors summary (returns table for inspection)
-_G.export_doors = function()
-    local summary = AP.DoorRandomizer.export_doors_summary()
-    for _, door in ipairs(summary) do
-        print(string.format("%s -> %s [%s] (uses: %d)",
-            door.from, door.to, door.description, door.uses))
-    end
-    return summary
-end
-
--- Show NPC Investigation status
-_G.npc_status = function()
-    AP.NpcInvestigation.print_status()
-end
-
--- Print recent replaceNpc calls
-_G.npc_replace_calls = function()
-    AP.NpcInvestigation.print_recent_replace_calls()
-end
-
--- Print recent NPC transitions (from List.Add)
-_G.npc_transitions = function()
-    AP.NpcInvestigation.print_recent_npc_transitions()
-end
-
--- Print all captured NPCs
-_G.npcs = function()
-    AP.NpcInvestigation.print_captured_npcs()
-end
-
--- Print the last NPC transition details
-_G.last_npc = function()
-    AP.NpcInvestigation.print_last_transition()
-end
-
--- Print the last replaceNpc call details
-_G.last_replace = function()
-    AP.NpcInvestigation.print_last_replace_call()
-end
-
--- Print NpcReplaceInfo fields discovered
-_G.npc_fields = function()
-    AP.NpcInvestigation.print_replace_info_fields()
-end
-
--- Retry hook installation
-_G.retry_npc_hook = function()
-    AP.NpcInvestigation.retry_hook_install()
-end
-
--- Show/hide NPC Investigation GUI window
-_G.show_npc_gui = function()
-    AP.NpcInvestigation.show_window()
-end
-
-_G.hide_npc_gui = function()
-    AP.NpcInvestigation.hide_window()
-end
-
-_G.toggle_npc_gui = function()
-    AP.NpcInvestigation.toggle_window()
-end
-
--- Save/load NPC data
-_G.save_npcs = function()
-    AP.NpcInvestigation.save_npcs()
-end
-
-_G.load_npcs = function()
-    AP.NpcInvestigation.load_npcs()
-end
-
--- Enable/disable debug mode for verbose logging
-_G.npc_debug = function(enabled)
-    if enabled == nil then enabled = true end
-    AP.NpcInvestigation.set_debug_mode(enabled)
-end
-
--- Get raw data tables (for inspection in console)
-_G.get_npc_transitions = function()
-    return AP.NpcInvestigation.get_recent_npc_transitions()
-end
-
-_G.get_replace_calls = function()
-    return AP.NpcInvestigation.get_recent_replace_calls()
-end
-
-_G.get_captured_npcs = function()
-    return AP.NpcInvestigation.get_captured_npcs()
-end
-
--- Explore NpcManager fields and methods
-_G.explore_npc_mgr = function()
-    AP.NpcInvestigation.explore_npc_manager()
-end
 
 log("Main script loaded.")

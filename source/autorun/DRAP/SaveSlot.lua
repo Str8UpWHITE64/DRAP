@@ -139,4 +139,31 @@ function M.apply_for_slot(slot_name, seed)
     end
 end
 
+function M.clear_redirect()
+    local td = sdk.find_type_definition(SaveService_TYPE_NAME)
+    local svc = sdk.get_managed_singleton(SaveService_TYPE_NAME)
+    if not svc then
+        svc = sdk.get_native_singleton(SaveService_TYPE_NAME)
+    end
+
+    if not svc then
+        M.log("SaveService singleton not found; are you in-game yet?")
+        return false
+    end
+
+    local get_mount_m = td:get_method("get_SaveMountPath")
+    local set_mount_m = td:get_method("set_SaveMountPath")
+
+    -- Apply original mount
+    local ok_set, err = pcall(function()
+        set_mount_m:call(svc, sdk.create_managed_string(BASE_SAVE_MOUNT))
+    end)
+
+    if not ok_set then
+        M.log("Failed to set SaveMountPath: " .. tostring(err))
+        return false
+    end
+
+end
+
 return M
