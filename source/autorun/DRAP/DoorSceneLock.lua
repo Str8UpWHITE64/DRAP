@@ -4,6 +4,7 @@
 local Shared = require("DRAP/Shared")
 
 local M = Shared.create_module("DoorSceneLock")
+local testing_mode = false
 
 ------------------------------------------------------------
 -- Singleton Managers
@@ -80,7 +81,11 @@ local last_level_path = nil
 ------------------------------------------------------------
 
 local function scene_is_locked(scene_code)
-    return LOCKED_SCENES[scene_code] == true
+    if testing_mode then
+        return false
+    else
+        return LOCKED_SCENES[scene_code] == true
+    end
 end
 
 local function current_event_blocks_s100_lock()
