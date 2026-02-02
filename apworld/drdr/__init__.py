@@ -145,7 +145,7 @@ class DRWorld(World):
                         location.name,
                         location.category,
                         location.default_item,
-                        None,
+                        self.location_name_to_id[location.name],
                         new_region
                     )
                     new_region.locations.append(new_location)
@@ -189,7 +189,7 @@ class DRWorld(World):
                     itempoolSize += 1
 
         # Place Victory event at the goal location
-        self.get_location("Ending S: Beat up Brock with your bare fists!").place_locked_item(self.create_event("Victory"))
+        self.get_location("Ending S: Beat up Brock with your bare fists!").place_locked_item(self.create_item("Victory"))
 
         foo = BuildItemPool(self.multiworld, itempoolSize, self.options)
 
@@ -205,7 +205,7 @@ class DRWorld(World):
         useful_categories = []
         data = self.item_name_to_id[name]
 
-        if name in key_item_names or item_dictionary[name].category == DRItemCategory.LOCK:
+        if name in key_item_names or item_dictionary[name].category in [DRItemCategory.LOCK, DRItemCategory.EVENT]:
             item_classification = ItemClassification.progression
         elif item_dictionary[name].category in useful_categories:
             item_classification = ItemClassification.useful

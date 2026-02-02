@@ -50,6 +50,36 @@ function M.is_connected()
 end
 
 ------------------------------------------------------------
+-- Goal Completion
+------------------------------------------------------------
+
+function M.send_goal_complete()
+    if not AP_REF.APClient then
+        M.log("Cannot send goal: APClient is nil")
+        return false
+    end
+
+    -- CLIENT_GOAL status is 30 in Archipelago protocol
+    local CLIENT_GOAL = 30
+
+    -- Try StatusUpdate method (standard AP client method)
+    if type(AP_REF.APClient.StatusUpdate) == "function" then
+        local ok, err = pcall(AP_REF.APClient.StatusUpdate, AP_REF.APClient, CLIENT_GOAL)
+        if ok then
+            M.log("Goal completion sent successfully!")
+            return true
+        else
+            M.log("StatusUpdate failed: " .. tostring(err))
+            re.msg("Goal completion failed to send: " .. tostring(err))
+        end
+    else
+        M.log("StatusUpdate method not found on APClient")
+    end
+
+    return false
+end
+
+------------------------------------------------------------
 -- DeathLink
 ------------------------------------------------------------
 
