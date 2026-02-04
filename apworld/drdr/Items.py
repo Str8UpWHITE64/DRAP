@@ -286,6 +286,20 @@ def BuildItemPool(multiworld, count, options):
     item_pool = []
     included_itemcount = 0
 
+    # Area keys to skip when door randomizer is enabled
+    area_key_names = {
+        "Rooftop key", "Service Hallway key", "Paradise Plaza key",
+        "Colby's Movie Theater key", "Leisure Park key", "North Plaza key",
+        "Crislip's Hardware Store key", "Food Court key", "Wonderland Plaza key",
+        "Al Fresca Plaza key", "Entrance Plaza key", "Grocery Store key",
+        "Maintenance Tunnel key", "Hideout key",
+    }
+
+    # Specialty items that must be included in the pool for Restricted mode
+    specialty_items = {
+        "Book [Japanese Conversation]"
+    }
+
     if options.guaranteed_items.value:
         for item_name in options.guaranteed_items.value:
             item = item_dictionary[item_name]
@@ -293,13 +307,23 @@ def BuildItemPool(multiworld, count, options):
             included_itemcount = included_itemcount + 1
     remaining_count = count - included_itemcount
 
+    if options.restricted_item_mode.value:
+        for item_name in specialty_items:
+            item = item_dictionary[item_name]
+            item_pool.append(item)
+            remaining_count = remaining_count - 1
+            included_itemcount = included_itemcount + 1
+
     itemList = [item for item in _all_items]
     lockList = [item for item in _all_items if item.category == DRItemCategory.LOCK]
     consumableList = [item for item in _all_items if item.category == DRItemCategory.CONSUMABLE]
     weaponList = [item for item in _all_items if item.category == DRItemCategory.WEAPON]
     fillerList = [item for item in itemList if item.category in (DRItemCategory.MISC, DRItemCategory.TRAP, DRItemCategory.WEAPON, DRItemCategory.CONSUMABLE)]
-    
+
     for lock in lockList:
+        # Skip area keys if door randomizer is enabled (they're precollected)
+        if options.door_randomizer and lock.name in area_key_names:
+            continue
         item = item_dictionary[lock.name]
         item_pool.append(item)
         remaining_count = remaining_count - 1

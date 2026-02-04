@@ -253,6 +253,11 @@ function M.is_on_title_screen()
     return M.CurrentLevelPath == "SCN_s140"
 end
 
+function M.set_testing_mode(enabled)
+    testing_mode = enabled == true
+    rescan_current_area_doors()
+end
+
 ------------------------------------------------------------
 -- Per-frame Update
 ------------------------------------------------------------

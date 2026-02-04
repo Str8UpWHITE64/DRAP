@@ -148,7 +148,6 @@ function M.clear_redirect()
 
     if not svc then
         M.log("SaveService singleton not found; are you in-game yet?")
-        return false
     end
 
     local get_mount_m = td:get_method("get_SaveMountPath")
@@ -161,9 +160,7 @@ function M.clear_redirect()
 
     if not ok_set then
         M.log("Failed to set SaveMountPath: " .. tostring(err))
-        return false
     end
-
 end
 
 return M
