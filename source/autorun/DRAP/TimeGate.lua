@@ -6,6 +6,8 @@ local Shared = require("DRAP/Shared")
 
 local M = Shared.create_module("TimeGate")
 
+local testing_mode = false  -- Set to true to disable time gating for testing
+
 ------------------------------------------------------------
 -- Singleton Managers
 ------------------------------------------------------------
@@ -71,8 +73,11 @@ local function apply_gate_state()
     local effective_freeze = manual_freeze_enabled or cap_freeze_enabled
 
     if effective_freeze then
+        -- Save the current time speed before freezing (only once)
         if saved_time_add == nil then
-            saved_time_add = 30
+            local current = gm.mTimeAdd
+            -- Don't save 0 as the restore value
+            saved_time_add = (current ~= 0) and current or 30
             M.log(string.format("Captured current time speed: %s", tostring(saved_time_add)))
         end
 
@@ -81,9 +86,15 @@ local function apply_gate_state()
             M.log("Time frozen (mTimeAdd set to 0).")
         end
     else
-        if saved_time_add ~= nil and gm.mTimeAdd ~= saved_time_add then
-            gm.mTimeAdd = 30
-            M.log(string.format("Time restored (mTimeAdd = %s).", tostring(saved_time_add)))
+        -- Only restore once when transitioning from frozen to unfrozen
+        if saved_time_add ~= nil then
+            -- Only restore if time is currently frozen (mTimeAdd == 0)
+            if gm.mTimeAdd == 0 then
+                gm.mTimeAdd = saved_time_add
+                M.log(string.format("Time restored (mTimeAdd = %s).", tostring(saved_time_add)))
+            end
+            -- Clear saved value so we stop interfering with player speed controls
+            saved_time_add = nil
         end
     end
 end
@@ -266,6 +277,9 @@ function M.unlock_day4_12pm() M.set_time_cap_mdate(TIME_CAPS.DAY4_12_PM) end
 ------------------------------------------------------------
 
 function M.on_frame()
+    if testing_mode then
+        return
+    end
     evaluate_time_cap_mdate()
     apply_gate_state()
 

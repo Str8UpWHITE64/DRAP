@@ -10,6 +10,27 @@ from .Items import DRItem, DRItemCategory, item_dictionary, key_item_names, item
 from .Locations import DRLocation, DRLocationCategory, location_tables, location_dictionary
 from .Options import DROption
 
+import os
+from .DoorRandomization import generate_door_randomization_for_ap, generate_door_map_html, DOOR_MODE_CHAOS, DOOR_MODE_PAIRED
+
+# List of all area key names for door randomizer
+AREA_KEY_NAMES = [
+    "Rooftop key",
+    "Service Hallway key",
+    "Paradise Plaza key",
+    "Colby's Movie Theater key",
+    "Leisure Park key",
+    "North Plaza key",
+    "Crislip's Hardware Store key",
+    "Food Court key",
+    "Wonderland Plaza key",
+    "Al Fresca Plaza key",
+    "Entrance Plaza key",
+    "Grocery Store key",
+    "Maintenance Tunnel key",
+    "Hideout key",
+]
+
 class DRWeb(WebWorld):
     bug_report_page = ""
     theme = "stone"
@@ -50,6 +71,7 @@ class DRWorld(World):
         self.locked_items = []
         self.locked_locations = []
         self.enabled_location_categories = set()
+        self.door_redirects = {}
 
     def generate_early(self):
         self.enabled_location_categories.add(DRLocationCategory.SURVIVOR)
@@ -59,6 +81,21 @@ class DRWorld(World):
         self.enabled_location_categories.add(DRLocationCategory.OVERTIME_SCOOP)
         self.enabled_location_categories.add(DRLocationCategory.PSYCHO_SCOOP)
         self.enabled_location_categories.add(DRLocationCategory.CHALLENGE)
+
+        # If door randomizer is enabled, precollect all area keys
+        if self.options.door_randomizer:
+            for key_name in AREA_KEY_NAMES:
+                self.multiworld.push_precollected(self.create_item(key_name))
+
+            # Get the door randomizer mode (0 = chaos, 1 = paired)
+            door_mode = self.options.door_randomizer_mode.value
+
+            # Generate door redirects for this player using per-slot random
+            # This ensures each player gets a unique door layout even with the same server seed
+            self.door_redirects = generate_door_randomization_for_ap(
+                self.multiworld.per_slot_randoms[self.player],
+                mode=door_mode
+            )
 
     def create_regions(self):
         # Create Regions
@@ -100,7 +137,6 @@ class DRWorld(World):
         create_connection("Service Hallway", "Paradise Plaza")
 
         create_connection("Paradise Plaza", "Colby's Movie Theater")
-        create_connection("Paradise Plaza", "Entrance Plaza")
         create_connection("Paradise Plaza", "Leisure Park")
 
         create_connection("Al Fresca Plaza", "Entrance Plaza")
@@ -240,22 +276,24 @@ class DRWorld(World):
 
         # Areas unlocked by keys
         set_rule(self.multiworld.get_location("Victory", self.player), lambda state: state.can_reach_location("Ending S: Beat up Brock with your bare fists!", self.player))
-        set_rule(self.multiworld.get_entrance("Safe Room -> Rooftop", self.player), lambda state: state.has("Rooftop key", self.player))
-        set_rule(self.multiworld.get_entrance("Rooftop -> Service Hallway", self.player), lambda state: state.has("Service Hallway key", self.player))
-        set_rule(self.multiworld.get_entrance("Service Hallway -> Paradise Plaza", self.player), lambda state: state.has("Paradise Plaza key", self.player))
-        set_rule(self.multiworld.get_entrance("Paradise Plaza -> Colby's Movie Theater", self.player), lambda state: state.has("Colby's Movie Theater key", self.player))
-        set_rule(self.multiworld.get_entrance("Paradise Plaza -> Leisure Park", self.player), lambda state: state.has("Leisure Park key", self.player))
-        # set_rule(self.multiworld.get_entrance("Paradise Plaza -> Entrance Plaza", self.player), lambda state: state.has("Entrance Plaza key", self.player))
-        set_rule(self.multiworld.get_entrance("Leisure Park -> Food Court", self.player), lambda state: state.has("Food Court key", self.player))
-        set_rule(self.multiworld.get_entrance("Leisure Park -> North Plaza", self.player), lambda state: state.has("North Plaza key", self.player))
-        set_rule(self.multiworld.get_entrance("Leisure Park -> Maintenance Tunnel", self.player), lambda state: state.has("Maintenance Tunnel key", self.player))
-        set_rule(self.multiworld.get_entrance("Food Court -> Al Fresca Plaza", self.player), lambda state: state.has("Al Fresca Plaza key", self.player))
-        set_rule(self.multiworld.get_entrance("Food Court -> Wonderland Plaza", self.player), lambda state: state.has("Wonderland Plaza key", self.player))
-        set_rule(self.multiworld.get_entrance("Al Fresca Plaza -> Entrance Plaza", self.player), lambda state: state.has("Entrance Plaza key", self.player))
-        set_rule(self.multiworld.get_entrance("Wonderland Plaza -> North Plaza", self.player), lambda state: state.has("North Plaza key", self.player))
-        set_rule(self.multiworld.get_entrance("North Plaza -> Grocery Store", self.player), lambda state: state.has("Grocery Store key", self.player))
-        set_rule(self.multiworld.get_entrance("North Plaza -> Hideout", self.player), lambda state: state.has("Hideout key", self.player))
-        set_rule(self.multiworld.get_entrance("North Plaza -> Crislip's Hardware Store", self.player), lambda state: state.has("Crislip's Hardware Store key", self.player))
+
+        if not self.options.door_randomizer:
+            # Normal key-based entrance rules
+            set_rule(self.multiworld.get_entrance("Safe Room -> Rooftop", self.player), lambda state: state.has("Rooftop key", self.player))
+            set_rule(self.multiworld.get_entrance("Rooftop -> Service Hallway", self.player), lambda state: state.has("Service Hallway key", self.player))
+            set_rule(self.multiworld.get_entrance("Service Hallway -> Paradise Plaza", self.player), lambda state: state.has("Paradise Plaza key", self.player))
+            set_rule(self.multiworld.get_entrance("Paradise Plaza -> Colby's Movie Theater", self.player), lambda state: state.has("Colby's Movie Theater key", self.player))
+            set_rule(self.multiworld.get_entrance("Paradise Plaza -> Leisure Park", self.player), lambda state: state.has("Leisure Park key", self.player))
+            set_rule(self.multiworld.get_entrance("Leisure Park -> Food Court", self.player), lambda state: state.has("Food Court key", self.player))
+            set_rule(self.multiworld.get_entrance("Leisure Park -> North Plaza", self.player), lambda state: state.has("North Plaza key", self.player))
+            set_rule(self.multiworld.get_entrance("Leisure Park -> Maintenance Tunnel", self.player), lambda state: state.has("Maintenance Tunnel key", self.player))
+            set_rule(self.multiworld.get_entrance("Food Court -> Al Fresca Plaza", self.player), lambda state: state.has("Al Fresca Plaza key", self.player))
+            set_rule(self.multiworld.get_entrance("Food Court -> Wonderland Plaza", self.player), lambda state: state.has("Wonderland Plaza key", self.player))
+            set_rule(self.multiworld.get_entrance("Al Fresca Plaza -> Entrance Plaza", self.player), lambda state: state.has("Entrance Plaza key", self.player))
+            set_rule(self.multiworld.get_entrance("Wonderland Plaza -> North Plaza", self.player), lambda state: state.has("North Plaza key", self.player))
+            set_rule(self.multiworld.get_entrance("North Plaza -> Grocery Store", self.player), lambda state: state.has("Grocery Store key", self.player))
+            set_rule(self.multiworld.get_entrance("North Plaza -> Hideout", self.player), lambda state: state.has("Hideout key", self.player))
+            set_rule(self.multiworld.get_entrance("North Plaza -> Crislip's Hardware Store", self.player), lambda state: state.has("Crislip's Hardware Store key", self.player))
 
         # Events
         set_rule(self.multiworld.get_location("Meet Jessie in the Service Hallway", self.player), lambda state: state.can_reach_region("Service Hallway", self.player))
@@ -604,15 +642,22 @@ class DRWorld(World):
 
         death_link_enabled = bool(self.options.death_link.value)
         restricted_item_mode_enabled = bool(self.options.restricted_item_mode.value)
+        door_randomizer_enabled = bool(self.options.door_randomizer.value)
+        door_randomizer_mode = self.options.door_randomizer_mode.value
 
         slot_data = {
             "options": {
                 "guaranteed_items": self.options.guaranteed_items.value,
-                "death_link": death_link_enabled,  # optional (debug/UI)
-                "restricted_item_mode": restricted_item_mode_enabled,  # optional (debug/UI)
+                "death_link": death_link_enabled,
+                "restricted_item_mode": restricted_item_mode_enabled,
+                "door_randomizer": door_randomizer_enabled,
+                "door_randomizer_mode": door_randomizer_mode,
             },
-            "death_link": death_link_enabled,  # IMPORTANT: what Lua will read
-            "restricted_item_mode": restricted_item_mode_enabled,  # IMPORTANT: what Lua will read for item restrictions
+            "death_link": death_link_enabled,
+            "restricted_item_mode": restricted_item_mode_enabled,
+            "door_randomizer": door_randomizer_enabled,
+            "door_randomizer_mode": door_randomizer_mode,  # For Lua: 0 = chaos, 1 = paired
+            "door_redirects": self.door_redirects if door_randomizer_enabled else {},
             "hints": hints,
             "seed": self.multiworld.seed_name,
             "slot": self.multiworld.player_name[self.player],
@@ -625,3 +670,27 @@ class DRWorld(World):
         }
 
         return slot_data
+
+    def generate_output(self, output_directory: str) -> None:
+        # Only generate door map if door randomizer is enabled and we have redirects
+        if self.options.door_randomizer and self.door_redirects:
+            player_name = self.multiworld.get_player_name(self.player)
+            seed_name = self.multiworld.seed_name
+            mode_name = "Paired" if self.options.door_randomizer_mode.value == 1 else "Chaos"
+
+            # Sanitize names for filename
+            safe_player = "".join(c if c.isalnum() or c in "-_" else "_" for c in player_name)
+            safe_seed = "".join(c if c.isalnum() or c in "-_" else "_" for c in str(seed_name))
+
+            # Generate the HTML map
+            html_content = generate_door_map_html(
+                self.door_redirects,
+                title=f"Door Map - {player_name} [{mode_name}] (Seed: {seed_name})"
+            )
+
+            # Write to output directory
+            filename = f"door_map_{safe_player}_{safe_seed}.html"
+            filepath = os.path.join(output_directory, filename)
+
+            with open(filepath, "w", encoding="utf-8") as f:
+                f.write(html_content)

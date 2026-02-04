@@ -24,8 +24,8 @@ AP.AP_BRIDGE        = AP_BRIDGE
 AP.ItemSpawner      = require("DRAP/ItemSpawner")
 AP.ItemRestriction  = require("DRAP/ItemRestriction")
 AP.DoorSceneLock    = require("DRAP/DoorSceneLock")
---AP.DoorRandomizer   = require("DRAP/DoorRandomizer")
---AP.NpcCarryover     = require("DRAP/NpcCarryover")
+AP.DoorRandomizer   = require("DRAP/DoorRandomizer")
+AP.NpcCarryover     = require("DRAP/NpcCarryover")
 AP.ChallengeTracker = require("DRAP/ChallengeTracker")
 AP.LevelTracker     = require("DRAP/LevelTracker")
 AP.EventTracker     = require("DRAP/EventTracker")
@@ -284,6 +284,26 @@ AP_REF.on_slot_connected = function(slot_data)
         log("Item spawning disabled due to hard mode")
     end
 
+    -- Door Randomizer option
+    local door_randomizer_enabled = (type(slot_data) == "table" and slot_data.door_randomizer == true)
+    AP.DoorRandomizerEnabled = door_randomizer_enabled
+    log("Door Randomizer enabled=" .. tostring(door_randomizer_enabled))
+
+    -- Apply door redirects if enabled
+    if door_randomizer_enabled and AP.DoorRandomizer then
+        local door_redirects = slot_data.door_redirects
+        if door_redirects then
+            AP.DoorRandomizer.set_redirects(door_redirects)
+            log(string.format("Door randomization activated with %d redirects",
+                AP.DoorRandomizer.get_redirect_config_count()))
+        else
+            AP.DoorRandomizer.clear_redirects()
+            log("Door randomizer enabled but no redirects provided")
+        end
+    elseif AP.DoorRandomizer then
+        AP.DoorRandomizer.clear_redirects()
+    end
+
     -- Save slot redirect
     if AP.SaveSlot and AP.SaveSlot.apply_for_slot and REDIRECT_SAVE_PATH then
         log("Applying AP save redirect for slot")
@@ -296,7 +316,7 @@ AP_REF.on_slot_connected = function(slot_data)
     AP_BRIDGE.set_received_items_filename(slot, seed)
     AP_BRIDGE.load_received_items()
 
-        -- Set up sticker save file
+    -- Set up sticker save file
     if AP.PPStickerTracker.set_save_filename then
         AP.PPStickerTracker.set_save_filename(slot, seed)
     end
@@ -362,8 +382,8 @@ re.on_frame(function()
     safe_on_frame(AP.ItemSpawner,      "ItemSpawner")
     safe_on_frame(AP.ItemRestriction,  "ItemRestriction")
     safe_on_frame(AP.DoorSceneLock,    "DoorSceneLock")
-    --safe_on_frame(AP.DoorRandomizer,   "DoorRandomizer")
-    --safe_on_frame(AP.NpcCarryover,     "NpcCarryover")
+    safe_on_frame(AP.DoorRandomizer,   "DoorRandomizer")
+    safe_on_frame(AP.NpcCarryover,     "NpcCarryover")
     safe_on_frame(AP.ChallengeTracker, "ChallengeTracker")
     safe_on_frame(AP.LevelTracker,     "LevelTracker")
     safe_on_frame(AP.EventTracker,     "EventTracker")
@@ -380,6 +400,10 @@ re.on_frame(function()
     was_in_game = now_in_game
 
     try_reapply_items_if_ready()
+end)
+
+re.on_script_reset(function()
+    AP.SaveSlot.clear_redirect()
 end)
 
 ------------------------------------------------------------

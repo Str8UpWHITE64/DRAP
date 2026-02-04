@@ -74,7 +74,7 @@ local CHALLENGES = {
     },
     ZombieRideDist = {
         label   = "Zombie ride distance",
-        targets = { 50 },
+        targets = { 1000 },
         location_ids = { "Ride zombies for 50 feet" },
     },
     indoorTime = {
@@ -164,12 +164,12 @@ local CHALLENGES = {
     },
     VehicleJumpDistanceMax = {
         label   = "Vehicle jump distance",
-        targets = { 50 },
+        targets = { 1000 },
         location_ids = { "Jump a vehicle 50 feet" },
     },
     GolfMaxDistance = {
         label   = "Longest golf shot",
-        targets = { 100 },
+        targets = { 10000 },
         location_ids = { "Hit a golf ball 100 feet" },
     },
 }

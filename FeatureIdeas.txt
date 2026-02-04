@@ -5,3 +5,4 @@
 -yaml options for all of the above so people can pick what they want to include
 -Dispenser randomizer option
 -Traps: clear inv, invert controls, "upset stomach"
+-One entrance door locks.  Unlock A->B but not C->B
