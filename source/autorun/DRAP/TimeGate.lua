@@ -6,8 +6,6 @@ local Shared = require("DRAP/Shared")
 
 local M = Shared.create_module("TimeGate")
 
-local testing_mode = false  -- Set to true to disable time gating for testing
-
 ------------------------------------------------------------
 -- Singleton Managers
 ------------------------------------------------------------
@@ -35,6 +33,7 @@ M.TIME_CAPS = TIME_CAPS
 -- Internal State
 ------------------------------------------------------------
 
+local testing_mode = false
 local manual_freeze_enabled = false
 local cap_freeze_enabled = false
 local saved_time_add = nil
@@ -189,28 +188,6 @@ function M.get_current_mdate()
     return read_scq_mdate()
 end
 
---- Checks if this appears to be a new game
---- @return boolean True if new game detected
-function M.is_new_game()
-    local md = read_scq_mdate()
-    if md == nil then return false end
-
-    local day, hour, minute = parse_mdate(md)
-    if not day then return false end
-
-    local current_event = AP and AP.EventTracker and AP.EventTracker.CURRENT_EVENT_NAME or nil
-
-    M.log(string.format("Current mDate=%s (Day %d %02d:%02d) event=%s",
-        tostring(md), day, hour, minute, tostring(current_event)))
-
-    if day == 1 and hour <= 12 and minute <= 05 and current_event == "EVENT01" then
-        M.log("New game detected based on mDate and event.")
-        return true
-    end
-
-    return false
-end
-
 --- Enables manual time freeze
 function M.enable()
     if manual_freeze_enabled then return end
@@ -235,24 +212,17 @@ end
 
 --- Sets the time cap using mDate format
 --- @param md_cap number The mDate cap value
-function M.set_time_cap_mdate(md_cap)
+function M.set_time_cap(md_cap)
     time_cap_mdate = tonumber(md_cap)
     cap_freeze_enabled = false
     M.log(string.format("Time cap set to mDate=%s.", mdate_to_string(time_cap_mdate)))
 end
 
--- Backward-compatible alias
-M.set_time_cap = M.set_time_cap_mdate
-
 --- Clears the time cap
 function M.clear_time_cap()
     time_cap_mdate = nil
-    if cap_freeze_enabled then
-        cap_freeze_enabled = false
-        M.log("Time cap cleared; cap-based freeze disabled.")
-    else
-        M.log("Time cap cleared.")
-    end
+    cap_freeze_enabled = false
+    M.log("Time cap cleared.")
     apply_gate_state()
 end
 
@@ -266,26 +236,63 @@ function M.unlock_all_time()
 end
 
 -- Named unlock functions
-function M.unlock_day2_6am()  M.set_time_cap_mdate(TIME_CAPS.DAY2_06_AM) end
-function M.unlock_day2_11am() M.set_time_cap_mdate(TIME_CAPS.DAY2_11_AM) end
-function M.unlock_day3_12am() M.set_time_cap_mdate(TIME_CAPS.DAY3_00_AM) end
-function M.unlock_day3_11am() M.set_time_cap_mdate(TIME_CAPS.DAY3_11_AM) end
-function M.unlock_day4_12pm() M.set_time_cap_mdate(TIME_CAPS.DAY4_12_PM) end
+function M.unlock_day2_6am()  M.set_time_cap(TIME_CAPS.DAY2_06_AM) end
+function M.unlock_day2_11am() M.set_time_cap(TIME_CAPS.DAY2_11_AM) end
+function M.unlock_day3_12am() M.set_time_cap(TIME_CAPS.DAY3_00_AM) end
+function M.unlock_day3_11am() M.set_time_cap(TIME_CAPS.DAY3_11_AM) end
+
+--- Sets testing mode (disables time gating)
+--- @param enabled boolean Whether testing mode is enabled
+function M.set_testing_mode(enabled)
+    testing_mode = enabled
+    M.log("Testing mode " .. (enabled and "enabled" or "disabled"))
+end
+
+--- Gets testing mode state
+--- @return boolean Whether testing mode is enabled
+function M.get_testing_mode()
+    return testing_mode
+end
 
 ------------------------------------------------------------
 -- Per-frame Update
 ------------------------------------------------------------
 
 function M.on_frame()
-    if testing_mode then
-        return
-    end
-    evaluate_time_cap_mdate()
-    apply_gate_state()
-
+    -- Always try to hook speed up unlock
     if not speed_up_unlock_hooked then
         pcall(speed_up_unlock_hook)
     end
+
+    if testing_mode then return end
+
+    evaluate_time_cap_mdate()
+    apply_gate_state()
 end
+
+------------------------------------------------------------
+-- REFramework UI
+------------------------------------------------------------
+
+re.on_draw_ui(function()
+    if imgui.tree_node("DRAP: TimeGate") then
+        local changed, new_val = imgui.checkbox("Testing Mode (Disable Time Gating)", testing_mode)
+        if changed then
+            M.set_testing_mode(new_val)
+        end
+
+        -- Display current time info
+        local md = read_scq_mdate()
+        if md then
+            imgui.text("Current mDate: " .. mdate_to_string(md))
+        end
+        if time_cap_mdate then
+            imgui.text("Time Cap: " .. mdate_to_string(time_cap_mdate))
+        end
+        imgui.text("Frozen: " .. tostring(manual_freeze_enabled or cap_freeze_enabled))
+
+        imgui.tree_pop()
+    end
+end)
 
 return M

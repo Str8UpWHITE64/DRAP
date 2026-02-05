@@ -52,6 +52,9 @@ AP_REF.APHost     = "archipelago.gg:12345"
 AP_REF.APSlot     = "Frank"
 AP_REF.APPassword = ""
 
+-- Save redirect option (redirects saves to AP-specific folder)
+AP_REF.APSaveRedirect = true
+
 function AP_REF.HexToImguiColor(color)
 	local r = string.sub(color, 1, 2)
 	local g = string.sub(color, 3, 4)
@@ -425,6 +428,20 @@ local function main_menu()
 			end
 		end
 
+		imgui.same_line()
+
+		-- Save Redirect Checkbox
+		local save_changed, save_val = imgui.checkbox("Redirect Saves", AP_REF.APSaveRedirect)
+		if save_changed then
+			AP_REF.APSaveRedirect = save_val
+			if not save_val then
+				-- Clear redirect immediately when disabled
+				if _G.AP and _G.AP.SaveSlot and _G.AP.SaveSlot.clear_redirect then
+					_G.AP.SaveSlot.clear_redirect()
+				end
+			end
+		end
+
 		imgui.pop_item_width()
 		imgui.separator()
 
@@ -493,6 +510,9 @@ local function SaveConfig()
     config["APSlot"] = AP_REF.APSlot
     config["APPassword"] = AP_REF.APPassword
 
+    -- save redirect option
+    config["APSaveRedirect"] = AP_REF.APSaveRedirect
+
     if not json.dump_file("AP_REF.json", config, 4) then
         print("Config cannot be saved!")
     end
@@ -536,6 +556,11 @@ local function ReadConfig()
         if config["APPassword"] ~= nil then
 			AP_REF.APPassword = config["APPassword"]
 		end
+
+        -- save redirect option
+        if config["APSaveRedirect"] ~= nil then
+            AP_REF.APSaveRedirect = config["APSaveRedirect"]
+        end
     else
         SaveConfig()
     end

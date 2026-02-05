@@ -133,10 +133,10 @@ function M.send_deathlink(data)
         local ok_slot, slot = pcall(AP_REF.APClient.get_slot, AP_REF.APClient)
         if ok_slot and slot then
             local ok_alias, alias = pcall(AP_REF.APClient.get_player_alias, AP_REF.APClient, slot)
-            if ok_alias and alias then my_alias = alias end
+            if ok_alias and alias then my_alias = Shared.clean_string(alias) end
         end
     end
-    my_alias = tostring((data and data.source) or my_alias)
+    my_alias = Shared.clean_string((data and data.source) or my_alias)
 
     local deathLinkData = {
         time = (data and data.time) or time_of_death,
@@ -350,11 +350,15 @@ local function handle_net_item(net_item, is_replay)
     local sender = net_item.player
     local index = net_item.index or -1
 
-    local item_name = AP_REF.APClient:get_item_name(item_id, nil)
-    local sender_name = AP_REF.APClient:get_player_alias(sender)
+    local item_name_raw = AP_REF.APClient:get_item_name(item_id, nil)
+    local sender_name_raw = AP_REF.APClient:get_player_alias(sender)
+
+    -- Clean strings from AP client to remove any binary garbage
+    local item_name = Shared.clean_string(item_name_raw)
+    local sender_name = Shared.clean_string(sender_name_raw)
 
     M.log(string.format("Applying item index=%d id=%d (%s) from %s (replay=%s)",
-        index, item_id, tostring(item_name), tostring(sender_name), tostring(is_replay)))
+        index, item_id, item_name, sender_name, tostring(is_replay)))
 
     -- Look up the game item number from our registered mappings
     local game_item_no = ITEM_NAME_TO_GAME_NO[item_name]

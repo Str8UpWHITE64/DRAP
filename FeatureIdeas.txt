@@ -5,4 +5,10 @@
 -yaml options for all of the above so people can pick what they want to include
 -Dispenser randomizer option
 -Traps: clear inv, invert controls, "upset stomach"
--One entrance door locks.  Unlock A->B but not C->B
+-Way to hint important things.  OoT has shrines (way of the hero).
+
+
+Bugs:
+-Time lock persists after exiting to menu and loading earlier save
+-Grabbed by raincoat PP stickers dont send
+-One way entrance door locks.  Unlock A->B but not C->B
