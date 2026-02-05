@@ -248,17 +248,18 @@ end
 ------------------------------------------------------------
 
 local function extract_seed(slot_data)
-    return slot_data and (slot_data.seed_name or slot_data.seed or slot_data.seed_id) or "unknown"
+    local raw = slot_data and (slot_data.seed_name or slot_data.seed or slot_data.seed_id) or "unknown"
+    return Shared.clean_string(raw)
 end
 
 local prev_on_slot_connected = AP_BRIDGE.AP_REF.on_slot_connected
 AP_BRIDGE.AP_REF.on_slot_connected = function(slot_data)
     if prev_on_slot_connected then pcall(prev_on_slot_connected, slot_data) end
 
-    local slot = AP_BRIDGE.AP_REF.APSlot or "unknown"
+    local slot = Shared.clean_string(AP_BRIDGE.AP_REF.APSlot or "unknown")
     local seed = extract_seed(slot_data)
 
-    log(string.format("Slot connected: slot=%s seed=%s", tostring(slot), seed))
+    log("Slot connected: slot=" .. slot .. " seed=" .. seed)
 
     -- DeathLink option
     local deathlink_enabled = (type(slot_data) == "table" and slot_data.death_link == true)
@@ -288,8 +289,7 @@ AP_BRIDGE.AP_REF.on_slot_connected = function(slot_data)
         local door_redirects = slot_data.door_redirects
         if door_redirects then
             AP.DoorRandomizer.set_redirects(door_redirects)
-            log(string.format("Door randomization activated with %d redirects",
-                AP.DoorRandomizer.get_redirect_config_count()))
+            log("Door randomization activated with " .. tostring(AP.DoorRandomizer.get_redirect_config_count()) .. " redirects")
         else
             AP.DoorRandomizer.clear_redirects()
             log("Door randomizer enabled but no redirects provided")

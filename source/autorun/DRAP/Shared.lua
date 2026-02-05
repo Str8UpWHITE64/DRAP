@@ -29,29 +29,19 @@ function Shared.safe_log_string(s)
     return str
 end
 
---- Safe print function that creates a clean copy of the string
---- This helps avoid buffer corruption issues with REFramework's print
---- @param msg string The message to print
-local function safe_print(msg)
-    -- Create an entirely new string by character-by-character copy
-    -- This ensures we don't share any buffer with potentially corrupted memory
+--- Builds a completely fresh, clean string character by character
+--- @param str string The input string
+--- @return string A fresh string with only printable ASCII
+local function build_clean_string(str)
     local clean = {}
-    local str = Shared.safe_log_string(msg)
     for i = 1, #str do
-        local c = str:sub(i, i)
-        local b = string.byte(c)
-        -- Only include printable ASCII, newlines, and tabs
-        if (b >= 32 and b <= 126) or b == 10 or b == 13 or b == 9 then
-            clean[#clean + 1] = c
+        local b = string.byte(str, i)
+        -- Only include printable ASCII (32-126), newline, tab
+        if (b >= 32 and b <= 126) or b == 10 or b == 9 then
+            clean[#clean + 1] = string.char(b)
         end
     end
-    local result = table.concat(clean)
-    -- Use log.info if available (more reliable), otherwise print
-    if log and log.info then
-        log.info(result)
-    else
-        print(result)
-    end
+    return table.concat(clean)
 end
 
 --- Creates a logger function with a prefix tag
@@ -60,8 +50,23 @@ end
 function Shared.create_logger(tag)
     local prefix = "[" .. tag .. "] "
     return function(msg)
-        safe_print(prefix .. Shared.safe_log_string(msg))
+        local str = prefix .. Shared.safe_log_string(msg)
+        print(build_clean_string(str))
     end
+end
+
+--- Safe string.format that cleans all string arguments first
+--- @param fmt string The format string
+--- @param ... any The arguments
+--- @return string The formatted string
+function Shared.safe_format(fmt, ...)
+    local args = {...}
+    for i, arg in ipairs(args) do
+        if type(arg) == "string" then
+            args[i] = Shared.clean_string(arg)
+        end
+    end
+    return string.format(fmt, table.unpack(args))
 end
 
 ------------------------------------------------------------
