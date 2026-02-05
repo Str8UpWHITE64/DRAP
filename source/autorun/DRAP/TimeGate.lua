@@ -6,7 +6,7 @@ local Shared = require("DRAP/Shared")
 
 local M = Shared.create_module("TimeGate")
 
-local testing_mode = false  -- Set to true to disable time gating for testing
+local testing_mode = true  -- Set to true to disable time gating for testing
 
 ------------------------------------------------------------
 -- Singleton Managers
