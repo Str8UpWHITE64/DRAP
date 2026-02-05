@@ -75,6 +75,7 @@ M.CurrentAreaIndex = nil
 local HITDATA_PATCHES = {}
 local last_area_index = nil
 local last_level_path = nil
+local pending_rescan = false
 
 ------------------------------------------------------------
 -- Helpers
@@ -233,12 +234,16 @@ end
 function M.lock_scene(scene_code)
     scene_code = tostring(scene_code)
     LOCKED_SCENES[scene_code] = true
+    -- Try to rescan now, but also flag for retry if managers aren't ready
+    pending_rescan = true
     rescan_current_area_doors()
 end
 
 function M.unlock_scene(scene_code)
     scene_code = tostring(scene_code)
     LOCKED_SCENES[scene_code] = nil
+    -- Try to rescan now, but also flag for retry if managers aren't ready
+    pending_rescan = true
     rescan_current_area_doors()
 end
 
@@ -267,10 +272,16 @@ end
 function M.on_frame()
     local area_index, level_path = get_area_info()
     if area_index and level_path then
-        if area_index ~= last_area_index or level_path ~= last_level_path then
+        local area_changed = (area_index ~= last_area_index or level_path ~= last_level_path)
+
+        if area_changed or pending_rescan then
             last_area_index = area_index
             last_level_path = level_path
             rescan_current_area_doors()
+            -- Only clear pending if we successfully have managers
+            if ahlm_mgr:get() then
+                pending_rescan = false
+            end
         end
     end
 end
