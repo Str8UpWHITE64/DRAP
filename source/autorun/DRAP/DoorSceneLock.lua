@@ -4,7 +4,7 @@
 local Shared = require("DRAP/Shared")
 
 local M = Shared.create_module("DoorSceneLock")
-local testing_mode = false
+local testing_mode = true
 
 ------------------------------------------------------------
 -- Singleton Managers
