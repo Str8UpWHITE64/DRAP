@@ -50,7 +50,10 @@ end
 function Shared.create_logger(tag)
     local prefix = "[" .. tag .. "] "
     return function(msg)
-        local str = prefix .. Shared.safe_log_string(msg)
+        local clean_msg = Shared.safe_log_string(msg)
+        -- Skip empty messages
+        if clean_msg == "" or clean_msg == "nil" then return end
+        local str = prefix .. clean_msg
         print(build_clean_string(str))
     end
 end
