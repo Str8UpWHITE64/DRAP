@@ -30,6 +30,14 @@ AP.TimeGate         = require("DRAP/TimeGate")
 AP.Scene            = require("DRAP/Scene")
 AP.DeathLink        = require("DRAP/DeathLink")
 
+AP.EventFlagExplorer = require("DRAP/EventFlagExplorer")
+AP.GameEventTracker  = require("DRAP/GameEventTracker")
+AP.EventFlagDumper   = require("DRAP/EventFlagDumper")
+AP.ScoopExplorer     = require("DRAP/ScoopExplorer")
+AP.NpcInvestigator   = require("DRAP/NpcInvestigator")
+AP.NpcSpawner        = require("DRAP/NpcSpawner")
+AP.ScoopUnlocker     = require("DRAP/ScoopUnlocker")
+
 local Shared = require("DRAP/Shared")
 local log = Shared.create_logger("DRAP")
 
@@ -73,6 +81,7 @@ local function register_spawn_handlers_from_json()
 end
 
 register_spawn_handlers_from_json()
+AP.ScoopUnlocker.register_with_ap_bridge(AP_BRIDGE)
 
 ------------------------------------------------------------
 -- Item Handlers: Area Keys
@@ -180,6 +189,7 @@ local function apply_permanent_effects_from_ap()
             AP.DoorSceneLock.unlock_scene(key.scene)
         end
     end
+    AP.ScoopUnlocker.reapply_unlocked_scoops()
 end
 
 ------------------------------------------------------------
@@ -381,6 +391,11 @@ re.on_frame(function()
     safe_on_frame(AP.PPStickerTracker, "PPStickerTracker")
     safe_on_frame(AP.SaveSlot,         "SaveSlot")
 
+    safe_on_frame(AP.GameEventTracker,  "GameEventTracker")
+    safe_on_frame(AP.EventFlagExplorer, "EventFlagExplorer")
+    safe_on_frame(AP.NpcInvestigator,  "NpcInvestigator")
+    safe_on_frame(AP.NpcSpawner,       "NpcSpawner")
+
     -- Enter-game edge detection
     if now_in_game and not was_in_game then
         pcall(on_enter_game)
@@ -407,5 +422,6 @@ _G.freeze     = function() AP.TimeGate.enable() end
 _G.cap        = function(code) AP.TimeGate.set_time_cap(code) end
 _G.show_items = function() AP.ItemSpawner.show_window() end
 _G.hide_items = function() AP.ItemSpawner.hide_window() end
+
 
 log("Main script loaded.")
