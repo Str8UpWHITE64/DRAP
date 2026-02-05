@@ -29,7 +29,7 @@ AP_REF.on_data_package_changed = function(data_package)
     for _ in pairs(AP_ITEMS_BY_NAME) do item_count = item_count + 1 end
     for _ in pairs(AP_LOCATIONS_BY_NAME) do loc_count = loc_count + 1 end
 
-    M.log(string.format("Data package loaded: items=%d locations=%d", item_count, loc_count))
+    M.log("Data package loaded: items=" .. tostring(item_count) .. " locations=" .. tostring(loc_count))
 end
 
 function M.get_item_id(name) return AP_ITEMS_BY_NAME[name] end
@@ -274,7 +274,7 @@ end
 function M.set_received_items_filename(slot_name, seed)
     local slot = safe_filename(slot_name)
     local sd = safe_filename(seed)
-    RECEIVED_ITEMS_FILE = string.format("./AP_DRDR_Items/AP_DRDR_items_%s_%s.json", slot, sd)
+    RECEIVED_ITEMS_FILE = "./AP_DRDR_Items/AP_DRDR_items_" .. slot .. "_" .. sd .. ".json"
 end
 
 local function rebuild_name_counts()
@@ -337,8 +337,7 @@ function M.register_item_handler_by_id(id, fn)
 end
 
 function M.default_item_handler(net_item, item_name, sender_name)
-    M.log(string.format("Unhandled item id=%s name=%s from %s",
-        tostring(net_item.item), tostring(item_name), tostring(sender_name)))
+    M.log("Unhandled item id=" .. tostring(net_item.item) .. " name=" .. tostring(item_name) .. " from " .. tostring(sender_name))
 end
 
 ------------------------------------------------------------
@@ -357,8 +356,7 @@ local function handle_net_item(net_item, is_replay)
     local item_name = Shared.clean_string(item_name_raw)
     local sender_name = Shared.clean_string(sender_name_raw)
 
-    M.log(string.format("Applying item index=%d id=%d (%s) from %s (replay=%s)",
-        index, item_id, item_name, sender_name, tostring(is_replay)))
+    M.log("Applying item index=" .. tostring(index) .. " id=" .. tostring(item_id) .. " (" .. item_name .. ") from " .. sender_name .. " (replay=" .. tostring(is_replay) .. ")")
 
     -- Look up the game item number from our registered mappings
     local game_item_no = ITEM_NAME_TO_GAME_NO[item_name]
@@ -383,7 +381,7 @@ local function handle_net_item(net_item, is_replay)
 
     local ok, err = pcall(handler, net_item, item_name, sender_name)
     if not ok then
-        M.log(string.format("Error in handler for id=%d: %s", item_id, tostring(err)))
+        M.log("Error in handler for id=" .. tostring(item_id) .. ": " .. tostring(err))
     end
 end
 
@@ -399,7 +397,7 @@ AP_REF.on_items_received = function(items)
 end
 
 function M.reapply_all_items()
-    M.log(string.format("Reapplying %d previously received items...", #RECEIVED_ITEMS))
+    M.log("Reapplying " .. tostring(#RECEIVED_ITEMS) .. " previously received items...")
 
     for _, entry in ipairs(RECEIVED_ITEMS) do
         local fake_net_item = {
