@@ -178,6 +178,20 @@ function M.clear_redirect()
     end
 
     M.log("SaveMountPath reset to default: " .. BASE_SAVE_MOUNT)
+
+    -- Refresh the save file list so UI updates
+    local upd_m = td:get_method("updateSaveFileDetailTbl")
+    if upd_m then
+        local ok_upd, err_upd = pcall(function()
+            upd_m:call(svc)
+        end)
+        if ok_upd then
+            M.log("Save list refreshed.")
+        else
+            M.log("Failed to refresh save list: " .. tostring(err_upd))
+        end
+    end
+
     return true
 end
 
