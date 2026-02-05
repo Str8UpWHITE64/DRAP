@@ -41,8 +41,8 @@ local global_not_before = 0.0
 -- Internal State: UI
 ------------------------------------------------------------
 
--- Currently selected item index in the UI
-local selected_item_index = nil
+-- Currently selected item name in the UI (for deduplicated list)
+local selected_item_name = nil
 
 -- UI State
 local mainWindowVisible = false
@@ -288,7 +288,7 @@ end
 
 --- Clears selection
 function M.clear_selection()
-    selected_item_index = nil
+    selected_item_name = nil
     M.log("Cleared selection")
 end
 
@@ -366,7 +366,7 @@ end
 local function draw_item_window()
     if not mainWindowVisible then return end
 
-    imgui.set_next_window_size(Vector2f.new(400, 350), 4)  -- 4 = ImGuiCond_FirstUseEver
+    imgui.set_next_window_size(Vector2f.new(400, 400), 4)  -- 4 = ImGuiCond_FirstUseEver
 
     if showMainWindow then
         showMainWindow = imgui.begin_window("Archipelago Items", showMainWindow, 0)
@@ -379,105 +379,34 @@ local function draw_item_window()
     -- Get items from bridge
     local received_items = get_received_items_from_bridge()
 
-    -- Build filtered and sorted list
-    local filtered_items = {}
+    -- Build deduplicated list: group by item_name, count occurrences
+    local item_counts = {}  -- item_name -> { count = N, first_index = i, entry = entry }
+    local unique_names = {}  -- ordered list of unique item names
+
     for i, entry in ipairs(received_items) do
+        local name = entry.item_name or ""
         if matches_filter(entry) then
-            table.insert(filtered_items, { index = i, entry = entry })
+            if not item_counts[name] then
+                item_counts[name] = { count = 0, first_index = i, entry = entry }
+                table.insert(unique_names, name)
+            end
+            item_counts[name].count = item_counts[name].count + 1
         end
     end
 
     -- Sort alphabetically by item name
-    table.sort(filtered_items, function(a, b)
-        local name_a = (a.entry.item_name or ""):lower()
-        local name_b = (b.entry.item_name or ""):lower()
-        return name_a < name_b
+    table.sort(unique_names, function(a, b)
+        return a:lower() < b:lower()
     end)
 
     local total = #received_items
-    local filtered_count = #filtered_items
+    local unique_count = #unique_names
 
-    -- Header: Stats
-    imgui.text(string.format("Items: %d (showing %d)", total, filtered_count))
+    -- === TOP SECTION: Action buttons and status (fixed at top) ===
 
-    -- Inventory status
-    local current, maxv = get_inventory_counts()
-    if current and maxv then
-        imgui.same_line()
-        imgui.text(string.format(" | Inventory: %d / %d", current, maxv))
-    else
-        imgui.same_line()
-        imgui.text_colored(" | Inventory: N/A", 0xFF8888FF)
-    end
+    -- Spawn Selected button at the TOP
+    local selected_entry = selected_item_name and item_counts[selected_item_name] and item_counts[selected_item_name].entry or nil
 
-    -- restricted item mode status
-    if spawning_disabled then
-        imgui.same_line()
-        imgui.text_colored(" | RESTRICTED ITEM MODE", 0xFFFF4444)  -- Red
-    end
-
-    imgui.separator()
-
-    -- Filter controls
-    imgui.text("Filter:")
-    imgui.same_line()
-    imgui.push_item_width(200)
-    local changed, new_filter = imgui.input_text("##filter", filter_text)
-    if changed then
-        filter_text = new_filter
-    end
-    imgui.pop_item_width()
-
-    imgui.separator()
-
-    -- Item list
-    local list_height = size.y - 120  -- Leave room for button at bottom
-    imgui.begin_child_window("ItemList", Vector2f.new(size.x - 16, list_height), true, 0)
-
-    for _, item_data in ipairs(filtered_items) do
-        local i = item_data.index
-        local entry = item_data.entry
-        local is_selected = (selected_item_index == i)
-
-        -- Build display text (just item name)
-        local display_text = entry.item_name or ("Item #" .. tostring(entry.item_id))
-
-        -- Use a small button for selection, then text
-        local button_label = is_selected and "> " or "  "
-        if imgui.button(button_label .. "##sel" .. tostring(i)) then
-            if is_selected then
-                selected_item_index = nil  -- Deselect on second click
-            else
-                selected_item_index = i
-            end
-        end
-        imgui.same_line()
-
-        -- Show item text with color based on selection
-        if is_selected then
-            imgui.text_colored(display_text, 0xFF00FFFF)  -- Cyan for selected
-        else
-            imgui.text(display_text)
-        end
-    end
-
-    if filtered_count == 0 then
-        if total == 0 then
-            imgui.text_colored("No items received yet.", 0xFF888888)
-        else
-            imgui.text_colored("No spawnable items match the filter.", 0xFF888888)
-        end
-    end
-
-    imgui.end_child_window()
-
-    imgui.separator()
-
-    -- Action button
-    local selected_entry = selected_item_index and received_items[selected_item_index] or nil
-
-    -- Spawn Selected button
-    -- In restricted item mode, spawning is disabled - items must be picked up from the world
     local can_spawn = selected_entry and
                       can_accept_more_items() and
                       ensure_inventory() and
@@ -488,11 +417,8 @@ local function draw_item_window()
             local success, err = try_spawn_item(selected_entry)
             if success then
                 M.log("Successfully spawned: " .. tostring(selected_entry.item_name))
-                -- Deselect after successful spawn
-                selected_item_index = nil
             else
-                M.log(string.format("Spawn failed: %s - %s",
-                    tostring(selected_entry.item_name), tostring(err)))
+                M.log("Spawn failed: " .. tostring(selected_entry.item_name) .. " - " .. tostring(err))
             end
         end
     else
@@ -501,17 +427,85 @@ local function draw_item_window()
         imgui.pop_style_color(1)
     end
 
-    -- Status messages
+    -- Status messages on same line
+    imgui.same_line()
     if selected_entry then
-        imgui.same_line()
         if spawning_disabled then
-            imgui.text_colored("Restricted item mode: pick up items in world!", 0xFFFF4444)
+            imgui.text_colored("Restricted mode!", 0xFFFF4444)
         elseif not can_accept_more_items() then
             imgui.text_colored("Inventory full!", 0xFFFF8800)
         elseif not ensure_inventory() then
             imgui.text_colored("Not in-game", 0xFFFF8800)
+        else
+            imgui.text_colored("Ready", 0xFF44FF44)
+        end
+    else
+        imgui.text_colored("Select an item", 0xFF888888)
+    end
+
+    imgui.separator()
+
+    -- Header: Stats
+    imgui.text("Items: " .. tostring(total) .. " total, " .. tostring(unique_count) .. " unique")
+
+    -- Inventory status
+    local current, maxv = get_inventory_counts()
+    if current and maxv then
+        imgui.same_line()
+        imgui.text(" | Inv: " .. tostring(current) .. "/" .. tostring(maxv))
+    end
+
+    -- restricted item mode status
+    if spawning_disabled then
+        imgui.same_line()
+        imgui.text_colored(" | RESTRICTED", 0xFFFF4444)
+    end
+
+    -- Filter controls
+    imgui.text("Filter:")
+    imgui.same_line()
+    imgui.push_item_width(size.x - 80)
+    local changed, new_filter = imgui.input_text("##filter", filter_text)
+    if changed then
+        filter_text = new_filter
+    end
+    imgui.pop_item_width()
+
+    imgui.separator()
+
+    -- === ITEM LIST (scrollable) ===
+    local list_height = size.y - 145  -- Adjusted for top controls
+    imgui.begin_child_window("ItemList", Vector2f.new(size.x - 16, list_height), true, 0)
+
+    for _, item_name in ipairs(unique_names) do
+        local data = item_counts[item_name]
+        local is_selected = (selected_item_name == item_name)
+
+        -- Build display text with count if > 1
+        local display_text = item_name
+        if data.count > 1 then
+            display_text = item_name .. " (x" .. tostring(data.count) .. ")"
+        end
+
+        -- Selectable row
+        if imgui.selectable(display_text, is_selected) then
+            if is_selected then
+                selected_item_name = nil  -- Deselect on second click
+            else
+                selected_item_name = item_name
+            end
         end
     end
+
+    if unique_count == 0 then
+        if total == 0 then
+            imgui.text_colored("No items received yet.", 0xFF888888)
+        else
+            imgui.text_colored("No spawnable items match the filter.", 0xFF888888)
+        end
+    end
+
+    imgui.end_child_window()
 
     imgui.end_window()
 end
