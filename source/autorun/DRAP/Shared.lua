@@ -29,13 +29,38 @@ function Shared.safe_log_string(s)
     return str
 end
 
+--- Safe print function that creates a clean copy of the string
+--- This helps avoid buffer corruption issues with REFramework's print
+--- @param msg string The message to print
+local function safe_print(msg)
+    -- Create an entirely new string by character-by-character copy
+    -- This ensures we don't share any buffer with potentially corrupted memory
+    local clean = {}
+    local str = Shared.safe_log_string(msg)
+    for i = 1, #str do
+        local c = str:sub(i, i)
+        local b = string.byte(c)
+        -- Only include printable ASCII, newlines, and tabs
+        if (b >= 32 and b <= 126) or b == 10 or b == 13 or b == 9 then
+            clean[#clean + 1] = c
+        end
+    end
+    local result = table.concat(clean)
+    -- Use log.info if available (more reliable), otherwise print
+    if log and log.info then
+        log.info(result)
+    else
+        print(result)
+    end
+end
+
 --- Creates a logger function with a prefix tag
 --- @param tag string The module name to prefix log messages with
 --- @return function A log function that prefixes messages with [tag]
 function Shared.create_logger(tag)
     local prefix = "[" .. tag .. "] "
     return function(msg)
-        print(prefix .. Shared.safe_log_string(msg))
+        safe_print(prefix .. Shared.safe_log_string(msg))
     end
 end
 
