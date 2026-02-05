@@ -81,11 +81,8 @@ local last_level_path = nil
 ------------------------------------------------------------
 
 local function scene_is_locked(scene_code)
-    if testing_mode then
-        return false
-    else
-        return LOCKED_SCENES[scene_code] == true
-    end
+    if testing_mode then return false end
+    return LOCKED_SCENES[scene_code] == true
 end
 
 local function current_event_blocks_s100_lock()
@@ -255,7 +252,12 @@ end
 
 function M.set_testing_mode(enabled)
     testing_mode = enabled == true
+    M.log("Testing mode " .. (testing_mode and "enabled" or "disabled"))
     rescan_current_area_doors()
+end
+
+function M.get_testing_mode()
+    return testing_mode
 end
 
 ------------------------------------------------------------
@@ -272,5 +274,38 @@ function M.on_frame()
         end
     end
 end
+
+------------------------------------------------------------
+-- REFramework UI
+------------------------------------------------------------
+
+re.on_draw_ui(function()
+    if imgui.tree_node("DRAP: DoorSceneLock") then
+        local changed, new_val = imgui.checkbox("Testing Mode (Unlock All Doors)", testing_mode)
+        if changed then
+            M.set_testing_mode(new_val)
+        end
+
+        -- Display current area info
+        if M.CurrentLevelPath then
+            imgui.text("Current Level: " .. tostring(M.CurrentLevelPath))
+        end
+        if M.CurrentAreaIndex then
+            imgui.text("Area Index: " .. tostring(M.CurrentAreaIndex))
+        end
+
+        -- Display locked scenes
+        if imgui.tree_node("Locked Scenes") then
+            for code, info in pairs(SCENE_INFO) do
+                local locked = LOCKED_SCENES[code] == true
+                local status = locked and "[LOCKED]" or "[UNLOCKED]"
+                imgui.text(string.format("%s %s (%s)", status, info.name, code))
+            end
+            imgui.tree_pop()
+        end
+
+        imgui.tree_pop()
+    end
+end)
 
 return M

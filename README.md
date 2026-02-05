@@ -12,7 +12,7 @@ I have only tested this using the 1.5.7 build of REFramework.  Other versions ma
 There are about 300 locations at the present time. More may be added in the future, it will just take time and testing.
 
 These include:
-- Main store scoops
+- Main story scoops
 - Survivor rescues
 - PP Sticker locations
 - Level ups
@@ -56,15 +56,16 @@ Currently, there is only one goal, to get Ending S and beat Brock. We may add mo
 11. Start a new game and enjoy!
 
 ## Gameplay Notes
-- Starting a new game will grant every item you have gotten so far at the start. 
-- Items only spawn in at a max of 16 per room, so if you get a lot of items and are wondering why they aren't spawning, leave the area, and they should start to appear again.
-- If you get an item and then die and continue, you won't get that item back until you start a new game.
-- Save early and often.  There are crashes that can happen, and you don't want to lose progress.
+- There are two main ways items are handled in this mod: Granted items and Restricted items.  This is determined by the options selected in your APWorld YAML file.
+  - Granted items show up in the AP Items window (see below) and can be spawned at any time.  These items are added to the list of items you have received from the APWorld, and can be spawned at any time.
+  - Restricted items are items that you are allowed to pick up in the world after you have received them from the APWorld.  These items will show up in the AP Items window, but you cannot spawn them.  Instead, you must find them in the world like normal.  If you haven't gotten the item from the APWorld yet, you will not be able to pick it up in the world.
 - Door locks and time locks gate your progress.  If you can't get to an area, you likely need to find the key for it. If you notice time isn't progressing towards a main scoop, you likely need an item.
 - If you disconnect while playing, you will send challenge and level locations on reconnect, but events and PP stickers wont go automatically.  I will try to add this in the future.
 - To open the ItemSpawner window, go into the REFramework window, scroll down to "Script Generated UI" and check "Show AP Items Window".  This will open a new window where you can spawn items you have received from the APWorld.
 
 ## Known Bugs
+Spawning items is by far the most buggy part of this mod.  When spawning items using the AP Items Window, try not to spam the spawn button.  Wait a few seconds after spawning an item before spawning another one.  If you do spawn multiple items quickly, you increase your chances of the game crashing.
+
 Some users are experiencing an issue where they are unable to save after connecting to the APWorld.  If you have this issue, close the game, open the AP_DRDR_main.lua file in a text file editor and change ``local redirect_save_path = true`` to ``local redirect_save_path = false``.  This will make it so the AP saves will use your default save directory, so make sure you are only loading saves for the APWorld. 
 
 PP Stickers are a little iffy.  They usually send without issue, but I have seen them not send until you leave the area and re-enter it.  I have also seen them send the wrong one, too.  Nothing too major, just keep it in mind.

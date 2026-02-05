@@ -8,13 +8,34 @@ local Shared = {}
 -- Logging Factory
 ------------------------------------------------------------
 
+--- Sanitizes a string for safe logging (removes binary garbage)
+--- @param s any The value to sanitize for logging
+--- @return string The sanitized string
+function Shared.safe_log_string(s)
+    if s == nil then return "nil" end
+    local str = tostring(s)
+    -- Remove null characters and everything after them
+    local null_pos = str:find("%z")
+    if null_pos then
+        str = str:sub(1, null_pos - 1)
+    end
+    -- Remove non-printable characters (keep newlines and tabs)
+    str = str:gsub("[%c%z]", function(c)
+        if c == "\n" or c == "\t" then return c end
+        return ""
+    end)
+    -- Remove high-byte characters (non-ASCII garbage)
+    str = str:gsub("[\128-\255]", "")
+    return str
+end
+
 --- Creates a logger function with a prefix tag
 --- @param tag string The module name to prefix log messages with
 --- @return function A log function that prefixes messages with [tag]
 function Shared.create_logger(tag)
     local prefix = "[" .. tag .. "] "
     return function(msg)
-        print(prefix .. tostring(msg))
+        print(prefix .. Shared.safe_log_string(msg))
     end
 end
 
@@ -40,26 +61,40 @@ function Shared.to_int(val)
     return math.floor(raw)
 end
 
---- Cleans a string by removing null characters and control characters
+--- Cleans a string by removing null characters, control characters, and binary garbage
 --- @param input any The value to clean
 --- @return string The cleaned string
 function Shared.clean_string(input)
     if input == nil then return "" end
 
+    local str
     if type(input) == "string" then
-        return input:gsub("%z", "")
-    end
-
-    -- Try to convert managed string properly
-    local mo = sdk.to_managed_object(input)
-    if mo ~= nil then
-        local ok, s = pcall(sdk.to_string, mo)
-        if ok and type(s) == "string" then
-            return s:gsub("%z", "")
+        str = input
+    else
+        -- Try to convert managed string properly
+        local mo = sdk.to_managed_object(input)
+        if mo ~= nil then
+            local ok, s = pcall(sdk.to_string, mo)
+            if ok and type(s) == "string" then
+                str = s
+            end
+        end
+        if not str then
+            str = tostring(input)
         end
     end
 
-    return tostring(input):gsub("%z", "")
+    -- Truncate at first null character
+    local null_pos = str:find("%z")
+    if null_pos then
+        str = str:sub(1, null_pos - 1)
+    end
+
+    -- Remove any remaining control characters and high-byte garbage
+    str = str:gsub("[%z%c]", "")
+    str = str:gsub("[\128-\255]", "")
+
+    return str
 end
 
 --- Sanitizes a string for use as a filename/token
