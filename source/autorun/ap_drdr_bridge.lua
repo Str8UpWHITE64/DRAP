@@ -29,7 +29,7 @@ AP_REF.on_data_package_changed = function(data_package)
     for _ in pairs(AP_ITEMS_BY_NAME) do item_count = item_count + 1 end
     for _ in pairs(AP_LOCATIONS_BY_NAME) do loc_count = loc_count + 1 end
 
-    M.log(string.format("Data package loaded: items=%d locations=%d", item_count, loc_count))
+    M.log("Data package loaded: items=" .. tostring(item_count) .. " locations=" .. tostring(loc_count))
 end
 
 function M.get_item_id(name) return AP_ITEMS_BY_NAME[name] end
@@ -133,10 +133,10 @@ function M.send_deathlink(data)
         local ok_slot, slot = pcall(AP_REF.APClient.get_slot, AP_REF.APClient)
         if ok_slot and slot then
             local ok_alias, alias = pcall(AP_REF.APClient.get_player_alias, AP_REF.APClient, slot)
-            if ok_alias and alias then my_alias = alias end
+            if ok_alias and alias then my_alias = Shared.clean_string(alias) end
         end
     end
-    my_alias = tostring((data and data.source) or my_alias)
+    my_alias = Shared.clean_string((data and data.source) or my_alias)
 
     local deathLinkData = {
         time = (data and data.time) or time_of_death,
@@ -274,7 +274,7 @@ end
 function M.set_received_items_filename(slot_name, seed)
     local slot = safe_filename(slot_name)
     local sd = safe_filename(seed)
-    RECEIVED_ITEMS_FILE = string.format("./AP_DRDR_Items/AP_DRDR_items_%s_%s.json", slot, sd)
+    RECEIVED_ITEMS_FILE = "./AP_DRDR_Items/AP_DRDR_items_" .. slot .. "_" .. sd .. ".json"
 end
 
 local function rebuild_name_counts()
@@ -304,6 +304,14 @@ end
 local function save_received_items()
     local data = { last_item_index = last_item_index, items = RECEIVED_ITEMS }
     Shared.save_json(RECEIVED_ITEMS_FILE, data, 4, M.log)
+end
+
+function M.reset_received_items()
+    M.log("Resetting received items file for fresh sync")
+    RECEIVED_ITEMS = {}
+    RECEIVED_ITEMS_BY_NAME = {}
+    last_item_index = -1
+    save_received_items()
 end
 
 re.on_config_save(save_received_items)
@@ -337,8 +345,7 @@ function M.register_item_handler_by_id(id, fn)
 end
 
 function M.default_item_handler(net_item, item_name, sender_name)
-    M.log(string.format("Unhandled item id=%s name=%s from %s",
-        tostring(net_item.item), tostring(item_name), tostring(sender_name)))
+    M.log("Unhandled item id=" .. tostring(net_item.item) .. " name=" .. tostring(item_name) .. " from " .. tostring(sender_name))
 end
 
 ------------------------------------------------------------
@@ -350,11 +357,14 @@ local function handle_net_item(net_item, is_replay)
     local sender = net_item.player
     local index = net_item.index or -1
 
-    local item_name = AP_REF.APClient:get_item_name(item_id, nil)
-    local sender_name = AP_REF.APClient:get_player_alias(sender)
+    local item_name_raw = AP_REF.APClient:get_item_name(item_id, nil)
+    local sender_name_raw = AP_REF.APClient:get_player_alias(sender)
 
-    M.log(string.format("Applying item index=%d id=%d (%s) from %s (replay=%s)",
-        index, item_id, tostring(item_name), tostring(sender_name), tostring(is_replay)))
+    -- Clean strings from AP client to remove any binary garbage
+    local item_name = Shared.clean_string(item_name_raw)
+    local sender_name = Shared.clean_string(sender_name_raw)
+
+    M.log("Applying item index=" .. tostring(index) .. " id=" .. tostring(item_id) .. " (" .. item_name .. ") from " .. sender_name .. " (replay=" .. tostring(is_replay) .. ")")
 
     -- Look up the game item number from our registered mappings
     local game_item_no = ITEM_NAME_TO_GAME_NO[item_name]
@@ -379,7 +389,7 @@ local function handle_net_item(net_item, is_replay)
 
     local ok, err = pcall(handler, net_item, item_name, sender_name)
     if not ok then
-        M.log(string.format("Error in handler for id=%d: %s", item_id, tostring(err)))
+        M.log("Error in handler for id=" .. tostring(item_id) .. ": " .. tostring(err))
     end
 end
 
@@ -395,7 +405,7 @@ AP_REF.on_items_received = function(items)
 end
 
 function M.reapply_all_items()
-    M.log(string.format("Reapplying %d previously received items...", #RECEIVED_ITEMS))
+    M.log("Reapplying " .. tostring(#RECEIVED_ITEMS) .. " previously received items...")
 
     for _, entry in ipairs(RECEIVED_ITEMS) do
         local fake_net_item = {

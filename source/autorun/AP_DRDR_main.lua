@@ -8,12 +8,6 @@ if game_name ~= "dd2" then
 end
 
 ------------------------------------------------------------
--- Configuration
-------------------------------------------------------------
-
-local REDIRECT_SAVE_PATH = true
-
-------------------------------------------------------------
 -- Load Modules
 ------------------------------------------------------------
 
@@ -205,7 +199,7 @@ end
 AP.LevelTracker.on_level_changed = function(old_level, new_level)
     log(string.format("Level changed %d -> %d", old_level, new_level))
     if new_level > old_level then
-        AP.AP_BRIDGE.check(string.format("Reach Level %d", new_level))
+        AP_BRIDGE.check(string.format("Reach Level %d", new_level))
     end
 end
 
@@ -215,7 +209,7 @@ end
 
 AP.EventTracker.on_tracked_location = function(desc, source, raw_id, extra)
     log(string.format("Tracked location: %s", tostring(desc)))
-    AP.AP_BRIDGE.check(desc)
+    AP_BRIDGE.check(desc)
 end
 
 ------------------------------------------------------------
@@ -225,7 +219,7 @@ end
 AP.ChallengeTracker.on_challenge_threshold = function(field_name, def, idx, target, prev, current, threshold_id)
     local loc_name = threshold_id or string.format("%s_%d", field_name, target or -1)
     log(string.format("Challenge reached [%s] target #%d: %d", tostring(loc_name), idx or -1, target or -1))
-    AP.AP_BRIDGE.check(loc_name)
+    AP_BRIDGE.check(loc_name)
 end
 
 ------------------------------------------------------------
@@ -234,7 +228,7 @@ end
 
 AP.NpcTracker.on_survivor_rescued = function(npc_id, state_index, friendly_name, game_id)
     log(string.format("Survivor rescued: %s", tostring(friendly_name)))
-    AP.AP_BRIDGE.check(string.format("Rescue %s", friendly_name))
+    AP_BRIDGE.check(string.format("Rescue %s", friendly_name))
 end
 
 ------------------------------------------------------------
@@ -243,7 +237,7 @@ end
 
 AP.PPStickerTracker.on_sticker_event_taked = function(location_name, item_number, photo_id, item_unique_no, having_event)
     log(string.format("PP sticker captured: %s", tostring(location_name)))
-    AP.AP_BRIDGE.check(location_name)
+    AP_BRIDGE.check(location_name)
 end
 
 ------------------------------------------------------------
@@ -263,18 +257,19 @@ end
 -- Slot Connection Handler
 ------------------------------------------------------------
 
-local AP_REF = AP_BRIDGE.AP_REF
-
 local function extract_seed(slot_data)
-    return slot_data and (slot_data.seed_name or slot_data.seed or slot_data.seed_id) or "unknown"
+    local raw = slot_data and (slot_data.seed_name or slot_data.seed or slot_data.seed_id) or "unknown"
+    return Shared.clean_string(raw)
 end
 
-local prev_on_slot_connected = AP_REF.on_slot_connected
-AP_REF.on_slot_connected = function(slot_data)
+local prev_on_slot_connected = AP_BRIDGE.AP_REF.on_slot_connected
+AP_BRIDGE.AP_REF.on_slot_connected = function(slot_data)
     if prev_on_slot_connected then pcall(prev_on_slot_connected, slot_data) end
 
-    log(string.format("Slot connected: slot=%s seed=%s",
-        tostring(AP_REF.APSlot), extract_seed(slot_data)))
+    local slot = Shared.clean_string(AP_BRIDGE.AP_REF.APSlot or "unknown")
+    local seed = extract_seed(slot_data)
+
+    log("Slot connected: slot=" .. slot .. " seed=" .. seed)
 
     -- DeathLink option
     local deathlink_enabled = (type(slot_data) == "table" and slot_data.death_link == true)
@@ -304,8 +299,7 @@ AP_REF.on_slot_connected = function(slot_data)
         local door_redirects = slot_data.door_redirects
         if door_redirects then
             AP.DoorRandomizer.set_redirects(door_redirects)
-            log(string.format("Door randomization activated with %d redirects",
-                AP.DoorRandomizer.get_redirect_config_count()))
+            log("Door randomization activated with " .. tostring(AP.DoorRandomizer.get_redirect_config_count()) .. " redirects")
         else
             AP.DoorRandomizer.clear_redirects()
             log("Door randomizer enabled but no redirects provided")
@@ -314,17 +308,17 @@ AP_REF.on_slot_connected = function(slot_data)
         AP.DoorRandomizer.clear_redirects()
     end
 
-    -- Save slot redirect
-    if AP.SaveSlot and AP.SaveSlot.apply_for_slot and REDIRECT_SAVE_PATH then
+    -- Save slot redirect (controlled via AP_REF.APSaveRedirect in connection window)
+    if AP.SaveSlot and AP.SaveSlot.apply_for_slot and AP_BRIDGE.AP_REF.APSaveRedirect then
         log("Applying AP save redirect for slot")
-        AP.SaveSlot.apply_for_slot(AP_REF.APSlot, extract_seed(slot_data))
+        AP.SaveSlot.apply_for_slot(slot, seed)
     end
 
-    -- Set up received items file
-    local slot = AP_REF.APSlot or "unknown"
-    local seed = extract_seed(slot_data)
+    -- Reset received items file for a fresh sync from the server.
+    -- This ensures any previously corrupted item data is discarded and
+    -- rebuilt from the authoritative server replay.
     AP_BRIDGE.set_received_items_filename(slot, seed)
-    AP_BRIDGE.load_received_items()
+    AP_BRIDGE.reset_received_items()
 
     -- Set up sticker save file
     if AP.PPStickerTracker.set_save_filename then
@@ -344,30 +338,23 @@ end
 ------------------------------------------------------------
 
 local was_in_game = false
-local pending_reapply_check = false
-local reapply_done = false
+local pending_reapply = false
 
 local function on_enter_game()
     log("Entered gameplay")
-    pending_reapply_check = true
-    reapply_done = false
+    pending_reapply = true
 end
 
-local function try_reapply_items_if_ready()
-    if not pending_reapply_check or reapply_done then return end
-
+local function try_reapply_if_ready()
+    if not pending_reapply then return end
     if not AP.ItemSpawner.inventory_system_running() then return end
 
-    if AP.TimeGate and AP.TimeGate.is_new_game and AP.TimeGate.is_new_game() then
-        log("New game confirmed; reapplying AP items")
-        AP_BRIDGE.reapply_all_items()
-    end
-
+    log("Reapplying AP items")
+    AP_BRIDGE.reapply_all_items()
     apply_permanent_effects_from_ap()
     apply_time_locks_from_ap()
 
-    reapply_done = true
-    pending_reapply_check = false
+    pending_reapply = false
 end
 
 ------------------------------------------------------------
@@ -402,6 +389,7 @@ re.on_frame(function()
     safe_on_frame(AP.DeathLink,        "DeathLink")
     safe_on_frame(AP.AP_BRIDGE,        "AP_BRIDGE")
     safe_on_frame(AP.PPStickerTracker, "PPStickerTracker")
+    safe_on_frame(AP.SaveSlot,         "SaveSlot")
 
     safe_on_frame(AP.GameEventTracker,  "GameEventTracker")
     safe_on_frame(AP.EventFlagExplorer, "EventFlagExplorer")
@@ -414,11 +402,7 @@ re.on_frame(function()
     end
     was_in_game = now_in_game
 
-    try_reapply_items_if_ready()
-end)
-
-re.on_script_reset(function()
-    AP.SaveSlot.clear_redirect()
+    try_reapply_if_ready()
 end)
 
 ------------------------------------------------------------
@@ -435,7 +419,7 @@ _G.list_rescued  = function()
 end
 _G.death_link = function() AP.DeathLink.kill_player("manual") end
 _G.freeze     = function() AP.TimeGate.enable() end
-_G.cap        = function(code) AP.TimeGate.set_time_cap_mdate(code) end
+_G.cap        = function(code) AP.TimeGate.set_time_cap(code) end
 _G.show_items = function() AP.ItemSpawner.show_window() end
 _G.hide_items = function() AP.ItemSpawner.hide_window() end
 

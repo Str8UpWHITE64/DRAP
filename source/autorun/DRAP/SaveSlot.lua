@@ -14,6 +14,12 @@ local SaveService_TYPE_NAME = "via.storage.saveService.SaveService"
 local BASE_SAVE_MOUNT = "./win64_save"
 
 ------------------------------------------------------------
+-- Internal State
+------------------------------------------------------------
+
+local init_cleanup_done = false
+
+------------------------------------------------------------
 -- Helpers
 ------------------------------------------------------------
 
@@ -141,25 +147,94 @@ end
 
 function M.clear_redirect()
     local td = sdk.find_type_definition(SaveService_TYPE_NAME)
+    if not td then
+        M.log("SaveService type definition not found.")
+        return false
+    end
+
     local svc = sdk.get_managed_singleton(SaveService_TYPE_NAME)
     if not svc then
         svc = sdk.get_native_singleton(SaveService_TYPE_NAME)
     end
 
     if not svc then
-        M.log("SaveService singleton not found; are you in-game yet?")
+        M.log("SaveService singleton not found.")
+        return false
     end
 
-    local get_mount_m = td:get_method("get_SaveMountPath")
     local set_mount_m = td:get_method("set_SaveMountPath")
+    if not set_mount_m then
+        M.log("set_SaveMountPath method not found.")
+        return false
+    end
 
-    -- Apply original mount
     local ok_set, err = pcall(function()
         set_mount_m:call(svc, sdk.create_managed_string(BASE_SAVE_MOUNT))
     end)
 
     if not ok_set then
         M.log("Failed to set SaveMountPath: " .. tostring(err))
+        return false
+    end
+
+    M.log("SaveMountPath reset to default: " .. BASE_SAVE_MOUNT)
+
+    -- Refresh the save file list so UI updates
+    local upd_m = td:get_method("updateSaveFileDetailTbl")
+    if upd_m then
+        local ok_upd, err_upd = pcall(function()
+            upd_m:call(svc)
+        end)
+        if ok_upd then
+            M.log("Save list refreshed.")
+        else
+            M.log("Failed to refresh save list: " .. tostring(err_upd))
+        end
+    end
+
+    return true
+end
+
+------------------------------------------------------------
+-- Initialization: Reset redirect on script load
+------------------------------------------------------------
+
+local function try_init_cleanup()
+    if init_cleanup_done then return end
+
+    local td = sdk.find_type_definition(SaveService_TYPE_NAME)
+    if not td then return end
+
+    local svc = sdk.get_managed_singleton(SaveService_TYPE_NAME)
+    if not svc then
+        svc = sdk.get_native_singleton(SaveService_TYPE_NAME)
+    end
+    if not svc then return end
+
+    local get_mount_m = td:get_method("get_SaveMountPath")
+    if not get_mount_m then return end
+
+    local current_path_obj = get_mount_m:call(svc)
+    local current_path_str = clean_path(current_path_obj)
+
+    -- Check if path has an AP redirect that needs cleanup
+    if current_path_str:find("_AP_", 1, true) then
+        M.log("Detected stale AP redirect on load: " .. current_path_str)
+        if M.clear_redirect() then
+            M.log("Cleaned up stale redirect.")
+        end
+    end
+
+    init_cleanup_done = true
+end
+
+------------------------------------------------------------
+-- Per-frame Update (for deferred init cleanup)
+------------------------------------------------------------
+
+function M.on_frame()
+    if not init_cleanup_done then
+        pcall(try_init_cleanup)
     end
 end
 

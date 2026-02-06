@@ -63,9 +63,8 @@ function M.set_save_filename(slot_name, seed)
 
     local slot = safe_fn(slot_name)
     local sd = safe_fn(seed)
-    CAPTURED_JSON_FILE = string.format("./%s/AP_DRDR_stickers_%s_%s.json",
-        CAPTURED_JSON_DIR, slot, sd)
-    M.log(string.format("Sticker save file: %s", CAPTURED_JSON_FILE))
+    CAPTURED_JSON_FILE = "./" .. CAPTURED_JSON_DIR .. "/AP_DRDR_stickers_" .. slot .. "_" .. sd .. ".json"
+    M.log("Sticker save file: " .. CAPTURED_JSON_FILE)
 end
 
 local function get_save_path()
