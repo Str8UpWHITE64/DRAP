@@ -304,9 +304,11 @@ AP_BRIDGE.AP_REF.on_slot_connected = function(slot_data)
         AP.SaveSlot.apply_for_slot(slot, seed)
     end
 
-    -- Set up received items file
+    -- Reset received items file for a fresh sync from the server.
+    -- This ensures any previously corrupted item data is discarded and
+    -- rebuilt from the authoritative server replay.
     AP_BRIDGE.set_received_items_filename(slot, seed)
-    AP_BRIDGE.load_received_items()
+    AP_BRIDGE.reset_received_items()
 
     -- Set up sticker save file
     if AP.PPStickerTracker.set_save_filename then
