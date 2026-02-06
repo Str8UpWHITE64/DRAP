@@ -306,6 +306,14 @@ local function save_received_items()
     Shared.save_json(RECEIVED_ITEMS_FILE, data, 4, M.log)
 end
 
+function M.reset_received_items()
+    M.log("Resetting received items file for fresh sync")
+    RECEIVED_ITEMS = {}
+    RECEIVED_ITEMS_BY_NAME = {}
+    last_item_index = -1
+    save_received_items()
+end
+
 re.on_config_save(save_received_items)
 re.on_script_reset(save_received_items)
 
