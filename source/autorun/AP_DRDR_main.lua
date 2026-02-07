@@ -208,8 +208,15 @@ end
 ------------------------------------------------------------
 
 AP.EventTracker.on_tracked_location = function(desc, source, raw_id, extra)
+    -- Don't send checks if ScoopUnlocker is currently enabling flags
+    -- (This prevents false completions when we unlock a mission)
+    if AP.ScoopUnlocker and AP.ScoopUnlocker.is_currently_unlocking() then
+        log(string.format("Ignoring tracked location '%s' (ScoopUnlocker is unlocking)", tostring(desc)))
+        return
+    end
+
     log(string.format("Tracked location: %s", tostring(desc)))
-    AP_BRIDGE.check(desc)
+    AP.AP_BRIDGE.check(desc)
 end
 
 ------------------------------------------------------------
@@ -351,6 +358,7 @@ local function try_reapply_if_ready()
 
     log("Reapplying AP items")
     AP_BRIDGE.reapply_all_items()
+    AP.ScoopUnlocker.reapply_unlocked_scoops()
     apply_permanent_effects_from_ap()
     apply_time_locks_from_ap()
 
