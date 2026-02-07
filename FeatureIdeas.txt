@@ -12,3 +12,5 @@ Bugs:
 -Time lock persists after exiting to menu and loading earlier save
 -Grabbed by raincoat PP stickers dont send
 -One way entrance door locks.  Unlock A->B but not C->B
+-New Event system is buggy.  Sometimes events dont trigger:
+-Medicine Run didnt get saved to SCQ success list
