@@ -504,7 +504,7 @@ location_tables = {
         DRLocationData("Kill 100 zombies with an RPG", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Photograph 10 survivors", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Photograph 30 survivors", "Milk", DRLocationCategory.CHALLENGE),
-        DRLocationData("Photograph 4 psychopaths", "Milk", DRLocationCategory.CHALLENGE),
+        DRLocationData("Photograph 8 psychopaths", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Photograph 10 PP Stickers", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Photograph all PP Stickers", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Escort 8 survivors at once", "Milk", DRLocationCategory.CHALLENGE),
