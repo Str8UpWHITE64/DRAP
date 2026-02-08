@@ -488,7 +488,7 @@ local function draw_item_window()
         end
 
         -- Selectable row
-        if imgui.selectable(display_text, is_selected) then
+        if imgui.menu_item(display_text, "", is_selected) then
             if is_selected then
                 selected_item_name = nil  -- Deselect on second click
             else

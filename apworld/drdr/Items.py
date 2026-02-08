@@ -12,6 +12,7 @@ class DRItemCategory(IntEnum):
     TRAP = 4,
     LOCK = 5,
     WEAPON = 6,
+    SCOOP = 7,
 
 
 class DRItemData(NamedTuple):
@@ -263,12 +264,66 @@ _all_items = [DRItemData(row[0], row[1], row[2]) for row in [
     ("Service Hallway key", 1012, DRItemCategory.LOCK),
     ("Wonderland Plaza key", 1013, DRItemCategory.LOCK),
 
+    # Special Items
+    ("Maintenance Tunnel Access Key", 1100, DRItemCategory.LOCK),
+
     # Time locks
     ("DAY2_06_AM", 2000, DRItemCategory.LOCK),
     ("DAY2_11_AM", 2001, DRItemCategory.LOCK),
     ("DAY3_00_AM", 2002, DRItemCategory.LOCK),
     ("DAY3_11_AM", 2003, DRItemCategory.LOCK),
     ("DAY4_12_PM", 2004, DRItemCategory.LOCK),
+
+    # Main Scoops
+    ("Backup for Brad", 3000, DRItemCategory.SCOOP),
+    ("A Temporary Agreement", 3001, DRItemCategory.SCOOP),
+    ("Image in the Monitor", 3002, DRItemCategory.SCOOP),
+    ("Rescue the Professor", 3003, DRItemCategory.SCOOP),
+    ("Medicine Run", 3004, DRItemCategory.SCOOP),
+    ("Another Source", 3005, DRItemCategory.SCOOP),
+    ("Girl Hunting", 3006, DRItemCategory.SCOOP),
+    ("A Promise to Isabella", 3007, DRItemCategory.SCOOP),
+    ("Santa Cabeza", 3008, DRItemCategory.SCOOP),
+    ("The Last Resort", 3009, DRItemCategory.SCOOP),
+    ("Hideout", 3010, DRItemCategory.SCOOP),
+    ("Jessie's Discovery", 3011, DRItemCategory.SCOOP),
+    ("The Butcher", 3012, DRItemCategory.SCOOP),
+    # ("The Facts", 3013, DRItemCategory.SCOOP),
+
+
+    # Survivor Scoops
+    ("Barricade Pair", 3100, DRItemCategory.SCOOP),
+    ("A Mother's Lament", 3101, DRItemCategory.SCOOP),
+    ("Japanese Tourists", 3102, DRItemCategory.SCOOP),
+    ("Shadow of the North Plaza", 3103, DRItemCategory.SCOOP),
+    ("Lovers", 3104, DRItemCategory.SCOOP),
+    ("The Coward", 3105, DRItemCategory.SCOOP),
+    ("Twin Sisters", 3106, DRItemCategory.SCOOP),
+    ("Restaurant Man", 3107, DRItemCategory.SCOOP),
+    ("Hanging by a Thread", 3108, DRItemCategory.SCOOP),
+    ("Antique Lover", 3109, DRItemCategory.SCOOP),
+    ("The Woman Who Didn't Make it", 3110, DRItemCategory.SCOOP),
+    ("Dressed for Action", 3111, DRItemCategory.SCOOP),
+    ("Gun Shop Standoff", 3112, DRItemCategory.SCOOP),
+    ("The Drunkard", 3113, DRItemCategory.SCOOP),
+    ("A Sick Man", 3114, DRItemCategory.SCOOP),
+    ("The Woman Left Behind", 3115, DRItemCategory.SCOOP),
+    ("A Woman in Dispair", 3116, DRItemCategory.SCOOP),
+
+    # Psychopath Scoops
+    ("Cut from the Same Cloth", 3200, DRItemCategory.SCOOP),
+    ("Photo Challenge", 3201, DRItemCategory.SCOOP),
+    ("Photographer's Pride", 3202, DRItemCategory.SCOOP),
+    ("Cletus", 3203, DRItemCategory.SCOOP),
+    ("The Convicts", 3204, DRItemCategory.SCOOP),
+    ("Out of Control", 3205, DRItemCategory.SCOOP),
+    ("The Hatchet Man", 3206, DRItemCategory.SCOOP),
+    ("Above the Law", 3207, DRItemCategory.SCOOP),
+    ("A Strange Group", 3208, DRItemCategory.SCOOP),
+    ("Long Haired Punk", 3209, DRItemCategory.SCOOP),
+    ("Mark of the Sniper", 3210, DRItemCategory.SCOOP),
+    ("Spawn the Raincoats", 3211, DRItemCategory.SCOOP),
+
 ]]
 
 item_descriptions = {}
@@ -287,6 +342,11 @@ def BuildItemPool(multiworld, count, options):
         "Crislip's Hardware Store key", "Food Court key", "Wonderland Plaza key",
         "Al Fresca Plaza key", "Entrance Plaza key", "Grocery Store key",
         "Maintenance Tunnel key", "Hideout key",
+    }
+
+    # Time keys to skip when scoop sanity is enabled
+    time_key_names = {
+        "DAY2_06_AM", "DAY2_11_AM", "DAY3_00_AM", "DAY3_11_AM", "DAY4_12_PM"
     }
 
     # Specialty items that must be included in the pool for Restricted mode
@@ -310,6 +370,7 @@ def BuildItemPool(multiworld, count, options):
 
     itemList = [item for item in _all_items]
     lockList = [item for item in _all_items if item.category == DRItemCategory.LOCK]
+    scoopList = [item for item in _all_items if item.category == DRItemCategory.SCOOP]
     consumableList = [item for item in _all_items if item.category == DRItemCategory.CONSUMABLE]
     weaponList = [item for item in _all_items if item.category == DRItemCategory.WEAPON]
     fillerList = [item for item in itemList if item.category in (DRItemCategory.MISC, DRItemCategory.TRAP, DRItemCategory.WEAPON, DRItemCategory.CONSUMABLE)]
@@ -318,10 +379,21 @@ def BuildItemPool(multiworld, count, options):
         # Skip area keys if door randomizer is enabled (they're precollected)
         if options.door_randomizer and lock.name in area_key_names:
             continue
+        # Skip time keys if scoop sanity is enabled
+        if options.scoop_sanity and lock.name in time_key_names:
+            continue
+
         item = item_dictionary[lock.name]
         item_pool.append(item)
         remaining_count = remaining_count - 1
         included_itemcount = included_itemcount + 1
+
+    if options.scoop_sanity:
+        for scoop in scoopList:
+            item = item_dictionary[scoop.name]
+            item_pool.append(item)
+            remaining_count = remaining_count - 1
+            included_itemcount = included_itemcount + 1
 
     for i in range(remaining_count):
         item = multiworld.random.choice(fillerList)

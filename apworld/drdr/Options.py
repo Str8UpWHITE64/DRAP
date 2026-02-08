@@ -50,6 +50,31 @@ class DoorRandomizerMode(Choice):
     option_paired = 1
     default = 0
 
+class ScoopSanity(Toggle):
+    """
+    When enabled, scoops are sent to the player as items and the game time is frozen
+    after completing the Entrance Plaza prologue.
+
+    The order for main scoops will be randomized and the player will need
+    to receive the scoop item in order for the next scoop to spawn in the world.
+
+    An example:
+    The player's scoop order is 1. Girl Hunting, 2. Hideout, 3. Backup for Brad.
+    After completing the Entrance Plaza prologue, the player will need to wait
+    until they receive the Girl Hunting scoop item from AP before they can do the mission.
+    If they receive a later mission, like Backup for Brad, they will not be able to do it until they
+    receive and complete the prior missions.
+
+    Players will also receive side scoops as items, which will spawn the NPCs into
+    the world right away.
+
+    An example:
+    The player receives "Lovers".  Tonya and Ross will now spawn into the world in
+    Wonderland plaza and are rescuable.
+    """
+    display_name = "ScoopSanity"
+    default = True
+
 
 @dataclass
 class DROption(PerGameCommonOptions):
@@ -58,3 +83,4 @@ class DROption(PerGameCommonOptions):
     restricted_item_mode: RestrictedItemMode
     door_randomizer: DoorRandomizer
     door_randomizer_mode: DoorRandomizerMode
+    scoop_sanity: ScoopSanity

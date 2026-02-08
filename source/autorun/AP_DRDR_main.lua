@@ -217,6 +217,11 @@ AP.EventTracker.on_tracked_location = function(desc, source, raw_id, extra)
 
     log(string.format("Tracked location: %s", tostring(desc)))
     AP.AP_BRIDGE.check(desc)
+
+    -- Forward events to ScoopUnlocker for milestone/chain tracking
+    if AP.ScoopUnlocker and AP.ScoopUnlocker.on_event_tracked then
+        pcall(AP.ScoopUnlocker.on_event_tracked, desc)
+    end
 end
 
 ------------------------------------------------------------
@@ -246,6 +251,31 @@ AP.PPStickerTracker.on_sticker_event_taked = function(location_name, item_number
     log(string.format("PP sticker captured: %s", tostring(location_name)))
     AP_BRIDGE.check(location_name)
 end
+
+------------------------------------------------------------
+-- Hook Wiring: ScoopUnlocker
+------------------------------------------------------------
+
+-- When ScoopUnlocker detects a scoop completion via its flag hook,
+-- send the corresponding AP location check
+AP.ScoopUnlocker.set_completion_callback(function(event_desc, flag_id, scoop_name)
+    log(string.format("Scoop completion detected: '%s' (flag %d, scoop '%s')",
+        tostring(event_desc), flag_id or 0, tostring(scoop_name)))
+    AP_BRIDGE.check(event_desc)
+end)
+
+-- When AP enforcement activates (Meet Jessie milestone), log it
+AP.ScoopUnlocker.set_ap_activated_callback(function()
+    log("ScoopUnlocker: AP enforcement activated")
+end)
+
+-- When time freeze triggers (Get to the Stairs! milestone), apply it
+AP.ScoopUnlocker.set_time_freeze_callback(function()
+    log("ScoopUnlocker: Time freeze triggered")
+    if AP.TimeGate and AP.TimeGate.freeze_time then
+        AP.TimeGate.freeze_time()
+    end
+end)
 
 ------------------------------------------------------------
 -- Hook Wiring: DeathLink
@@ -313,6 +343,26 @@ AP_BRIDGE.AP_REF.on_slot_connected = function(slot_data)
         end
     elseif AP.DoorRandomizer then
         AP.DoorRandomizer.clear_redirects()
+    end
+
+    -- ScoopSanity option
+    local scoop_sanity_enabled = (type(slot_data) == "table" and slot_data.scoop_sanity == true)
+    AP.ScoopSanityEnabled = scoop_sanity_enabled
+    log("ScoopSanity enabled=" .. tostring(scoop_sanity_enabled))
+
+    -- Set up ScoopUnlocker persistence and ordering
+    AP.ScoopUnlocker.set_save_filename(slot, seed)
+    AP.ScoopUnlocker.load_save()
+
+    if scoop_sanity_enabled then
+        -- Apply randomized main scoop order from server
+        local scoop_order = slot_data.scoop_order
+        if scoop_order and type(scoop_order) == "table" and #scoop_order > 0 then
+            AP.ScoopUnlocker.set_scoop_order(scoop_order)
+            log("Scoop order set with " .. tostring(#scoop_order) .. " entries")
+        else
+            log("WARNING: ScoopSanity enabled but no scoop_order in slot data")
+        end
     end
 
     -- Save slot redirect (controlled via AP_REF.APSaveRedirect in connection window)
