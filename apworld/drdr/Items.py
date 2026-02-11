@@ -308,7 +308,7 @@ _all_items = [DRItemData(row[0], row[1], row[2]) for row in [
     ("The Drunkard", 3113, DRItemCategory.SCOOP),
     ("A Sick Man", 3114, DRItemCategory.SCOOP),
     ("The Woman Left Behind", 3115, DRItemCategory.SCOOP),
-    ("A Woman in Dispair", 3116, DRItemCategory.SCOOP),
+    ("A Woman in Despair", 3116, DRItemCategory.SCOOP),
 
     # Psychopath Scoops
     ("Cut from the Same Cloth", 3200, DRItemCategory.SCOOP),
@@ -322,7 +322,7 @@ _all_items = [DRItemData(row[0], row[1], row[2]) for row in [
     ("A Strange Group", 3208, DRItemCategory.SCOOP),
     ("Long Haired Punk", 3209, DRItemCategory.SCOOP),
     ("Mark of the Sniper", 3210, DRItemCategory.SCOOP),
-    ("Spawn the Raincoats", 3211, DRItemCategory.SCOOP),
+    ("The Cult", 3211, DRItemCategory.SCOOP),
 
 ]]
 

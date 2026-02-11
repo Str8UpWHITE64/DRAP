@@ -270,11 +270,14 @@ AP.ScoopUnlocker.set_ap_activated_callback(function()
 end)
 
 -- When time freeze triggers (Get to the Stairs! milestone), apply it
+-- Only used in ScoopSanity mode — time is frozen indefinitely until scoops progress
 AP.ScoopUnlocker.set_time_freeze_callback(function()
-    log("ScoopUnlocker: Time freeze triggered")
-    if AP.TimeGate and AP.TimeGate.freeze_time then
-        AP.TimeGate.freeze_time()
+    if not AP.ScoopSanityEnabled then
+        log("ScoopUnlocker: Time freeze milestone hit but ScoopSanity disabled, ignoring")
+        return
     end
+    log("ScoopUnlocker: Time freeze triggered (ScoopSanity)")
+    AP.TimeGate.enable()
 end)
 
 ------------------------------------------------------------
@@ -411,6 +414,12 @@ local function try_reapply_if_ready()
     AP.ScoopUnlocker.reapply_unlocked_scoops()
     apply_permanent_effects_from_ap()
     apply_time_locks_from_ap()
+
+    -- ScoopSanity: restore indefinite time freeze if milestone was reached
+    if AP.ScoopSanityEnabled and AP.ScoopUnlocker.is_time_frozen() then
+        AP.TimeGate.enable()
+        log("Restored time freeze from saved milestone (ScoopSanity)")
+    end
 
     pending_reapply = false
 end

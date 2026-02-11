@@ -179,102 +179,119 @@ local SCOOP_DATA = {
         flags = { 793, 802 },
         npcs = { "Burt Thompson", "Aaron Swoop" },
         category = "Survivor",
+        completion_event = "Rescue Burt Thompson",
     },
 
     ["A Mother's Lament"] = {
         flags = { 796 },
         npcs = { "Leah Stein" },
         category = "Survivor",
+        completion_event = "Rescue Leah Stein",
     },
 
     ["Japanese Tourists"] = {
         flags = { 797, 803 },
         npcs = { "Yuu Tanaka", "Shinji Kitano" },
         category = "Survivor",
+        completion_event = "Rescue Yuu Tanaka",
     },
 
     ["Shadow of the North Plaza"] = {
         flags = { 789 },
         npcs = { "David Bailey" },
         category = "Survivor",
+        completion_event = "Rescue David Bailey",
     },
 
     ["Lovers"] = {
         flags = { 800, 804 },
         npcs = { "Tonya Waters", "Ross Folk" },
         category = "Survivor",
+        completion_event = "Rescue Ross Folk",
     },
 
     ["The Coward"] = {
         flags = { 790 },
         npcs = { "Gordon Stalworth" },
         category = "Survivor",
+        completion_event = "Rescue Gordon Stalworth",
     },
 
     ["Twin Sisters"] = {
         flags = { 812, 820 },
         npcs = { "Heather Tompkins", "Pamela Tompkins" },
         category = "Survivor",
+        completion_event = "Rescue Pamela Tompkins",
     },
 
     ["Restaurant Man"] = {
         flags = { 791 },
         npcs = { "Ronald Shiner" },
         category = "Survivor",
+        completion_event = "Rescue Ronald Shiner",
     },
 
     ["Hanging by a Thread"] = {
         flags = { 821, 817 },
         npcs = { "Nick Evans", "Sally Mills" },
         category = "Survivor",
+        completion_event = "Rescue Nick Evans",
     },
 
     ["Antique Lover"] = {
         flags = { 792 },
         npcs = { "Floyd Sanders" },
         category = "Survivor",
+        completion_event = "Rescue Floyd Sanders",
     },
 
     ["The Woman Who Didn't Make it"] = {
         flags = { 794, 795 },
         npcs = { "Jolie Wu", "Rachel Decker" },
         category = "Survivor",
+        completion_event = "Rescue Jolie Wu",
     },
 
     ["Dressed for Action"] = {
         flags = { 814 },
         npcs = { "Kindell Johnson" },
         category = "Survivor",
+        completion_event = "Rescue Kindell Johnson",
     },
 
     ["Gun Shop Standoff"] = {
         flags = { 819, 823, 822 },
         npcs = { "Brett Styles", "Alyssa Laurent", "Jonathan Picardson" },
         category = "Survivor",
+        completion_event = "Rescue Brett Styles",
     },
 
     ["The Drunkard"] = {
         flags = { 818 },
         npcs = { "Gil Jiminez" },
         category = "Survivor",
+        completion_event = "Rescue Gil Jiminez",
     },
 
     ["A Sick Man"] = {
         flags = { 799 },
         npcs = { "Leroy McKenna" },
         category = "Survivor",
+        completion_event = "Rescue Leroy McKenna",
     },
 
     ["The Woman Left Behind"] = {
         flags = { 815 },
         npcs = { "Susan Walsh" },
         category = "Survivor",
+        completion_event = "Rescue Susan Walsh",
     },
 
     ["A Woman in Despair"] = {
         flags = { 801 },
         npcs = { "Simone Ravendark" },
         category = "Survivor",
+        completion_event = "Rescue Simone Ravendark",
     },
 
     -- Psychopath Scoops
@@ -293,7 +310,7 @@ local SCOOP_DATA = {
     },
 
     ["Photographer's Pride"] = {
-        flags = {781, 1155},
+        flags = {781, 2710},
         npcs = { "Kent Day 3", "Tad Hawthorne" },
         category = "Psychopath",
         completion_event = "Kill Kent on day 3",
@@ -355,10 +372,17 @@ local SCOOP_DATA = {
     },
 
     ["The Cult"] = {
-        flags = { 787, 2699 },
+        flags = { 787, 811, 2699 },
         npcs = { "Raincoats", "Jennifer Gorman" },
         category = "Psychopath",
         completion_event = "Witness Sean in Paradise Plaza",
+    },
+
+    --Special items
+    ["Maintenance Tunnel Access key"] = {
+        flags = { 2082 },
+        npcs = { "" },
+        category = "Special",
     },
 }
 
