@@ -20,11 +20,9 @@ local efm_mgr = M:add_singleton("efm", "app.solid.gamemastering.EventFlagsManage
 --
 -- Flags listed here are ALWAYS disabled during enforcement,
 -- regardless of scoop state, grace periods, or completion.
--- Use this to suppress flags that cause problems when active.
 ------------------------------------------------------------
 
 local FLAG_BLACKLIST = {
-    -- Example: [9999] = "Reason this flag is blacklisted",
     [300] = "Kills all NPCs when enabled"
 }
 
@@ -33,17 +31,9 @@ local FLAG_BLACKLIST = {
 --
 -- When the game enables a trigger flag, we reactively
 -- enable or disable other flags. Runs in the evFlagOn hook.
---
--- Format:
---   [trigger_flag] = {
---       enable  = { flag_ids... },  -- flags to turn ON
---       disable = { flag_ids... },  -- flags to turn OFF
---   }
 ------------------------------------------------------------
 
 local FLAG_TRIGGERS = {
-    -- Hideout transition: game sets 392 at the door, but won't
-    -- proceed unless 300 is on. The game disables 300 after.
     [392] = { enable = { 300 } },
 }
 
@@ -426,9 +416,9 @@ local COMPLETION_FLAGS = {
 -- State
 ------------------------------------------------------------
 
-local ap_received = {}        -- { ["Scoop Name"] = true } AP sent us this item
-local received_scoops = {}    -- { ["Scoop Name"] = true } Flags enabled (unlocked)
-local completed_scoops = {}   -- { ["Scoop Name"] = true } Mission completed
+local ap_received = {}
+local received_scoops = {}
+local completed_scoops = {}
 local currently_unlocking = false
 
 local hooks_installed = false
@@ -440,7 +430,7 @@ local last_enforcement_time = 0
 local ENFORCEMENT_COOLDOWN = 1.0
 
 -- Grace periods: when game enables a flag, wait before disabling
-local FLAG_GRACE_PERIOD = 15.0
+local FLAG_GRACE_PERIOD = 10.0
 local flag_grace_until = {}  -- { [flag_id] = expiry timestamp }
 
 local on_completion_detected_callback = nil
@@ -448,8 +438,6 @@ local on_completion_detected_callback = nil
 ------------------------------------------------------------
 -- AP Scoop Ordering & Milestones
 --
--- The AP server sends a randomized order for main scoops.
--- Scoops unlock one at a time as the previous one completes.
 -- Enforcement only starts after "Meet Jessie" milestone.
 ------------------------------------------------------------
 
@@ -468,6 +456,7 @@ local save_filename = nil        -- Set via set_save_filename(slot, seed)
 local MILESTONE_EVENTS = {
     ["Get to the stairs!"] = "time_freeze",
     ["Meet Jessie in the Service Hallway"] = "activate",
+    ["Get bit!"] = "time_freeze",
 }
 
 ------------------------------------------------------------
