@@ -24,18 +24,18 @@ local ss_mgr = M:add_singleton("ss", "app.solid.SolidStorage")
 local CHALLENGES = {
     PlayerLevel = {
         label   = "Reach Level",
-        targets = { 50 },
-        location_ids = { "Reach max level" },
+        targets = { 10, 20, 30, 40, 50 },
+        location_ids = { "Reach Level 10!", "Reach Level 20!", "Reach Level 30!", "Reach Level 40!", "Reach max level" },
     },
     zombieKilledHandTotal = {
         label   = "Zombie kills by hand",
-        targets = { 100 },
-        location_ids = { "Kill 500 zombies by hand" },
+        targets = { 50, 100 },
+        location_ids = { "Kill 50 zombies by hand", "Kill 100 zombies by hand" },
     },
     zombieKilledVehicleTotal = {
         label   = "Zombie Vehicle kills",
-        targets = { 500 },
-        location_ids = { "Kill 500 zombies by vehicle" },
+        targets = { 500, 1000 },
+        location_ids = { "Kill 500 zombies by vehicle", "Kill 1000 zombies by vehicle" },
     },
     changeClothNum = {
         label   = "Outfit changes",
@@ -54,8 +54,8 @@ local CHALLENGES = {
     },
     zombieKill_1Play = {
         label   = "Zombies killed",
-        targets = { 1000, 10000, 53594 },
-        location_ids = { "Kill 1000 zombies", "Kill 10000 zombies", "Zombie Genocide" },
+        targets = { 1000, 2000, 5000, 10000 },
+        location_ids = { "Kill 1000 zombies", "Kill 2000 zombies", "Kill 5000 zombies", "Kill 10000 zombies" },
     },
     secretForceKill = {
         label   = "Special forces killed",
@@ -65,12 +65,12 @@ local CHALLENGES = {
     foodCourtDishFlag = {
         label   = "Food court dishes destroyed",
         targets = { 262143 },
-        location_ids = { "Destroy 30 dishes in the Food Court" },
+        location_ids = { "Destroy all of the dishes in the Food Court" },
     },
     firedBulletCount = {
         label   = "Bullets fired",
-        targets = { 300 },
-        location_ids = { "Fire 300 bullets" },
+        targets = { 30, 300 },
+        location_ids = { "Fire 30 bullets", "Fire 300 bullets" },
     },
     ZombieRideDist = {
         label   = "Zombie ride distance",
@@ -119,8 +119,8 @@ local CHALLENGES = {
     },
     PPPhotoCount = {
         label   = "PP stickers photographed (total)",
-        targets = { 10, 100 },
-        location_ids = { "Photograph 10 PP Stickers", "Photograph all PP Stickers" },
+        targets = { 10, 20, 30, 40, 50, 60, 70, 80, 90, 100 },
+        location_ids = { "Photograph 10 PP Stickers", "Photograph 20 PP Stickers", "Photograph 30 PP Stickers", "Photograph 40 PP Stickers", "Photograph 50 PP Stickers", "Photograph 60 PP Stickers", "Photograph 70 PP Stickers", "Photograph 80 PP Stickers", "Photograph 90 PP Stickers", "Photograph all PP Stickers" },
     },
     NPCJoinMax = {
         label   = "Max survivors escorted at once",
@@ -174,8 +174,8 @@ local CHALLENGES = {
     },
     fullMarathonDist = {
         label   = "Full marathon distance traveled",
-        targets = { 42195 },
-        location_ids = { "Walk a marathon" },
+        targets = { 1054875 },
+        location_ids = { "Walk a quarter marathon" },
     },
 }
 
