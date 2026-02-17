@@ -341,7 +341,7 @@ def BuildItemPool(multiworld, count, options):
         "Colby's Movie Theater key", "Leisure Park key", "North Plaza key",
         "Crislip's Hardware Store key", "Food Court key", "Wonderland Plaza key",
         "Al Fresca Plaza key", "Entrance Plaza key", "Grocery Store key",
-        "Maintenance Tunnel key", "Hideout key",
+        "Maintenance Tunnel key", "Hideout key", "Maintenance Tunnel Access Key"
     }
 
     # Time keys to skip when scoop sanity is enabled
@@ -390,10 +390,14 @@ def BuildItemPool(multiworld, count, options):
 
     if options.scoop_sanity:
         for scoop in scoopList:
+            # Skip "Out of Control" if door randomizer is also enabled (it's precollected for softlock prevention)
+            if options.door_randomizer and scoop.name == "Out of Control":
+                continue
             item = item_dictionary[scoop.name]
             item_pool.append(item)
             remaining_count = remaining_count - 1
             included_itemcount = included_itemcount + 1
+
 
     for i in range(remaining_count):
         item = multiworld.random.choice(fillerList)

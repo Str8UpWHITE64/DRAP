@@ -44,15 +44,14 @@ local global_not_before = 0.0
 -- Currently selected item name in the UI (for deduplicated list)
 local selected_item_name = nil
 
--- UI State
-local mainWindowVisible = false
-local showMainWindow = true
-
 -- Filter options
 local filter_text = ""
 
 -- Reference to bridge module
 local AP_BRIDGE = nil
+
+-- Reference to ScoopUnlocker (for event item filtering)
+local ScoopUnlocker = nil
 
 ------------------------------------------------------------
 -- Time Helper
@@ -225,7 +224,7 @@ local function try_spawn_item(item_entry)
     -- Optional "don't spawn before time loads" gate
     if AP and AP.TimeGate and AP.TimeGate.get_current_mdate then
         local ok_tg, mdate = pcall(AP.TimeGate.get_current_mdate)
-        if ok_tg and mdate and mdate <= 11200 then
+        if ok_tg and mdate and mdate < 11200 then
             return false, "Game time not ready"
         end
     end
@@ -319,8 +318,24 @@ end
 -- UI: Filter Helper
 ------------------------------------------------------------
 
+local function get_scoop_unlocker()
+    if ScoopUnlocker then return ScoopUnlocker end
+    local ok, mod = pcall(require, "DRAP/ScoopUnlocker")
+    if ok and mod then
+        ScoopUnlocker = mod
+        return ScoopUnlocker
+    end
+    return nil
+end
+
 local function is_effect_item(item_name)
     if not item_name then return false end
+
+    -- Filter out scoop/milestone event items handled by ScoopUnlocker
+    local su = get_scoop_unlocker()
+    if su and su.is_event_item and su.is_event_item(item_name) then
+        return true
+    end
 
     -- Special case for "Hockey Stick"
     if item_name == "Hockey Stick" then
@@ -338,6 +353,12 @@ local function is_effect_item(item_name)
     end
 
     return false
+end
+
+local function is_key_item(item_name)
+    if not item_name then return false end
+    if item_name == "Hockey Stick" then return false end
+    return string.find(item_name, "key", 1, true) ~= nil
 end
 
 local function matches_filter(entry)
@@ -363,17 +384,7 @@ end
 -- UI: Item Window Drawing
 ------------------------------------------------------------
 
-local function draw_item_window()
-    if not mainWindowVisible then return end
-
-    imgui.set_next_window_size(Vector2f.new(400, 400), 4)  -- 4 = ImGuiCond_FirstUseEver
-
-    if showMainWindow then
-        showMainWindow = imgui.begin_window("Archipelago Items", showMainWindow, 0)
-    else
-        imgui.begin_window("Archipelago Items", nil, 0)
-    end
-
+function M.draw_tab_content(debug)
     local size = imgui.get_window_size()
 
     -- Get items from bridge
@@ -445,36 +456,38 @@ local function draw_item_window()
 
     imgui.separator()
 
-    -- Header: Stats
-    imgui.text("Items: " .. tostring(total) .. " total, " .. tostring(unique_count) .. " unique")
+    if debug then
+        -- Header: Stats
+        imgui.text("Items: " .. tostring(total) .. " total, " .. tostring(unique_count) .. " unique")
 
-    -- Inventory status
-    local current, maxv = get_inventory_counts()
-    if current and maxv then
+        -- Inventory status
+        local current, maxv = get_inventory_counts()
+        if current and maxv then
+            imgui.same_line()
+            imgui.text(" | Inv: " .. tostring(current) .. "/" .. tostring(maxv))
+        end
+
+        -- restricted item mode status
+        if spawning_disabled then
+            imgui.same_line()
+            imgui.text_colored(" | RESTRICTED", 0xFFFF4444)
+        end
+
+        -- Filter controls
+        imgui.text("Filter:")
         imgui.same_line()
-        imgui.text(" | Inv: " .. tostring(current) .. "/" .. tostring(maxv))
-    end
+        imgui.push_item_width(size.x - 80)
+        local changed, new_filter = imgui.input_text("##filter", filter_text)
+        if changed then
+            filter_text = new_filter
+        end
+        imgui.pop_item_width()
 
-    -- restricted item mode status
-    if spawning_disabled then
-        imgui.same_line()
-        imgui.text_colored(" | RESTRICTED", 0xFFFF4444)
+        imgui.separator()
     end
-
-    -- Filter controls
-    imgui.text("Filter:")
-    imgui.same_line()
-    imgui.push_item_width(size.x - 80)
-    local changed, new_filter = imgui.input_text("##filter", filter_text)
-    if changed then
-        filter_text = new_filter
-    end
-    imgui.pop_item_width()
-
-    imgui.separator()
 
     -- === ITEM LIST (scrollable) ===
-    local list_height = size.y - 145  -- Adjusted for top controls
+    local list_height = size.y - (debug and 145 or 80)
     imgui.begin_child_window("ItemList", Vector2f.new(size.x - 16, list_height), true, 0)
 
     for _, item_name in ipairs(unique_names) do
@@ -506,28 +519,57 @@ local function draw_item_window()
     end
 
     imgui.end_child_window()
-
-    imgui.end_window()
 end
 
 ------------------------------------------------------------
--- UI Toggle (Public API)
+-- UI: Keys Tab Drawing
 ------------------------------------------------------------
 
-function M.show_window()
-    showMainWindow = true
-end
+function M.draw_keys_tab_content(debug)
+    local received_items = get_received_items_from_bridge()
 
-function M.hide_window()
-    showMainWindow = false
-end
+    -- Collect key items, deduplicated
+    local key_counts = {}   -- name -> { count = N, entry = entry }
+    local key_names = {}    -- ordered unique names
 
-function M.toggle_window()
-    showMainWindow = not showMainWindow
-end
+    for _, entry in ipairs(received_items) do
+        local name = entry.item_name or ""
+        if is_key_item(name) then
+            if not key_counts[name] then
+                key_counts[name] = { count = 0, entry = entry }
+                table.insert(key_names, name)
+            end
+            key_counts[name].count = key_counts[name].count + 1
+        end
+    end
 
-function M.is_window_visible()
-    return showMainWindow
+    table.sort(key_names, function(a, b) return a:lower() < b:lower() end)
+
+    if debug then
+        local total_keys = 0
+        for _, data in pairs(key_counts) do total_keys = total_keys + data.count end
+
+        imgui.text(string.format("Keys received: %d (%d unique)", total_keys, #key_names))
+        imgui.separator()
+    end
+
+    -- Key list
+    imgui.begin_child_window("KeyList", Vector2f.new(0, 0), true, 0)
+
+    for _, name in ipairs(key_names) do
+        local data = key_counts[name]
+        local display = name
+        if data.count > 1 then
+            display = name .. " (x" .. tostring(data.count) .. ")"
+        end
+        imgui.text_colored(display, 0xFF44DDFF)
+    end
+
+    if #key_names == 0 then
+        imgui.text_colored("No keys received yet.", 0xFF888888)
+    end
+
+    imgui.end_child_window()
 end
 
 ------------------------------------------------------------
@@ -538,31 +580,5 @@ function M.on_frame()
     if not M:should_run() then return end
     ensure_inventory()
 end
-
-------------------------------------------------------------
--- REFramework Hooks
-------------------------------------------------------------
-
-re.on_frame(function()
-    if mainWindowVisible then
-        draw_item_window()
-    end
-end)
-
-re.on_draw_ui(function()
-    local changed
-    changed, showMainWindow = imgui.checkbox("Show AP Items Window", showMainWindow)
-    if changed then
-        -- Checkbox was toggled
-    end
-end)
-
-re.on_pre_application_entry("UpdateBehavior", function()
-    if reframework:is_drawing_ui() and showMainWindow then
-        mainWindowVisible = true
-    else
-        mainWindowVisible = false
-    end
-end)
 
 return M

@@ -31,12 +31,13 @@ AP.Scene            = require("DRAP/Scene")
 AP.DeathLink        = require("DRAP/DeathLink")
 
 AP.EventFlagExplorer = require("DRAP/EventFlagExplorer")
-AP.GameEventTracker  = require("DRAP/GameEventTracker")
-AP.EventFlagDumper   = require("DRAP/EventFlagDumper")
-AP.ScoopExplorer     = require("DRAP/ScoopExplorer")
-AP.NpcInvestigator   = require("DRAP/NpcInvestigator")
-AP.NpcSpawner        = require("DRAP/NpcSpawner")
+--AP.GameEventTracker  = require("DRAP/GameEventTracker")
+--AP.EventFlagDumper   = require("DRAP/EventFlagDumper")
+--AP.ScoopExplorer     = require("DRAP/ScoopExplorer")
+--AP.NpcInvestigator   = require("DRAP/NpcInvestigator")
+--AP.NpcSpawner        = require("DRAP/NpcSpawner")
 AP.ScoopUnlocker     = require("DRAP/ScoopUnlocker")
+AP.GUI               = require("DRAP/DRAP_GUI")
 
 local Shared = require("DRAP/Shared")
 local log = Shared.create_logger("DRAP")
@@ -272,12 +273,13 @@ end)
 -- When time freeze triggers (Get to the Stairs! milestone), apply it
 -- Only used in ScoopSanity mode — time is frozen indefinitely until scoops progress
 AP.ScoopUnlocker.set_time_freeze_callback(function()
-    if not AP.ScoopSanityEnabled then
-        log("ScoopUnlocker: Time freeze milestone hit but ScoopSanity disabled, ignoring")
-        return
-    end
     log("ScoopUnlocker: Time freeze triggered (ScoopSanity)")
     AP.TimeGate.enable()
+end)
+
+AP.ScoopUnlocker.set_time_unfreeze_callback(function()
+    log("ScoopUnlocker: Time unfreeze triggered (ScoopSanity)")
+    AP.TimeGate.disable()
 end)
 
 ------------------------------------------------------------
@@ -332,6 +334,7 @@ AP_BRIDGE.AP_REF.on_slot_connected = function(slot_data)
     -- Door Randomizer option
     local door_randomizer_enabled = (type(slot_data) == "table" and slot_data.door_randomizer == true)
     AP.DoorRandomizerEnabled = door_randomizer_enabled
+    AP.ScoopUnlocker.set_door_randomizer_enabled(door_randomizer_enabled)
     log("Door Randomizer enabled=" .. tostring(door_randomizer_enabled))
 
     -- Apply door redirects if enabled
@@ -351,6 +354,7 @@ AP_BRIDGE.AP_REF.on_slot_connected = function(slot_data)
     -- ScoopSanity option
     local scoop_sanity_enabled = (type(slot_data) == "table" and slot_data.scoop_sanity == true)
     AP.ScoopSanityEnabled = scoop_sanity_enabled
+    AP.ScoopUnlocker.set_scoop_sanity_enabled(scoop_sanity_enabled)
     log("ScoopSanity enabled=" .. tostring(scoop_sanity_enabled))
 
     -- Set up ScoopUnlocker persistence and ordering
@@ -399,15 +403,26 @@ end
 
 local was_in_game = false
 local pending_reapply = false
+local new_game_checked = false
 
 local function on_enter_game()
     log("Entered gameplay")
     pending_reapply = true
+    new_game_checked = false
 end
 
 local function try_reapply_if_ready()
     if not pending_reapply then return end
     if not AP.ItemSpawner.inventory_system_running() then return end
+
+    -- Check for new game before reapplying (only once per game entry)
+    if not new_game_checked then
+        new_game_checked = true
+        if AP.ScoopUnlocker.is_new_game() then
+            log("New game detected — resetting side scoop progress")
+            AP.ScoopUnlocker.reset_for_new_game()
+        end
+    end
 
     log("Reapplying AP items")
     AP_BRIDGE.reapply_all_items()
@@ -430,8 +445,8 @@ end
 
 local function safe_on_frame(mod, name)
     if mod and type(mod.on_frame) == "function" then
-        local ok = pcall(mod.on_frame)
-        if not ok then log(name .. ".on_frame error suppressed") end
+        local ok, err = pcall(mod.on_frame)
+        if not ok then log(name .. ".on_frame ERROR: " .. tostring(err)) end
     end
 end
 
@@ -458,9 +473,9 @@ re.on_frame(function()
     safe_on_frame(AP.PPStickerTracker, "PPStickerTracker")
     safe_on_frame(AP.SaveSlot,         "SaveSlot")
 
-    safe_on_frame(AP.GameEventTracker,  "GameEventTracker")
+    --safe_on_frame(AP.GameEventTracker,  "GameEventTracker")
     safe_on_frame(AP.EventFlagExplorer, "EventFlagExplorer")
-    safe_on_frame(AP.NpcInvestigator,  "NpcInvestigator")
+    --safe_on_frame(AP.NpcInvestigator,  "NpcInvestigator")
     safe_on_frame(AP.NpcSpawner,       "NpcSpawner")
 
     -- Enter-game edge detection
@@ -487,8 +502,8 @@ end
 _G.death_link = function() AP.DeathLink.kill_player("manual") end
 _G.freeze     = function() AP.TimeGate.enable() end
 _G.cap        = function(code) AP.TimeGate.set_time_cap(code) end
-_G.show_items = function() AP.ItemSpawner.show_window() end
-_G.hide_items = function() AP.ItemSpawner.hide_window() end
+_G.show_items = function() AP.GUI.show_window() end
+_G.hide_items = function() AP.GUI.hide_window() end
 
 
 log("Main script loaded.")

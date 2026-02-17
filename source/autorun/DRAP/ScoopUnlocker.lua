@@ -38,6 +38,21 @@ local FLAG_TRIGGERS = {
 }
 
 ------------------------------------------------------------
+-- Time Skip Triggers
+--
+-- When a trigger flag is enabled, turbo-advance time to
+-- the target mDate via TimeGate. Each fires once per session.
+-- Add new entries as flags are identified.
+------------------------------------------------------------
+
+local TIME_SKIP_TRIGGERS = {
+    [1311] = { target_mdate = 41200, name = "Zombie Jessie to Get Bit!" },
+}
+
+local time_skips_fired = {}     -- [flag_id] = true once triggered
+local active_time_skip = nil    -- { flag = id, target_mdate = n, name = str } or nil
+
+------------------------------------------------------------
 -- Scoop Definitions
 ------------------------------------------------------------
 
@@ -113,8 +128,8 @@ local SCOOP_DATA = {
     },
 
     ["A Promise to Isabella"] = {
-        primary_flag = 286,
-        secondary_flags = { 773 },
+        primary_flag = 773,
+        secondary_flags = { 286 },
         cascade_flags = { 2336, 2337, 2338, 2340, 2341, 2342, 2343, 2344, 2345, 2346, 2347 },
         category = "Main",
         order = 10,
@@ -288,7 +303,7 @@ local SCOOP_DATA = {
     },
 
     ["A Woman in Despair"] = {
-        flags = { 801 },
+        flags = { 801, 295 },
         npcs = { "Simone Ravendark" },
         category = "Survivor",
         completion_event = "Rescue Simone Ravendark",
@@ -297,13 +312,14 @@ local SCOOP_DATA = {
     -- Psychopath Scoops
     ["Cut from the Same Cloth"] = {
         flags = { 779 },
+        disable_flags = { 346, 386, 387, 843, 1224, 1225, 1277 },  -- Suppress day 2 flag while day 1 is active
         npcs = { "Kent Day 1" },
         category = "Psychopath",
         completion_event = "Complete Kent's day 1 photoshoot",
     },
 
     ["Photo Challenge"] = {
-        flags = {779, 1225},
+        flags = { 779, 1225 },
         npcs = { "Kent Day 2" },
         category = "Psychopath",
         completion_event = "Complete Kent's day 2 photoshoot",
@@ -334,6 +350,7 @@ local SCOOP_DATA = {
         flags = { 784, 2711 },
         npcs = { "Adam", "Greg Simpson" },
         category = "Psychopath",
+        completion_event = "Kill Adam",
     },
 
     ["The Hatchet Man"] = {
@@ -393,11 +410,13 @@ local SCOOP_DATA = {
 local COMPLETION_EVENT_TO_SCOOP = {}
 local PRIMARY_FLAG_TO_SCOOP = {}
 local ALL_PRIMARY_FLAGS = {}
+local ALL_SIDE_SCOOP_FLAGS = {}  -- { [flag_id] = scoop_name } for Survivor/Psychopath scoops
 
 local function build_lookup_tables()
     COMPLETION_EVENT_TO_SCOOP = {}
     PRIMARY_FLAG_TO_SCOOP = {}
     ALL_PRIMARY_FLAGS = {}
+    ALL_SIDE_SCOOP_FLAGS = {}
 
     for scoop_name, data in pairs(SCOOP_DATA) do
         if data.completion_event then
@@ -407,10 +426,55 @@ local function build_lookup_tables()
             PRIMARY_FLAG_TO_SCOOP[data.primary_flag] = scoop_name
             ALL_PRIMARY_FLAGS[data.primary_flag] = true
         end
+        if data.category ~= "Main" and data.flags then
+            for _, flag_id in ipairs(data.flags) do
+                if flag_id and flag_id ~= 0 then
+                    ALL_SIDE_SCOOP_FLAGS[flag_id] = scoop_name
+                end
+            end
+        end
     end
 end
 
 build_lookup_tables()
+
+------------------------------------------------------------
+-- Conflict Groups
+--
+-- Scoops within a group cannot be active simultaneously.
+-- Only the first not-completed scoop (by group order) that
+-- has been received from AP gets its flags enabled.
+-- When it completes, the next received one unlocks.
+------------------------------------------------------------
+
+local CONFLICT_GROUPS = {
+    kent = {
+        "Cut from the Same Cloth",  -- Kent Day 1
+        "Photo Challenge",          -- Kent Day 2
+        "Photographer's Pride",     -- Kent Day 3
+    },
+    gun_shop = {
+        "Cletus",
+        "Gun Shop Standoff",
+    },
+}
+
+-- Reverse lookup: scoop_name → { group_name, group_list }
+local SCOOP_TO_CONFLICT_GROUP = {}
+
+local function build_conflict_lookups()
+    SCOOP_TO_CONFLICT_GROUP = {}
+    for group_name, group_list in pairs(CONFLICT_GROUPS) do
+        for _, scoop_name in ipairs(group_list) do
+            SCOOP_TO_CONFLICT_GROUP[scoop_name] = {
+                group = group_name,
+                members = group_list,
+            }
+        end
+    end
+end
+
+build_conflict_lookups()
 
 ------------------------------------------------------------
 -- Completion Flag Detection
@@ -420,6 +484,7 @@ build_lookup_tables()
 ------------------------------------------------------------
 
 local COMPLETION_FLAGS = {
+    [769] = { event = "Meet Jessie in the Service Hallway", scoop = "Meet Jessie in the Service Hallway" },
     [270] = { event = "Complete Backup for Brad", scoop = "Backup for Brad" },
     [272] = { event = "Escort Brad to see Dr Barnaby", scoop = "An Odd Old Man" },
     [273] = { event = "Complete Temporary Agreement", scoop = "A Temporary Agreement" },
@@ -434,6 +499,8 @@ local COMPLETION_FLAGS = {
     [301] = { event = "Escort Isabela to the Hideout and have a chat", scoop = "Hideout" },
     [302] = { event = "Complete Jessie's Discovery", scoop = "Jessie's Discovery" },
     [304] = { event = "Complete The Butcher", scoop = "The Butcher" },
+
+    [1292] = { event = "Kill Kent on Day 3", scoop = "Photographer's Pride" },
 }
 
 ------------------------------------------------------------
@@ -469,10 +536,13 @@ local scoop_order = {}           -- Ordered list of main scoop names from AP
 local scoop_order_set = false    -- Has AP provided the ordering?
 local ap_activated = false       -- True after "Meet Jessie" milestone
 local time_frozen = false        -- True after "Get to the Stairs!" milestone
+local scoop_sanity_enabled = false  -- Set by AP_DRDR_main when ScoopSanity is active
+local door_randomizer_enabled = false  -- Set by AP_DRDR_main when DoorRandomizer is active
 
 -- Callbacks for main script
 local on_ap_activated_callback = nil   -- Called when enforcement activates
 local on_time_freeze_callback = nil    -- Called when time should freeze
+local on_time_unfreeze_callback = nil  -- Called when time should unfreeze
 
 -- Persistence
 local save_filename = nil        -- Set via set_save_filename(slot, seed)
@@ -482,6 +552,10 @@ local MILESTONE_EVENTS = {
     ["Meet Jessie in the Service Hallway"] = "activate",
     ["Get bit!"] = "time_freeze",
 }
+
+-- Flag 769 is always ON after talking to Jessie. If it's ever OFF
+-- while ap_activated is true, the player reloaded a pre-Jessie save.
+local JESSIE_FLAG = 769
 
 ------------------------------------------------------------
 -- Public: Unlock state queries for other modules
@@ -603,6 +677,64 @@ local function load_state()
 end
 
 ------------------------------------------------------------
+-- Conflict Group Helpers
+--
+-- Returns whether a scoop is blocked by its conflict group.
+-- A scoop is blocked if another member earlier in the group
+-- order is received but not yet completed.
+------------------------------------------------------------
+
+local function is_conflict_blocked(scoop_name)
+    local info = SCOOP_TO_CONFLICT_GROUP[scoop_name]
+    if not info then return false end
+
+    -- Blocked if ANY other member in the group is currently active
+    for _, member in ipairs(info.members) do
+        if member ~= scoop_name and received_scoops[member] and not completed_scoops[member] then
+            return true, member
+        end
+    end
+    return false
+end
+
+local function try_advance_conflict_group(completed_name)
+    local info = SCOOP_TO_CONFLICT_GROUP[completed_name]
+    if not info then return end
+
+    -- Find the first pending member (by group order) to unlock
+    for _, member in ipairs(info.members) do
+        if member ~= completed_name and ap_received[member] and not completed_scoops[member] then
+            if not received_scoops[member] then
+                M.log(string.format("Conflict group '%s': '%s' completed → unlocking '%s'",
+                    info.group, completed_name, member))
+                M.unlock_scoop(member)
+            end
+            return  -- Only unlock one at a time
+        end
+    end
+end
+
+local function get_all_conflict_blocked_flags()
+    local blocked_flags = {}
+    for scoop_name, _ in pairs(SCOOP_TO_CONFLICT_GROUP) do
+        if not completed_scoops[scoop_name] then
+            local blocked, _ = is_conflict_blocked(scoop_name)
+            if blocked then
+                local data = SCOOP_DATA[scoop_name]
+                if data and data.flags then
+                    for _, flag_id in ipairs(data.flags) do
+                        if flag_id and flag_id ~= 0 then
+                            blocked_flags[flag_id] = scoop_name
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return blocked_flags
+end
+
+------------------------------------------------------------
 -- Blacklist Enforcement
 --
 -- Force-disable any blacklisted flag that is currently on.
@@ -653,8 +785,20 @@ local function enforce_primary_flags()
     -- Always run blacklist enforcement
     enforce_blacklist()
 
-    -- Main scoop flag enforcement only runs after AP activation
-    if not ap_activated then return end
+    -- Pre-activation: suppress all Survivor/Psychopath scoop flags
+    if not ap_activated then
+        for flag_id, scoop_name in pairs(ALL_SIDE_SCOOP_FLAGS) do
+            if raw_check_flag(flag_id) then
+                if raw_set_flag_off(flag_id) then
+                    if verbose_logging then
+                        M.log(string.format("Pre-activation: suppressed flag %d ('%s')",
+                            flag_id, scoop_name))
+                    end
+                end
+            end
+        end
+        return
+    end
 
     -- Build set of flags that active scoops want suppressed
     -- These override completion protection
@@ -693,14 +837,20 @@ local function enforce_primary_flags()
                     goto continue
                 end
 
-                -- Completion protection: if this flag marks a completed scoop, leave it
-                local completion_data = COMPLETION_FLAGS[flag_id]
-                if completion_data and completion_data.scoop and completed_scoops[completion_data.scoop] then
-                    if verbose_logging then
-                        M.log(string.format("Flag %d marks completed '%s' - skipping",
-                            flag_id, completion_data.scoop))
+                -- Completion protection ONLY when this flag's scoop was received
+                -- AND completed. If we never received the scoop, its primary flag
+                -- must be disabled — even if this flag also marks a *different*
+                -- scoop's completion (e.g. flag 284 is primary for "Girl Hunting"
+                -- AND completion marker for "Another Source").
+                if scoop_received and scoop_completed then
+                    local completion_data = COMPLETION_FLAGS[flag_id]
+                    if completion_data and completion_data.scoop and completed_scoops[completion_data.scoop] then
+                        if verbose_logging then
+                            M.log(string.format("Flag %d marks completed '%s' - skipping (own scoop done)",
+                                flag_id, completion_data.scoop))
+                        end
+                        goto continue
                     end
-                    goto continue
                 end
 
                 if is_flag_in_grace(flag_id) then
@@ -736,6 +886,50 @@ local function enforce_primary_flags()
                             flag_id, requesting_scoop))
                     else
                         M.log(string.format("Disabled conflicting flag %d for '%s'", flag_id, requesting_scoop))
+                    end
+                end
+            end
+        end
+    end
+    -- Third pass: enforce conflict group suppression
+    -- Suppress flags for scoops that are received but blocked by their conflict group
+    local conflict_blocked = get_all_conflict_blocked_flags()
+    for flag_id, scoop_name in pairs(conflict_blocked) do
+        if raw_check_flag(flag_id) then
+            if raw_set_flag_off(flag_id) then
+                if verbose_logging then
+                    M.log(string.format("Conflict suppressed flag %d ('%s' blocked by group)",
+                        flag_id, scoop_name))
+                end
+            end
+        end
+    end
+
+    -- Fourth pass: positive enforcement for active side scoops
+    -- Re-enable flags for received, non-completed, non-blocked Survivor/Psychopath scoops.
+    -- This catches the game clearing shared flags during mission completion sequences
+    -- (e.g. flag 779 cleared when "Cut from the Same Cloth" completes, but needed
+    -- by the now-active "Photo Challenge").
+    for scoop_name, _ in pairs(received_scoops) do
+        if not completed_scoops[scoop_name] then
+            local data = SCOOP_DATA[scoop_name]
+            if data and data.category ~= "Main" and data.flags then
+                -- Skip conflict-blocked scoops (their flags were just suppressed above)
+                local blocked = is_conflict_blocked(scoop_name)
+                if not blocked then
+                    for _, flag_id in ipairs(data.flags) do
+                        if flag_id and flag_id ~= 0 and not active_disable_flags[flag_id] then
+                            if not raw_check_flag(flag_id) then
+                                currently_unlocking = true
+                                if raw_set_flag_on(flag_id) then
+                                    if verbose_logging then
+                                        M.log(string.format("Re-enabled flag %d for active '%s'",
+                                            flag_id, scoop_name))
+                                    end
+                                end
+                                currently_unlocking = false
+                            end
+                        end
                     end
                 end
             end
@@ -808,6 +1002,19 @@ local function install_hooks()
                     end
                 end
 
+                -- Process time skip triggers (mark active, on_frame drives turbo)
+                local skip = TIME_SKIP_TRIGGERS[flag_id]
+                if skip and not time_skips_fired[flag_id] and not active_time_skip then
+                    time_skips_fired[flag_id] = true
+                    active_time_skip = {
+                        flag = flag_id,
+                        target_mdate = skip.target_mdate,
+                        name = skip.name,
+                    }
+                    M.log(string.format("Time skip activated: flag %d → advance to %d (%s)",
+                        flag_id, skip.target_mdate, skip.name))
+                end
+
                 -- Start grace period for unreceived primary flags
                 if ALL_PRIMARY_FLAGS[flag_id] then
                     local scoop_name = PRIMARY_FLAG_TO_SCOOP[flag_id]
@@ -876,6 +1083,12 @@ local function try_advance_chain()
     end
 
     M.log("Chain: All main scoops completed!")
+
+    -- Trigger "The Facts" — the non-randomized finale
+    if not received_scoops["The Facts"] and not completed_scoops["The Facts"] then
+        M.log("Chain: Triggering 'The Facts' — go back to the safe room")
+        M.unlock_scoop("The Facts")
+    end
 end
 
 ------------------------------------------------------------
@@ -893,8 +1106,21 @@ local function process_milestone(event_desc)
         ap_activated = true
         M.log("MILESTONE: AP enforcement activated (Meet Jessie)")
 
-        -- Try to unlock the first scoop if we have it
+        -- Advance main scoop chain
         try_advance_chain()
+
+        -- Flush all pending non-Main scoops that arrived before activation
+        local flushed = 0
+        for scoop_name, _ in pairs(ap_received) do
+            local data = SCOOP_DATA[scoop_name]
+            if data and data.category ~= "Main" and not received_scoops[scoop_name] then
+                M.unlock_scoop(scoop_name)
+                flushed = flushed + 1
+            end
+        end
+        if flushed > 0 then
+            M.log(string.format("Flushed %d pending scoops after activation", flushed))
+        end
 
         if on_ap_activated_callback then
             pcall(on_ap_activated_callback)
@@ -928,6 +1154,23 @@ function M.unlock_scoop(scoop_name)
     end
 
     if received_scoops[scoop_name] then return true, 0 end
+
+    -- Activation gate: no scoops unlock before "Meet Jessie" milestone
+    if not ap_activated and scoop.category ~= "Main" then
+        M.log(string.format("Activation deferred: '%s' — waiting for Meet Jessie", scoop_name))
+        return false, 0
+    end
+
+    -- Conflict group check: defer if another group member is active
+    if scoop.category ~= "Main" then
+        local blocked, blocker = is_conflict_blocked(scoop_name)
+        if blocked then
+            M.log(string.format("Conflict deferred: '%s' blocked by active '%s'",
+                scoop_name, tostring(blocker)))
+            return false, 0
+        end
+    end
+
     received_scoops[scoop_name] = true
     currently_unlocking = true
 
@@ -963,6 +1206,12 @@ function M.unlock_scoop(scoop_name)
         end
         M.log(string.format("Unlocked %s '%s' (%d flags)",
             scoop.category, scoop_name, count))
+
+        -- DoorRandomizer: set flag 514 with maintenance key to prevent softlocks
+        if door_randomizer_enabled and scoop_name == "Maintenance Tunnel Access key" then
+            raw_set_flag_on(514)
+            M.log("DoorRandomizer: set flag 514 for maintenance tunnel softlock prevention")
+        end
     end
 
     currently_unlocking = false
@@ -976,10 +1225,13 @@ function M.complete_scoop(scoop_name)
     completed_scoops[scoop_name] = true
     M.log(string.format("Completed %s '%s'", scoop.category, scoop_name))
 
-    -- Chain advancement: check if the next scoop is ready
+    -- Chain advancement: check if the next main scoop is ready
     if scoop.category == "Main" and scoop_order_set then
         try_advance_chain()
     end
+
+    -- Conflict group advancement: unlock next deferred scoop in group
+    try_advance_conflict_group(scoop_name)
 
     -- Persist
     save_state()
@@ -1011,14 +1263,10 @@ function M.reapply_unlocked_scoops()
     M.log("Reapplying unlocked scoops...")
     local main_count, side_count = 0, 0
 
-    -- If using AP ordering, only reapply the current chain scoop
+    -- If using AP ordering, let the chain logic decide what to unlock
+    -- (respects both ordering AND ap_received gate)
     if scoop_order_set and ap_activated then
-        local current = M.get_current_chain_scoop()
-        if current and not completed_scoops[current] then
-            received_scoops[current] = nil  -- Clear so unlock re-enables flags
-            M.unlock_scoop(current)
-            main_count = 1
-        end
+        try_advance_chain()
     else
         -- Fallback: reapply all received main scoops
         for scoop_name, _ in pairs(received_scoops) do
@@ -1102,11 +1350,17 @@ end
 function M.get_all_status()
     local status = {}
     for name, data in pairs(SCOOP_DATA) do
+        local blocked, blocker = is_conflict_blocked(name)
+        local conflict_info = SCOOP_TO_CONFLICT_GROUP[name]
         table.insert(status, {
             name = name,
             flags_active = M.is_scoop_active(name),
             received = M.has_received_scoop(name),
+            ap_item_received = ap_received[name] == true,
             completed = M.is_scoop_completed(name),
+            conflict_blocked = blocked,
+            conflict_blocker = blocker,
+            conflict_group = conflict_info and conflict_info.group or nil,
             npcs = data.npcs,
             category = data.category,
             completion_event = data.completion_event,
@@ -1124,6 +1378,35 @@ function M.get_all_status()
         return a.name < b.name
     end)
     return status
+end
+
+------------------------------------------------------------
+-- Event Item Detection
+--
+-- Returns true if an item name is handled by ScoopUnlocker
+-- (scoop unlocks or milestone events) rather than being a
+-- spawnable inventory item.  Used by ItemSpawner to filter.
+------------------------------------------------------------
+
+local EVENT_ITEM_NAMES = nil  -- lazy-built set
+
+local function build_event_item_set()
+    EVENT_ITEM_NAMES = {}
+    for scoop_name, _ in pairs(SCOOP_DATA) do
+        EVENT_ITEM_NAMES[scoop_name] = true
+    end
+    for event_name, _ in pairs(MILESTONE_EVENTS) do
+        EVENT_ITEM_NAMES[event_name] = true
+    end
+end
+
+--- Returns true if `name` is handled as an event item (scoop or milestone)
+--- @param name string The item name to check
+--- @return boolean
+function M.is_event_item(name)
+    if not name then return false end
+    if not EVENT_ITEM_NAMES then build_event_item_set() end
+    return EVENT_ITEM_NAMES[name] == true
 end
 
 function M.get_completion_flags()
@@ -1147,7 +1430,72 @@ function M.reset_all()
     time_frozen = false
     scoop_order = {}
     scoop_order_set = false
+    time_skips_fired = {}
+    active_time_skip = nil
     M.log("Reset all scoop tracking")
+    save_state()
+end
+
+------------------------------------------------------------
+-- New Game Detection & Side Scoop Reset
+--
+-- Flags 263 + 264 are set during the intro ("Get to the Stairs").
+-- If neither is set, the player started a new game.
+-- We clear side scoop progress so survivors/psychopaths can
+-- be reattempted, but preserve main chain progress.
+------------------------------------------------------------
+
+local NEW_GAME_FLAGS = { 263, 264 }
+
+function M.is_new_game()
+    -- Must have EFM to check flags reliably
+    local efm = efm_mgr:get()
+    if not efm then return false end
+
+    for _, flag_id in ipairs(NEW_GAME_FLAGS) do
+        if raw_check_flag(flag_id) then
+            return false
+        end
+    end
+    return true
+end
+
+function M.reset_for_new_game()
+    M.log("NEW GAME detected — resetting side scoop progress")
+
+    local side_reset, main_preserved = 0, 0
+
+    -- Clear side scoop completion and unlock state, keep ap_received
+    local new_completed = {}
+    for name, _ in pairs(completed_scoops) do
+        local data = SCOOP_DATA[name]
+        if data and data.category == "Main" then
+            new_completed[name] = true
+            main_preserved = main_preserved + 1
+        else
+            side_reset = side_reset + 1
+        end
+    end
+    completed_scoops = new_completed
+
+    -- Clear received_scoops for side scoops so they re-unlock on reapply
+    local new_received = {}
+    for name, _ in pairs(received_scoops) do
+        local data = SCOOP_DATA[name]
+        if data and data.category == "Main" then
+            new_received[name] = true
+        end
+    end
+    received_scoops = new_received
+
+    -- Reset milestones since the player is replaying the intro
+    time_frozen = false
+    ap_activated = false
+    time_skips_fired = {}
+    active_time_skip = nil
+
+    M.log(string.format("Reset %d side scoops, preserved %d main completions",
+        side_reset, main_preserved))
     save_state()
 end
 
@@ -1320,6 +1668,16 @@ function M.is_time_frozen()
     return time_frozen
 end
 
+function M.set_scoop_sanity_enabled(enabled)
+    scoop_sanity_enabled = enabled
+    M.log("ScoopSanity " .. (enabled and "ENABLED" or "DISABLED"))
+end
+
+function M.set_door_randomizer_enabled(enabled)
+    door_randomizer_enabled = enabled
+    M.log("DoorRandomizer " .. (enabled and "ENABLED" or "DISABLED"))
+end
+
 function M.set_ap_activated_callback(callback)
     on_ap_activated_callback = callback
     M.log("AP activated callback " .. (callback and "SET" or "CLEARED"))
@@ -1330,6 +1688,11 @@ function M.set_time_freeze_callback(callback)
     M.log("Time freeze callback " .. (callback and "SET" or "CLEARED"))
 end
 
+function M.set_time_unfreeze_callback(callback)
+    on_time_unfreeze_callback = callback
+    M.log("Time unfreeze callback " .. (callback and "SET" or "CLEARED"))
+end
+
 -- Force activation (for testing or manual override)
 function M.force_activate()
     if ap_activated then return end
@@ -1337,6 +1700,14 @@ function M.force_activate()
     M.log("FORCED: AP enforcement activated")
 
     try_advance_chain()
+
+    -- Flush pending non-Main scoops
+    for scoop_name, _ in pairs(ap_received) do
+        local data = SCOOP_DATA[scoop_name]
+        if data and data.category ~= "Main" and not received_scoops[scoop_name] then
+            M.unlock_scoop(scoop_name)
+        end
+    end
 
     if on_ap_activated_callback then
         pcall(on_ap_activated_callback)
@@ -1400,9 +1771,9 @@ end
 -- GUI
 ------------------------------------------------------------
 
-local gui_visible = false
 local filter_category = "All"
 local show_only_received = false
+local hide_completed = false
 
 local CATEGORY_COLORS = {
     Main = 0xFFFFFF00,
@@ -1410,118 +1781,171 @@ local CATEGORY_COLORS = {
     Psychopath = 0xFFFF6666,
 }
 
-local function draw_main_window()
-    if not gui_visible then return end
+function M.draw_tab_content(debug)
+    if debug then
+        -- Status bar
+        local efm = efm_mgr:get()
+        imgui.text_colored(efm and "EFM: OK" or "EFM: N/A", efm and 0xFF00FF00 or 0xFFFF0000)
+        imgui.same_line()
+        imgui.text_colored(hooks_installed and "Hook: ON" or "Hook: OFF", hooks_installed and 0xFF00FF00 or 0xFFFF0000)
+        imgui.same_line()
+        imgui.text_colored(enforcement_enabled and "Enforce: ON" or "Enforce: OFF",
+            enforcement_enabled and 0xFF00FF00 or 0xFFFFFF00)
+        imgui.same_line()
+        imgui.text_colored(ap_activated and "AP: ACTIVE" or "AP: WAITING",
+            ap_activated and 0xFF00FF00 or 0xFFFF8800)
+        imgui.same_line()
+        imgui.text_colored(time_frozen and "Time: FROZEN" or "Time: NORMAL",
+            time_frozen and 0xFF88CCFF or 0xFFAAAAAA)
+        imgui.same_line()
+        if imgui.button(scoop_sanity_enabled and "ScoopSanity: ON" or "ScoopSanity: OFF") then
+            M.set_scoop_sanity_enabled(not scoop_sanity_enabled)
+        end
+        if active_time_skip then
+            imgui.text_colored(string.format("TIME SKIP: %s → %d",
+                active_time_skip.name, active_time_skip.target_mdate), 0xFF00FFFF)
+        end
 
-    imgui.set_next_window_size(Vector2f.new(700, 800), 4)
-    local still_open = imgui.begin_window("Scoop Unlocker v8", true, 0)
-    if not still_open then
-        gui_visible = false
-        imgui.end_window()
-        return
+        -- Counts
+        local received_count, completed_count = 0, 0
+        for _ in pairs(received_scoops) do received_count = received_count + 1 end
+        for _ in pairs(completed_scoops) do completed_count = completed_count + 1 end
+
+        local blacklist_count = 0
+        for _ in pairs(FLAG_BLACKLIST) do blacklist_count = blacklist_count + 1 end
+
+        local trigger_count = 0
+        for _ in pairs(FLAG_TRIGGERS) do trigger_count = trigger_count + 1 end
+
+        imgui.text(string.format("Recv: %d | Done: %d | Blacklist: %d | Triggers: %d",
+            received_count, completed_count, blacklist_count, trigger_count))
     end
 
-    -- Status bar
-    local efm = efm_mgr:get()
-    imgui.text_colored(efm and "EFM: OK" or "EFM: N/A", efm and 0xFF00FF00 or 0xFFFF0000)
-    imgui.same_line()
-    imgui.text_colored(hooks_installed and "Hook: ON" or "Hook: OFF", hooks_installed and 0xFF00FF00 or 0xFFFF0000)
-    imgui.same_line()
-    imgui.text_colored(enforcement_enabled and "Enforce: ON" or "Enforce: OFF",
-        enforcement_enabled and 0xFF00FF00 or 0xFFFFFF00)
-    imgui.same_line()
-    imgui.text_colored(ap_activated and "AP: ACTIVE" or "AP: WAITING",
-        ap_activated and 0xFF00FF00 or 0xFFFF8800)
-    imgui.same_line()
-    imgui.text_colored(time_frozen and "Time: FROZEN" or "Time: NORMAL",
-        time_frozen and 0xFF88CCFF or 0xFFAAAAAA)
+    -- Chain display
+    if scoop_order_set and #scoop_order > 0 then
+        local current_chain_name = M.get_current_chain_scoop()
 
-    -- Counts
-    local received_count, completed_count = 0, 0
-    for _ in pairs(received_scoops) do received_count = received_count + 1 end
-    for _ in pairs(completed_scoops) do completed_count = completed_count + 1 end
+        if not debug then
+            -- Player mode: colored scoop names showing full chain progress
+            imgui.text("Main Story:")
+            for i, name in ipairs(scoop_order) do
+                local color
+                if completed_scoops[name] then
+                    color = 0xFF888888   -- grey = done
+                elseif name == current_chain_name and received_scoops[name] then
+                    color = 0xFF00FF00   -- green = current and received
+                elseif name == current_chain_name then
+                    color = 0xFF00FFFF   -- yellow = current but not received
+                elseif received_scoops[name] then
+                    color = 0xFF00FFFF   -- yellow = received, waiting
+                else
+                    color = 0xFF4444FF   -- red = missing
+                end
+                imgui.text_colored(string.format("  %d. %s", i, name), color)
+            end
 
-    local blacklist_count = 0
-    for _ in pairs(FLAG_BLACKLIST) do blacklist_count = blacklist_count + 1 end
-
-    local trigger_count = 0
-    for _ in pairs(FLAG_TRIGGERS) do trigger_count = trigger_count + 1 end
-
-    imgui.text(string.format("Recv: %d | Done: %d | Blacklist: %d | Triggers: %d",
-        received_count, completed_count, blacklist_count, trigger_count))
-
-    -- Chain status
-    if scoop_order_set then
-        local chain_idx = M.get_current_chain_index()
-        local current_scoop = M.get_current_chain_scoop()
-        if current_scoop then
-            imgui.text_colored(
-                string.format("Chain: %d/%d → %s", chain_idx, #scoop_order, current_scoop),
-                0xFF00FFFF)
+            -- All-complete message
+            if not current_chain_name then
+                imgui.text_colored("  All main scoops complete!", 0xFF00FF00)
+            end
         else
-            imgui.text_colored(
-                string.format("Chain: COMPLETE (%d/%d)", #scoop_order, #scoop_order),
-                0xFF00FF00)
+            -- Debug mode: compact one-liner
+            local chain_idx = M.get_current_chain_index()
+            if current_chain_name then
+                imgui.text_colored(
+                    string.format("Chain: %d/%d → %s", chain_idx, #scoop_order, current_chain_name),
+                    0xFF00FFFF)
+            else
+                imgui.text_colored(
+                    string.format("Chain: COMPLETE (%d/%d)", #scoop_order, #scoop_order),
+                    0xFF00FF00)
+            end
         end
-    else
+    elseif debug then
         imgui.text_colored("Chain: No order set", 0xFFFF8800)
     end
 
     imgui.separator()
 
-    -- Bulk actions
-    if imgui.button("Unlock ALL") then M.unlock_all() end
-    imgui.same_line()
-    if imgui.button("Unlock Main") then M.unlock_category("Main") end
-    imgui.same_line()
-    if imgui.button("Unlock Survivors") then M.unlock_category("Survivor") end
-    imgui.same_line()
-    if imgui.button("Unlock Psychos") then M.unlock_category("Psychopath") end
+    if debug then
+        -- Bulk actions
+        if imgui.button("Unlock ALL") then M.unlock_all() end
+        imgui.same_line()
+        if imgui.button("Unlock Main") then M.unlock_category("Main") end
+        imgui.same_line()
+        if imgui.button("Unlock Survivors") then M.unlock_category("Survivor") end
+        imgui.same_line()
+        if imgui.button("Unlock Psychos") then M.unlock_category("Psychopath") end
 
-    if imgui.button("Reset All") then M.reset_all() end
-    imgui.same_line()
-    if imgui.button("Reapply") then M.reapply_unlocked_scoops() end
-    imgui.same_line()
-    if imgui.button("Force Enforce") then M.force_enforce() end
-    imgui.same_line()
-    if not ap_activated then
-        if imgui.button("Force Activate") then M.force_activate() end
+        if imgui.button("Reset All") then M.reset_all() end
+        imgui.same_line()
+        if imgui.button("Reapply") then M.reapply_unlocked_scoops() end
+        imgui.same_line()
+        if imgui.button("Force Enforce") then M.force_enforce() end
+        imgui.same_line()
+        if not ap_activated then
+            if imgui.button("Force Activate") then M.force_activate() end
+        end
+
+        local enforce_changed, enforce_val = imgui.checkbox("Enforcement", enforcement_enabled)
+        if enforce_changed then M.set_enforcement_enabled(enforce_val) end
+        imgui.same_line()
+        local verbose_changed, verbose_val = imgui.checkbox("Verbose", verbose_logging)
+        if verbose_changed then M.set_verbose_logging(verbose_val) end
+
+        imgui.separator()
+
+        -- Filter
+        imgui.text("Filter:")
+        imgui.same_line()
+        if imgui.button("All##f") then filter_category = "All" end
+        imgui.same_line()
+        if imgui.button("Main##f") then filter_category = "Main" end
+        imgui.same_line()
+        if imgui.button("Survivor##f") then filter_category = "Survivor" end
+        imgui.same_line()
+        if imgui.button("Psycho##f") then filter_category = "Psychopath" end
+
+        local recv_changed, recv_val = imgui.checkbox("Show only received", show_only_received)
+        if recv_changed then show_only_received = recv_val end
+        imgui.same_line()
+        local hide_changed, hide_val = imgui.checkbox("Hide completed", hide_completed)
+        if hide_changed then hide_completed = hide_val end
+
+        imgui.separator()
     end
-
-    local enforce_changed, enforce_val = imgui.checkbox("Enforcement", enforcement_enabled)
-    if enforce_changed then M.set_enforcement_enabled(enforce_val) end
-    imgui.same_line()
-    local verbose_changed, verbose_val = imgui.checkbox("Verbose", verbose_logging)
-    if verbose_changed then M.set_verbose_logging(verbose_val) end
-
-    imgui.separator()
-
-    -- Filter
-    imgui.text("Filter:")
-    imgui.same_line()
-    if imgui.button("All##f") then filter_category = "All" end
-    imgui.same_line()
-    if imgui.button("Main##f") then filter_category = "Main" end
-    imgui.same_line()
-    if imgui.button("Survivor##f") then filter_category = "Survivor" end
-    imgui.same_line()
-    if imgui.button("Psycho##f") then filter_category = "Psychopath" end
-
-    local recv_changed, recv_val = imgui.checkbox("Show only received", show_only_received)
-    if recv_changed then show_only_received = recv_val end
-
-    imgui.separator()
 
     -- Scoop list
     imgui.begin_child_window("ScoopList", Vector2f.new(0, 0), true, 0)
 
     local status_list = M.get_all_status()
     local current_chain_scoop = M.get_current_chain_scoop()
+    local side_header_shown = false
+
+    -- Player mode: show waiting message if side scoops are deferred
+    if not debug and not ap_activated then
+        local pending = 0
+        for name, _ in pairs(ap_received) do
+            local data = SCOOP_DATA[name]
+            if data and data.category ~= "Main" and not received_scoops[name] then
+                pending = pending + 1
+            end
+        end
+        if pending > 0 then
+            imgui.text_colored(
+                string.format("Waiting for Meet Jessie: %d side scoop%s pending",
+                    pending, pending > 1 and "s" or ""),
+                0xFFFF8800)
+        end
+    end
 
     for _, s in ipairs(status_list) do
         local show = true
         if filter_category ~= "All" and s.category ~= filter_category then show = false end
         if show_only_received and not s.received then show = false end
+        if hide_completed and s.completed then show = false end
+        if not debug and s.category == "Main" then show = false end
+        if not debug and s.category ~= "Main" and not s.received then show = false end
 
         if show then
             local color = CATEGORY_COLORS[s.category] or 0xFFFFFFFF
@@ -1529,67 +1953,85 @@ local function draw_main_window()
 
             local status_str = ""
             if s.completed then
-                status_str = " [DONE]"
                 color = 0xFF888888
             elseif is_current_chain then
                 status_str = " [CURRENT]"
                 color = 0xFF00FFFF
+            elseif s.conflict_blocked and s.ap_item_received then
+                status_str = " [DEFERRED]"
+                color = 0xFFFF8800
             elseif s.received then
                 status_str = " [RECV]"
             end
-            if s.flags_active then
-                status_str = status_str .. " [ON]"
-            end
 
-            -- Show chain position for main scoops
-            local chain_str = ""
-            if scoop_order_set and s.category == "Main" then
-                local chain_pos = get_chain_position(s.name)
-                if chain_pos then
-                    chain_str = string.format(" (%d/%d)", chain_pos, #scoop_order)
+            if debug then
+                if s.completed then
+                    status_str = " [DONE]"
                 end
-            end
+                if s.flags_active then
+                    status_str = status_str .. " [ON]"
+                end
 
-            if imgui.button("Unlock##" .. s.name) then M.unlock_scoop(s.name) end
-            imgui.same_line()
+                -- Show chain position for main scoops
+                local chain_str = ""
+                if scoop_order_set and s.category == "Main" then
+                    local chain_pos = get_chain_position(s.name)
+                    if chain_pos then
+                        chain_str = string.format(" (%d/%d)", chain_pos, #scoop_order)
+                    end
+                end
 
-            if s.completion_event then
-                if imgui.button("Done##" .. s.name) then M.complete_scoop(s.name) end
+                if imgui.button("Unlock##" .. s.name) then M.unlock_scoop(s.name) end
                 imgui.same_line()
-            end
 
-            local order_str = s.order and string.format(" #%d", s.order) or ""
-            local flag_str = s.primary_flag and string.format(" [%d]", s.primary_flag) or ""
-            local npc_str = s.npcs and #s.npcs > 0 and (" - " .. table.concat(s.npcs, ", ")) or ""
-
-            imgui.text_colored(
-                string.format("%s [%s%s]%s%s%s%s", s.name, s.category or "?", order_str, flag_str, chain_str, status_str, npc_str),
-                color
-            )
-
-            if imgui.is_item_hovered() then
-                local tip = ""
-                if s.primary_flag then tip = "Primary: " .. s.primary_flag end
-                if s.flags and #s.flags > 0 then
-                    tip = tip .. (tip ~= "" and "\n" or "") .. "Flags: " .. table.concat(s.flags, ", ")
+                if s.completion_event then
+                    if imgui.button("Done##" .. s.name) then M.complete_scoop(s.name) end
+                    imgui.same_line()
                 end
-                if s.completion_event then tip = tip .. "\nCompletes: " .. s.completion_event end
-                if tip ~= "" then imgui.set_tooltip(tip) end
+
+                local order_str = s.order and string.format(" #%d", s.order) or ""
+                local flag_str = s.primary_flag and string.format(" [%d]", s.primary_flag) or ""
+                local npc_str = s.npcs and #s.npcs > 0 and (" - " .. table.concat(s.npcs, ", ")) or ""
+
+                imgui.text_colored(
+                    string.format("%s [%s%s]%s%s%s%s", s.name, s.category or "?", order_str, flag_str, chain_str, status_str, npc_str),
+                    color
+                )
+
+                if imgui.is_item_hovered() then
+                    local tip = ""
+                    if s.primary_flag then tip = "Primary: " .. s.primary_flag end
+                    if s.flags and #s.flags > 0 then
+                        tip = tip .. (tip ~= "" and "\n" or "") .. "Flags: " .. table.concat(s.flags, ", ")
+                    end
+                    if s.completion_event then tip = tip .. "\nCompletes: " .. s.completion_event end
+                    if s.conflict_group then
+                        tip = tip .. "\nConflict group: " .. s.conflict_group
+                    end
+                    if s.conflict_blocked and s.conflict_blocker then
+                        tip = tip .. "\nBlocked by: " .. s.conflict_blocker
+                    end
+                    if tip ~= "" then imgui.set_tooltip(tip) end
+                end
+            else
+                -- Player mode: scoop name + status + Done button
+                if not side_header_shown and s.category ~= "Main" then
+                    side_header_shown = true
+                    imgui.text("Side Quests:")
+                end
+
+                if s.completion_event and not s.completed then
+                    if imgui.button("Done##" .. s.name) then M.complete_scoop(s.name) end
+                    imgui.same_line()
+                end
+
+                imgui.text_colored(s.name .. status_str, color)
             end
         end
     end
 
     imgui.end_child_window()
-    imgui.end_window()
 end
-
-------------------------------------------------------------
--- Public GUI API
-------------------------------------------------------------
-
-function M.show_window() gui_visible = true end
-function M.hide_window() gui_visible = false end
-function M.toggle_window() gui_visible = not gui_visible end
 
 ------------------------------------------------------------
 -- Per-Frame Update
@@ -1601,6 +2043,101 @@ function M.on_frame()
             install_hooks()
         end
     end
+
+    -- ScoopSanity: sync time freeze with "Get to the Stairs" flags
+    if scoop_sanity_enabled then
+        local efm = efm_mgr:get()
+        if efm then
+            local past_stairs = raw_check_flag(NEW_GAME_FLAGS[1]) and raw_check_flag(NEW_GAME_FLAGS[2])
+            if past_stairs and not time_frozen then
+                time_frozen = true
+                M.log("ScoopSanity: past stairs — activating time freeze")
+                if on_time_freeze_callback then pcall(on_time_freeze_callback) end
+            elseif not past_stairs and time_frozen then
+                time_frozen = false
+                M.log("ScoopSanity: pre-stairs — clearing time freeze")
+                if on_time_unfreeze_callback then pcall(on_time_unfreeze_callback) end
+            end
+        end
+    end
+
+    -- Detect save reload to before "Meet Jessie"
+    -- Flag 769 is always ON after talking to Jessie. If it's off
+    -- while we think we're activated, the player reloaded.
+    if ap_activated then
+        local jessie_on = raw_check_flag(JESSIE_FLAG)
+        if jessie_on == false then
+            ap_activated = false
+            time_frozen = false
+            M.log("RELOAD DETECTED: Flag 769 off — deactivating until Meet Jessie replays")
+
+            -- Clear side scoop unlock state so enforcement suppresses them
+            local cleared = 0
+            for scoop_name, _ in pairs(received_scoops) do
+                local data = SCOOP_DATA[scoop_name]
+                if data and data.category ~= "Main" then
+                    received_scoops[scoop_name] = nil
+                    cleared = cleared + 1
+                end
+            end
+            if cleared > 0 then
+                M.log(string.format("Cleared %d side scoop unlocks for pre-Jessie state", cleared))
+            end
+
+            save_state()
+        end
+    elseif not ap_activated and scoop_sanity_enabled then
+        -- Reverse: loaded a post-Jessie save while not yet activated
+        local jessie_on = raw_check_flag(JESSIE_FLAG)
+        if jessie_on == true then
+            ap_activated = true
+            M.log("RELOAD DETECTED: Flag 769 on — activating AP enforcement")
+
+            -- Advance main scoop chain
+            try_advance_chain()
+
+            -- Flush all pending non-Main scoops that arrived before activation
+            local flushed = 0
+            for scoop_name, _ in pairs(ap_received) do
+                local data = SCOOP_DATA[scoop_name]
+                if data and data.category ~= "Main" and not received_scoops[scoop_name] then
+                    M.unlock_scoop(scoop_name)
+                    flushed = flushed + 1
+                end
+            end
+            if flushed > 0 then
+                M.log(string.format("Flushed %d pending scoops after activation", flushed))
+            end
+
+            if on_ap_activated_callback then pcall(on_ap_activated_callback) end
+            save_state()
+        end
+    end
+
+    -- Drive active time skip — keep turbo running until target reached
+    if active_time_skip then
+        local ok_tg, TimeGate = pcall(require, "DRAP/TimeGate")
+        if ok_tg and TimeGate then
+            local md = TimeGate.get_current_mdate()
+            if md and tonumber(md) >= active_time_skip.target_mdate then
+                -- Target reached — force stop immediately
+                M.log(string.format("Time skip complete: %s (reached %s)",
+                    active_time_skip.name, tostring(md)))
+                active_time_skip = nil
+                if TimeGate.is_turbo_active() then
+                    TimeGate.cancel_turbo()
+                end
+                -- Re-freeze
+                TimeGate.enable()
+            elseif not TimeGate.is_turbo_active() then
+                -- Turbo died (cutscene killed it) — restart
+                M.log(string.format("Time skip re-triggering turbo → %d (%s)",
+                    active_time_skip.target_mdate, active_time_skip.name))
+                TimeGate.turbo_advance_to(active_time_skip.target_mdate)
+            end
+        end
+    end
+
     enforce_primary_flags()
 end
 
@@ -1610,12 +2147,6 @@ end
 
 re.on_frame(function()
     M.on_frame()
-    if gui_visible then draw_main_window() end
-end)
-
-re.on_draw_ui(function()
-    local changed, new_val = imgui.checkbox("Show Scoop Unlocker", gui_visible)
-    if changed then gui_visible = new_val end
 end)
 
 ------------------------------------------------------------
@@ -1624,7 +2155,10 @@ end)
 
 _G.scoop_unlock = function(name) return M.unlock_scoop(name) end
 _G.scoop_complete = function(name) return M.complete_scoop(name) end
-_G.scoop_gui = function() M.show_window() end
+_G.scoop_gui = function()
+    local gui = require("DRAP/DRAP_GUI")
+    if gui then gui.show_window() end
+end
 _G.scoop_unlock_all = function() return M.unlock_all() end
 _G.scoop_enforce = function() M.force_enforce() end
 _G.scoop_verbose = function(on)
@@ -1634,6 +2168,11 @@ end
 _G.scoop_blacklist = function(flag_id, reason) M.blacklist_flag(flag_id, reason) end
 _G.scoop_unblacklist = function(flag_id) M.unblacklist_flag(flag_id) end
 _G.scoop_activate = function() M.force_activate() end
+_G.scoop_newgame = function()
+    print("New game: " .. tostring(M.is_new_game()))
+    print("Use scoop_newgame_reset() to force reset")
+end
+_G.scoop_newgame_reset = function() M.reset_for_new_game() end
 _G.scoop_chain = function()
     if not scoop_order_set then
         print("No scoop order set")
@@ -1674,6 +2213,9 @@ end
 local primary_count = 0
 for _ in pairs(ALL_PRIMARY_FLAGS) do primary_count = primary_count + 1 end
 
+local side_flag_count = 0
+for _ in pairs(ALL_SIDE_SCOOP_FLAGS) do side_flag_count = side_flag_count + 1 end
+
 local completion_count = 0
 for _ in pairs(COMPLETION_FLAGS) do completion_count = completion_count + 1 end
 
@@ -1683,7 +2225,10 @@ for _ in pairs(FLAG_BLACKLIST) do blacklist_count = blacklist_count + 1 end
 local trigger_count = 0
 for _ in pairs(FLAG_TRIGGERS) do trigger_count = trigger_count + 1 end
 
-M.log(string.format("ScoopUnlocker v8 loaded | Primary: %d | Completion: %d | Blacklist: %d | Triggers: %d | Grace: %.0fs",
-    primary_count, completion_count, blacklist_count, trigger_count, FLAG_GRACE_PERIOD))
+local conflict_group_count = 0
+for _ in pairs(CONFLICT_GROUPS) do conflict_group_count = conflict_group_count + 1 end
+
+M.log(string.format("ScoopUnlocker v8 loaded | Primary: %d | Side: %d | Completion: %d | Blacklist: %d | Triggers: %d | Conflicts: %d",
+    primary_count, side_flag_count, completion_count, blacklist_count, trigger_count, conflict_group_count))
 
 return M

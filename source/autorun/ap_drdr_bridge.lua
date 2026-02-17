@@ -12,6 +12,8 @@ local M = Shared.create_module("AP-DRDR-Bridge")
 
 local AP_ITEMS_BY_NAME = {}
 local AP_LOCATIONS_BY_NAME = {}
+local data_package_ready = false
+local pending_items = {}  -- Items received before data package was ready
 
 AP_REF.on_data_package_changed = function(data_package)
     local ap_game = AP_REF.APClient and AP_REF.APClient:get_game() or AP_REF.APGameName
@@ -30,6 +32,8 @@ AP_REF.on_data_package_changed = function(data_package)
     for _ in pairs(AP_LOCATIONS_BY_NAME) do loc_count = loc_count + 1 end
 
     M.log("Data package loaded: items=" .. tostring(item_count) .. " locations=" .. tostring(loc_count))
+
+    data_package_ready = true
 end
 
 function M.get_item_id(name) return AP_ITEMS_BY_NAME[name] end
@@ -311,6 +315,7 @@ function M.reset_received_items()
     RECEIVED_ITEMS = {}
     RECEIVED_ITEMS_BY_NAME = {}
     last_item_index = -1
+    pending_items = {}
     save_received_items()
 end
 
@@ -398,8 +403,15 @@ AP_REF.on_items_received = function(items)
 
     for _, net_item in ipairs(items) do
         if net_item.index and net_item.index > last_item_index then
-            last_item_index = net_item.index
-            handle_net_item(net_item, false)
+            -- Check if data package is actually ready by testing name resolution
+            local test_name = AP_REF.APClient:get_item_name(net_item.item, nil)
+            if test_name == "Unknown" or test_name == nil then
+                M.log("Queuing item index=" .. tostring(net_item.index) .. " id=" .. tostring(net_item.item) .. " (data package not ready)")
+                table.insert(pending_items, net_item)
+            else
+                last_item_index = net_item.index
+                handle_net_item(net_item, false)
+            end
         end
     end
 end
@@ -427,6 +439,22 @@ function M.on_frame()
     if not bound_once and AP_REF.APClient then
         bound_once = true
         M.bind_client()
+    end
+
+    -- Process queued items once data package is actually available
+    if #pending_items > 0 then
+        local test_name = AP_REF.APClient and AP_REF.APClient:get_item_name(pending_items[1].item, nil)
+        if test_name and test_name ~= "Unknown" then
+            M.log("Processing " .. tostring(#pending_items) .. " items queued before data package")
+            local queue = pending_items
+            pending_items = {}
+            for _, queued in ipairs(queue) do
+                if queued.index and queued.index > last_item_index then
+                    last_item_index = queued.index
+                    handle_net_item(queued, false)
+                end
+            end
+        end
     end
 end
 
