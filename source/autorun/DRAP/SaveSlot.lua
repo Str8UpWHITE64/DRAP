@@ -18,6 +18,7 @@ local BASE_SAVE_MOUNT = "./win64_save"
 ------------------------------------------------------------
 
 local init_cleanup_done = false
+local redirect_active = false
 
 ------------------------------------------------------------
 -- Helpers
@@ -133,6 +134,8 @@ end
 --- @param slot_name string The slot name
 --- @param seed string The seed identifier
 function M.apply_for_slot(slot_name, seed)
+    redirect_active = true
+    init_cleanup_done = true
     local clean_slot = Shared.sanitize_token(slot_name)
     local clean_seed = Shared.sanitize_token(seed)
     M.log("Applying redirect -> Slot: " .. clean_slot .. " | Seed: " .. clean_seed)
@@ -178,6 +181,7 @@ function M.clear_redirect()
     end
 
     M.log("SaveMountPath reset to default: " .. BASE_SAVE_MOUNT)
+    redirect_active = false
 
     -- Refresh the save file list so UI updates
     local upd_m = td:get_method("updateSaveFileDetailTbl")
@@ -201,6 +205,10 @@ end
 
 local function try_init_cleanup()
     if init_cleanup_done then return end
+    if redirect_active then
+        init_cleanup_done = true
+        return
+    end
 
     local td = sdk.find_type_definition(SaveService_TYPE_NAME)
     if not td then return end

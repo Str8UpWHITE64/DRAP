@@ -88,6 +88,7 @@ local redirect_count = 0
 
 local ahlm_mgr = M:add_singleton("ahlm", "app.solid.gamemastering.AreaHitLayoutManager")
 local am_mgr   = M:add_singleton("am", "app.solid.gamemastering.AreaManager")
+local pm_mgr   = M:add_singleton("pm", "app.solid.PlayerManager")
 
 ------------------------------------------------------------
 -- Helper Functions
@@ -321,6 +322,24 @@ local function get_current_area_info()
 end
 
 ------------------------------------------------------------
+-- Vehicle Dismount Helper
+------------------------------------------------------------
+
+local function dismount_vehicle()
+    local pm = pm_mgr:get()
+    if not pm then return end
+
+    local vtype_field = pm_mgr:get_field("<VehicleType>k__BackingField", false)
+    if not vtype_field then return end
+
+    local cur = Shared.safe_get_field(pm, vtype_field)
+    if cur and cur ~= 0 then
+        pcall(function() vtype_field:set_data(pm, 0) end)
+        M.log("Dismounted player from vehicle for door transition")
+    end
+end
+
+------------------------------------------------------------
 -- Hook Installation
 ------------------------------------------------------------
 
@@ -401,6 +420,7 @@ local function install_hook()
                         if mod_ok then
                             was_redirected = true
                             redirect_count = redirect_count + 1
+                            dismount_vehicle()
                             M.log(string.format("Redirected %s -> %s (was: %s)",
                                 door_id, get_scene_name(redirect_target), get_scene_name(original_dest)))
                         end
@@ -513,6 +533,8 @@ function M.clear_redirects()
     DOOR_REDIRECTS = {}
     randomization_enabled = false
     redirect_count = 0
+    vehicle_blocked_doors = {}
+    player_was_in_vehicle = false
     M.log("Door redirects cleared")
 end
 
@@ -539,20 +561,238 @@ function M.is_hook_installed()
 end
 
 ------------------------------------------------------------
+-- Vehicle Door Blocking
+--
+-- When door randomization is active and the player is riding
+-- a vehicle, we disable all area-jump hit data so they cannot
+-- transition through a door while in the vehicle.  When they
+-- exit the vehicle, we re-enable the doors (respecting any
+-- DoorSceneLock locks that may still apply).
+------------------------------------------------------------
+
+local DoorSceneLock = nil
+local function get_door_scene_lock()
+    if not DoorSceneLock then
+        local ok, mod = pcall(require, "DRAP/DoorSceneLock")
+        if ok and mod then DoorSceneLock = mod end
+    end
+    return DoorSceneLock
+end
+
+local vehicle_blocked_doors = {}   -- layout_info -> jump_name
+local player_was_in_vehicle = false
+
+local function is_player_in_vehicle()
+    local pm = pm_mgr:get()
+    if not pm then return false end
+
+    local vtype_field = pm_mgr:get_field("<VehicleType>k__BackingField", false)
+    if not vtype_field then return false end
+
+    local cur = Shared.safe_get_field(pm, vtype_field)
+    return cur ~= nil and cur ~= 0
+end
+
+local function scan_and_set_doors_disabled(disabled)
+    local ahlm = ahlm_mgr:get()
+    if not ahlm then return 0 end
+
+    local res_field = ahlm_mgr:get_field("mAreaHitResource", false)
+                   or ahlm_mgr:get_field("<mAreaHitResource>k__BackingField", false)
+    if not res_field then return 0 end
+
+    local res_list = Shared.safe_get_field(ahlm, res_field)
+    if not res_list then return 0 end
+
+    local count = 0
+
+    for _, res in Shared.iter_collection(res_list) do
+        if res then
+            local pResource_val = Shared.get_field_value(res, {"pResource", "<pResource>k__BackingField"})
+            if pResource_val then
+                local pRes_td = pResource_val:get_type_definition()
+                if pRes_td and pRes_td:get_full_name() == "app.solid.gamemastering.rAreaHitLayout" then
+                    local layout_list = Shared.get_field_value(pResource_val,
+                        {"mpLayoutInfoList", "<mpLayoutInfoList>k__BackingField"})
+
+                    if layout_list then
+                        for _, li in Shared.iter_collection(layout_list) do
+                            if li then
+                                local jump_name = Shared.get_field_value(li,
+                                    {"AREA_JUMP_NAME", "<AREA_JUMP_NAME>k__BackingField"})
+                                jump_name = jump_name and tostring(jump_name) or ""
+
+                                local mHitData = Shared.get_field_value(li,
+                                    {"mHitData", "<mHitData>k__BackingField"})
+
+                                if mHitData and jump_name ~= "" then
+                                    if disabled then
+                                        local ok_set = pcall(mHitData.set_field, mHitData, "Disabled", true)
+                                        if ok_set then
+                                            vehicle_blocked_doors[li] = jump_name
+                                            count = count + 1
+                                        end
+                                    elseif vehicle_blocked_doors[li] then
+                                        -- Only re-enable doors WE blocked, and only
+                                        -- if DoorSceneLock doesn't have the scene locked
+                                        local dsl = get_door_scene_lock()
+                                        local scene_locked = dsl and dsl.is_scene_locked(jump_name)
+                                        if not scene_locked then
+                                            pcall(mHitData.set_field, mHitData, "Disabled", false)
+                                        end
+                                        vehicle_blocked_doors[li] = nil
+                                        count = count + 1
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    return count
+end
+
+local function update_vehicle_door_blocking()
+    if not randomization_enabled then return end
+
+    local in_vehicle = is_player_in_vehicle()
+    if in_vehicle == player_was_in_vehicle then return end
+    player_was_in_vehicle = in_vehicle
+
+    local action = in_vehicle and "disabled" or "re-enabled"
+    local count = scan_and_set_doors_disabled(in_vehicle)
+    M.log(string.format("Player %s vehicle — %s %d door(s)",
+        in_vehicle and "entered" or "exited", action, count))
+end
+
+------------------------------------------------------------
+-- Existing HIT_DATA Borrowing (for warp)
+------------------------------------------------------------
+
+--- Finds an existing HIT_DATA from the current area's door layout
+local function find_existing_hit_data()
+    local ahlm = ahlm_mgr:get()
+    if not ahlm then return nil end
+
+    local res_field = ahlm_mgr:get_field("mAreaHitResource", false)
+                   or ahlm_mgr:get_field("<mAreaHitResource>k__BackingField", false)
+    if not res_field then return nil end
+
+    local res_list = Shared.safe_get_field(ahlm, res_field)
+    if not res_list then return nil end
+
+    for _, res in Shared.iter_collection(res_list) do
+        if res then
+            local pResource_val = Shared.get_field_value(res, {"pResource", "<pResource>k__BackingField"})
+            if pResource_val then
+                local pRes_td = pResource_val:get_type_definition()
+                if pRes_td and pRes_td:get_full_name() == "app.solid.gamemastering.rAreaHitLayout" then
+                    local layout_list = Shared.get_field_value(pResource_val,
+                        {"mpLayoutInfoList", "<mpLayoutInfoList>k__BackingField"})
+
+                    if layout_list then
+                        for _, li in Shared.iter_collection(layout_list) do
+                            if li then
+                                local mHitData = Shared.get_field_value(li,
+                                    {"mHitData", "<mHitData>k__BackingField"})
+                                if mHitData then return mHitData end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    return nil
+end
+
+--- Simulates the s231->s136 door transition to warp the player to the Safe Room
+function M.warp_to_safe_room()
+    if not hook_installed or not area_jump_method then
+        M.log("Cannot warp: areaJump hook not installed")
+        return false
+    end
+
+    local ahlm = ahlm_mgr:get()
+    if not ahlm then
+        M.log("Cannot warp: AreaHitLayoutManager not available")
+        return false
+    end
+
+    local hit_data = find_existing_hit_data()
+    if not hit_data then
+        M.log("Cannot warp: no existing HIT_DATA found in current area")
+        return false
+    end
+
+    -- Configure the HIT_DATA to match the s231->s136 door0 transition
+    local mod_ok = modify_hit_data_destination(
+        hit_data,
+        "s136",                                      -- mAreaJumpName
+        { x = 153.19, y = 9.32, z = 216.92 },       -- mAreaJumpPos
+        { x = 0.0,    y = 0.93, z = 0.0 }            -- mAreaJumpAngle
+    )
+
+    if not mod_ok then
+        M.log("Cannot warp: failed to configure HIT_DATA")
+        return false
+    end
+
+    -- Set door number
+    pcall(function() hit_data:set_field("mDoorNo", 0) end)
+
+    local ok, err = pcall(area_jump_method.call, area_jump_method, ahlm, hit_data)
+    if ok then
+        M.log("Warped to Safe Room via simulated door entry")
+        return true
+    else
+        M.log("Warp failed: " .. tostring(err))
+        return false
+    end
+end
+
+------------------------------------------------------------
 -- Per-frame Update
 ------------------------------------------------------------
 
 function M.on_frame()
-    if hook_installed or hook_install_attempted then
-        return
-    end
-
     if not Shared.is_in_game() then
         return
     end
 
-    install_hook()
+    if not hook_installed and not hook_install_attempted then
+        install_hook()
+    end
+
+    update_vehicle_door_blocking()
 end
+
+------------------------------------------------------------
+-- REFramework UI
+------------------------------------------------------------
+
+re.on_draw_ui(function()
+    if imgui.tree_node("DRAP: DoorRandomizer") then
+        imgui.text("Hook Installed: " .. tostring(hook_installed))
+        imgui.text("Randomization: " .. (randomization_enabled and "ENABLED" or "DISABLED"))
+        imgui.text("Redirects Configured: " .. tostring(M.get_redirect_config_count()))
+        imgui.text("Redirects Applied: " .. tostring(redirect_count))
+        imgui.text("Player In Vehicle: " .. tostring(player_was_in_vehicle))
+        local vbd_count = 0
+        for _ in pairs(vehicle_blocked_doors) do vbd_count = vbd_count + 1 end
+        imgui.text("Vehicle-Blocked Doors: " .. tostring(vbd_count))
+
+        if imgui.button("Warp to Safe Room") then
+            M.warp_to_safe_room()
+        end
+
+        imgui.tree_pop()
+    end
+end)
 
 ------------------------------------------------------------
 -- Module Initialization

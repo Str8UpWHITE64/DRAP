@@ -12,6 +12,7 @@ local M = Shared.create_module("TimeGate")
 
 local gm_mgr  = M:add_singleton("gm", "app.solid.gamemastering.GameManager")
 local scq_mgr = M:add_singleton("scq", "app.solid.gamemastering.SCQManager")
+local gts_mgr = M:add_singleton("gts", "app.solid.gamemastering.GameTimeSpeedManager")
 
 ------------------------------------------------------------
 -- Configuration
@@ -40,6 +41,13 @@ local saved_time_add = nil
 local time_cap_mdate = nil
 local speed_up_unlock_hooked = false
 
+-- Turbo advance state
+local turbo_active = false
+local turbo_target_mdate = nil
+local turbo_complete_callback = nil
+local TURBO_SPEED_VALUE = 2000
+local NORMAL_SPEED_VALUE = 50
+
 ------------------------------------------------------------
 -- Helpers: mDate parse/format
 ------------------------------------------------------------
@@ -66,6 +74,9 @@ end
 ------------------------------------------------------------
 
 local function apply_gate_state()
+    -- Don't interfere while turbo advance is running
+    if turbo_active then return end
+
     local gm = gm_mgr:get()
     if not gm then return end
 
@@ -118,9 +129,94 @@ local function read_scq_mdate()
     return nil
 end
 
+local function write_scq_mdate(new_mdate)
+    local scq = scq_mgr:get()
+    if not scq then
+        M.log("ERROR: SCQManager not available for mDate write")
+        return false
+    end
+
+    local ok, err = pcall(function()
+        scq:call("set_mDate(System.UInt32)", new_mdate)
+    end)
+
+    if ok then
+        M.log(string.format("Set mDate to %s", mdate_to_string(new_mdate)))
+        return true
+    else
+        M.log(string.format("ERROR writing mDate: %s", tostring(err)))
+        return false
+    end
+end
+
 ------------------------------------------------------------
--- Time Cap Logic
+-- Turbo Advance
+--
+-- Sets SpeedMode to turbo (2) with a very high speed value,
+-- then monitors mDate until we hit the target. On arrival,
+-- restores SpeedMode to normal (0) and freezes time.
 ------------------------------------------------------------
+
+local function start_turbo()
+    local gts = gts_mgr:get()
+    if not gts then
+        M.log("ERROR: GameTimeSpeedManager not available for turbo")
+        return false
+    end
+
+    gts.SpeedUpTurboValue = TURBO_SPEED_VALUE
+    gts:call("switchTimeSpeedMode(app.solid.gamemastering.GameTimeSpeedManager.Mode)", 2)
+    turbo_active = true
+    M.log(string.format("Turbo started: switchTimeSpeedMode(2), SpeedUpTurboValue=%d, target=%s",
+        TURBO_SPEED_VALUE, mdate_to_string(turbo_target_mdate)))
+    return true
+end
+
+local function stop_turbo()
+    local gts = gts_mgr:get()
+    if gts then
+        gts:call("switchTimeSpeedMode(app.solid.gamemastering.GameTimeSpeedManager.Mode)", 0)
+        gts.SpeedUpTurboValue = NORMAL_SPEED_VALUE
+    end
+    turbo_active = false
+    turbo_target_mdate = nil
+    turbo_complete_callback = nil
+    M.log("Turbo stopped: switchTimeSpeedMode(0), SpeedUpTurboValue=" .. tostring(NORMAL_SPEED_VALUE))
+end
+
+local function evaluate_turbo()
+    if not turbo_active or not turbo_target_mdate then return end
+
+    local md = read_scq_mdate()
+    if not md then return end
+    md = tonumber(md) or 0
+
+    if md >= turbo_target_mdate then
+        M.log(string.format("Turbo target reached: current=%s target=%s",
+            mdate_to_string(md), mdate_to_string(turbo_target_mdate)))
+        local cb = turbo_complete_callback
+        stop_turbo()
+        -- Re-freeze time after turbo advance
+        manual_freeze_enabled = true
+        apply_gate_state()
+        -- Notify caller
+        if cb then pcall(cb) end
+        return  -- Do NOT re-engage after stopping
+    end
+
+    -- Force turbo every frame — cutscenes and game events can reset it
+    -- Only if we haven't reached target yet
+    local gts = gts_mgr:get()
+    if gts then
+        gts.SpeedUpTurboValue = TURBO_SPEED_VALUE
+        gts:call("switchTimeSpeedMode(app.solid.gamemastering.GameTimeSpeedManager.Mode)", 2)
+    end
+    -- Also ensure mTimeAdd isn't zeroed (cutscenes can freeze time)
+    local gm = gm_mgr:get()
+    if gm and gm.mTimeAdd == 0 then
+        gm.mTimeAdd = saved_time_add or 30
+    end
+end
 
 local function evaluate_time_cap_mdate()
     if not time_cap_mdate then
@@ -186,6 +282,62 @@ end
 --- @return number|nil The current mDate
 function M.get_current_mdate()
     return read_scq_mdate()
+end
+
+--- Sets the mDate directly (advance time)
+--- @param new_mdate number The target mDate value
+--- @return boolean Whether the write succeeded
+function M.set_mdate(new_mdate)
+    new_mdate = tonumber(new_mdate)
+    if not new_mdate then return false end
+    local current = read_scq_mdate()
+    M.log(string.format("Advancing time: %s -> %s",
+        current and mdate_to_string(current) or "?", mdate_to_string(new_mdate)))
+    return write_scq_mdate(new_mdate)
+end
+
+--- Turbo-advance time to a target mDate
+--- Unfreezes time, sets turbo speed, then re-freezes on arrival
+--- @param target_mdate number The target mDate value
+--- @return boolean Whether turbo started successfully
+--- Turbo-advance time to a target mDate
+--- Unfreezes time, sets turbo speed, then re-freezes on arrival
+--- @param target_mdate number The target mDate value
+--- @param on_complete function|nil Optional callback when target is reached
+--- @return boolean Whether turbo started successfully
+function M.turbo_advance_to(target_mdate, on_complete)
+    target_mdate = tonumber(target_mdate)
+    if not target_mdate then return false end
+
+    local current = read_scq_mdate()
+    if current and tonumber(current) >= target_mdate then
+        M.log(string.format("Already past target: current=%s target=%s",
+            mdate_to_string(current), mdate_to_string(target_mdate)))
+        if on_complete then pcall(on_complete) end
+        return true
+    end
+
+    -- Disable manual freeze so apply_gate_state doesn't fight us
+    manual_freeze_enabled = false
+    apply_gate_state()
+
+    turbo_target_mdate = target_mdate
+    turbo_complete_callback = on_complete
+    return start_turbo()
+end
+
+--- Whether turbo advance is currently running
+--- @return boolean
+function M.is_turbo_active()
+    return turbo_active
+end
+
+--- Cancel an in-progress turbo advance
+function M.cancel_turbo()
+    if turbo_active then
+        stop_turbo()
+        M.log("Turbo advance cancelled")
+    end
 end
 
 --- Enables manual time freeze
@@ -266,6 +418,7 @@ function M.on_frame()
 
     if testing_mode then return end
 
+    evaluate_turbo()
     evaluate_time_cap_mdate()
     apply_gate_state()
 end
@@ -290,6 +443,25 @@ re.on_draw_ui(function()
             imgui.text("Time Cap: " .. mdate_to_string(time_cap_mdate))
         end
         imgui.text("Frozen: " .. tostring(manual_freeze_enabled or cap_freeze_enabled))
+
+        -- Turbo status
+        if turbo_active then
+            imgui.text_colored("TURBO ACTIVE -> " .. mdate_to_string(turbo_target_mdate), 0xFF00FFFF)
+            if imgui.button("Cancel Turbo") then M.cancel_turbo() end
+        end
+
+        imgui.separator()
+        imgui.text("Turbo Advance To:")
+        if md then
+            if imgui.button("Day2 6AM") then M.turbo_advance_to(20600) end
+            imgui.same_line()
+            if imgui.button("Day2 11AM") then M.turbo_advance_to(21100) end
+            imgui.same_line()
+            if imgui.button("Day3 12AM") then M.turbo_advance_to(30000) end
+            if imgui.button("Day3 11AM") then M.turbo_advance_to(31100) end
+            imgui.same_line()
+            if imgui.button("Day4 12PM") then M.turbo_advance_to(41200) end
+        end
 
         imgui.tree_pop()
     end

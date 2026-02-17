@@ -356,11 +356,14 @@ class DoorRandomizer:
                 doors_from_area[door.from_area] = []
             doors_from_area[door.from_area].append(door_id)
 
-        # Pre-compute templates for each destination
-        templates_to_area: Dict[str, str] = {}
+        # Pre-compute templates for each (from_area, to_area) pair
+        # This ensures each redirect uses the correct spawn position for that specific route
+        templates: Dict[str, Dict[str, str]] = {}  # from_area -> to_area -> door_id
         for door_id, door in self.doors.items():
-            if door.to_area not in templates_to_area:
-                templates_to_area[door.to_area] = door_id
+            if door.from_area not in templates:
+                templates[door.from_area] = {}
+            if door.to_area not in templates[door.from_area]:
+                templates[door.from_area][door.to_area] = door_id
 
         for attempt in range(max_attempts):
             self.redirects = {}
@@ -422,30 +425,60 @@ class DoorRandomizer:
                     if not door4_id:
                         continue
 
-                    # We have a valid 4-door swap!
+                    # Get the vanilla destinations for reverse door lookup
+                    _, to_e = door_info[door3_id]  # door3: D→E (to_d→to_e)
+                    _, to_f = door_info[door4_id]  # door4: B→F (to_b→to_f)
+
+                    # Extract door numbers for proper pairing
+                    # Door IDs are like "SCN_s400|s300|door0" - we need the "door0" part
+                    door1_num = door1_id.split("|")[-1]  # e.g., "door0"
+                    door2_num = door2_id.split("|")[-1]
+                    door3_num = door3_id.split("|")[-1]
+                    door4_num = door4_id.split("|")[-1]
+
+                    # For TRUE bidirectional pairing, each door spawns you at its
+                    # PAIRED door's entrance. We find this by looking up the REVERSE
+                    # of the paired door WITH THE SAME DOOR NUMBER.
+                    #
+                    # This is critical because door0 and door1 between the same areas
+                    # are at DIFFERENT physical locations!
+
+                    # Build expected reverse door IDs
+                    reverse3_expected = f"SCN_{to_e}|{to_d}|{door3_num}"  # E→D (reverse of door3)
+                    reverse1_expected = f"SCN_{to_b}|{from_a}|{door1_num}"  # B→A (reverse of door1)
+                    reverse4_expected = f"SCN_{to_f}|{to_b}|{door4_num}"  # F→B (reverse of door4)
+                    reverse2_expected = f"SCN_{to_d}|{from_c}|{door2_num}"  # D→C (reverse of door2)
+
+                    # Check if these specific reverse doors exist
+                    reverse3_id = reverse3_expected if reverse3_expected in self.doors else None
+                    reverse1_id = reverse1_expected if reverse1_expected in self.doors else None
+                    reverse4_id = reverse4_expected if reverse4_expected in self.doors else None
+                    reverse2_id = reverse2_expected if reverse2_expected in self.doors else None
+
+                    if not (reverse3_id and reverse1_id and reverse4_id and reverse2_id):
+                        continue  # Skip this swap, matching reverse doors don't exist
+
+                    # All reverse doors exist - commit to the swap
                     used_doors.update({door1_id, door2_id, door3_id, door4_id})
                     swap_count += 1
 
-                    # Apply redirects:
-                    # door1: A→B becomes A→D
-                    template = templates_to_area.get(to_d)
-                    if template and template != door1_id:
-                        self.redirects[door1_id] = template
+                    # Apply redirects - spawn at paired door's entrance (using reverse door's position)
 
-                    # door2: C→D becomes C→B
-                    template = templates_to_area.get(to_b)
-                    if template and template != door2_id:
-                        self.redirects[door2_id] = template
+                    # door1 → D, spawn at door3's entrance (reverse3 = E→D position)
+                    if reverse3_id != door1_id:
+                        self.redirects[door1_id] = reverse3_id
 
-                    # door3: D→? becomes D→A
-                    template = templates_to_area.get(from_a)
-                    if template and template != door3_id:
-                        self.redirects[door3_id] = template
+                    # door2 → B, spawn at door4's entrance (reverse4 = F→B position)
+                    if reverse4_id != door2_id:
+                        self.redirects[door2_id] = reverse4_id
 
-                    # door4: B→? becomes B→C
-                    template = templates_to_area.get(from_c)
-                    if template and template != door4_id:
-                        self.redirects[door4_id] = template
+                    # door3 → A, spawn at door1's entrance (reverse1 = B→A position)
+                    if reverse1_id != door3_id:
+                        self.redirects[door3_id] = reverse1_id
+
+                    # door4 → C, spawn at door2's entrance (reverse2 = D→C position)
+                    if reverse2_id != door4_id:
+                        self.redirects[door4_id] = reverse2_id
 
                     break  # Move to next door1
 
@@ -477,9 +510,37 @@ class DoorRandomizer:
                     f"Found valid paired randomization on attempt {attempt + 1} ({swap_count} 4-door swaps, {len(self.redirects)} redirects)")
                 return self.redirects
 
-        print(f"Could not find valid paired randomization after {max_attempts} attempts")
-        print("Falling back to chaos mode")
-        return self.randomize_with_validation(max_attempts=50)
+        # If we get here, this seed batch failed - return None to signal retry needed
+        print(f"Could not find valid paired randomization after {max_attempts} attempts with current seed")
+        return None
+
+    def randomize_paired_with_retry(self, max_attempts_per_seed: int = 500, max_reseeds: int = 100) -> Dict[str, str]:
+        """
+        Attempts paired mode randomization, reseeding if necessary.
+        Never falls back to chaos mode.
+
+        Args:
+            max_attempts_per_seed: Number of shuffle attempts per seed
+            max_reseeds: Maximum number of times to try a new seed
+
+        Returns:
+            Dict of redirects, guaranteed to be valid paired mode
+        """
+        for reseed_attempt in range(max_reseeds):
+            if reseed_attempt > 0:
+                # Generate a new seed based on current RNG state
+                new_seed = self.rng.randint(0, 2 ** 31 - 1)
+                self.rng = random.Random(new_seed)
+                print(f"Reseeding (attempt {reseed_attempt + 1}/{max_reseeds}) with seed {new_seed}")
+
+            result = self.randomize_paired(max_attempts=max_attempts_per_seed)
+            if result is not None:
+                return result
+
+        # This should be extremely rare - log an error
+        print(f"ERROR: Could not find valid paired randomization after {max_reseeds} reseeds!")
+        print("Returning empty redirects (vanilla door layout)")
+        return {}
 
     def randomize_with_validation(self, max_attempts: int = 100) -> Dict[str, str]:
         """
@@ -739,7 +800,8 @@ EMBEDDED_DOOR_DATA = {
                             "position": {"x": -230.5, "y": 5.0, "z": -249.0}, "angle": {"x": 0.0, "y": 3.14, "z": 0.0},
                             "door_no": 0},
     "SCN_s600|s500|door0": {"from_area_code": "s600", "to_area_code": "s500",
-                            "position": {"x": -230.23, "y": 5.0, "z": -244.97}, "angle": {"x": 0.0, "y": -0.17, "z": 0.0},
+                            "position": {"x": -230.23, "y": 5.0, "z": -244.97},
+                            "angle": {"x": 0.0, "y": -0.17, "z": 0.0},
                             "door_no": 0},
 }
 
@@ -771,7 +833,7 @@ def generate_door_randomization_for_ap(random_source, mode: int = DOOR_MODE_CHAO
 
     # Generate randomization based on mode
     if mode == DOOR_MODE_PAIRED:
-        randomizer.randomize_paired(max_attempts=500)
+        randomizer.randomize_paired_with_retry(max_attempts_per_seed=500, max_reseeds=100)
     else:
         # Default to chaos mode
         randomizer.randomize_with_validation(max_attempts=100)
