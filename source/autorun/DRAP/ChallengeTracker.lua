@@ -49,7 +49,7 @@ local CHALLENGES = {
     },
     NpcJoinCount = {
         label   = "Survivors joined (ever)",
-        targets = { 25 },
+        targets = { 50 },
         location_ids = { "Get 50 survivors to join" },
     },
     zombieKill_1Play = {
@@ -70,7 +70,7 @@ local CHALLENGES = {
     firedBulletCount = {
         label   = "Bullets fired",
         targets = { 300 },
-        location_ids = { "Fire 300 Bullets" },
+        location_ids = { "Fire 300 bullets" },
     },
     ZombieRideDist = {
         label   = "Zombie ride distance",
@@ -171,6 +171,11 @@ local CHALLENGES = {
         label   = "Longest golf shot",
         targets = { 10000 },
         location_ids = { "Hit a golf ball 100 feet" },
+    },
+    fullMarathonDist = {
+        label   = "Full marathon distance traveled",
+        targets = { 42195 },
+        location_ids = { "Walk a marathon" },
     },
 }
 

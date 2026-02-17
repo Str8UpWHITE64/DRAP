@@ -52,21 +52,6 @@ M.on_sticker_event_taked = nil
 -- Save File Management
 ------------------------------------------------------------
 
---- Set the save filename based on slot and seed
---- @param slot_name string The AP slot name
---- @param seed string The seed
-function M.set_save_filename(slot_name, seed)
-    local function safe_fn(s)
-        if not s then return "unknown" end
-        return tostring(s):gsub("[^%w%-_]", "_"):sub(1, 32)
-    end
-
-    local slot = safe_fn(slot_name)
-    local sd = safe_fn(seed)
-    CAPTURED_JSON_FILE = "./" .. CAPTURED_JSON_DIR .. "/AP_DRDR_stickers_" .. slot .. "_" .. sd .. ".json"
-    M.log("Sticker save file: " .. CAPTURED_JSON_FILE)
-end
-
 local function get_save_path()
     return CAPTURED_JSON_FILE or (CAPTURED_JSON_DIR .. "/AP_DRDR_stickers_default.json")
 end
@@ -91,19 +76,46 @@ local function save_captured()
 end
 
 local function load_captured()
+    CAPTURED = {}
     local data = Shared.load_json(get_save_path())
-    if data and data.captured then
+    if not data or type(data.captured) ~= "table" then return end
+
+    local ok, err = pcall(function()
         for photo_id_str, _ in pairs(data.captured) do
             local photo_id = tonumber(photo_id_str)
-            if photo_id then
+            if photo_id and photo_id == photo_id then  -- NaN guard
                 CAPTURED[photo_id] = true
             end
         end
+    end)
 
-        local count = 0
-        for _ in pairs(CAPTURED) do count = count + 1 end
-        M.log(string.format("Loaded %d captured stickers from save", count))
+    if not ok then
+        M.log("WARNING: Corrupt sticker save data, resetting: " .. tostring(err))
+        CAPTURED = {}
     end
+
+    local count = 0
+    for _ in pairs(CAPTURED) do count = count + 1 end
+    M.log(string.format("Loaded %d captured stickers from save", count))
+end
+
+--- Set the save filename based on slot and seed
+--- @param slot_name string The AP slot name
+--- @param seed string The seed
+function M.set_save_filename(slot_name, seed)
+    local function safe_fn(s)
+        if not s then return "unknown" end
+        return tostring(s):gsub("[^%w%-_]", "_"):sub(1, 32)
+    end
+
+    local slot = safe_fn(slot_name)
+    local sd = safe_fn(seed)
+    CAPTURED_JSON_FILE = "./" .. CAPTURED_JSON_DIR .. "/AP_DRDR_stickers_" .. slot .. "_" .. sd .. ".json"
+    M.log("Sticker save file: " .. CAPTURED_JSON_FILE)
+
+    -- Reset and reload with the correct path
+    initialized = false
+    load_captured()
 end
 
 -- Auto-save
