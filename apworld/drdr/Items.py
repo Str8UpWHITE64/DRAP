@@ -280,7 +280,7 @@ _all_items = [DRItemData(row[0], row[1], row[2]) for row in [
     ("Image in the Monitor", 3002, DRItemCategory.SCOOP),
     ("Rescue the Professor", 3003, DRItemCategory.SCOOP),
     ("Medicine Run", 3004, DRItemCategory.SCOOP),
-    ("Another Source", 3005, DRItemCategory.SCOOP),
+    ("Professor's Past", 3005, DRItemCategory.SCOOP),
     ("Girl Hunting", 3006, DRItemCategory.SCOOP),
     ("A Promise to Isabella", 3007, DRItemCategory.SCOOP),
     ("Santa Cabeza", 3008, DRItemCategory.SCOOP),

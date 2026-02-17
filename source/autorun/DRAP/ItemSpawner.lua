@@ -342,6 +342,10 @@ local function is_effect_item(item_name)
         return false
     end
 
+    if item_name == "Maintenance Tunnel Access Key" then
+        return true
+    end
+
     -- Filter out key items
     if string.find(item_name, "key", 1, true) then
         return true
