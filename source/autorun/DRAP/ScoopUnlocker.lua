@@ -57,7 +57,7 @@ local SCOOP_DATA = {
         primary_flag = 2311, secondary_flags = { 277 }, category = "Main", order = 7,
         completion_event = "Complete Medicine Run",
     },
-    ["Another Source"] = {
+    ["Professor's Past"] = {
         primary_flag = 772, category = "Main", order = 8,
         completion_event = "Complete Professor's Past",
     },
@@ -329,7 +329,7 @@ local function build_lookup_tables()
             PRIMARY_FLAG_TO_SCOOP[data.primary_flag] = scoop_name
             ALL_PRIMARY_FLAGS[data.primary_flag] = true
         end
-        if data.category ~= "Main" and data.flags then
+        if data.category ~= "Main" and data.category ~= "Special" and data.flags then
             for _, flag_id in ipairs(data.flags) do
                 if flag_id and flag_id ~= 0 then
                     ALL_SIDE_SCOOP_FLAGS[flag_id] = scoop_name
@@ -635,6 +635,16 @@ local function enforce_primary_flags()
 
     -- Always run blacklist enforcement
     enforce_blacklist()
+
+    -- DoorRandomizer: keep flag 514 always on to prevent door softlocks
+    if door_randomizer_enabled and not raw_check_flag(514) then
+        currently_unlocking = true
+        raw_set_flag_on(514)
+        currently_unlocking = false
+        if verbose_logging then
+            M.log("DoorRandomizer: re-enabled flag 514")
+        end
+    end
 
     -- Pre-activation: suppress all Survivor/Psychopath scoop flags
     if not ap_activated then
@@ -993,7 +1003,8 @@ function M.unlock_scoop(scoop_name)
     if received_scoops[scoop_name] then return true, 0 end
 
     -- Activation gate: no scoops unlock before "Meet Jessie" milestone
-    if not ap_activated and scoop.category ~= "Main" then
+    -- Special items (e.g. Maintenance Tunnel Access key) bypass this gate
+    if not ap_activated and scoop.category ~= "Main" and scoop.category ~= "Special" then
         M.log(string.format("Activation deferred: '%s' — waiting for Meet Jessie", scoop_name))
         return false, 0
     end
@@ -1043,12 +1054,6 @@ function M.unlock_scoop(scoop_name)
         end
         M.log(string.format("Unlocked %s '%s' (%d flags)",
             scoop.category, scoop_name, count))
-
-        -- DoorRandomizer: set flag 514 with maintenance key to prevent softlocks
-        if door_randomizer_enabled and scoop_name == "Maintenance Tunnel Access key" then
-            raw_set_flag_on(514)
-            M.log("DoorRandomizer: set flag 514 for maintenance tunnel softlock prevention")
-        end
     end
 
     currently_unlocking = false
@@ -1451,6 +1456,13 @@ end
 function M.set_door_randomizer_enabled(enabled)
     door_randomizer_enabled = enabled
     M.log("DoorRandomizer " .. (enabled and "ENABLED" or "DISABLED"))
+    -- Immediately set flag 514 to prevent door softlocks
+    if enabled then
+        currently_unlocking = true
+        raw_set_flag_on(514)
+        currently_unlocking = false
+        M.log("DoorRandomizer: set flag 514 for door softlock prevention")
+    end
 end
 
 function M.set_ap_activated_callback(callback)
@@ -1696,7 +1708,7 @@ function M.draw_tab_content(debug)
             elseif s.conflict_blocked and s.ap_item_received then
                 status_str = " [DEFERRED]"
                 color = 0xFFFF8800
-            elseif s.received then
+            elseif s.received and debug then
                 status_str = " [RECV]"
             end
 
