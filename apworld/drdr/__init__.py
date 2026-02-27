@@ -50,6 +50,19 @@ SCOOP_COMPLETION_MAP = {
     "The Butcher": "Complete The Butcher",
 }
 
+# Region(s) the player must physically reach to complete each scoop.
+# Scoops in the Safe Room (always reachable) are omitted.
+SCOOP_REGION_REQUIREMENTS = {
+    "Backup for Brad": ["Food Court"],
+    "Rescue the Professor": ["Entrance Plaza"],
+    "Medicine Run": ["Grocery Store"],
+    "Girl Hunting": ["North Plaza"],
+    "A Promise to Isabela": ["North Plaza"],
+    "The Last Resort": ["Maintenance Tunnel"],
+    "Hideout": ["Hideout"],
+    "The Butcher": ["Maintenance Tunnel"],
+}
+
 # List of all area key names for door randomizer
 AREA_KEY_NAMES = [
     "Rooftop key",
@@ -523,19 +536,23 @@ class DRWorld(World):
 
         set_rule(self.multiworld.get_location("Ending S: Beat up Brock with your bare fists!", self.player), lambda state: state.can_reach_location("Fight a tank and win", self.player))
 
-        # ScoopSanity: Override main scoop completion rules with randomized order + item requirements
+        # ScoopSanity: Override main scoop completion rules with randomized order + item requirements + region access
         if self.options.scoop_sanity:
             for i, scoop_name in enumerate(self.scoop_order):
                 completion = SCOOP_COMPLETION_MAP[scoop_name]
                 loc = self.multiworld.get_location(completion, self.player)
+                regions = SCOOP_REGION_REQUIREMENTS.get(scoop_name, [])
                 if i == 0:
-                    set_rule(loc, lambda state, sn=scoop_name:
+                    set_rule(loc, lambda state, sn=scoop_name, rn=regions:
                         state.has(sn, self.player) and
-                        state.can_reach_location("Meet Jessie in the Service Hallway", self.player))
+                        state.can_reach_location("Meet Jessie in the Service Hallway", self.player) and
+                        all(state.can_reach_region(r, self.player) for r in rn))
                 else:
                     prev_completion = SCOOP_COMPLETION_MAP[self.scoop_order[i - 1]]
-                    set_rule(loc, lambda state, sn=scoop_name, pc=prev_completion:
-                        state.has(sn, self.player) and state.can_reach_location(pc, self.player))
+                    set_rule(loc, lambda state, sn=scoop_name, pc=prev_completion, rn=regions:
+                        state.has(sn, self.player) and
+                        state.can_reach_location(pc, self.player) and
+                        all(state.can_reach_region(r, self.player) for r in rn))
 
             # Complete Memories chains to the last scoop in randomized order
             last_completion = SCOOP_COMPLETION_MAP[self.scoop_order[-1]]

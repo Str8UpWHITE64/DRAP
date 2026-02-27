@@ -29,15 +29,11 @@ AP.SaveSlot         = require("DRAP/SaveSlot")
 AP.TimeGate         = require("DRAP/TimeGate")
 AP.Scene            = require("DRAP/Scene")
 AP.DeathLink        = require("DRAP/DeathLink")
-
-AP.EventFlagExplorer = require("DRAP/EventFlagExplorer")
---AP.GameEventTracker  = require("DRAP/GameEventTracker")
---AP.EventFlagDumper   = require("DRAP/EventFlagDumper")
---AP.ScoopExplorer     = require("DRAP/ScoopExplorer")
---AP.NpcInvestigator   = require("DRAP/NpcInvestigator")
---AP.NpcSpawner        = require("DRAP/NpcSpawner")
 AP.ScoopUnlocker     = require("DRAP/ScoopUnlocker")
 AP.GUI               = require("DRAP/DRAP_GUI")
+
+-- Debug modules
+AP.EventFlagExplorer = require("DRAP/EventFlagExplorer")
 
 local Shared = require("DRAP/Shared")
 local log = Shared.create_logger("DRAP")
@@ -473,10 +469,8 @@ re.on_frame(function()
     safe_on_frame(AP.PPStickerTracker, "PPStickerTracker")
     safe_on_frame(AP.SaveSlot,         "SaveSlot")
 
-    --safe_on_frame(AP.GameEventTracker,  "GameEventTracker")
+    -- Debug modules
     safe_on_frame(AP.EventFlagExplorer, "EventFlagExplorer")
-    --safe_on_frame(AP.NpcInvestigator,  "NpcInvestigator")
-    safe_on_frame(AP.NpcSpawner,       "NpcSpawner")
 
     -- Enter-game edge detection
     if now_in_game and not was_in_game then
