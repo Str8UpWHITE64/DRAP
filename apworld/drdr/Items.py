@@ -282,7 +282,7 @@ _all_items = [DRItemData(row[0], row[1], row[2]) for row in [
     ("Medicine Run", 3004, DRItemCategory.SCOOP),
     ("Professor's Past", 3005, DRItemCategory.SCOOP),
     ("Girl Hunting", 3006, DRItemCategory.SCOOP),
-    ("A Promise to Isabella", 3007, DRItemCategory.SCOOP),
+    ("A Promise to Isabela", 3007, DRItemCategory.SCOOP),
     ("Santa Cabeza", 3008, DRItemCategory.SCOOP),
     ("The Last Resort", 3009, DRItemCategory.SCOOP),
     ("Hideout", 3010, DRItemCategory.SCOOP),
