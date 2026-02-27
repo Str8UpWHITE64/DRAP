@@ -24,7 +24,7 @@ MAIN_SCOOP_NAMES = [
     "Medicine Run",
     "Professor's Past",
     "Girl Hunting",
-    "A Promise to Isabella",
+    "A Promise to Isabela",
     "Santa Cabeza",
     "The Last Resort",
     "Hideout",
@@ -42,7 +42,7 @@ SCOOP_COMPLETION_MAP = {
     "Medicine Run": "Complete Medicine Run",
     "Professor's Past": "Complete Professor's Past",
     "Girl Hunting": "Complete Girl Hunting",
-    "A Promise to Isabella": "Carry Isabela back to the Safe Room",
+    "A Promise to Isabela": "Carry Isabela back to the Safe Room",
     "Santa Cabeza": "Complete Santa Cabeza",
     "The Last Resort": "Complete Bomb Collector",
     "Hideout": "Escort Isabela to the Hideout and have a chat",
@@ -386,33 +386,14 @@ class DRWorld(World):
                     set_rule(location, lambda state, r=region.name:
                              state.can_reach_region(r, self.player))
 
-        # ──────────────────────────────────────────────────────
-        # LEVEL-UP SPHERE RULES
-        #
-        # Level ups live in the "Level Ups" region (Sphere 0), but
-        # we gate higher levels behind region access so the fill
-        # algorithm spreads progression items across multiple spheres.
-        #
-        # Tiers are based on how much of the mall the player needs
-        # to realistically earn enough PP to reach that level:
-        #
-        #   Levels  2-6:  Sphere 0 (grinding rooftop/safe room area)
-        #   Levels  7-9:  Rooftop access (first key)
-        #   Levels 10-14: Paradise Plaza access
-        #   Levels 15-19: Leisure Park access (opens up the mall hub)
-        #   Levels 20-24: Food Court + branching areas
-        #   Levels 25-29: North Plaza / deeper mall
-        #   Levels 30-39: Most of the mall accessible
-        #   Levels 40-50: Late-game, endgame regions
-        #
-        # Each level still chains to the previous one so the fill
-        # algorithm knows they must be completed sequentially.
-        # ──────────────────────────────────────────────────────
+        # Level-up sphere gates: higher levels require deeper mall access
         LEVEL_SPHERE_GATES = {
             7:  "Rooftop",
             10: "Paradise Plaza",
             12: "Leisure Park",
             15: "Food Court",
+            16: "Al Fresca Plaza",
+            17: "Wonderland Plaza",
             18: "North Plaza",
             20: "Entrance Plaza",
             22: "Maintenance Tunnel",
@@ -862,9 +843,9 @@ class DRWorld(World):
         set_rule(self.multiworld.get_location("Save 10 survivors", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player) and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.has("DAY3_00_AM", self.player) and state.has("DAY3_11_AM", self.player) and state.can_reach_location("Kill Kent on day 3", self.player) and state.can_reach_location("Kill Cliff", self.player) and state.can_reach_location("Kill Jo", self.player) and state.can_reach_location("Kill Adam", self.player) and state.can_reach_location("Kill Sean", self.player) and state.can_reach_location("Kill Roger and Jack (and Thomas if you want) and chat with Wayne", self.player) and state.can_reach_location("Defeat Paul", self.player))
         set_rule(self.multiworld.get_location("Save 50 survivors", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player) and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.has("DAY3_00_AM", self.player) and state.has("DAY3_11_AM", self.player) and state.can_reach_location("Kill Kent on day 3", self.player) and state.can_reach_location("Kill Cliff", self.player) and state.can_reach_location("Kill Jo", self.player) and state.can_reach_location("Kill Adam", self.player) and state.can_reach_location("Kill Sean", self.player) and state.can_reach_location("Kill Roger and Jack (and Thomas if you want) and chat with Wayne", self.player) and state.can_reach_location("Defeat Paul", self.player))
         set_rule(self.multiworld.get_location("Kill 1000 zombies", self.player), lambda state: state.can_reach_region("Maintenance Tunnel", self.player))
-        set_rule(self.multiworld.get_location("Kill 2000 zombies", self.player), lambda state: state.can_reach_region("Maintenance Tunnel", self.player))
-        set_rule(self.multiworld.get_location("Kill 5000 zombies", self.player), lambda state: state.can_reach_region("Maintenance Tunnel", self.player))
-        set_rule(self.multiworld.get_location("Kill 10000 zombies", self.player), lambda state: state.can_reach_region("Maintenance Tunnel", self.player))
+        set_rule(self.multiworld.get_location("Kill 2000 zombies", self.player), lambda state: state.can_reach_region("Maintenance Tunnel", self.player) and state.can_reach_region("North Plaza", self.player) and state.can_reach_region("Entrance Plaza", self.player))
+        set_rule(self.multiworld.get_location("Kill 5000 zombies", self.player), lambda state: state.can_reach_region("Maintenance Tunnel", self.player) and state.can_reach_region("North Plaza", self.player) and state.can_reach_region("Entrance Plaza", self.player) and state.can_reach_region("Wonderland Plaza", self.player) and state.can_reach_region("Al Fresca Plaza", self.player))
+        set_rule(self.multiworld.get_location("Kill 10000 zombies", self.player), lambda state: state.can_reach_region("Maintenance Tunnel", self.player) and state.can_reach_region("North Plaza", self.player) and state.can_reach_region("Entrance Plaza", self.player) and state.can_reach_region("Wonderland Plaza", self.player) and state.can_reach_region("Al Fresca Plaza", self.player) and state.can_reach_location("Get bit!", self.player))
         set_rule(self.multiworld.get_location("Walk a quarter marathon", self.player), lambda state: state.can_reach_region("Leisure Park", self.player) and state.can_reach_region("Al Fresca Plaza", self.player) and state.can_reach_region("Wonderland Plaza", self.player) and state.can_reach_region("North Plaza", self.player) and state.can_reach_region("Entrance Plaza", self.player) and state.can_reach_region("Food Court", self.player) and state.can_reach_region("Paradise Plaza", self.player) and state.can_reach_region("Grocery Store", self.player) and state.can_reach_region("Crislip's Hardware Store", self.player) and state.can_reach_region("Colby's Movie Theater", self.player))
         set_rule(self.multiworld.get_location("Kill 10 Special Forces", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player) and state.has("DAY3_11_AM", self.player) and state.can_reach_location("Witness Special Forces 10pm day 3", self.player))
         set_rule(self.multiworld.get_location("Destroy all of the dishes in the Food Court", self.player), lambda state: state.can_reach_region("Food Court", self.player))

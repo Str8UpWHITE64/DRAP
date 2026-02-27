@@ -47,6 +47,12 @@ local current_tab = 0
 local scan_results = {}
 local manual_flag_input = "1"
 
+-- Mission Recording: groups flag changes by active mission for walkthrough data collection
+local recording_active = false
+local mission_records = {}          -- { [scoop_name] = { sets = {flag_id,...}, clears = {flag_id,...}, set_names = {}, clear_names = {} } }
+local current_record_mission = nil  -- set externally or auto-detected from ScoopUnlocker
+local MISSION_RECORD_FILE = "AP_DRDR_mission_flags.json"
+
 local efm_methods = {}
 local methods_discovered = false
 
@@ -522,6 +528,33 @@ function M.detect_changes()
     return changes
 end
 
+local function record_change_for_mission(change)
+    if not recording_active or not current_record_mission then return end
+
+    local mission = current_record_mission
+    if not mission_records[mission] then
+        mission_records[mission] = { sets = {}, clears = {}, set_names = {}, clear_names = {} }
+    end
+
+    local rec = mission_records[mission]
+    local name = change.name or M.get_flag_name(change.flag_id) or "Unknown"
+
+    if change.new_val then
+        -- Avoid duplicate entries for the same flag
+        for _, id in ipairs(rec.sets) do
+            if id == change.flag_id then return end
+        end
+        table.insert(rec.sets, change.flag_id)
+        rec.set_names[change.flag_id] = name
+    else
+        for _, id in ipairs(rec.clears) do
+            if id == change.flag_id then return end
+        end
+        table.insert(rec.clears, change.flag_id)
+        rec.clear_names[change.flag_id] = name
+    end
+end
+
 local function process_changes()
     local changes = M.detect_changes()
 
@@ -530,6 +563,9 @@ local function process_changes()
         local name = change.name or "Unknown"
 
         M.log(string.format("FLAG %s: %d (%s)", action, change.flag_id, name))
+
+        -- Record for mission if recording
+        record_change_for_mission(change)
 
         table.insert(recent_changes, 1, change)
         while #recent_changes > MAX_RECENT_CHANGES do
@@ -784,12 +820,141 @@ local function draw_names_tab()
     imgui.end_child_window()
 end
 
+local function draw_record_tab()
+    imgui.text("Mission Flag Recorder")
+    imgui.separator()
+    imgui.text_colored("Records which flags change during each mission.", 0xFF888888)
+    imgui.text_colored("Play through missions in order. Flags are grouped per mission.", 0xFF888888)
+
+    -- Recording toggle
+    if recording_active then
+        if imgui.button("Stop Recording") then
+            recording_active = false
+            M.log("Mission recording stopped")
+        end
+        imgui.same_line()
+        imgui.text_colored("RECORDING", 0xFFFF0000)
+    else
+        if imgui.button("Start Recording") then
+            recording_active = true
+            -- Auto-enable monitoring if not already on
+            if not monitoring_enabled then
+                M.take_snapshot()
+                monitoring_enabled = true
+            end
+            M.log("Mission recording started")
+        end
+    end
+
+    -- Current mission display + manual override
+    imgui.same_line()
+    imgui.text("  Mission:")
+    imgui.same_line()
+    if current_record_mission then
+        imgui.text_colored(current_record_mission, 0xFF00FF00)
+    else
+        imgui.text_colored("(none)", 0xFFFF8800)
+    end
+
+    -- Auto-detect from ScoopUnlocker
+    local ok_su, ScoopUnlocker = pcall(require, "DRAP/ScoopUnlocker")
+    if ok_su and ScoopUnlocker then
+        local chain_scoop = ScoopUnlocker.get_current_chain_scoop and ScoopUnlocker.get_current_chain_scoop()
+        if chain_scoop and chain_scoop ~= current_record_mission then
+            if imgui.button("Sync: " .. chain_scoop) then
+                current_record_mission = chain_scoop
+                -- Take fresh snapshot when switching missions
+                M.take_snapshot()
+                M.log("Recording mission set to: " .. chain_scoop)
+            end
+        end
+    end
+
+    -- Manual mission name input
+    imgui.text("Set mission manually:")
+    imgui.same_line()
+    imgui.push_item_width(200)
+    local name_changed, name_val = imgui.input_text("##rec_mission", current_record_mission or "")
+    if name_changed and name_val ~= "" then
+        current_record_mission = name_val
+    end
+    imgui.pop_item_width()
+    imgui.same_line()
+    if imgui.button("Snapshot##rec") then
+        M.take_snapshot()
+        M.log("Fresh snapshot taken for recording")
+    end
+
+    imgui.separator()
+
+    -- Save / Clear
+    if imgui.button("Save Report") then
+        M.save_mission_records()
+    end
+    imgui.same_line()
+    if imgui.button("Clear All Records") then
+        mission_records = {}
+        M.log("Mission records cleared")
+    end
+
+    imgui.separator()
+
+    -- Display per-mission records
+    imgui.begin_child_window("MissionRecords", Vector2f.new(0, 0), true, 0)
+
+    local mission_count = 0
+    for _ in pairs(mission_records) do mission_count = mission_count + 1 end
+
+    if mission_count == 0 then
+        imgui.text_colored("No missions recorded yet.", 0xFF888888)
+        imgui.text("1. Click 'Start Recording'")
+        imgui.text("2. Set/sync the active mission name")
+        imgui.text("3. Play through the mission")
+        imgui.text("4. Change mission name and repeat")
+    else
+        -- Sort missions for consistent display
+        local sorted_missions = {}
+        for name, _ in pairs(mission_records) do
+            table.insert(sorted_missions, name)
+        end
+        table.sort(sorted_missions)
+
+        for _, mission_name in ipairs(sorted_missions) do
+            local rec = mission_records[mission_name]
+            local is_current = (mission_name == current_record_mission)
+            local header_color = is_current and 0xFF00FFFF or 0xFFFFFF00
+
+            imgui.text_colored(string.format("=== %s ===", mission_name), header_color)
+
+            if #rec.sets > 0 then
+                imgui.text_colored(string.format("  SET (%d):", #rec.sets), 0xFF00FF00)
+                for _, flag_id in ipairs(rec.sets) do
+                    local name = rec.set_names[flag_id] or "Unknown"
+                    imgui.text(string.format("    %d (%s)", flag_id, name))
+                end
+            end
+
+            if #rec.clears > 0 then
+                imgui.text_colored(string.format("  CLEARED (%d):", #rec.clears), 0xFFFF8800)
+                for _, flag_id in ipairs(rec.clears) do
+                    local name = rec.clear_names[flag_id] or "Unknown"
+                    imgui.text(string.format("    %d (%s)", flag_id, name))
+                end
+            end
+
+            imgui.text("")  -- spacing
+        end
+    end
+
+    imgui.end_child_window()
+end
+
 local function draw_main_window()
     if not gui_visible then return end
 
-    imgui.set_next_window_size(Vector2f.new(550, 450), 4)
+    imgui.set_next_window_size(Vector2f.new(600, 500), 4)
 
-    local still_open = imgui.begin_window("Event Flag Explorer v2", true, 0)
+    local still_open = imgui.begin_window("Event Flag Explorer v3", true, 0)
     if not still_open then
         gui_visible = false
         imgui.end_window()
@@ -804,6 +969,10 @@ local function draw_main_window()
     if monitoring_enabled then
         imgui.same_line()
         imgui.text_colored(" [MONITORING]", 0xFF00FFFF)
+    end
+    if recording_active then
+        imgui.same_line()
+        imgui.text_colored(" [RECORDING]", 0xFFFF0000)
     end
 
     local name_count = 0
@@ -820,6 +989,8 @@ local function draw_main_window()
     if imgui.button("Manual") then current_tab = 2 end
     imgui.same_line()
     if imgui.button("Names") then current_tab = 3 end
+    imgui.same_line()
+    if imgui.button(recording_active and "Record*" or "Record") then current_tab = 4 end
 
     imgui.separator()
 
@@ -831,6 +1002,8 @@ local function draw_main_window()
         draw_manual_tab()
     elseif current_tab == 3 then
         draw_names_tab()
+    elseif current_tab == 4 then
+        draw_record_tab()
     end
 
     imgui.end_window()
@@ -887,6 +1060,112 @@ function M.register_known_flag(flag_id, name, category)
         category = category,
     }
     flag_names_cache[flag_id] = name
+end
+
+------------------------------------------------------------
+-- Mission Recording API
+------------------------------------------------------------
+
+function M.set_record_mission(mission_name)
+    current_record_mission = mission_name
+    -- Take a fresh snapshot so we only see NEW changes from this point
+    M.take_snapshot()
+    M.log("Recording mission set to: " .. tostring(mission_name))
+end
+
+function M.start_recording(mission_name)
+    recording_active = true
+    if mission_name then
+        current_record_mission = mission_name
+    end
+    if not monitoring_enabled then
+        M.take_snapshot()
+        monitoring_enabled = true
+    end
+    M.log("Mission recording started" .. (mission_name and (": " .. mission_name) or ""))
+end
+
+function M.stop_recording()
+    recording_active = false
+    M.log("Mission recording stopped")
+end
+
+function M.get_mission_records()
+    return mission_records
+end
+
+function M.save_mission_records()
+    -- Build a clean export format
+    local export = {
+        version = 1,
+        recorded_at = os.time(),
+        missions = {},
+    }
+
+    for mission_name, rec in pairs(mission_records) do
+        local sets = {}
+        for _, flag_id in ipairs(rec.sets) do
+            table.insert(sets, {
+                flag = flag_id,
+                name = rec.set_names[flag_id] or M.get_flag_name(flag_id) or "Unknown",
+            })
+        end
+
+        local clears = {}
+        for _, flag_id in ipairs(rec.clears) do
+            table.insert(clears, {
+                flag = flag_id,
+                name = rec.clear_names[flag_id] or M.get_flag_name(flag_id) or "Unknown",
+            })
+        end
+
+        export.missions[mission_name] = {
+            flags_set = sets,
+            flags_cleared = clears,
+        }
+    end
+
+    local ok = pcall(json.dump_file, MISSION_RECORD_FILE, export)
+    if ok then
+        local count = 0
+        for _ in pairs(mission_records) do count = count + 1 end
+        M.log(string.format("Saved mission records (%d missions) to %s", count, MISSION_RECORD_FILE))
+    else
+        M.log("ERROR: Failed to save mission records")
+    end
+end
+
+function M.load_mission_records()
+    local data = json.load_file(MISSION_RECORD_FILE)
+    if not data or not data.missions then
+        M.log("No mission records found at " .. MISSION_RECORD_FILE)
+        return false
+    end
+
+    mission_records = {}
+    for mission_name, mission_data in pairs(data.missions) do
+        local rec = { sets = {}, clears = {}, set_names = {}, clear_names = {} }
+
+        if mission_data.flags_set then
+            for _, entry in ipairs(mission_data.flags_set) do
+                table.insert(rec.sets, entry.flag)
+                rec.set_names[entry.flag] = entry.name
+            end
+        end
+        if mission_data.flags_cleared then
+            for _, entry in ipairs(mission_data.flags_cleared) do
+                table.insert(rec.clears, entry.flag)
+                rec.clear_names[entry.flag] = entry.name
+            end
+        end
+
+        mission_records[mission_name] = rec
+    end
+
+    local count = 0
+    for _ in pairs(mission_records) do count = count + 1 end
+    M.log(string.format("Loaded mission records (%d missions)", count))
+    return true
 end
 
 ------------------------------------------------------------
@@ -971,15 +1250,56 @@ _G.eflag_dump = function()
     return M.dump_all_names()
 end
 
+-- Mission recording console helpers
+_G.eflag_rec = function(mission_name)
+    M.start_recording(mission_name)
+end
+
+_G.eflag_rec_stop = function()
+    M.stop_recording()
+end
+
+_G.eflag_rec_mission = function(name)
+    M.set_record_mission(name)
+end
+
+_G.eflag_rec_save = function()
+    M.save_mission_records()
+end
+
+_G.eflag_rec_load = function()
+    M.load_mission_records()
+end
+
+_G.eflag_rec_show = function()
+    for mission_name, rec in pairs(mission_records) do
+        print(string.format("=== %s ===", mission_name))
+        if #rec.sets > 0 then
+            print(string.format("  SET (%d):", #rec.sets))
+            for _, flag_id in ipairs(rec.sets) do
+                print(string.format("    %d (%s)", flag_id, rec.set_names[flag_id] or "?"))
+            end
+        end
+        if #rec.clears > 0 then
+            print(string.format("  CLEARED (%d):", #rec.clears))
+            for _, flag_id in ipairs(rec.clears) do
+                print(string.format("    %d (%s)", flag_id, rec.clear_names[flag_id] or "?"))
+            end
+        end
+    end
+end
+
 ------------------------------------------------------------
 -- Module Load
 ------------------------------------------------------------
 
 M.load_discovered()
-M.log("EventFlagExplorer v2 loaded")
+M.log("EventFlagExplorer v3 loaded")
 M.log("Commands: eflag_check(id), eflag_on(id), eflag_off(id), eflag_scan(s,e)")
 M.log("          eflag_name(id), eflag_explore(), eflag_extract(s,e), eflag_dump()")
 M.log("          eflag_gui()")
+M.log("Recording: eflag_rec(mission), eflag_rec_stop(), eflag_rec_mission(name)")
+M.log("           eflag_rec_save(), eflag_rec_load(), eflag_rec_show()")
 
 -- Auto-explore on load
 explore_event_flag_type()

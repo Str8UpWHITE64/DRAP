@@ -351,7 +351,14 @@ def BuildItemPool(multiworld, count, options):
 
     # Specialty items that must be included in the pool for Restricted mode
     specialty_items = {
-        "Book [Japanese Conversation]"
+        "Book [Japanese Conversation]",
+        "Bowling Ball",
+        "Dishes",
+        "Fire Extinguisher",
+        "Golf Club",
+        "Handgun",
+        "Orange Juice",
+        "Parasol",
     }
 
     if options.guaranteed_items.value:
