@@ -48,7 +48,23 @@ class DoorRandomizerMode(Choice):
     display_name = "Door Randomizer Mode"
     option_chaos = 0
     option_paired = 1
+    default = 1
+
+class Goal(Choice):
+    """
+    Determines the victory condition for the game.
+
+    Ending S: Complete all overtime missions and defeat Brock on the tank.
+              This is the full game experience including overtime mode.
+
+    Ending A: Solve all of the cases and reach the helipad by 12pm on Day 4.
+              Overtime scoops are removed from the pool, making for a shorter run.
+    """
+    display_name = "Goal"
+    option_ending_s = 0
+    option_ending_a = 1
     default = 0
+
 
 class ScoopSanity(Toggle):
     """
@@ -76,11 +92,36 @@ class ScoopSanity(Toggle):
     default = True
 
 
+class ExcludeLevels(Toggle):
+    """
+    When enabled, high level-up checks are prevented from having progression items.
+    This can be used to limit grinding and allows more control over the potential length of a run.
+    """
+    display_name = "Exclude Levels"
+    default = True
+
+
+class ExcludeLevelsAbove(Range):
+    """
+    If 'Exclude Levels' is enabled, any level-ups above the chosen value will still
+    exist as checks but will be prevented from having progression items.
+    If 'Exclude Levels' is disabled, this value can be ignored.
+    """
+
+    display_name = "Exclude Levels Above"
+    range_start = 25
+    range_end = 50
+    default = 30
+
+
 @dataclass
 class DROption(PerGameCommonOptions):
+    goal: Goal
     guaranteed_items: GuaranteedItemsOption
     death_link: DeathLink
     restricted_item_mode: RestrictedItemMode
     door_randomizer: DoorRandomizer
     door_randomizer_mode: DoorRandomizerMode
     scoop_sanity: ScoopSanity
+    exclude_levels: ExcludeLevels
+    exclude_levels_above: ExcludeLevelsAbove

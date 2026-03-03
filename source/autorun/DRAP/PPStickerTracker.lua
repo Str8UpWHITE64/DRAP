@@ -53,10 +53,11 @@ M.on_sticker_event_taked = nil
 ------------------------------------------------------------
 
 local function get_save_path()
-    return CAPTURED_JSON_FILE or (CAPTURED_JSON_DIR .. "/AP_DRDR_stickers_default.json")
+    return CAPTURED_JSON_FILE  -- nil until set_save_filename() is called
 end
 
 local function save_captured()
+    if not CAPTURED_JSON_FILE then return end  -- No save until filename set
     if not save_dirty then return end
 
     local data = {
@@ -77,6 +78,7 @@ end
 
 local function load_captured()
     CAPTURED = {}
+    if not CAPTURED_JSON_FILE then return end  -- No load until filename set
     local data = Shared.load_json(get_save_path())
     if not data or type(data.captured) ~= "table" then return end
 

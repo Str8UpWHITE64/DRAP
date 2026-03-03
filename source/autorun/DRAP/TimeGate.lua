@@ -187,6 +187,21 @@ end
 local function evaluate_turbo()
     if not turbo_active or not turbo_target_mdate then return end
 
+    -- Keep turbo value set (just a property, doesn't reset the speed mode).
+    -- Do NOT call switchTimeSpeedMode every frame — that resets the game's
+    -- internal speed accumulator and prevents time from advancing properly.
+    -- start_turbo() already set speed mode to 2; the game maintains it.
+    local gts = gts_mgr:get()
+    if gts then
+        gts.SpeedUpTurboValue = TURBO_SPEED_VALUE
+    end
+    -- Ensure mTimeAdd isn't zeroed (cutscenes can freeze time)
+    local gm = gm_mgr:get()
+    if gm and gm.mTimeAdd == 0 then
+        gm.mTimeAdd = saved_time_add or 30
+    end
+
+    -- Check mDate for completion
     local md = read_scq_mdate()
     if not md then return end
     md = tonumber(md) or 0
@@ -202,19 +217,6 @@ local function evaluate_turbo()
         -- Notify caller
         if cb then pcall(cb) end
         return  -- Do NOT re-engage after stopping
-    end
-
-    -- Force turbo every frame — cutscenes and game events can reset it
-    -- Only if we haven't reached target yet
-    local gts = gts_mgr:get()
-    if gts then
-        gts.SpeedUpTurboValue = TURBO_SPEED_VALUE
-        gts:call("switchTimeSpeedMode(app.solid.gamemastering.GameTimeSpeedManager.Mode)", 2)
-    end
-    -- Also ensure mTimeAdd isn't zeroed (cutscenes can freeze time)
-    local gm = gm_mgr:get()
-    if gm and gm.mTimeAdd == 0 then
-        gm.mTimeAdd = saved_time_add or 30
     end
 end
 
@@ -266,7 +268,10 @@ local function speed_up_unlock_hook()
     sdk.hook(
         m,
         function(args)
-            return sdk.PreHookResult.SKIP_ORIGINAL, true
+            return sdk.PreHookResult.SKIP_ORIGINAL
+        end,
+        function(retval)
+            return sdk.to_ptr(1)
         end
     )
 

@@ -216,6 +216,14 @@ end
 function M.check(loc_name)
     M.log("Sending location check: " .. tostring(loc_name))
 
+    -- Record every check for resend-on-reconnect, even if the send fails
+    if loc_name and COMPLETED_CHECKS_FILE then
+        if not COMPLETED_CHECKS[loc_name] then
+            COMPLETED_CHECKS[loc_name] = true
+            save_completed_checks()
+        end
+    end
+
     if not AP_REF.APClient then
         M.log("APClient is nil")
         return false
@@ -238,6 +246,76 @@ function M.check(loc_name)
     M.log("LocationChecks ok=" .. tostring(ok))
     return ok
 end
+
+------------------------------------------------------------
+-- Filename Sanitizer
+------------------------------------------------------------
+
+local function safe_filename(s)
+    s = tostring(s or "unknown")
+    s = s:gsub("[^%w%-%._]", "_")
+    return s
+end
+
+------------------------------------------------------------
+-- Completed Checks Persistence (resend on reconnect)
+------------------------------------------------------------
+
+local COMPLETED_CHECKS = {}
+local COMPLETED_CHECKS_FILE = nil
+
+function M.set_completed_checks_filename(slot_name, seed)
+    local slot = safe_filename(slot_name)
+    local sd = safe_filename(seed)
+    COMPLETED_CHECKS_FILE = "./AP_DRDR_Items/AP_DRDR_checks_" .. slot .. "_" .. sd .. ".json"
+end
+
+local function save_completed_checks()
+    if not COMPLETED_CHECKS_FILE then return end
+    local list = {}
+    for name, _ in pairs(COMPLETED_CHECKS) do
+        table.insert(list, name)
+    end
+    table.sort(list)
+    Shared.save_json(COMPLETED_CHECKS_FILE, { checks = list }, 4, M.log)
+end
+
+function M.load_completed_checks()
+    if not COMPLETED_CHECKS_FILE then return end
+    local data = Shared.load_json(COMPLETED_CHECKS_FILE, M.log)
+    if not data or not data.checks then
+        M.log("No existing completed-checks file; starting fresh")
+        COMPLETED_CHECKS = {}
+        return
+    end
+    COMPLETED_CHECKS = {}
+    for _, name in ipairs(data.checks) do
+        COMPLETED_CHECKS[name] = true
+    end
+    M.log(string.format("Loaded %d completed checks from file", #data.checks))
+end
+
+function M.resend_all_checks()
+    local count = 0
+    for loc_name, _ in pairs(COMPLETED_CHECKS) do
+        local loc_id = resolve_location_id(loc_name)
+        if loc_id then
+            loc_id = tonumber(loc_id) or loc_id
+            pcall(AP_REF.APClient.LocationChecks, AP_REF.APClient, { loc_id })
+            count = count + 1
+        end
+    end
+    M.log(string.format("Resent %d completed checks to server", count))
+end
+
+function M.reset_completed_checks()
+    COMPLETED_CHECKS = {}
+    save_completed_checks()
+    M.log("Completed checks reset")
+end
+
+re.on_config_save(save_completed_checks)
+re.on_script_reset(save_completed_checks)
 
 ------------------------------------------------------------
 -- Game Item Number Mapping
@@ -268,12 +346,6 @@ local RECEIVED_ITEMS = {}
 local RECEIVED_ITEMS_BY_NAME = {}
 local last_item_index = -1
 local RECEIVED_ITEMS_FILE = nil
-
-local function safe_filename(s)
-    s = tostring(s or "unknown")
-    s = s:gsub("[^%w%-%._]", "_")
-    return s
-end
 
 function M.set_received_items_filename(slot_name, seed)
     local slot = safe_filename(slot_name)

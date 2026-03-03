@@ -5,6 +5,7 @@ local Shared = require("DRAP/Shared")
 local M = Shared.create_module("ScoopUnlocker")
 
 local efm_mgr = M:add_singleton("efm", "app.solid.gamemastering.EventFlagsManager")
+local am_mgr  = M:add_singleton("am",  "app.solid.gamemastering.AreaManager")
 
 local FLAG_BLACKLIST = {
     [300] = "Kills all NPCs when enabled"
@@ -19,6 +20,10 @@ local TIME_SKIP_TRIGGERS = {
     [1311] = { target_mdate = 41200, name = "Zombie Jessie to Get Bit!" },
 }
 
+local HIDEOUT_AREA_INDEX = 1025
+local NORTH_PLAZA_AREA_INDEX = 1024
+local PARADISE_PLAZA_AREA_INDEX = 512
+
 local time_skips_fired = {}
 local active_time_skip = nil
 
@@ -26,10 +31,6 @@ local SCOOP_DATA = {
     -- Main Scoops
     ["Backup for Brad"] = {
         primary_flag = 268, category = "Main", order = 2,
-        completion_event = "Complete Backup for Brad",
-    },
-    ["An Odd Old Man"] = {
-        primary_flag = 271, secondary_flags = { 270 }, category = "Main", order = 3,
         completion_event = "Escort Brad to see Dr Barnaby",
     },
     ["A Temporary Agreement"] = {
@@ -41,7 +42,7 @@ local SCOOP_DATA = {
         completion_event = "Complete Image in the Monitor",
     },
     ["Rescue the Professor"] = {
-        primary_flag = 275, secondary_flags = { 515, 536, 2310 }, category = "Main", order = 6,
+        primary_flag = 275, secondary_flags = { 536, 2310 }, category = "Main", order = 6,
         completion_event = "Complete Rescue the Professor",
     },
     ["Medicine Run"] = {
@@ -209,14 +210,14 @@ local SCOOP_DATA = {
     -- Psychopath Scoops
     ["Cut from the Same Cloth"] = {
         flags = { 779 },
-        disable_flags = { 346, 386, 387, 843, 1224, 1225, 1277 },
         npcs = { "Kent Day 1" },
         category = "Psychopath",
         completion_event = "Complete Kent's day 1 photoshoot",
     },
 
     ["Photo Challenge"] = {
-        flags = { 779, 1225 },
+        flags = { 779, 780, 1225 },
+        disable_flags = { 342, 344, 385, 843, 1224, 1277 },
         npcs = { "Kent Day 2" },
         category = "Psychopath",
         completion_event = "Complete Kent's day 2 photoshoot",
@@ -224,6 +225,7 @@ local SCOOP_DATA = {
 
     ["Photographer's Pride"] = {
         flags = {781, 2710},
+        disable_flags = { 352, 386, 387, 389, 844, 2183, 2444, 2509 },
         npcs = { "Kent Day 3", "Tad Hawthorne" },
         category = "Psychopath",
         completion_event = "Kill Kent on day 3",
@@ -286,7 +288,7 @@ local SCOOP_DATA = {
     },
 
     ["The Cult"] = {
-        flags = { 787, 811, 2699 },
+        flags = { 787, 811, 2699 }, --326, 1222
         npcs = { "Raincoats", "Jennifer Gorman" },
         category = "Psychopath",
         completion_event = "Witness Sean in Paradise Plaza",
@@ -305,11 +307,6 @@ local SCOOP_DESCRIPTIONS = {
         location = "Food Court",
         trigger = "Enter the Food Court",
         description = "Help Brad fight Carlito.",
-    },
-    ["An Odd Old Man"] = {
-        location = "Entrance Plaza",
-        trigger = "Walk to the book store in Entrance Plaza",
-        description = "Escort Brad to see Dr. Barnaby.",
     },
     ["A Temporary Agreement"] = {
         location = "Safe Room",
@@ -446,10 +443,29 @@ end
 
 build_conflict_lookups()
 
+-- Side scoops that must be suppressed while a specific main scoop is active (crash prevention)
+local MAIN_BLOCKS_SIDE = {
+    ["Rescue the Professor"] = { "Mark of the Sniper" },
+    ["Backup for Brad"] = { "Mark of the Sniper" },
+}
+
+local SIDE_BLOCKED_BY_MAIN = {}
+for main_name, side_list in pairs(MAIN_BLOCKS_SIDE) do
+    for _, side_name in ipairs(side_list) do
+        SIDE_BLOCKED_BY_MAIN[side_name] = main_name
+    end
+end
+
+-- Prerequisite scoops that must be completed before a scoop can be unlocked (ordering enforcement)
+local SCOOP_PREREQUISITES = {
+    ["Photo Challenge"]      = { "Cut from the Same Cloth" },                          -- Kent Day 2 needs Day 1 done
+    ["Photographer's Pride"] = { "Cut from the Same Cloth", "Photo Challenge" },       -- Kent Day 3 needs Day 1+2 done
+}
+
 local COMPLETION_FLAGS = {
     [769] = { event = "Meet Jessie in the Service Hallway", scoop = "Meet Jessie in the Service Hallway" },
-    [270] = { event = "Complete Backup for Brad", scoop = "Backup for Brad" },
-    [272] = { event = "Escort Brad to see Dr Barnaby", scoop = "An Odd Old Man" },
+    [270] = { event = "Complete Backup for Brad" },
+    [272] = { event = "Escort Brad to see Dr Barnaby", scoop = "Backup for Brad" },
     [273] = { event = "Complete Temporary Agreement", scoop = "A Temporary Agreement" },
     [275] = { event = "Complete Image in the Monitor", scoop = "Image in the Monitor" },
     [277] = { event = "Complete Rescue the Professor", scoop = "Rescue the Professor" },
@@ -464,6 +480,13 @@ local COMPLETION_FLAGS = {
     [304] = { event = "Complete The Butcher", scoop = "The Butcher" },
 
     [1292] = { event = "Kill Kent on Day 3", scoop = "Photographer's Pride" },
+
+    -- Event-only checks (no scoop completion)
+    [316]  = { event = "Frank sees a sick-ass RC Drone" },
+    [129]  = { event = "See the crashed helicopter" },
+    [131]  = { event = "Reach the end of the tunnel with Isabela" },
+    [1352] = { event = "Find Greg's secret passage" },
+    [312]  = { event = "Ending A: Solve all of the cases and be on the helipad at 12pm"},
 }
 
 -- Mission byproduct flags cleared each cycle (only when owning mission is inactive).
@@ -474,11 +497,13 @@ local CASCADE_FLAGS = {
     [1282] = "Backup for Brad",
     [418]  = "Backup for Brad",
 
-    -- An Odd Old Man
-    [1204] = "An Odd Old Man",
+    -- An Odd Old Man (merged into Backup for Brad)
+    [270]  = "Backup for Brad",
+    [271]  = "Backup for Brad",
+    [1204] = "Backup for Brad",
 
     -- Rescue the Professor
-    [276]  = "Rescue the Professor",
+    --[276]  = "Rescue the Professor",
     [415]  = "Rescue the Professor",
     [1283] = "Rescue the Professor",
     [137]  = "Rescue the Professor",
@@ -512,7 +537,7 @@ local CASCADE_FLAGS = {
 
     -- Hideout
     [392]  = "Hideout",
-    [355]  = "Hideout",
+    --[355]  = "Hideout",
 
     -- The Butcher
     [304]  = "The Butcher",
@@ -543,6 +568,8 @@ local door_randomizer_enabled = false
 local on_ap_activated_callback = nil
 local on_time_freeze_callback = nil
 local on_time_unfreeze_callback = nil
+local hideout_355_handled = false   -- one-shot: true after we disable 355 when Hideout is active
+local endgame_reached = false       -- true after Get bit! or Ending A (persisted)
 local save_filename = nil
 
 local MILESTONE_EVENTS = {
@@ -601,6 +628,7 @@ local function save_state()
         version = 2,
         ap_activated = ap_activated,
         time_frozen = time_frozen,
+        endgame_reached = endgame_reached,
         scoop_order = scoop_order,
         completed_scoops = completed_list,
         ap_received = ap_received_list,
@@ -633,6 +661,10 @@ local function load_state()
     if data.time_frozen then
         time_frozen = true
         M.log("Restored: Time frozen")
+    end
+    if data.endgame_reached then
+        endgame_reached = true
+        M.log("Restored: Endgame reached (flags 2052, 514 enforced)")
     end
 
     if data.scoop_order and #data.scoop_order > 0 and not scoop_order_set then
@@ -667,6 +699,31 @@ local function is_conflict_blocked(scoop_name)
         end
     end
     return false
+end
+
+local function is_blocked_by_active_main(scoop_name)
+    local blocking_main = SIDE_BLOCKED_BY_MAIN[scoop_name]
+    if not blocking_main then return false end
+    return received_scoops[blocking_main] == true and not completed_scoops[blocking_main]
+end
+
+local function has_prerequisites_met(scoop_name)
+    local prereqs = SCOOP_PREREQUISITES[scoop_name]
+    if not prereqs then return true end
+    for _, req_name in ipairs(prereqs) do
+        if not completed_scoops[req_name] then
+            return false
+        end
+    end
+    return true
+end
+
+local function get_current_area_index()
+    local am = am_mgr:get()
+    if not am then return nil end
+    local f = am_mgr:get_field("mAreaIndex", false)
+    if not f then return nil end
+    return Shared.to_int(Shared.safe_get_field(am, f))
 end
 
 local function try_advance_conflict_group(completed_name)
@@ -740,12 +797,117 @@ end
 
 local function enforce_flags()
     if not enforcement_enabled then return end
+    if not scoop_sanity_enabled then return end
 
     local now = os.clock()
     if now - last_enforcement_time < ENFORCEMENT_COOLDOWN then return end
     last_enforcement_time = now
 
     enforce_blacklist()
+
+    -- Ensure post-Jessie flags stay enabled (265, 267 = progression, 315 = queen spawning)
+    if ap_activated then
+        local post_jessie_flags = { 265, 267, 315, 513, 515 }
+        for _, fid in ipairs(post_jessie_flags) do
+            if not raw_check_flag(fid) then
+                raw_set_flag_on(fid)
+                if verbose_logging then
+                    M.log(string.format("Enforced post-Jessie flag %d", fid))
+                end
+            end
+        end
+    end
+
+    -- Flag 355 controls Hideout mission. One-shot disable when Hideout becomes active,
+    -- then leave it alone for the game to manage.
+    if ap_activated then
+        if completed_scoops["Hideout"] then
+            hideout_355_handled = true
+        end
+
+        if not hideout_355_handled and M.get_current_chain_scoop() == "Hideout" then
+            hideout_355_handled = true
+            if raw_check_flag(355) then
+                raw_set_flag_off(355)
+                M.log("Hideout: disabled flag 355 (Hideout active — one-shot)")
+            end
+        end
+    end
+
+    -- Enable Entrance Plaza door (flag 276) only while in Paradise Plaza.
+    -- 276 is tied to Rescue the Professor ending, so we suppress it elsewhere.
+    -- Exception: when Rescue the Professor is active, let the game manage 276.
+    if ap_activated then
+        local professor_active = (M.get_current_chain_scoop() == "Rescue the Professor")
+        if not professor_active then
+            if get_current_area_index() == PARADISE_PLAZA_AREA_INDEX then
+                if not raw_check_flag(276) then
+                    currently_unlocking = true
+                    raw_set_flag_on(276)
+                    currently_unlocking = false
+                    if verbose_logging then
+                        M.log("Entrance Plaza door: enabled flag 276 (player in Paradise Plaza)")
+                    end
+                end
+            else
+                if raw_check_flag(276) then
+                    raw_set_flag_off(276)
+                    if verbose_logging then
+                        M.log("Entrance Plaza door: disabled flag 276 (player left Paradise Plaza)")
+                    end
+                end
+            end
+        end
+    end
+
+    -- After "A Strange Group" is completed, keep the Raincoat cult spawning.
+    -- Suppress completion/death flags but enforce the three cult-spawn flags.
+    -- Flags auto-re-enabled by 326 (1222, 327, 1157, 3722, 1217, 1219, 1221, 1223, 3600)
+    -- are left alone — the game handles those.
+    if completed_scoops["A Strange Group"] then
+        -- Flags to keep ON for cult spawning
+        local cult_on = { 326, 811, 1166, 2063 }
+        for _, fid in ipairs(cult_on) do
+            if not raw_check_flag(fid) then
+                currently_unlocking = true
+                raw_set_flag_on(fid)
+                currently_unlocking = false
+                if verbose_logging then
+                    M.log(string.format("Cult respawn: enabled flag %d", fid))
+                end
+            end
+        end
+        -- Completion/death flags to keep OFF so cult keeps spawning
+        local cult_off = {
+            783,                                      -- scoop start flags
+            4131, 738, 847, 875, 1173, 1294,          -- fight/kill flags
+            2447, 2475, 335, 403, 3329, 1182,         -- post-kill flags
+            462,                                      -- cult fight flag
+        }
+        for _, fid in ipairs(cult_off) do
+            if raw_check_flag(fid) then
+                raw_set_flag_off(fid)
+                if verbose_logging then
+                    M.log(string.format("Cult respawn: suppressed flag %d", fid))
+                end
+            end
+        end
+    end
+
+    -- Endgame flags: enforce after Get bit! or Ending A (survives reload)
+    if endgame_reached then
+        local endgame_flags = { 2052, 514 }
+        for _, fid in ipairs(endgame_flags) do
+            if not raw_check_flag(fid) then
+                currently_unlocking = true
+                raw_set_flag_on(fid)
+                currently_unlocking = false
+                if verbose_logging then
+                    M.log(string.format("Endgame: enforced flag %d", fid))
+                end
+            end
+        end
+    end
 
     if door_randomizer_enabled and not raw_check_flag(514) then
         currently_unlocking = true
@@ -826,25 +988,27 @@ local function enforce_flags()
 
     -- Cascade: clear byproduct flags for inactive missions
     local cascade_count = 0
+    local cascade_details = {}
     for flag_id, owner_scoop in pairs(CASCADE_FLAGS) do
         local mission_active = received_scoops[owner_scoop] and not completed_scoops[owner_scoop]
         if not mission_active and not is_in_completion_grace(owner_scoop) and raw_check_flag(flag_id) then
             raw_set_flag_off(flag_id)
             cascade_count = cascade_count + 1
+            table.insert(cascade_details, string.format("%d(%s)", flag_id, owner_scoop))
             if verbose_logging then
                 M.log(string.format("Cascade: cleared flag %d (%s)", flag_id, owner_scoop))
             end
         end
     end
     if cascade_count > 0 and not verbose_logging then
-        M.log(string.format("Cascade: cleared %d flags", cascade_count))
+        M.log(string.format("Cascade: cleared %d flags: %s", cascade_count, table.concat(cascade_details, ", ")))
     end
 
-    -- disable_flags for active Main scoops
+    -- disable_flags for all active scoops (Main, Psychopath, etc.)
     for scoop_name, _ in pairs(received_scoops) do
         if not completed_scoops[scoop_name] then
             local data = SCOOP_DATA[scoop_name]
-            if data and data.category == "Main" and data.disable_flags then
+            if data and data.disable_flags then
                 for _, flag_id in ipairs(data.disable_flags) do
                     if raw_check_flag(flag_id) then
                         raw_set_flag_off(flag_id)
@@ -870,12 +1034,30 @@ local function enforce_flags()
         end
     end
 
+    -- Suppress side scoops blocked by an active main scoop (crash prevention)
+    for side_name, main_name in pairs(SIDE_BLOCKED_BY_MAIN) do
+        if received_scoops[main_name] and not completed_scoops[main_name] then
+            local data = SCOOP_DATA[side_name]
+            if data and data.flags then
+                for _, flag_id in ipairs(data.flags) do
+                    if flag_id and flag_id ~= 0 and raw_check_flag(flag_id) then
+                        raw_set_flag_off(flag_id)
+                        if verbose_logging then
+                            M.log(string.format("Main-blocked: suppressed flag %d ('%s' blocked by active '%s')",
+                                flag_id, side_name, main_name))
+                        end
+                    end
+                end
+            end
+        end
+    end
+
     -- Re-enable flags for active side scoops
     for scoop_name, _ in pairs(received_scoops) do
         if not completed_scoops[scoop_name] then
             local data = SCOOP_DATA[scoop_name]
             if data and data.category ~= "Main" and data.flags then
-                local blocked = is_conflict_blocked(scoop_name)
+                local blocked = is_conflict_blocked(scoop_name) or is_blocked_by_active_main(scoop_name) or not has_prerequisites_met(scoop_name)
                 if not blocked then
                     for _, flag_id in ipairs(data.flags) do
                         if flag_id and flag_id ~= 0 then
@@ -930,58 +1112,63 @@ local function install_hooks()
                 local completion = COMPLETION_FLAGS[flag_id]
                 if completion and not completed_scoops[completion.scoop] then
                     M.log(string.format("COMPLETION: Flag %d → '%s'", flag_id, completion.event))
-                    M.complete_scoop(completion.scoop)
+                    if completion.scoop then
+                        M.complete_scoop(completion.scoop)
+                    end
 
                     if on_completion_detected_callback then
                         pcall(on_completion_detected_callback, completion.event, flag_id, completion.scoop)
                     end
                 end
 
-                local trigger = FLAG_TRIGGERS[flag_id]
-                if trigger then
-                    if trigger.enable then
-                        for _, target in ipairs(trigger.enable) do
-                            raw_set_flag_on(target)
-                            M.log(string.format("Trigger: flag %d → enabled %d", flag_id, target))
+                -- ScoopSanity-only: flag triggers, time skips, and controlled flag suppression
+                if scoop_sanity_enabled then
+                    local trigger = FLAG_TRIGGERS[flag_id]
+                    if trigger then
+                        if trigger.enable then
+                            for _, target in ipairs(trigger.enable) do
+                                raw_set_flag_on(target)
+                                M.log(string.format("Trigger: flag %d → enabled %d", flag_id, target))
+                            end
+                        end
+                        if trigger.disable then
+                            for _, target in ipairs(trigger.disable) do
+                                raw_set_flag_off(target)
+                                M.log(string.format("Trigger: flag %d → disabled %d", flag_id, target))
+                            end
                         end
                     end
-                    if trigger.disable then
-                        for _, target in ipairs(trigger.disable) do
-                            raw_set_flag_off(target)
-                            M.log(string.format("Trigger: flag %d → disabled %d", flag_id, target))
-                        end
+
+                    local skip = TIME_SKIP_TRIGGERS[flag_id]
+                    if skip and not time_skips_fired[flag_id] and not active_time_skip then
+                        time_skips_fired[flag_id] = true
+                        active_time_skip = {
+                            flag = flag_id,
+                            target_mdate = skip.target_mdate,
+                            name = skip.name,
+                        }
+                        M.log(string.format("Time skip activated: flag %d → advance to %d (%s)",
+                            flag_id, skip.target_mdate, skip.name))
                     end
-                end
 
-                local skip = TIME_SKIP_TRIGGERS[flag_id]
-                if skip and not time_skips_fired[flag_id] and not active_time_skip then
-                    time_skips_fired[flag_id] = true
-                    active_time_skip = {
-                        flag = flag_id,
-                        target_mdate = skip.target_mdate,
-                        name = skip.name,
-                    }
-                    M.log(string.format("Time skip activated: flag %d → advance to %d (%s)",
-                        flag_id, skip.target_mdate, skip.name))
-                end
-
-                if CONTROLLED_FLAGS[flag_id] then
-                    local scoop_name = CONTROLLED_FLAGS[flag_id]
-                    if is_protected_primary(flag_id, scoop_name) then
-                        if verbose_logging then
-                            M.log(string.format("Hook: allowing protected primary %d (%s)",
-                                flag_id, scoop_name))
-                        end
-                    elseif is_in_completion_grace(scoop_name) then
-                        if verbose_logging then
-                            M.log(string.format("Hook: grace period for flag %d (%s)",
-                                flag_id, scoop_name))
-                        end
-                    else
-                        pending_suppress[flag_id] = true
-                        if verbose_logging then
-                            M.log(string.format("Hook: flagging controlled flag %d (%s) for suppression",
-                                flag_id, scoop_name))
+                    if CONTROLLED_FLAGS[flag_id] then
+                        local scoop_name = CONTROLLED_FLAGS[flag_id]
+                        if is_protected_primary(flag_id, scoop_name) then
+                            if verbose_logging then
+                                M.log(string.format("Hook: allowing protected primary %d (%s)",
+                                    flag_id, scoop_name))
+                            end
+                        elseif is_in_completion_grace(scoop_name) then
+                            if verbose_logging then
+                                M.log(string.format("Hook: grace period for flag %d (%s)",
+                                    flag_id, scoop_name))
+                            end
+                        else
+                            pending_suppress[flag_id] = true
+                            if verbose_logging then
+                                M.log(string.format("Hook: flagging controlled flag %d (%s) for suppression",
+                                    flag_id, scoop_name))
+                            end
                         end
                     end
                 end
@@ -1056,6 +1243,14 @@ local function activate_ap(reason)
     if ap_activated then return false end
     ap_activated = true
     M.log(reason or "AP enforcement activated")
+    -- Enable flags needed after Meet Jessie
+    local post_jessie_flags = { 265, 267, 315 }
+    for _, fid in ipairs(post_jessie_flags) do
+        if not raw_check_flag(fid) then
+            raw_set_flag_on(fid)
+            M.log(string.format("Post-Jessie: enabled flag %d", fid))
+        end
+    end
     try_advance_chain()
     flush_pending_side_scoops()
     if on_ap_activated_callback then pcall(on_ap_activated_callback) end
@@ -1067,12 +1262,12 @@ local function process_milestone(event_desc)
     local milestone = MILESTONE_EVENTS[event_desc]
     if not milestone then return false end
 
-    if milestone == "activate" then
+    if milestone == "activate" and scoop_sanity_enabled then
         return activate_ap("MILESTONE: AP enforcement activated (Meet Jessie)")
 
-    elseif milestone == "time_freeze" and not time_frozen then
+    elseif milestone == "time_freeze" and scoop_sanity_enabled and not time_frozen then
         time_frozen = true
-        M.log("MILESTONE: Time freeze triggered (Get to the Stairs!)")
+        M.log("MILESTONE: Time freeze triggered (ScoopSanity)")
 
         if on_time_freeze_callback then
             pcall(on_time_freeze_callback)
@@ -1093,7 +1288,7 @@ function M.unlock_scoop(scoop_name)
 
     if received_scoops[scoop_name] then return true, 0 end
 
-    if not ap_activated and scoop.category ~= "Main" and scoop.category ~= "Special" then
+    if not ap_activated then
         M.log(string.format("Activation deferred: '%s' — waiting for Meet Jessie", scoop_name))
         return false, 0
     end
@@ -1103,6 +1298,10 @@ function M.unlock_scoop(scoop_name)
         if blocked then
             M.log(string.format("Conflict deferred: '%s' blocked by active '%s'",
                 scoop_name, tostring(blocker)))
+            return false, 0
+        end
+        if not has_prerequisites_met(scoop_name) then
+            M.log(string.format("Prerequisite deferred: '%s' — missing required completions", scoop_name))
             return false, 0
         end
     end
@@ -1121,14 +1320,6 @@ function M.unlock_scoop(scoop_name)
                 if raw_set_flag_on(flag_id) then count = count + 1 end
             end
         end
-        if scoop.disable_flags then
-            for _, flag_id in ipairs(scoop.disable_flags) do
-                if raw_check_flag(flag_id) then
-                    raw_set_flag_off(flag_id)
-                    M.log(string.format("Disabled conflicting flag %d for '%s'", flag_id, scoop_name))
-                end
-            end
-        end
         M.log(string.format("Unlocked MAIN '%s' (%d flags, primary=%d)",
             scoop_name, count, scoop.primary_flag or 0))
     else
@@ -1141,6 +1332,16 @@ function M.unlock_scoop(scoop_name)
         end
         M.log(string.format("Unlocked %s '%s' (%d flags)",
             scoop.category, scoop_name, count))
+    end
+
+    -- disable_flags apply to all scoop categories (Main, Psychopath, etc.)
+    if scoop.disable_flags then
+        for _, flag_id in ipairs(scoop.disable_flags) do
+            if raw_check_flag(flag_id) then
+                raw_set_flag_off(flag_id)
+                M.log(string.format("Disabled conflicting flag %d for '%s'", flag_id, scoop_name))
+            end
+        end
     end
 
     currently_unlocking = false
@@ -1164,8 +1365,20 @@ function M.complete_scoop(scoop_name)
     return true
 end
 
+local ENDGAME_EVENTS = {
+    ["Get bit!"] = true,
+    ["Ending A: Solve all of the cases and be on the helipad at 12pm"] = true,
+}
+
 function M.on_event_tracked(event_desc)
     process_milestone(event_desc)
+
+    if ENDGAME_EVENTS[event_desc] and not endgame_reached then
+        endgame_reached = true
+        M.log(string.format("Endgame reached: '%s' — enforcing flags 2052, 514", event_desc))
+        save_state()
+    end
+
     local scoop_name = COMPLETION_EVENT_TO_SCOOP[event_desc]
     if scoop_name then
         M.complete_scoop(scoop_name)
@@ -1324,6 +1537,8 @@ function M.reset_all()
     scoop_order_set = false
     time_skips_fired = {}
     active_time_skip = nil
+    hideout_355_handled = false
+    endgame_reached = false
     M.log("Reset all scoop tracking")
     save_state()
 end
@@ -1372,6 +1587,8 @@ function M.reset_for_new_game()
     ap_activated = false
     time_skips_fired = {}
     active_time_skip = nil
+    hideout_355_handled = false
+    endgame_reached = false
 
     M.log(string.format("Reset %d side scoops, preserved %d main completions",
         side_reset, main_preserved))
@@ -1577,7 +1794,7 @@ function M.force_activate()
 end
 
 function M.set_save_filename(slot, seed)
-    save_filename = string.format("DRAP_scoops_%s_%s.json",
+    save_filename = string.format("./AP_DRDR_Scoops/DRAP_scoops_%s_%s.json",
         tostring(slot or "unknown"), tostring(seed or "unknown"))
     M.log("Save filename: " .. save_filename)
 end
@@ -1677,16 +1894,17 @@ function M.draw_tab_content(debug)
             imgui.text("Main Story:")
             for i, name in ipairs(scoop_order) do
                 local color
+                local has_item = ap_received[name] or received_scoops[name]
                 if completed_scoops[name] then
-                    color = 0xFF888888
-                elseif name == current_chain_name and received_scoops[name] then
-                    color = 0xFF00FF00
+                    color = 0xFF888888          -- gray: completed
+                elseif name == current_chain_name and has_item then
+                    color = 0xFF00FF00          -- green: current + received
                 elseif name == current_chain_name then
-                    color = 0xFF4444FF
-                elseif received_scoops[name] then
-                    color = 0xFF00FFFF
+                    color = 0xFF44DDFF          -- orange: current + not received
+                elseif has_item then
+                    color = 0xFFFF8800          -- blue: received + not current
                 else
-                    color = 0xFF4444FF
+                    color = 0xFF0000FF          -- red: not received + not current
                 end
                 imgui.text_colored(string.format("  %d. %s", i, name), color)
             end
@@ -1796,12 +2014,18 @@ function M.draw_tab_content(debug)
             local status_str = ""
             if s.completed then
                 color = 0xFF888888
+            elseif is_current_chain and s.received then
+                status_str = " [CURRENT]"
+                color = 0xFF00FF00          -- green: current + received
             elseif is_current_chain then
                 status_str = " [CURRENT]"
-                color = 0xFF00FFFF
+                color = 0xFF00AAFF          -- orange: current + not received
             elseif s.conflict_blocked and s.ap_item_received then
                 status_str = " [DEFERRED]"
-                color = 0xFFFF8800
+                color = 0xFF00AAFF
+            elseif s.received and s.category == "Main" then
+                status_str = " [RECV]"
+                color = 0xFFFF8800          -- blue: received + not current (main)
             elseif s.received and debug then
                 status_str = " [RECV]"
             end
@@ -1822,7 +2046,10 @@ function M.draw_tab_content(debug)
                     end
                 end
 
-                if imgui.button("Unlock##" .. s.name) then M.unlock_scoop(s.name) end
+                if imgui.button("Unlock##" .. s.name) then
+                    ap_received[s.name] = true
+                    M.unlock_scoop(s.name)
+                end
                 imgui.same_line()
 
                 if s.completion_event then
@@ -1880,22 +2107,6 @@ function M.on_frame()
         end
     end
 
-    if scoop_sanity_enabled then
-        local efm = efm_mgr:get()
-        if efm then
-            local past_stairs = raw_check_flag(NEW_GAME_FLAGS[1]) and raw_check_flag(NEW_GAME_FLAGS[2])
-            if past_stairs and not time_frozen then
-                time_frozen = true
-                M.log("ScoopSanity: past stairs — activating time freeze")
-                if on_time_freeze_callback then pcall(on_time_freeze_callback) end
-            elseif not past_stairs and time_frozen then
-                time_frozen = false
-                M.log("ScoopSanity: pre-stairs — clearing time freeze")
-                if on_time_unfreeze_callback then pcall(on_time_unfreeze_callback) end
-            end
-        end
-    end
-
     -- Detect save reload (flag 769 off = pre-Jessie)
     if ap_activated then
         local jessie_on = raw_check_flag(JESSIE_FLAG)
@@ -1925,9 +2136,31 @@ function M.on_frame()
         end
     end
 
+    -- ScoopSanity: ensure time freeze matches game state (past stairs or Meet Jessie backup)
+    if scoop_sanity_enabled and efm_mgr:get() then
+        local past_stairs = raw_check_flag(NEW_GAME_FLAGS[1]) and raw_check_flag(NEW_GAME_FLAGS[2])
+        local jessie_on = raw_check_flag(JESSIE_FLAG)
+
+        if (past_stairs or jessie_on) and not time_frozen then
+            time_frozen = true
+            M.log(string.format("ScoopSanity: time freeze applied (past_stairs=%s, jessie=%s)",
+                tostring(past_stairs), tostring(jessie_on)))
+            if on_time_freeze_callback then pcall(on_time_freeze_callback) end
+            save_state()
+        elseif not past_stairs and not jessie_on and time_frozen then
+            time_frozen = false
+            M.log("ScoopSanity: pre-stairs — clearing time freeze")
+            if on_time_unfreeze_callback then pcall(on_time_unfreeze_callback) end
+        end
+    end
+
     if active_time_skip then
         local ok_tg, TimeGate = pcall(require, "DRAP/TimeGate")
         if ok_tg and TimeGate then
+            -- Run TimeGate frame logic here so turbo is maintained even when
+            -- the main loop skips it (e.g. during cutscenes where isInGame() is false)
+            TimeGate.on_frame()
+
             local md = TimeGate.get_current_mdate()
             if md and tonumber(md) >= active_time_skip.target_mdate then
                 M.log(string.format("Time skip complete: %s (reached %s)",
