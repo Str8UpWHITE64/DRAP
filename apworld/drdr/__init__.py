@@ -150,7 +150,7 @@ class DRWeb(WebWorld):
         "English",
         "setup_en.md",
         "setup/en",
-        ["ArsonAssassin"]
+        ["Str8UpWHITE64"]
     )
     game_info_languages = ["en"]
     tutorials = [setup_en]
