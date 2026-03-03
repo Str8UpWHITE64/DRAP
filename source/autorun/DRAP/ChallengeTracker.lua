@@ -65,7 +65,7 @@ local CHALLENGES = {
     foodCourtDishFlag = {
         label   = "Food court dishes destroyed",
         targets = { 262143 },
-        location_ids = { "Destroy all of the dishes in the Food Court" },
+        location_ids = { "Destroy all of the wall plates in the Food Court" },
     },
     firedBulletCount = {
         label   = "Bullets fired",
@@ -94,8 +94,8 @@ local CHALLENGES = {
     },
     cultKillNum = {
         label   = "Cultists killed",
-        targets = { 100 },
-        location_ids = { "Kill 100 cultists" },
+        targets = { 50 },
+        location_ids = { "Kill 50 cultists" },
     },
     parasolHitNum_1Play = {
         label   = "Parasol hits (1 play)",
@@ -114,8 +114,8 @@ local CHALLENGES = {
     },
     psychoPhotoCount_1Play = {
         label   = "Psychopath photos (1 play)",
-        targets = { 4 },
-        location_ids = { "Photograph 4 psychopaths" },
+        targets = { 8 },
+        location_ids = { "Photograph 8 psychopaths" },
     },
     PPPhotoCount = {
         label   = "PP stickers photographed (total)",
@@ -159,8 +159,8 @@ local CHALLENGES = {
     },
     StrikeHitMax = {
         label   = "Zombie bowling",
-        targets = { 10 },
-        location_ids = { "Bowl over 10 zombies" },
+        targets = { 5 },
+        location_ids = { "Bowl over 5 zombies" },
     },
     VehicleJumpDistanceMax = {
         label   = "Vehicle jump distance",

@@ -102,7 +102,7 @@ local TRACKED_SCQ_IDS = {
     ["0x7E"] = "Ending A: Solve all of the cases and be on the helipad at 12pm",
     ["0x20"] = "Complete Kent's day 1 photoshoot",
     ["0x4A"] = 'Kill Roger and Jack (and Thomas if you want) and chat with Wayne',
-    ["0xCA"] = "Find Greg's secret passage",
+    --["0xCA"] = "Find Greg's secret passage",
 }
 
 -- Expose for external use

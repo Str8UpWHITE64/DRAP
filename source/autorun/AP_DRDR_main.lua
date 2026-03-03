@@ -347,6 +347,12 @@ AP_BRIDGE.AP_REF.on_slot_connected = function(slot_data)
         AP.DoorRandomizer.clear_redirects()
     end
 
+    -- Goal option
+    local goal = (type(slot_data) == "table" and slot_data.goal) or 0
+    AP.Goal = goal
+    local goal_names = { [0] = "Ending S", [1] = "Ending A" }
+    log("Goal: " .. (goal_names[goal] or tostring(goal)))
+
     -- ScoopSanity option
     local scoop_sanity_enabled = (type(slot_data) == "table" and slot_data.scoop_sanity == true)
     AP.ScoopSanityEnabled = scoop_sanity_enabled
@@ -356,6 +362,13 @@ AP_BRIDGE.AP_REF.on_slot_connected = function(slot_data)
     -- Set up ScoopUnlocker persistence and ordering
     AP.ScoopUnlocker.set_save_filename(slot, seed)
     AP.ScoopUnlocker.load_save()
+
+    -- Re-apply time freeze if needed (ScoopSanity only — handles mid-game reconnect
+    -- where the Meet Jessie flag is already set but TimeGate lost its freeze state)
+    if scoop_sanity_enabled and AP.ScoopUnlocker.is_time_frozen() then
+        AP.TimeGate.enable()
+        log("Restored time freeze after connect (ScoopSanity)")
+    end
 
     if scoop_sanity_enabled then
         -- Apply randomized main scoop order from server
@@ -380,16 +393,15 @@ AP_BRIDGE.AP_REF.on_slot_connected = function(slot_data)
     AP_BRIDGE.set_received_items_filename(slot, seed)
     AP_BRIDGE.reset_received_items()
 
+    -- Load completed checks list and resend all to the server.
+    -- This catches any checks that were completed while disconnected.
+    AP_BRIDGE.set_completed_checks_filename(slot, seed)
+    AP_BRIDGE.load_completed_checks()
+    AP_BRIDGE.resend_all_checks()
+
     -- Set up sticker save file
     if AP.PPStickerTracker.set_save_filename then
         AP.PPStickerTracker.set_save_filename(slot, seed)
-    end
-
-    -- Sync rescued survivors
-    local rescued_survivors = AP.NpcTracker.get_rescued_survivors()
-    for id, _ in pairs(rescued_survivors) do
-        local name = string.format("Rescue %s", AP.NpcTracker.get_survivor_friendly_name(id) or tostring(id))
-        AP_BRIDGE.check(name)
     end
 end
 

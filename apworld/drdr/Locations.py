@@ -139,9 +139,9 @@ location_tables = {
 
     "Service Hallway": [
         # Events in Service Hallway
-        DRLocationData("Stomp the queen", "Milk", DRLocationCategory.EVENT),
+        # DRLocationData("Stomp the queen", "Milk", DRLocationCategory.MAIN_SCOOP),
         DRLocationData("Meet Jessie in the Service Hallway", "Milk", DRLocationCategory.MAIN_SCOOP),
-        DRLocationData("Witness Special Forces 10pm day 3", "Milk", DRLocationCategory.EVENT),
+        DRLocationData("Witness Special Forces 10pm day 3", "Milk", DRLocationCategory.MAIN_SCOOP),
 
     ],
 
@@ -155,7 +155,7 @@ location_tables = {
         DRLocationData("Complete Kent's day 2 photoshoot", "Milk", DRLocationCategory.PSYCHO_SCOOP),
         DRLocationData("Meet Kent on day 3", "Milk", DRLocationCategory.PSYCHO_SCOOP),
         DRLocationData("Kill Kent on day 3", "Milk", DRLocationCategory.PSYCHO_SCOOP),
-        DRLocationData("Get grabbed by the raincoats", "Milk", DRLocationCategory.EVENT),
+        DRLocationData("Get grabbed by the raincoats", "Milk", DRLocationCategory.PSYCHO_SCOOP),
 
         # Survivors rescued from Paradise Plaza
         DRLocationData("Rescue Heather Tompkins", "Milk", DRLocationCategory.SURVIVOR),
@@ -258,7 +258,7 @@ location_tables = {
         DRLocationData("Kill Adam", "Milk", DRLocationCategory.PSYCHO_SCOOP),
         DRLocationData("Meet Jo", "Milk", DRLocationCategory.PSYCHO_SCOOP),
         DRLocationData("Kill Jo", "Milk", DRLocationCategory.PSYCHO_SCOOP),
-        DRLocationData("Find Greg's secret passage", "Milk", DRLocationCategory.EVENT),
+        DRLocationData("Find Greg's secret passage", "Milk", DRLocationCategory.PSYCHO_SCOOP),
 
         # Survivors rescued from Wonderland Plaza
         DRLocationData("Rescue Greg Simpson", "Milk", DRLocationCategory.SURVIVOR),
@@ -302,7 +302,7 @@ location_tables = {
         DRLocationData("Beat up Isabela", "Milk", DRLocationCategory.MAIN_SCOOP),
         DRLocationData("Complete Promise to Isabela", "Milk", DRLocationCategory.MAIN_SCOOP),
         DRLocationData("Save Isabela from the zombie", "Milk", DRLocationCategory.MAIN_SCOOP),
-        DRLocationData("Frank sees a sick-ass RC Drone", "Milk", DRLocationCategory.EVENT),
+        DRLocationData("Frank sees a sick-ass RC Drone", "Milk", DRLocationCategory.OVERTIME_SCOOP),
         DRLocationData("Meet Cletus", "Milk", DRLocationCategory.PSYCHO_SCOOP),
         DRLocationData("Kill Cletus", "Milk", DRLocationCategory.PSYCHO_SCOOP),
 
@@ -420,6 +420,7 @@ location_tables = {
     ],
 
     "Tunnels": [
+        DRLocationData("Reach the end of the tunnel with Isabela", "Milk", DRLocationCategory.OVERTIME_SCOOP),
         DRLocationData("Get to the Humvee", "Milk", DRLocationCategory.OVERTIME_SCOOP),
         DRLocationData("Fight a tank and win", "Milk", DRLocationCategory.OVERTIME_SCOOP),
         DRLocationData("Ending S: Beat up Brock with your bare fists!", "Victory", DRLocationCategory.EVENT),
@@ -486,8 +487,8 @@ location_tables = {
 
     "Challenges": [
         DRLocationData("Reach max level", "Milk", DRLocationCategory.CHALLENGE),
-        DRLocationData("Kill 50 zombies by hand", "Milk", DRLocationCategory.CHALLENGE),
-        DRLocationData("Kill 100 zombies by hand", "Milk", DRLocationCategory.CHALLENGE),
+        # DRLocationData("Kill 50 zombies by hand", "Milk", DRLocationCategory.CHALLENGE),
+        # DRLocationData("Kill 100 zombies by hand", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Kill 500 zombies by vehicle", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Kill 1000 zombies by vehicle", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Walk a quarter marathon", "Milk", DRLocationCategory.CHALLENGE),
@@ -500,8 +501,8 @@ location_tables = {
         DRLocationData("Kill 2000 zombies", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Kill 5000 zombies", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Kill 10000 zombies", "Milk", DRLocationCategory.CHALLENGE),
-        DRLocationData("Kill 10 Special Forces", "Milk", DRLocationCategory.CHALLENGE),
-        DRLocationData("Destroy all of the dishes in the Food Court", "Milk", DRLocationCategory.CHALLENGE),
+        DRLocationData("Kill 10 Special Forces", "Milk", DRLocationCategory.OVERTIME_SCOOP),
+        DRLocationData("Destroy all of the wall plates in the Food Court", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Fire 30 bullets", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Fire 300 bullets", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Ride zombies for 50 feet", "Milk", DRLocationCategory.CHALLENGE),
@@ -509,9 +510,9 @@ location_tables = {
         # DRLocationData("Spend 12 hours outdoors", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Kill 1 psychopath", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Kill 8 psychopaths", "Milk", DRLocationCategory.CHALLENGE),
-        DRLocationData("Kill 100 cultists", "Milk", DRLocationCategory.CHALLENGE),
+        DRLocationData("Kill 50 cultists", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Hit 10 zombies with a parasol", "Milk", DRLocationCategory.CHALLENGE),
-        DRLocationData("Kill 100 zombies with an RPG", "Milk", DRLocationCategory.CHALLENGE),
+        DRLocationData("Kill 100 zombies with an RPG", "Milk", DRLocationCategory.OVERTIME_SCOOP),
         DRLocationData("Photograph 10 survivors", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Photograph 30 survivors", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Photograph 8 psychopaths", "Milk", DRLocationCategory.CHALLENGE),
@@ -533,7 +534,7 @@ location_tables = {
         DRLocationData("Get 10000 PP in one photo", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Get 50 targets in one photo", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Fall from a high height", "Milk", DRLocationCategory.CHALLENGE),
-        DRLocationData("Bowl over 10 zombies", "Milk", DRLocationCategory.CHALLENGE),
+        DRLocationData("Bowl over 5 zombies", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Jump a vehicle 50 feet", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Hit a golf ball 100 feet", "Milk", DRLocationCategory.CHALLENGE),
 

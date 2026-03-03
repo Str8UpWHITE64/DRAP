@@ -384,6 +384,30 @@ local function main_menu()
             return
         end
 
+        -- Connection status indicator
+        do
+            local status_text, status_color
+            if AP_REF.APClient == nil then
+                status_text = "Disconnected"
+                status_color = 0xFF0000FF      -- red
+            else
+                local state = AP_REF.APClient:get_state()
+                if state == AP.State.SLOT_CONNECTED then
+                    status_text = "Connected"
+                    status_color = 0xFF00FF00  -- green
+                elseif state == AP.State.DISCONNECTED then
+                    status_text = "Disconnected"
+                    status_color = 0xFF0000FF  -- red
+                else
+                    status_text = "Connecting..."
+                    status_color = 0xFFFFFF00  -- yellow
+                end
+            end
+            imgui.text("Status: ")
+            imgui.same_line()
+            imgui.text_colored(status_text, status_color)
+        end
+
 		local size = imgui.get_window_size()
         local foo = ""
         imgui.push_item_width(0.001) 
