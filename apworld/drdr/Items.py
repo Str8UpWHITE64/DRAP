@@ -330,6 +330,18 @@ item_descriptions = {}
 
 item_dictionary = {item_data.name: item_data for item_data in _all_items}
 
+# Specialty items that must be included in the pool for Restricted mode
+# These are required for specific scoops/psychopaths and are progression when RestrictedItemMode is enabled
+specialty_items = {
+    "Book [Japanese Conversation]",
+    "Bowling Ball",
+    "Fire Extinguisher",
+    "Golf Club",
+    "Handgun",
+    "Orange Juice",
+    "Parasol",
+}
+
 
 def BuildItemPool(multiworld, count, options):
     item_pool = []
@@ -347,18 +359,6 @@ def BuildItemPool(multiworld, count, options):
     # Time keys to skip when scoop sanity is enabled
     time_key_names = {
         "DAY2_06_AM", "DAY2_11_AM", "DAY3_00_AM", "DAY3_11_AM", "DAY4_12_PM"
-    }
-
-    # Specialty items that must be included in the pool for Restricted mode
-    specialty_items = {
-        "Book [Japanese Conversation]",
-        "Bowling Ball",
-        "Dishes",
-        "Fire Extinguisher",
-        "Golf Club",
-        "Handgun",
-        "Orange Juice",
-        "Parasol",
     }
 
     if options.guaranteed_items.value:
@@ -406,9 +406,17 @@ def BuildItemPool(multiworld, count, options):
             included_itemcount = included_itemcount + 1
 
 
-    for i in range(remaining_count):
-        item = multiworld.random.choice(fillerList)
-        item_pool.append(item)
+    # Add filler items, ensuring each unique item appears once before any duplicates
+    shuffled_filler = list(fillerList)
+    multiworld.random.shuffle(shuffled_filler)
+    filler_index = 0
+    for _ in range(remaining_count):
+        if filler_index >= len(shuffled_filler):
+            # All unique fillers added once; reshuffle for the next pass
+            multiworld.random.shuffle(shuffled_filler)
+            filler_index = 0
+        item_pool.append(shuffled_filler[filler_index])
+        filler_index += 1
 
     multiworld.random.shuffle(item_pool)
     return item_pool
