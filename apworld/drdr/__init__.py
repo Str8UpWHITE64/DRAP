@@ -6,7 +6,7 @@ from BaseClasses import MultiWorld, Region, Item, Entrance, Tutorial, ItemClassi
 from worlds.AutoWorld import World, WebWorld
 from worlds.generic.Rules import set_rule, add_rule, add_item_rule, forbid_item
 
-from .Items import DRItem, DRItemCategory, item_dictionary, key_item_names, item_descriptions, BuildItemPool
+from .Items import DRItem, DRItemCategory, item_dictionary, key_item_names, item_descriptions, BuildItemPool, specialty_items
 from .Locations import DRLocation, DRLocationCategory, location_tables, location_dictionary
 from .Options import DROption
 
@@ -389,6 +389,8 @@ class DRWorld(World):
             item_classification = ItemClassification.progression
         elif item_dictionary[name].category == DRItemCategory.SCOOP and self.options.scoop_sanity:
             item_classification = ItemClassification.progression
+        elif name in specialty_items and self.options.restricted_item_mode:
+            item_classification = ItemClassification.progression
         elif item_dictionary[name].category in useful_categories:
             item_classification = ItemClassification.useful
         elif item_dictionary[name].category == DRItemCategory.TRAP:
@@ -504,7 +506,7 @@ class DRWorld(World):
             if threshold < 50:
                 for location in self.multiworld.get_locations(self.player):
                     name = location.name
-                    match = re.match("Reach Level (\d+)", name)
+                    match = re.match(r"Reach Level (\d+)", name)
 
                     if match:
                         level_number = int(match.group(1))
@@ -860,7 +862,7 @@ class DRWorld(World):
             set_rule(self.multiworld.get_location("Rescue Heather Tompkins", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player) and state.has("Twin Sisters", self.player))
             set_rule(self.multiworld.get_location("Rescue Pamela Tompkins", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player) and state.has("Twin Sisters", self.player))
             set_rule(self.multiworld.get_location("Rescue Ronald Shiner", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player) and state.has("Restaurant Man", self.player) and state.has("Orange Juice", self.player))
-            set_rule(self.multiworld.get_location("Rescue Jennifer Gorman", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player) and state.has("Spawn the Raincoats", self.player))
+            set_rule(self.multiworld.get_location("Rescue Jennifer Gorman", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player) and state.has("The Cult", self.player))
             set_rule(self.multiworld.get_location("Rescue Tad Hawthorne", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player) and state.has("Photographer's Pride", self.player))
             set_rule(self.multiworld.get_location("Rescue Simone Ravendark", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player) and state.has("A Woman in Despair", self.player))
 

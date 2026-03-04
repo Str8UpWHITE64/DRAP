@@ -370,8 +370,8 @@ local SCOOP_DESCRIPTIONS = {
     },
     ["The Facts"] = {
         location = "Safe Room",
-        trigger = "Enter the Security Room",
-        description = "Final confrontation.",
+        trigger = "Walk into Paradise Plaza",
+        description = "Head back to the Safe Room to talk to Jessie.",
     },
 }
 
@@ -803,6 +803,41 @@ local function enforce_flags()
     if now - last_enforcement_time < ENFORCEMENT_COOLDOWN then return end
     last_enforcement_time = now
 
+    -- Overtime: skip all enforcement except endgame flags + hideout 301 cutscene prevention
+    if endgame_reached then
+        local endgame_flags = { 2052, 514 }
+        for _, fid in ipairs(endgame_flags) do
+            if not raw_check_flag(fid) then
+                currently_unlocking = true
+                raw_set_flag_on(fid)
+                currently_unlocking = false
+                if verbose_logging then
+                    M.log(string.format("Endgame: enforced flag %d", fid))
+                end
+            end
+        end
+
+        if get_current_area_index() == HIDEOUT_AREA_INDEX then
+            if not raw_check_flag(301) then
+                currently_unlocking = true
+                raw_set_flag_on(301)
+                currently_unlocking = false
+                if verbose_logging then
+                    M.log("Overtime: enabled flag 301 (player in Hideout)")
+                end
+            end
+        else
+            if raw_check_flag(301) then
+                raw_set_flag_off(301)
+                if verbose_logging then
+                    M.log("Overtime: disabled flag 301 (player left Hideout)")
+                end
+            end
+        end
+
+        return
+    end
+
     enforce_blacklist()
 
     -- Ensure post-Jessie flags stay enabled (265, 267 = progression, 315 = queen spawning)
@@ -889,21 +924,6 @@ local function enforce_flags()
                 raw_set_flag_off(fid)
                 if verbose_logging then
                     M.log(string.format("Cult respawn: suppressed flag %d", fid))
-                end
-            end
-        end
-    end
-
-    -- Endgame flags: enforce after Get bit! or Ending A (survives reload)
-    if endgame_reached then
-        local endgame_flags = { 2052, 514 }
-        for _, fid in ipairs(endgame_flags) do
-            if not raw_check_flag(fid) then
-                currently_unlocking = true
-                raw_set_flag_on(fid)
-                currently_unlocking = false
-                if verbose_logging then
-                    M.log(string.format("Endgame: enforced flag %d", fid))
                 end
             end
         end
@@ -1077,6 +1097,7 @@ local function enforce_flags()
             end
         end
     end
+
 end
 
 local function install_hooks()
@@ -1879,6 +1900,14 @@ function M.draw_tab_content(debug)
         if current_chain_name then
             local info = SCOOP_DESCRIPTIONS[current_chain_name]
             imgui.text_colored("Current Quest: " .. current_chain_name, 0xFF00FF00)
+            if info then
+                imgui.text_colored("  Location:    " .. info.location, 0xFFFFFF00)
+                imgui.text_colored("  Trigger:     " .. info.trigger, 0xFFFFFF00)
+                imgui.text_colored("  Description: " .. info.description, 0xFFFFFF00)
+            end
+        elseif received_scoops["The Facts"] and not completed_scoops["The Facts"] then
+            local info = SCOOP_DESCRIPTIONS["The Facts"]
+            imgui.text_colored("Current Quest: The Facts", 0xFF00FF00)
             if info then
                 imgui.text_colored("  Location:    " .. info.location, 0xFFFFFF00)
                 imgui.text_colored("  Trigger:     " .. info.trigger, 0xFFFFFF00)
