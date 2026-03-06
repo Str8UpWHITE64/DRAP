@@ -10,10 +10,9 @@ from .Items import DRItem, DRItemCategory, item_dictionary, key_item_names, item
 from .Locations import DRLocation, DRLocationCategory, location_tables, location_dictionary
 from .Options import DROption
 
-import os
 import re
 
-from .DoorRandomization import generate_door_randomization_for_ap, generate_door_map_html, DOOR_MODE_CHAOS, DOOR_MODE_PAIRED
+from .DoorRandomization import generate_door_randomization_for_ap, DOOR_MODE_CHAOS, DOOR_MODE_PAIRED
 
 # Main scoop names eligible for randomized ordering (ScoopSanity)
 # These must match the scoop names in ScoopUnlocker.lua's SCOOP_DATA
@@ -1118,25 +1117,5 @@ class DRWorld(World):
                 spoiler_handle.write(f"  {i + 1}. {scoop_name}\n")
 
     def generate_output(self, output_directory: str) -> None:
-        # Only generate door map if door randomizer is enabled and we have redirects
-        if self.options.door_randomizer and self.door_redirects:
-            player_name = self.multiworld.get_player_name(self.player)
-            seed_name = self.multiworld.seed_name
-            mode_name = "Paired" if self.options.door_randomizer_mode.value == 1 else "Chaos"
-
-            # Sanitize names for filename
-            safe_player = "".join(c if c.isalnum() or c in "-_" else "_" for c in player_name)
-            safe_seed = "".join(c if c.isalnum() or c in "-_" else "_" for c in str(seed_name))
-
-            # Generate the HTML map
-            html_content = generate_door_map_html(
-                self.door_redirects,
-                title=f"Door Map - {player_name} [{mode_name}] (Seed: {seed_name})"
-            )
-
-            # Write to output directory
-            filename = f"door_map_{safe_player}_{safe_seed}.html"
-            filepath = os.path.join(output_directory, filename)
-
-            with open(filepath, "w", encoding="utf-8") as f:
-                f.write(html_content)
+        # Door map HTML is now generated on-demand by the Lua-side DoorVisualizer
+        pass
