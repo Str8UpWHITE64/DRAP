@@ -2,10 +2,7 @@
 """
 Door Randomization Logic for Dead Rising Deluxe Remaster Archipelago
 
-This module generates valid door connection mappings that ensure:
-1. All areas remain reachable from the starting location
-2. No softlocks (player can always escape any area)
-3. The game remains completable
+Ensures all areas remain reachable, no softlocks, and the game stays completable.
 """
 
 from typing import Dict, List, Set, Tuple, Optional
@@ -15,7 +12,6 @@ import random
 
 @dataclass
 class DoorEndpoint:
-    """Represents one side of a door (the exit point when you go through it)"""
     door_id: str
     from_area: str
     to_area: str
@@ -26,14 +22,12 @@ class DoorEndpoint:
 
 @dataclass
 class AreaInfo:
-    """Information about a game area"""
     code: str
     name: str
-    outgoing_doors: List[str]  # door_ids that leave this area
-    incoming_doors: List[str]  # door_ids that enter this area
+    outgoing_doors: List[str]
+    incoming_doors: List[str]
 
 
-# Area definitions with friendly names
 AREA_NAMES = {
     "s135": "Helipad",
     "s136": "Safe Room",
@@ -54,45 +48,36 @@ AREA_NAMES = {
     "s601": "Butcher",
 }
 
-# Define which areas should NOT have their doors randomized
-# (typically story-critical areas or starting areas)
 PROTECTED_AREAS = {
-    "s135",  # Helipad - needed for endings
-    "s136",  # Safe Room - hub/save point
-    "s601",  # Butcher - boss arena
+    "s135",  # Helipad
+    "s136",  # Safe Room
+    "s601",  # Butcher
 }
 
-# Areas that are "dead ends" with only one exit
 DEAD_END_AREAS = {
-    "s135": ["s136"],  # Helipad only connects to Safe Room
-    "s401": ["s400"],  # Hideout only connects to North Plaza
-    "s501": ["s400"],  # Crislip's only connects to North Plaza
-    "s503": ["s200"],  # Colby's only connects to Paradise Plaza
-    "s601": ["s600"],  # Butcher only connects to Maintenance Tunnel
+    "s135": ["s136"],
+    "s401": ["s400"],
+    "s501": ["s400"],
+    "s503": ["s200"],
+    "s601": ["s600"],
 }
 
-# Starting area (player spawns here)
-START_AREA = "s136"  # Safe Room
+START_AREA = "s136"
 
 
 class DoorRandomizer:
-    """Handles door randomization logic"""
-
     def __init__(self, seed: Optional[int] = None):
         self.rng = random.Random(seed)
         self.doors: Dict[str, DoorEndpoint] = {}
         self.areas: Dict[str, AreaInfo] = {}
-        self.redirects: Dict[str, str] = {}  # source_door_id -> target_door_id
+        self.redirects: Dict[str, str] = {}
 
     def load_doors_from_json(self, door_data: dict) -> None:
-        """Load door data from the JSON format used by the Lua mod"""
         doors_dict = door_data.get("doors", door_data)
 
         for door_id, door_info in doors_dict.items():
-            # Parse the door_id format: SCN_{from}|{to}|door{n}
             from_area = door_info.get("from_area_code", "")
             to_area = door_info.get("to_area_code", "")
-
             pos = door_info.get("position", {})
             angle = door_info.get("angle", {})
 
@@ -107,64 +92,27 @@ class DoorRandomizer:
 
             self.doors[door_id] = endpoint
 
-            # Build area info
             if from_area not in self.areas:
                 self.areas[from_area] = AreaInfo(
-                    code=from_area,
-                    name=AREA_NAMES.get(from_area, from_area),
-                    outgoing_doors=[],
-                    incoming_doors=[]
+                    code=from_area, name=AREA_NAMES.get(from_area, from_area),
+                    outgoing_doors=[], incoming_doors=[]
                 )
             if to_area not in self.areas:
                 self.areas[to_area] = AreaInfo(
-                    code=to_area,
-                    name=AREA_NAMES.get(to_area, to_area),
-                    outgoing_doors=[],
-                    incoming_doors=[]
+                    code=to_area, name=AREA_NAMES.get(to_area, to_area),
+                    outgoing_doors=[], incoming_doors=[]
                 )
 
             self.areas[from_area].outgoing_doors.append(door_id)
             self.areas[to_area].incoming_doors.append(door_id)
 
     def add_missing_doors(self) -> None:
-        """Add placeholder data for missing doors (Grocery Store connections)"""
+        """Add placeholder data for missing doors (Grocery Store connections)."""
         missing_doors = [
-            # North Plaza -> Grocery Store
-            DoorEndpoint(
-                door_id="SCN_s400|s500|door0",
-                from_area="s400",
-                to_area="s500",
-                position=(0, 5, -180),  # Estimated position
-                angle=(0, 1.5, 0),
-                door_no=0
-            ),
-            # Grocery Store -> North Plaza
-            DoorEndpoint(
-                door_id="SCN_s500|s400|door0",
-                from_area="s500",
-                to_area="s400",
-                position=(0, 0, 0),  # Needs real position
-                angle=(0, -1.5, 0),
-                door_no=0
-            ),
-            # Grocery Store -> Maintenance Tunnel
-            DoorEndpoint(
-                door_id="SCN_s500|s600|door0",
-                from_area="s500",
-                to_area="s600",
-                position=(0, 0, 50),  # Needs real position
-                angle=(0, 0, 0),
-                door_no=0
-            ),
-            # Maintenance Tunnel -> Grocery Store
-            DoorEndpoint(
-                door_id="SCN_s600|s500|door0",
-                from_area="s600",
-                to_area="s500",
-                position=(-100, 0, 0),  # Needs real position
-                angle=(0, 3.14, 0),
-                door_no=0
-            ),
+            DoorEndpoint("SCN_s400|s500|door0", "s400", "s500", (0, 5, -180), (0, 1.5, 0), 0),
+            DoorEndpoint("SCN_s500|s400|door0", "s500", "s400", (0, 0, 0), (0, -1.5, 0), 0),
+            DoorEndpoint("SCN_s500|s600|door0", "s500", "s600", (0, 0, 50), (0, 0, 0), 0),
+            DoorEndpoint("SCN_s600|s500|door0", "s600", "s500", (-100, 0, 0), (0, 3.14, 0), 0),
         ]
 
         for door in missing_doors:
@@ -173,107 +121,77 @@ class DoorRandomizer:
 
                 if door.from_area not in self.areas:
                     self.areas[door.from_area] = AreaInfo(
-                        code=door.from_area,
-                        name=AREA_NAMES.get(door.from_area, door.from_area),
-                        outgoing_doors=[],
-                        incoming_doors=[]
+                        code=door.from_area, name=AREA_NAMES.get(door.from_area, door.from_area),
+                        outgoing_doors=[], incoming_doors=[]
                     )
                 if door.to_area not in self.areas:
                     self.areas[door.to_area] = AreaInfo(
-                        code=door.to_area,
-                        name=AREA_NAMES.get(door.to_area, door.to_area),
-                        outgoing_doors=[],
-                        incoming_doors=[]
+                        code=door.to_area, name=AREA_NAMES.get(door.to_area, door.to_area),
+                        outgoing_doors=[], incoming_doors=[]
                     )
 
                 self.areas[door.from_area].outgoing_doors.append(door.door_id)
                 self.areas[door.to_area].incoming_doors.append(door.door_id)
 
     def get_door_pairs(self) -> List[Tuple[str, str]]:
-        """
-        Find door pairs (A->B and B->A) that represent the same physical connection.
-        Returns list of (door_id_a_to_b, door_id_b_to_a) tuples.
-        """
+        """Find bidirectional door pairs (A->B and B->A)."""
         pairs = []
         seen = set()
 
         for door_id, door in self.doors.items():
             if door_id in seen:
                 continue
-
-            # Look for the reverse door
             reverse_pattern = f"SCN_{door.to_area}|{door.from_area}|door{door.door_no}"
-
             if reverse_pattern in self.doors:
                 pairs.append((door_id, reverse_pattern))
                 seen.add(door_id)
                 seen.add(reverse_pattern)
             else:
-                # One-way door or missing pair
                 pairs.append((door_id, None))
                 seen.add(door_id)
 
         return pairs
 
     def get_randomizable_doors(self) -> List[str]:
-        """Get list of door IDs that can be randomized (excluding protected areas)"""
-        randomizable = []
-
-        for door_id, door in self.doors.items():
-            # Skip doors involving protected areas
-            if door.from_area in PROTECTED_AREAS or door.to_area in PROTECTED_AREAS:
-                continue
-            randomizable.append(door_id)
-
-        return randomizable
+        """Get door IDs that can be randomized (excluding protected areas)."""
+        return [
+            door_id for door_id, door in self.doors.items()
+            if door.from_area not in PROTECTED_AREAS and door.to_area not in PROTECTED_AREAS
+        ]
 
     def build_adjacency_graph(self, use_redirects: bool = False) -> Dict[str, Set[str]]:
-        """
-        Build a graph of area connections.
-        If use_redirects is True, uses the randomized redirects.
-        Returns {area_code: set of reachable area codes}
-        """
+        """Build area connection graph, optionally following redirects."""
         graph: Dict[str, Set[str]] = {area: set() for area in self.areas}
 
         for door_id, door in self.doors.items():
             if use_redirects and door_id in self.redirects:
-                # Use randomized destination
-                target_door_id = self.redirects[door_id]
-                target_door = self.doors[target_door_id]
-                # The redirect means: when you use this door, you end up at target_door's destination
+                target_door = self.doors[self.redirects[door_id]]
                 graph[door.from_area].add(target_door.to_area)
             else:
-                # Use vanilla destination
                 graph[door.from_area].add(door.to_area)
 
         return graph
 
     def is_fully_connected(self, graph: Dict[str, Set[str]], start: str = START_AREA) -> bool:
-        """Check if all areas are reachable from the start using BFS"""
+        """BFS check that all areas are reachable from start."""
         if start not in graph:
             return False
 
         visited = set()
         queue = [start]
-
         while queue:
             current = queue.pop(0)
             if current in visited:
                 continue
             visited.add(current)
-
             for neighbor in graph.get(current, set()):
                 if neighbor not in visited:
                     queue.append(neighbor)
 
-        # Check all areas are reachable
         return visited >= set(self.areas.keys())
 
     def can_escape_all_areas(self, graph: Dict[str, Set[str]]) -> bool:
-        """
-        Check that every area has at least one outgoing connection.
-        This prevents softlocks where player enters an area with no exits.
-        """
+        """Check every non-protected area has at least one exit."""
         for area in self.areas:
             if area in PROTECTED_AREAS:
                 continue
@@ -282,73 +200,42 @@ class DoorRandomizer:
         return True
 
     def generate_spanning_tree_redirects(self) -> Dict[str, str]:
-        """
-        Generate redirects that form a spanning tree, ensuring all areas are connected.
-        This is the first pass - remaining doors are randomized freely.
-        """
-        # Get all non-protected areas
-        areas_to_connect = [a for a in self.areas if a not in PROTECTED_AREAS]
-
-        # Start from areas adjacent to protected areas (they're our entry points)
+        """Generate redirects forming a spanning tree to ensure connectivity."""
         connected = {START_AREA}
-
-        # Find areas directly connected to start
         for door_id, door in self.doors.items():
             if door.from_area == START_AREA:
                 connected.add(door.to_area)
 
         redirects = {}
 
-        # Use Prim's algorithm-like approach to build spanning tree
         while len(connected) < len(self.areas):
-            # Find a door from connected area to unconnected area
-            candidates = []
-
-            for door_id, door in self.doors.items():
-                if door.from_area in connected and door.to_area not in connected:
-                    candidates.append(door_id)
-
+            candidates = [
+                door_id for door_id, door in self.doors.items()
+                if door.from_area in connected and door.to_area not in connected
+            ]
             if not candidates:
-                # Try to find any door that could bridge to unconnected area
                 unconnected = set(self.areas.keys()) - connected
-                for door_id, door in self.doors.items():
-                    if door.to_area in unconnected:
-                        candidates.append(door_id)
-
+                candidates = [
+                    door_id for door_id, door in self.doors.items()
+                    if door.to_area in unconnected
+                ]
                 if not candidates:
-                    break  # No way to connect remaining areas
+                    break
 
-            # Pick a random candidate
-            chosen = self.rng.choice(candidates)
-            chosen_door = self.doors[chosen]
-
-            # This door stays vanilla (or is the critical connection)
+            chosen_door = self.doors[self.rng.choice(candidates)]
             connected.add(chosen_door.to_area)
 
         return redirects
 
     def randomize_paired(self, max_attempts: int = 500) -> Dict[str, str]:
         """
-        Randomize doors in paired/bidirectional mode with individual door granularity.
-
-        GUARANTEE: If you can travel from area A to area B, there WILL be a door
-        in area B that takes you back to area A.
-
-        Algorithm (Individual Door Swapping):
-        Instead of swapping entire edges, we swap individual doors in groups of 4:
-        - door1: A→B and door2: C→D swap to become A→D and C→B
-        - door3: D→? and door4: B→? swap to become D→A and B→C
-        This creates two new bidirectional connections (A↔D and B↔C) using 4 doors.
-
-        This allows multiple doors between the same areas to be randomized differently.
-        For example, the two Rooftop→Service Hallway doors can end up going to different areas.
+        Randomize doors in bidirectional paired mode using 4-door swaps.
+        If A->B and C->D swap, return paths D->A and B->C are also created.
         """
         randomizable_doors = list(self.get_randomizable_doors())
 
-        # Build info about each door
-        door_info = {}  # door_id -> (from_area, to_area)
-        doors_from_area = {}  # area -> list of door_ids leaving that area
-
+        door_info = {}
+        doors_from_area = {}
         for door_id in randomizable_doors:
             door = self.doors[door_id]
             door_info[door_id] = (door.from_area, door.to_area)
@@ -356,9 +243,7 @@ class DoorRandomizer:
                 doors_from_area[door.from_area] = []
             doors_from_area[door.from_area].append(door_id)
 
-        # Pre-compute templates for each (from_area, to_area) pair
-        # This ensures each redirect uses the correct spawn position for that specific route
-        templates: Dict[str, Dict[str, str]] = {}  # from_area -> to_area -> door_id
+        templates: Dict[str, Dict[str, str]] = {}
         for door_id, door in self.doors.items():
             if door.from_area not in templates:
                 templates[door.from_area] = {}
@@ -368,18 +253,15 @@ class DoorRandomizer:
         for attempt in range(max_attempts):
             self.redirects = {}
 
-            # Shuffle doors for random pairing
             shuffled_doors = randomizable_doors.copy()
             self.rng.shuffle(shuffled_doors)
 
-            # Also shuffle the doors_from_area lists for variety
             shuffled_doors_from_area = {}
             for area, doors in doors_from_area.items():
                 shuffled_list = doors.copy()
                 self.rng.shuffle(shuffled_list)
                 shuffled_doors_from_area[area] = shuffled_list
 
-            # Track which doors have been used in a swap
             used_doors = set()
             swap_count = 0
 
@@ -387,10 +269,8 @@ class DoorRandomizer:
                 if door1_id in used_doors:
                     continue
 
-                from_a, to_b = door_info[door1_id]  # door1: A→B
+                from_a, to_b = door_info[door1_id]
 
-                # Find door2: C→D where A,B,C,D are all different
-                # Shuffle the search order for variety
                 search_order = list(range(i + 1, len(shuffled_doors)))
                 self.rng.shuffle(search_order)
 
@@ -399,99 +279,68 @@ class DoorRandomizer:
                     if door2_id in used_doors:
                         continue
 
-                    from_c, to_d = door_info[door2_id]  # door2: C→D
+                    from_c, to_d = door_info[door2_id]
 
-                    # All 4 areas must be different for a clean swap
                     if len({from_a, to_b, from_c, to_d}) < 4:
                         continue
 
-                    # Find door3: any unused door from D (for D→A return path)
+                    # Find return path doors
                     door3_id = None
                     for d_id in shuffled_doors_from_area.get(to_d, []):
                         if d_id not in used_doors and d_id != door2_id:
                             door3_id = d_id
                             break
-
                     if not door3_id:
                         continue
 
-                    # Find door4: any unused door from B (for B→C return path)
                     door4_id = None
                     for d_id in shuffled_doors_from_area.get(to_b, []):
                         if d_id not in used_doors and d_id != door1_id:
                             door4_id = d_id
                             break
-
                     if not door4_id:
                         continue
 
-                    # Get the vanilla destinations for reverse door lookup
-                    _, to_e = door_info[door3_id]  # door3: D→E (to_d→to_e)
-                    _, to_f = door_info[door4_id]  # door4: B→F (to_b→to_f)
+                    _, to_e = door_info[door3_id]
+                    _, to_f = door_info[door4_id]
 
-                    # Extract door numbers for proper pairing
-                    # Door IDs are like "SCN_s400|s300|door0" - we need the "door0" part
-                    door1_num = door1_id.split("|")[-1]  # e.g., "door0"
+                    door1_num = door1_id.split("|")[-1]
                     door2_num = door2_id.split("|")[-1]
                     door3_num = door3_id.split("|")[-1]
                     door4_num = door4_id.split("|")[-1]
 
-                    # For TRUE bidirectional pairing, each door spawns you at its
-                    # PAIRED door's entrance. We find this by looking up the REVERSE
-                    # of the paired door WITH THE SAME DOOR NUMBER.
-                    #
-                    # This is critical because door0 and door1 between the same areas
-                    # are at DIFFERENT physical locations!
+                    # Build reverse door IDs for proper spawn positions
+                    reverse3_id = f"SCN_{to_e}|{to_d}|{door3_num}"
+                    reverse1_id = f"SCN_{to_b}|{from_a}|{door1_num}"
+                    reverse4_id = f"SCN_{to_f}|{to_b}|{door4_num}"
+                    reverse2_id = f"SCN_{to_d}|{from_c}|{door2_num}"
 
-                    # Build expected reverse door IDs
-                    reverse3_expected = f"SCN_{to_e}|{to_d}|{door3_num}"  # E→D (reverse of door3)
-                    reverse1_expected = f"SCN_{to_b}|{from_a}|{door1_num}"  # B→A (reverse of door1)
-                    reverse4_expected = f"SCN_{to_f}|{to_b}|{door4_num}"  # F→B (reverse of door4)
-                    reverse2_expected = f"SCN_{to_d}|{from_c}|{door2_num}"  # D→C (reverse of door2)
+                    if not all(r in self.doors for r in [reverse3_id, reverse1_id, reverse4_id, reverse2_id]):
+                        continue
 
-                    # Check if these specific reverse doors exist
-                    reverse3_id = reverse3_expected if reverse3_expected in self.doors else None
-                    reverse1_id = reverse1_expected if reverse1_expected in self.doors else None
-                    reverse4_id = reverse4_expected if reverse4_expected in self.doors else None
-                    reverse2_id = reverse2_expected if reverse2_expected in self.doors else None
-
-                    if not (reverse3_id and reverse1_id and reverse4_id and reverse2_id):
-                        continue  # Skip this swap, matching reverse doors don't exist
-
-                    # All reverse doors exist - commit to the swap
                     used_doors.update({door1_id, door2_id, door3_id, door4_id})
                     swap_count += 1
 
-                    # Apply redirects - spawn at paired door's entrance (using reverse door's position)
-
-                    # door1 → D, spawn at door3's entrance (reverse3 = E→D position)
+                    # Apply redirects using reverse door positions for correct spawning
                     if reverse3_id != door1_id:
                         self.redirects[door1_id] = reverse3_id
-
-                    # door2 → B, spawn at door4's entrance (reverse4 = F→B position)
                     if reverse4_id != door2_id:
                         self.redirects[door2_id] = reverse4_id
-
-                    # door3 → A, spawn at door1's entrance (reverse1 = B→A position)
                     if reverse1_id != door3_id:
                         self.redirects[door3_id] = reverse1_id
-
-                    # door4 → C, spawn at door2's entrance (reverse2 = D→C position)
                     if reverse2_id != door4_id:
                         self.redirects[door4_id] = reverse2_id
 
-                    break  # Move to next door1
+                    break
 
-            # Validate
             graph = self.build_adjacency_graph(use_redirects=True)
 
             if not self.is_fully_connected(graph):
                 continue
-
             if not self.can_escape_all_areas(graph):
                 continue
 
-            # Check bidirectionality
+            # Verify bidirectionality
             is_bidirectional = True
             for from_area, to_areas in graph.items():
                 if from_area in PROTECTED_AREAS:
@@ -506,29 +355,17 @@ class DoorRandomizer:
                     break
 
             if is_bidirectional:
-                print(
-                    f"Found valid paired randomization on attempt {attempt + 1} ({swap_count} 4-door swaps, {len(self.redirects)} redirects)")
+                print(f"Found valid paired randomization on attempt {attempt + 1} "
+                      f"({swap_count} 4-door swaps, {len(self.redirects)} redirects)")
                 return self.redirects
 
-        # If we get here, this seed batch failed - return None to signal retry needed
         print(f"Could not find valid paired randomization after {max_attempts} attempts with current seed")
         return None
 
     def randomize_paired_with_retry(self, max_attempts_per_seed: int = 500, max_reseeds: int = 100) -> Dict[str, str]:
-        """
-        Attempts paired mode randomization, reseeding if necessary.
-        Never falls back to chaos mode.
-
-        Args:
-            max_attempts_per_seed: Number of shuffle attempts per seed
-            max_reseeds: Maximum number of times to try a new seed
-
-        Returns:
-            Dict of redirects, guaranteed to be valid paired mode
-        """
+        """Attempts paired mode randomization, reseeding if necessary."""
         for reseed_attempt in range(max_reseeds):
             if reseed_attempt > 0:
-                # Generate a new seed based on current RNG state
                 new_seed = self.rng.randint(0, 2 ** 31 - 1)
                 self.rng = random.Random(new_seed)
                 print(f"Reseeding (attempt {reseed_attempt + 1}/{max_reseeds}) with seed {new_seed}")
@@ -537,33 +374,25 @@ class DoorRandomizer:
             if result is not None:
                 return result
 
-        # This should be extremely rare - log an error
         print(f"ERROR: Could not find valid paired randomization after {max_reseeds} reseeds!")
         print("Returning empty redirects (vanilla door layout)")
         return {}
 
     def randomize_with_validation(self, max_attempts: int = 100) -> Dict[str, str]:
-        """
-        Randomize doors with validation to ensure the game remains completable.
-        Uses multiple attempts to find a valid configuration.
-        """
+        """Chaos mode: shuffle all randomizable doors, validate connectivity."""
         randomizable = self.get_randomizable_doors()
 
         for attempt in range(max_attempts):
             self.redirects = {}
 
-            # Create a shuffled list of destination doors
             destinations = randomizable.copy()
             self.rng.shuffle(destinations)
 
-            # Map each door to a random destination
             for source, dest in zip(randomizable, destinations):
-                if source != dest:  # Don't redirect to self
+                if source != dest:
                     self.redirects[source] = dest
 
-            # Validate
             graph = self.build_adjacency_graph(use_redirects=True)
-
             if self.is_fully_connected(graph) and self.can_escape_all_areas(graph):
                 print(f"Found valid randomization on attempt {attempt + 1}")
                 return self.redirects
@@ -573,16 +402,11 @@ class DoorRandomizer:
         return self.redirects
 
     def export_redirects_for_lua(self) -> Dict[str, dict]:
-        """
-        Export redirects in a format the Lua mod can use.
-        Returns a dict mapping source_door_id to redirect info.
-        """
+        """Export redirects in Lua-compatible format."""
         lua_redirects = {}
-
         for source_id, target_id in self.redirects.items():
             source_door = self.doors.get(source_id)
             target_door = self.doors.get(target_id)
-
             if not source_door or not target_door:
                 continue
 
@@ -590,22 +414,12 @@ class DoorRandomizer:
                 "target_area": target_door.to_area,
                 "target_area_name": AREA_NAMES.get(target_door.to_area, target_door.to_area),
                 "template_door_id": target_id,
-                "position": {
-                    "x": target_door.position[0],
-                    "y": target_door.position[1],
-                    "z": target_door.position[2],
-                },
-                "angle": {
-                    "x": target_door.angle[0],
-                    "y": target_door.angle[1],
-                    "z": target_door.angle[2],
-                },
+                "position": {"x": target_door.position[0], "y": target_door.position[1], "z": target_door.position[2]},
+                "angle": {"x": target_door.angle[0], "y": target_door.angle[1], "z": target_door.angle[2]},
             }
-
         return lua_redirects
 
     def print_summary(self) -> None:
-        """Print a summary of areas and doors"""
         print(f"\n=== Door Randomizer Summary ===")
         print(f"Total areas: {len(self.areas)}")
         print(f"Total doors: {len(self.doors)}")
@@ -624,30 +438,14 @@ class DoorRandomizer:
 
 
 def generate_door_randomization(door_json: dict, seed: int) -> Dict[str, dict]:
-    """
-    Main entry point for generating door randomization.
-
-    Args:
-        door_json: Door data loaded from JSON file
-        seed: Random seed for reproducible randomization
-
-    Returns:
-        Dict of redirects in Lua-compatible format
-    """
+    """Main entry point for generating door randomization."""
     randomizer = DoorRandomizer(seed)
     randomizer.load_doors_from_json(door_json)
     randomizer.add_missing_doors()
-
-    # Use validation-based randomization
     randomizer.randomize_with_validation()
-
     randomizer.print_summary()
-
     return randomizer.export_redirects_for_lua()
 
-
-# Pre-built door data (embedded so we don't need external file during AP generation)
-# This can be updated when you collect the remaining 4 doors
 EMBEDDED_DOOR_DATA = {
     "SCN_s100|s136|door0": {"from_area_code": "s100", "to_area_code": "s136",
                             "position": {"x": 131.51, "y": 8.0, "z": 251.65}, "angle": {"x": 0.0, "y": 1.48, "z": 0.0},
@@ -805,25 +603,12 @@ EMBEDDED_DOOR_DATA = {
                             "door_no": 0},
 }
 
-# Door randomization modes
 DOOR_MODE_CHAOS = 0
 DOOR_MODE_PAIRED = 1
 
 
-def generate_door_randomization_for_ap(random_source, mode: int = DOOR_MODE_CHAOS, use_embedded: bool = True) -> Dict[
-    str, dict]:
-    """
-    Generate door randomization for Archipelago world generation.
-
-    Args:
-        random_source: The multiworld.random object for seeded randomization
-        mode: DOOR_MODE_CHAOS (0) for full random, DOOR_MODE_PAIRED (1) for bidirectional pairs
-        use_embedded: If True, use embedded door data. If False, requires external file.
-
-    Returns:
-        Dict of redirects in Lua-compatible format
-    """
-    # Create randomizer with a seed derived from the AP random
+def generate_door_randomization_for_ap(random_source, mode: int = DOOR_MODE_CHAOS, use_embedded: bool = True) -> Dict[str, dict]:
+    """Generate door randomization for Archipelago world generation."""
     randomizer = DoorRandomizer(seed=random_source.randint(0, 2 ** 31))
 
     if use_embedded:
@@ -831,36 +616,24 @@ def generate_door_randomization_for_ap(random_source, mode: int = DOOR_MODE_CHAO
 
     randomizer.add_missing_doors()
 
-    # Generate randomization based on mode
     if mode == DOOR_MODE_PAIRED:
         randomizer.randomize_paired_with_retry(max_attempts_per_seed=500, max_reseeds=100)
     else:
-        # Default to chaos mode
         randomizer.randomize_with_validation(max_attempts=100)
 
     return randomizer.export_redirects_for_lua()
 
 
 def generate_door_map_html(redirects: Dict[str, dict], title: str = "Door Randomization Map") -> str:
-    """
-    Generate an HTML visualization of door redirects for inclusion in AP output.
-
-    Args:
-        redirects: The door redirects dictionary from export_redirects_for_lua()
-        title: Title for the HTML page
-
-    Returns:
-        HTML string content
-    """
+    """Generate an HTML visualization of door redirects for AP output."""
     import json
 
-    # Color scheme for areas
     area_colors = {
-        "s135": "#FFD700", "s136": "#90EE90", "s231": "#87CEEB", "s230": "#DDA0DD",
-        "s200": "#FF6B6B", "s100": "#4ECDC4", "s900": "#95E1D3", "sa00": "#F38181",
-        "s300": "#AA96DA", "s400": "#FCBAD3", "s700": "#A8D8EA", "s501": "#FFB347",
-        "s503": "#B19CD9", "s401": "#77DD77", "s600": "#808080", "s500": "#F0E68C",
-        "s601": "#CD5C5C",
+        "s200": "#FF1744", "sa00": "#FF6D00", "s135": "#FFD600", "s401": "#76FF03",
+        "s136": "#00C853", "s100": "#00BFA5", "s700": "#00E5FF", "s231": "#2979FF",
+        "s503": "#304FFE", "s300": "#AA00FF", "s230": "#D500F9", "s400": "#FF4081",
+        "s601": "#8D6E63", "s600": "#78909C", "s500": "#FFFFFF", "s501": "#CE93D8",
+        "s900": "#AED581",
     }
 
     short_names = {
@@ -871,13 +644,8 @@ def generate_door_map_html(redirects: Dict[str, dict], title: str = "Door Random
         "s601": "Butcher",
     }
 
-    # Rebuild door info from redirects to build graph
-    # Parse door IDs to get from_area, and use target_area for destination
     all_areas = set()
-    edges = []  # (from_area, to_area, is_new)
-
-    # Track vanilla connections from embedded data
-    vanilla_connections = {}  # from_area -> set of to_areas
+    vanilla_connections = {}
     for door_id, door_data in EMBEDDED_DOOR_DATA.items():
         from_area = door_data.get("from_area_code", "")
         to_area = door_data.get("to_area_code", "")
@@ -888,10 +656,8 @@ def generate_door_map_html(redirects: Dict[str, dict], title: str = "Door Random
                 vanilla_connections[from_area] = set()
             vanilla_connections[from_area].add(to_area)
 
-    # Build randomized connections from redirects - track door counts
-    rando_connections = {}  # from_area -> {to_area -> count}
+    rando_connections = {}
     for door_id, redirect_info in redirects.items():
-        # Parse door_id: SCN_{from}|{to}|door{n}
         parts = door_id.replace("SCN_", "").split("|")
         if len(parts) >= 2:
             from_area = parts[0]
@@ -905,7 +671,6 @@ def generate_door_map_html(redirects: Dict[str, dict], title: str = "Door Random
                     rando_connections[from_area][target_area] = 0
                 rando_connections[from_area][target_area] += 1
 
-    # Add non-redirected connections (doors that weren't changed)
     for door_id, door_data in EMBEDDED_DOOR_DATA.items():
         if door_id not in redirects:
             from_area = door_data.get("from_area_code", "")
@@ -917,97 +682,65 @@ def generate_door_map_html(redirects: Dict[str, dict], title: str = "Door Random
                     rando_connections[from_area][to_area] = 0
                 rando_connections[from_area][to_area] += 1
 
-    # Build nodes data
     nodes_data = []
     for area_code in sorted(all_areas):
         color = area_colors.get(area_code, "#CCCCCC")
         label = short_names.get(area_code, area_code)
         full_name = AREA_NAMES.get(area_code, area_code)
         border_width = 4 if area_code in PROTECTED_AREAS else 2
-        border_color = "#FFD700" if area_code == START_AREA else "#333333"
+        border_color = "#fbbf24" if area_code == START_AREA else "#2a2d35"
 
         nodes_data.append({
-            "id": area_code,
-            "label": label,
-            "title": full_name,
-            "color": {
-                "background": color,
-                "border": border_color,
-                "highlight": {"background": color, "border": "#FF0000"}
-            },
-            "borderWidth": border_width,
-            "font": {"size": 14, "face": "arial"}
+            "id": area_code, "label": label, "title": full_name,
+            "color": {"background": color, "border": border_color, "highlight": {"background": color, "border": "#fbbf24"}},
+            "borderWidth": border_width, "font": {"size": 14, "face": "arial"}
         })
 
-    # Build edges data - consolidate bidirectional connections
     edges_data = []
-    processed_pairs = set()  # Track area pairs we've already handled
+    processed_pairs = set()
 
     for from_area, to_areas_dict in rando_connections.items():
         for to_area, door_count_forward in to_areas_dict.items():
-            # Create a canonical pair key (alphabetically sorted) to avoid duplicates
             pair_key = tuple(sorted([from_area, to_area]))
             if pair_key in processed_pairs:
                 continue
             processed_pairs.add(pair_key)
 
-            # Check if reverse connection exists (bidirectional)
             reverse_count = rando_connections.get(to_area, {}).get(from_area, 0)
             is_bidirectional = reverse_count > 0
 
-            # Check if either direction is new
             vanilla_dests_forward = vanilla_connections.get(from_area, set())
             vanilla_dests_reverse = vanilla_connections.get(to_area, set())
-            is_new_forward = to_area not in vanilla_dests_forward
-            is_new_reverse = from_area not in vanilla_dests_reverse if is_bidirectional else False
-            is_new = is_new_forward or is_new_reverse
+            is_new = (to_area not in vanilla_dests_forward) or (is_bidirectional and from_area not in vanilla_dests_reverse)
 
-            color = "#00AA00" if is_new else "#888888"
+            color = "#22c997" if is_new else "#555"
             width = 3 if is_new else 1
-
             from_name = short_names.get(from_area, from_area)
             to_name = short_names.get(to_area, to_area)
 
             if is_bidirectional:
-                # Bidirectional: show both directions with arrows on each end
                 arrows = {"to": {"enabled": True}, "from": {"enabled": True}}
-
-                # Build label showing door counts for both directions
-                total_doors = door_count_forward + reverse_count
                 if door_count_forward > 1 or reverse_count > 1:
-                    # Show counts per direction if different, or total if same
-                    if door_count_forward == reverse_count:
-                        edge_label = str(door_count_forward) if door_count_forward > 1 else ""
-                    else:
-                        edge_label = f"{door_count_forward}|{reverse_count}"
+                    edge_label = str(door_count_forward) if door_count_forward == reverse_count else f"{door_count_forward}|{reverse_count}"
                 else:
                     edge_label = ""
-
-                # Build tooltip
                 fwd_str = f" (x{door_count_forward})" if door_count_forward > 1 else ""
                 rev_str = f" (x{reverse_count})" if reverse_count > 1 else ""
                 new_marker = "NEW: " if is_new else ""
                 edge_title = f"{new_marker}{from_name} <-> {to_name}\n{from_name}->{to_name}{fwd_str}\n{to_name}->{from_name}{rev_str}"
             else:
-                # One-way: single arrow
                 arrows = "to"
                 count_str = f" (x{door_count_forward})" if door_count_forward > 1 else ""
                 edge_title = f"{'NEW: ' if is_new else ''}{from_name} -> {to_name}{count_str}"
                 edge_label = str(door_count_forward) if door_count_forward > 1 else ""
 
             edges_data.append({
-                "from": from_area,
-                "to": to_area,
-                "arrows": arrows,
-                "color": {"color": color, "highlight": "#FF0000"},
-                "width": width,
-                "dashes": False,
-                "title": edge_title,
-                "label": edge_label,
+                "from": from_area, "to": to_area, "arrows": arrows,
+                "color": {"color": color, "highlight": "#fbbf24"},
+                "width": width, "dashes": False, "title": edge_title, "label": edge_label,
                 "font": {"size": 10, "color": "#FFFFFF", "strokeWidth": 2, "strokeColor": "#000000"}
             })
 
-    # Generate redirect list HTML
     redirect_list_html = ""
     for source_id, redirect_info in sorted(redirects.items()):
         parts = source_id.replace("SCN_", "").split("|")
@@ -1019,8 +752,6 @@ def generate_door_map_html(redirects: Dict[str, dict], title: str = "Door Random
 
     nodes_json = json.dumps(nodes_data)
     edges_json = json.dumps(edges_data)
-
-    # Calculate total doors and unique connections
     total_doors = sum(sum(counts.values()) for counts in rando_connections.values())
     total_unique_connections = sum(len(counts) for counts in rando_connections.values())
 
@@ -1032,23 +763,24 @@ def generate_door_map_html(redirects: Dict[str, dict], title: str = "Door Random
     <script src="https://unpkg.com/vis-network@9.1.6/dist/vis-network.min.js"></script>
     <style>
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-        body {{ font-family: Arial, sans-serif; display: flex; height: 100vh; background: #1a1a2e; color: #eee; }}
-        #graph-container {{ flex: 1; height: 100%; background: #1a1a2e; }}
-        #error-msg {{ color: #ff6b6b; padding: 20px; display: none; }}
-        #sidebar {{ width: 350px; background: #16213e; padding: 20px; overflow-y: auto; border-left: 2px solid #0f3460; }}
-        h1 {{ font-size: 1.4em; margin-bottom: 15px; color: #e94560; }}
-        h2 {{ font-size: 1.1em; margin: 15px 0 10px 0; color: #0f3460; background: #e94560; padding: 5px 10px; border-radius: 4px; }}
-        .stats {{ background: #0f3460; padding: 10px; border-radius: 4px; margin-bottom: 15px; }}
-        .stats div {{ margin: 5px 0; }}
-        .redirect-item {{ background: #0f3460; padding: 8px; margin: 5px 0; border-radius: 4px; font-size: 0.9em; }}
-        .redirect-item .orig {{ color: #ff6b6b; text-decoration: line-through; }}
-        .redirect-item .arrow {{ color: #ffd93d; margin: 0 5px; }}
-        .redirect-item .new {{ color: #6bcb77; font-weight: bold; }}
-        .legend {{ margin-top: 20px; padding: 10px; background: #0f3460; border-radius: 4px; }}
-        .legend-item {{ display: flex; align-items: center; margin: 5px 0; }}
-        .legend-color {{ width: 30px; height: 4px; margin-right: 10px; border-radius: 2px; }}
-        .legend-color.new {{ background: #00AA00; height: 6px; }}
-        .legend-color.unchanged {{ background: #888888; }}
+        body {{ font-family: 'Inter','Segoe UI',system-ui,sans-serif; display: flex; height: 100vh; background: #0f1117; color: #e4e4e7; }}
+        #graph-container {{ flex: 1; height: 100%; background: #0f1117; }}
+        #error-msg {{ color: #ef5350; padding: 20px; display: none; }}
+        #sidebar {{ width: 350px; background: #161920; padding: 20px; overflow-y: auto; border-left: 1px solid #2a2d35; }}
+        h1 {{ font-size: 1.3em; margin-bottom: 15px; color: #e4e4e7; font-weight: 700; }}
+        h2 {{ font-size: 1em; margin: 15px 0 10px; color: #e4e4e7; background: #1e2028; padding: 6px 10px; border-radius: 6px; border: 1px solid #2a2d35; font-weight: 600; }}
+        .stats {{ background: #1e2028; padding: 10px 12px; border-radius: 6px; margin-bottom: 15px; border: 1px solid #2a2d35; font-size: 0.85em; color: #8b8d98; }}
+        .stats div {{ margin: 4px 0; }}
+        .redirect-item {{ background: #1e2028; padding: 8px 10px; margin: 4px 0; border-radius: 6px; font-size: 0.85em; border: 1px solid transparent; }}
+        .redirect-item:hover {{ border-color: #2a2d35; background: #262830; }}
+        .redirect-item .orig {{ color: #ef5350; text-decoration: line-through; opacity: 0.85; }}
+        .redirect-item .arrow {{ color: #5f6170; margin: 0 4px; }}
+        .redirect-item .new {{ color: #4ade80; font-weight: 600; }}
+        .legend {{ margin-top: 16px; padding: 10px 12px; background: #1e2028; border-radius: 6px; border: 1px solid #2a2d35; }}
+        .legend-item {{ display: flex; align-items: center; margin: 5px 0; font-size: 0.85em; color: #8b8d98; }}
+        .legend-color {{ width: 24px; height: 3px; margin-right: 10px; border-radius: 2px; }}
+        .legend-color.new {{ background: #22c997; height: 5px; }}
+        .legend-color.unchanged {{ background: #666; }}
     </style>
 </head>
 <body>
@@ -1063,34 +795,29 @@ def generate_door_map_html(redirects: Dict[str, dict], title: str = "Door Random
         </div>
         <div class="legend">
             <strong>Legend:</strong>
-            <div class="legend-item"><div class="legend-color new"></div><span>New/Changed Connection</span></div>
-            <div class="legend-item"><div class="legend-color unchanged"></div><span>Unchanged Connection</span></div>
-            <div class="legend-item"><span style="margin-left: 5px;">&lt;--&gt; Bidirectional (arrows both ends)</span></div>
-            <div class="legend-item"><span style="margin-left: 5px;">Numbers show door count (or A|B for each direction)</span></div>
+            <div class="legend-item"><div class="legend-color new"></div><span>New/Changed</span></div>
+            <div class="legend-item"><div class="legend-color unchanged"></div><span>Unchanged</span></div>
+            <div class="legend-item"><span style="margin-left: 5px;">&lt;--&gt; Bidirectional</span></div>
         </div>
         <h2>Door Redirects</h2>
         <div id="redirect-list">{redirect_list_html}</div>
     </div>
     <script>
         try {{
-            var nodesData = {nodes_json};
-            var edgesData = {edges_json};
-            var nodes = new vis.DataSet(nodesData);
-            var edges = new vis.DataSet(edgesData);
+            var nodes = new vis.DataSet({nodes_json});
+            var edges = new vis.DataSet({edges_json});
             var container = document.getElementById("graph-container");
-            var data = {{ nodes: nodes, edges: edges }};
             var options = {{
                 physics: {{ enabled: true, solver: "forceAtlas2Based", forceAtlas2Based: {{ gravitationalConstant: -100, centralGravity: 0.01, springLength: 150, springConstant: 0.08, damping: 0.4 }}, stabilization: {{ iterations: 200 }} }},
                 nodes: {{ shape: "box", margin: 10, shadow: true }},
                 edges: {{ smooth: {{ type: "curvedCW", roundness: 0.2 }}, shadow: true }},
                 interaction: {{ hover: true, tooltipDelay: 100 }}
             }};
-            var network = new vis.Network(container, data, options);
+            var network = new vis.Network(container, {{ nodes: nodes, edges: edges }}, options);
             network.on("stabilizationIterationsDone", function() {{ network.setOptions({{ physics: {{ enabled: false }} }}); }});
         }} catch (e) {{
             document.getElementById("error-msg").style.display = "block";
             document.getElementById("error-msg").innerText = "Error: " + e.message;
-            console.error(e);
         }}
     </script>
 </body>
@@ -1099,27 +826,18 @@ def generate_door_map_html(redirects: Dict[str, dict], title: str = "Door Random
     return html
 
 
-# For testing
 if __name__ == "__main__":
     import json
     import random as stdlib_random
 
-    # Test with embedded data
     print("Testing with embedded door data...")
-
 
     class MockRandom:
         def randint(self, a, b):
             return stdlib_random.randint(a, b)
 
-
-    mock_random = MockRandom()
-    result = generate_door_randomization_for_ap(mock_random)
-
+    result = generate_door_randomization_for_ap(MockRandom())
     print(f"\nGenerated {len(result)} door redirects")
     print("\nSample output (first 3):")
     for i, (door_id, redirect) in enumerate(list(result.items())[:3]):
         print(f"  {door_id}: -> {redirect['target_area_name']}")
-
-    print("\nFull JSON export:")
-    print(json.dumps(result, indent=2)[:1000] + "...")

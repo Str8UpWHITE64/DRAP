@@ -515,6 +515,7 @@ function M.set_redirects(redirects)
             target_area = redirect_data.target_area,
             target_pos = redirect_data.target_pos or redirect_data.position,
             target_angle = redirect_data.target_angle or redirect_data.angle,
+            template_door_id = redirect_data.template_door_id,
         }
         count = count + 1
     end
@@ -553,6 +554,12 @@ function M.get_redirect_config_count()
     local count = 0
     for _ in pairs(DOOR_REDIRECTS) do count = count + 1 end
     return count
+end
+
+--- Returns the current door redirects table
+--- @return table Dictionary of door_id -> redirect info
+function M.get_redirects()
+    return DOOR_REDIRECTS
 end
 
 --- Returns whether the hook is installed

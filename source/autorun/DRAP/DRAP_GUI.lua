@@ -12,6 +12,7 @@ local M = Shared.create_module("DRAP_GUI")
 
 local ItemSpawner = nil
 local ScoopUnlocker = nil
+local DoorVisualizer = nil
 
 local function ensure_modules()
     if not ItemSpawner then
@@ -21,6 +22,10 @@ local function ensure_modules()
     if not ScoopUnlocker then
         local ok, mod = pcall(require, "DRAP/ScoopUnlocker")
         if ok then ScoopUnlocker = mod end
+    end
+    if not DoorVisualizer then
+        local ok, mod = pcall(require, "DRAP/DoorVisualizer")
+        if ok then DoorVisualizer = mod end
     end
 end
 
@@ -37,7 +42,7 @@ local active_tab = "Items"
 -- Drawing
 ------------------------------------------------------------
 
-local TAB_LIST = { "Items", "Keys", "Scoops" }
+local TAB_LIST = { "Items", "Keys", "Scoops", "Doors" }
 
 local function draw_window()
     if not window_visible then return end
@@ -86,6 +91,12 @@ local function draw_window()
             ScoopUnlocker.draw_tab_content(debug_mode)
         else
             imgui.text_colored("ScoopUnlocker not loaded", 0xFFFF8800)
+        end
+    elseif active_tab == "Doors" then
+        if DoorVisualizer and DoorVisualizer.draw_tab_content then
+            DoorVisualizer.draw_tab_content(debug_mode)
+        else
+            imgui.text_colored("DoorVisualizer not loaded", 0xFFFF8800)
         end
     end
 
