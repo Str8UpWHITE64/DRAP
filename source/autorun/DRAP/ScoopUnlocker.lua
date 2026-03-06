@@ -58,7 +58,8 @@ local SCOOP_DATA = {
         completion_event = "Beat up Isabela",
     },
     ["A Promise to Isabela"] = {
-        primary_flag = 773, secondary_flags = { 286 }, category = "Main", order = 10,
+        primary_flag = 773, secondary_flags = { 286 }, disable_flags = { 292 },
+        category = "Main", order = 10,
         completion_event = "Carry Isabela back to the Safe Room",
     },
     ["Santa Cabeza"] = {
@@ -71,6 +72,7 @@ local SCOOP_DATA = {
     },
     ["Hideout"] = {
         primary_flag = 776, secondary_flags = { 265 }, disable_flags = { 304 },
+        disable_on_unlock = { 355 },
         category = "Main", order = 13,
         -- Completion via COMPLETION_FLAGS[2322] (EventTracker fires too early)
     },
@@ -84,7 +86,7 @@ local SCOOP_DATA = {
     },
     ["The Facts"] = {
         primary_flag = 305, secondary_flags = { 348 }, category = "Main", order = 16,
-        completion_event = "Complete Memories",
+        completion_event = "Get bit!",
     },
 
     -- Survivor Scoops
@@ -452,7 +454,10 @@ local MAIN_BLOCKS_SIDE = {
 local SIDE_BLOCKED_BY_MAIN = {}
 for main_name, side_list in pairs(MAIN_BLOCKS_SIDE) do
     for _, side_name in ipairs(side_list) do
-        SIDE_BLOCKED_BY_MAIN[side_name] = main_name
+        if not SIDE_BLOCKED_BY_MAIN[side_name] then
+            SIDE_BLOCKED_BY_MAIN[side_name] = {}
+        end
+        table.insert(SIDE_BLOCKED_BY_MAIN[side_name], main_name)
     end
 end
 
@@ -465,7 +470,7 @@ local SCOOP_PREREQUISITES = {
 local COMPLETION_FLAGS = {
     [769] = { event = "Meet Jessie in the Service Hallway", scoop = "Meet Jessie in the Service Hallway" },
     [270] = { event = "Complete Backup for Brad" },
-    [272] = { event = "Escort Brad to see Dr Barnaby", scoop = "Backup for Brad" },
+    [2280] = { event = "Escort Brad to see Dr Barnaby", scoop = "Backup for Brad" },
     [273] = { event = "Complete Temporary Agreement", scoop = "A Temporary Agreement" },
     [275] = { event = "Complete Image in the Monitor", scoop = "Image in the Monitor" },
     [277] = { event = "Complete Rescue the Professor", scoop = "Rescue the Professor" },
@@ -482,6 +487,7 @@ local COMPLETION_FLAGS = {
     [1292] = { event = "Kill Kent on Day 3", scoop = "Photographer's Pride" },
 
     -- Event-only checks (no scoop completion)
+    [2356] = { event = "Complete Memories" },
     [316]  = { event = "Frank sees a sick-ass RC Drone" },
     [129]  = { event = "See the crashed helicopter" },
     [131]  = { event = "Reach the end of the tunnel with Isabela" },
@@ -500,7 +506,6 @@ local CASCADE_FLAGS = {
     -- An Odd Old Man (merged into Backup for Brad)
     [270]  = "Backup for Brad",
     [271]  = "Backup for Brad",
-    [1204] = "Backup for Brad",
 
     -- Rescue the Professor
     --[276]  = "Rescue the Professor",
@@ -568,7 +573,6 @@ local door_randomizer_enabled = false
 local on_ap_activated_callback = nil
 local on_time_freeze_callback = nil
 local on_time_unfreeze_callback = nil
-local hideout_355_handled = false   -- one-shot: true after we disable 355 when Hideout is active
 local endgame_reached = false       -- true after Get bit! or Ending A (persisted)
 local save_filename = nil
 
@@ -702,9 +706,14 @@ local function is_conflict_blocked(scoop_name)
 end
 
 local function is_blocked_by_active_main(scoop_name)
-    local blocking_main = SIDE_BLOCKED_BY_MAIN[scoop_name]
-    if not blocking_main then return false end
-    return received_scoops[blocking_main] == true and not completed_scoops[blocking_main]
+    local blockers = SIDE_BLOCKED_BY_MAIN[scoop_name]
+    if not blockers then return false end
+    for _, main_name in ipairs(blockers) do
+        if received_scoops[main_name] == true and not completed_scoops[main_name] then
+            return true, main_name
+        end
+    end
+    return false
 end
 
 local function has_prerequisites_met(scoop_name)
@@ -762,17 +771,31 @@ local function get_all_conflict_blocked_flags()
     return blocked_flags
 end
 
--- Primary flags left alone when their mission hasn't been received yet.
--- Only for flags needed for NPC state transitions (not cutscene/fight triggers).
+-- Primary flags the enforcement loop should not touch (conditionally or always).
+-- Each entry maps a flag to { scoop, [while_active] }.
+--   scoop           – the CONTROLLED_FLAGS owner this protection applies to.
+--   while_active    – (optional) only protect while this OTHER scoop is active
+--                     (received + not completed). Omit for unconditional protection.
+--
+-- 292: Isabela NPC despawn after Promise to Isabela.  Santa Cabeza needs BOTH
+--      292 AND 774, so leaving 292 alone permanently is safe.
+-- 272: Set by the game during Backup for Brad's ending sequence.  Enforcement
+--      must not touch it until 2280 fires (completing Backup for Brad), after
+--      which it can be managed normally for A Temporary Agreement.
 local PROTECTED_PRIMARY_FLAGS = {
-    [292] = "Santa Cabeza",  -- Isabela NPC despawn after Promise to Isabela
+    [292] = { scoop = "Santa Cabeza" },
+    [272] = { scoop = "A Temporary Agreement", while_active = "Backup for Brad" },
 }
 
 local function is_protected_primary(flag_id, scoop_name)
-    local expected_scoop = PROTECTED_PRIMARY_FLAGS[flag_id]
-    if not expected_scoop then return false end
-    if expected_scoop ~= scoop_name then return false end
-    if received_scoops[scoop_name] then return false end
+    local entry = PROTECTED_PRIMARY_FLAGS[flag_id]
+    if not entry then return false end
+    if entry.scoop ~= scoop_name then return false end
+    if entry.while_active then
+        -- Only protected while the guarding scoop is active (received + not completed)
+        return received_scoops[entry.while_active] == true
+           and not completed_scoops[entry.while_active]
+    end
     return true
 end
 
@@ -853,22 +876,6 @@ local function enforce_flags()
         end
     end
 
-    -- Flag 355 controls Hideout mission. One-shot disable when Hideout becomes active,
-    -- then leave it alone for the game to manage.
-    if ap_activated then
-        if completed_scoops["Hideout"] then
-            hideout_355_handled = true
-        end
-
-        if not hideout_355_handled and M.get_current_chain_scoop() == "Hideout" then
-            hideout_355_handled = true
-            if raw_check_flag(355) then
-                raw_set_flag_off(355)
-                M.log("Hideout: disabled flag 355 (Hideout active — one-shot)")
-            end
-        end
-    end
-
     -- Enable Entrance Plaza door (flag 276) only while in Paradise Plaza.
     -- 276 is tied to Rescue the Professor ending, so we suppress it elsewhere.
     -- Exception: when Rescue the Professor is active, let the game manage 276.
@@ -889,6 +896,35 @@ local function enforce_flags()
                     raw_set_flag_off(276)
                     if verbose_logging then
                         M.log("Entrance Plaza door: disabled flag 276 (player left Paradise Plaza)")
+                    end
+                end
+            end
+        end
+    end
+
+    -- Toggle flag 355 based on area: ON in North Plaza, OFF in Hideout.
+    -- While Hideout is active (received + not completed), skip area toggling
+    -- so the game can manage 355 on its own (it enables 355 for a cutscene).
+    -- The one-time disable at unlock (disable_on_unlock) ensures 355 starts OFF.
+    if ap_activated then
+        local hideout_active = received_scoops["Hideout"]
+                           and not completed_scoops["Hideout"]
+        if not hideout_active then
+            local area = get_current_area_index()
+            if area == NORTH_PLAZA_AREA_INDEX then
+                if not raw_check_flag(355) then
+                    currently_unlocking = true
+                    raw_set_flag_on(355)
+                    currently_unlocking = false
+                    if verbose_logging then
+                        M.log("Area toggle: enabled flag 355 (player in North Plaza)")
+                    end
+                end
+            elseif area == HIDEOUT_AREA_INDEX then
+                if raw_check_flag(355) then
+                    raw_set_flag_off(355)
+                    if verbose_logging then
+                        M.log("Area toggle: disabled flag 355 (player in Hideout)")
                     end
                 end
             end
@@ -979,7 +1015,9 @@ local function enforce_flags()
         local should_be_on = (received_scoops[scoop_name] == true)
                          and (not completed_scoops[scoop_name])
 
-        if should_be_on then
+        if is_protected_primary(flag_id, scoop_name) then
+            -- Leave this flag entirely alone; the game manages it.
+        elseif should_be_on then
             if not raw_check_flag(flag_id) then
                 currently_unlocking = true
                 raw_set_flag_on(flag_id)
@@ -990,8 +1028,7 @@ local function enforce_flags()
                 end
             end
         else
-            if not is_protected_primary(flag_id, scoop_name)
-               and not is_in_completion_grace(scoop_name)
+            if not is_in_completion_grace(scoop_name)
                and raw_check_flag(flag_id) then
                 raw_set_flag_off(flag_id)
                 disabled_count = disabled_count + 1
@@ -1055,8 +1092,15 @@ local function enforce_flags()
     end
 
     -- Suppress side scoops blocked by an active main scoop (crash prevention)
-    for side_name, main_name in pairs(SIDE_BLOCKED_BY_MAIN) do
-        if received_scoops[main_name] and not completed_scoops[main_name] then
+    for side_name, blocker_list in pairs(SIDE_BLOCKED_BY_MAIN) do
+        local active_blocker = nil
+        for _, main_name in ipairs(blocker_list) do
+            if received_scoops[main_name] and not completed_scoops[main_name] then
+                active_blocker = main_name
+                break
+            end
+        end
+        if active_blocker then
             local data = SCOOP_DATA[side_name]
             if data and data.flags then
                 for _, flag_id in ipairs(data.flags) do
@@ -1064,7 +1108,7 @@ local function enforce_flags()
                         raw_set_flag_off(flag_id)
                         if verbose_logging then
                             M.log(string.format("Main-blocked: suppressed flag %d ('%s' blocked by active '%s')",
-                                flag_id, side_name, main_name))
+                                flag_id, side_name, active_blocker))
                         end
                     end
                 end
@@ -1321,6 +1365,12 @@ function M.unlock_scoop(scoop_name)
                 scoop_name, tostring(blocker)))
             return false, 0
         end
+        local main_blocked, main_blocker = is_blocked_by_active_main(scoop_name)
+        if main_blocked then
+            M.log(string.format("Main-blocked deferred: '%s' blocked by active '%s'",
+                scoop_name, tostring(main_blocker)))
+            return false, 0
+        end
         if not has_prerequisites_met(scoop_name) then
             M.log(string.format("Prerequisite deferred: '%s' — missing required completions", scoop_name))
             return false, 0
@@ -1329,6 +1379,21 @@ function M.unlock_scoop(scoop_name)
 
     received_scoops[scoop_name] = true
     currently_unlocking = true
+
+    -- disable_flags BEFORE enabling mission flags — prevents stale flags from
+    -- triggering immediate completion (e.g. 292 left over from Santa Cabeza).
+    -- disable_on_unlock is the same but only fires here (not in the enforcement
+    -- loop), so the game can re-enable the flag later (e.g. 355 for Hideout cutscene).
+    for _, list in ipairs({ scoop.disable_flags, scoop.disable_on_unlock }) do
+        if list then
+            for _, flag_id in ipairs(list) do
+                if raw_check_flag(flag_id) then
+                    raw_set_flag_off(flag_id)
+                    M.log(string.format("Disabled conflicting flag %d for '%s'", flag_id, scoop_name))
+                end
+            end
+        end
+    end
 
     local count = 0
 
@@ -1353,16 +1418,6 @@ function M.unlock_scoop(scoop_name)
         end
         M.log(string.format("Unlocked %s '%s' (%d flags)",
             scoop.category, scoop_name, count))
-    end
-
-    -- disable_flags apply to all scoop categories (Main, Psychopath, etc.)
-    if scoop.disable_flags then
-        for _, flag_id in ipairs(scoop.disable_flags) do
-            if raw_check_flag(flag_id) then
-                raw_set_flag_off(flag_id)
-                M.log(string.format("Disabled conflicting flag %d for '%s'", flag_id, scoop_name))
-            end
-        end
     end
 
     currently_unlocking = false
@@ -1558,7 +1613,6 @@ function M.reset_all()
     scoop_order_set = false
     time_skips_fired = {}
     active_time_skip = nil
-    hideout_355_handled = false
     endgame_reached = false
     M.log("Reset all scoop tracking")
     save_state()
@@ -1608,7 +1662,6 @@ function M.reset_for_new_game()
     ap_activated = false
     time_skips_fired = {}
     active_time_skip = nil
-    hideout_355_handled = false
     endgame_reached = false
 
     M.log(string.format("Reset %d side scoops, preserved %d main completions",

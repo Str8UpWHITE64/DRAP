@@ -528,7 +528,6 @@ location_tables = {
         DRLocationData("Photograph all PP Stickers", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Escort 8 survivors at once", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Frank the pimp", "Milk", DRLocationCategory.CHALLENGE),
-        DRLocationData("Build a profile for 87 survivors", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Save 10 survivors", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Save 50 survivors", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Get 10000 PP in one photo", "Milk", DRLocationCategory.CHALLENGE),
