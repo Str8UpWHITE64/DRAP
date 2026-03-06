@@ -12,6 +12,58 @@ local M = Shared.create_module("DoorVisualizer")
 ------------------------------------------------------------
 
 local HTML_OUTPUT_PATH = "door_map.html"
+local MALL_PNG_PATH = "Mall.png"
+
+------------------------------------------------------------
+-- Base64 Encoder
+------------------------------------------------------------
+
+local b64chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+
+local function base64_encode(data)
+    local parts = {}
+    local len = #data
+    for i = 1, len, 3 do
+        local b1 = data:byte(i)
+        local b2 = (i + 1 <= len) and data:byte(i + 1) or 0
+        local b3 = (i + 2 <= len) and data:byte(i + 2) or 0
+
+        local n = b1 * 65536 + b2 * 256 + b3
+
+        local c1 = math.floor(n / 262144) % 64
+        local c2 = math.floor(n / 4096) % 64
+        local c3 = math.floor(n / 64) % 64
+        local c4 = n % 64
+
+        local remaining = len - i + 1
+        if remaining >= 3 then
+            parts[#parts + 1] = b64chars:sub(c1+1,c1+1) .. b64chars:sub(c2+1,c2+1) ..
+                                b64chars:sub(c3+1,c3+1) .. b64chars:sub(c4+1,c4+1)
+        elseif remaining == 2 then
+            parts[#parts + 1] = b64chars:sub(c1+1,c1+1) .. b64chars:sub(c2+1,c2+1) ..
+                                b64chars:sub(c3+1,c3+1) .. "="
+        else
+            parts[#parts + 1] = b64chars:sub(c1+1,c1+1) .. b64chars:sub(c2+1,c2+1) .. "=="
+        end
+    end
+    return table.concat(parts)
+end
+
+local function load_mall_png_base64()
+    local file = io.open(MALL_PNG_PATH, "rb")
+    if not file then
+        M.log("WARNING: Could not open " .. MALL_PNG_PATH)
+        return nil
+    end
+    local data = file:read("*a")
+    file:close()
+    if not data or #data == 0 then
+        M.log("WARNING: " .. MALL_PNG_PATH .. " is empty")
+        return nil
+    end
+    M.log(string.format("Read %s (%d bytes)", MALL_PNG_PATH, #data))
+    return base64_encode(data)
+end
 
 ------------------------------------------------------------
 -- Static Data: Area Colors (17 areas)
@@ -392,6 +444,15 @@ local function generate_html()
     local redir_html = build_redirect_list_html(redirects)
     local chips_html = build_area_chips_html(connections)
 
+    -- Load Mall.png and embed as base64 data URI
+    local mall_b64 = load_mall_png_base64()
+    local img_src
+    if mall_b64 then
+        img_src = "data:image/png;base64," .. mall_b64
+    else
+        img_src = "Mall.png"  -- fallback to relative path
+    end
+
     -- Build full HTML using efficient table.concat pattern
     local parts = {}
     local function emit(s) parts[#parts + 1] = s end
@@ -661,9 +722,11 @@ canvas#overlay { position:absolute; top:0; left:0; pointer-events:none; }
     </div>
   </div>
   <div id="map-container">
-    <img id="map-image" src="Mall.png" draggable="false">
+    <img id="map-image" src="]==])
+    emit(img_src)
+    emit([==[" draggable="false">
     <canvas id="overlay"></canvas>
-  </div>
+  </div>]==])
   <div id="zoom-ctrls">
     <button onclick="zoomIn()">+</button>
     <button onclick="zoomOut()">&minus;</button>
@@ -1243,10 +1306,10 @@ updateSidebar();
 end
 
 ------------------------------------------------------------
--- File I/O and Browser Launch
+-- File I/O
 ------------------------------------------------------------
 
-local function write_and_open_html()
+local function write_html()
     local html = generate_html()
     if not html or #html == 0 then
         M.log("ERROR: Failed to generate HTML")
@@ -1262,9 +1325,6 @@ local function write_and_open_html()
     file:write(html)
     file:close()
     M.log(string.format("Door map written to %s (%d bytes)", HTML_OUTPUT_PATH, #html))
-
-    -- Open in default browser (Windows-only game)
-    os.execute('start "" "' .. HTML_OUTPUT_PATH .. '"')
 
     return true, nil
 end
@@ -1297,7 +1357,7 @@ function M.draw_tab_content(debug)
     imgui.spacing()
 
     if imgui.button("Generate Door Map") then
-        local ok, err_msg = write_and_open_html()
+        local ok, err_msg = write_html()
         if ok then
             last_generate_status = "success"
         else
@@ -1311,7 +1371,7 @@ function M.draw_tab_content(debug)
         local elapsed = os.clock() - last_generate_time
         if elapsed < 5 then
             if last_generate_status == "success" then
-                imgui.text_colored("Door map generated and opened in browser!", 0xFF00FF00)
+                imgui.text_colored("Door map saved to " .. HTML_OUTPUT_PATH .. "!", 0xFF00FF00)
             else
                 imgui.text_colored("Error: " .. last_generate_status, 0xFFFF0000)
             end
