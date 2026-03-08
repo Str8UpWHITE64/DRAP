@@ -144,14 +144,14 @@ local DOOR_MAP_POSITIONS = {
     ["SCN_s200|s600|door0"] = {648.7, 320.2},
     ["SCN_s200|s700|door0"] = {540.6, 307.2},
     ["SCN_s231|s136|door0"] = {707.8, 457.3},
-    ["SCN_s231|s230|door0"] = {703.3, 482.5},
-    ["SCN_s231|s230|door1"] = {738.5, 476.6},
+    ["SCN_s231|s230|door0"] = {738.5, 476.6},
+    ["SCN_s231|s230|door1"] = {703.3, 482.5},
     ["SCN_s136|s100|door0"] = {724.8, 730.9},
     ["SCN_s136|s135|door0"] = {734.1, 714.5},
     ["SCN_s136|s231|door0"] = {734.6, 687.8},
     ["SCN_s230|s200|door0"] = {622.5, 441.5},
-    ["SCN_s230|s231|door0"] = {647.1, 490.0},
-    ["SCN_s230|s231|door1"] = {650.1, 448.7},
+    ["SCN_s230|s231|door0"] = {650.1, 448.7},
+    ["SCN_s230|s231|door1"] = {647.1, 490.0},
     ["SCN_s300|s200|door0"] = {228.1, 316.5},
     ["SCN_s300|s400|door0"] = {135.9, 213.0},
     ["SCN_s400|s300|door0"] = {131.9, 197.0},
@@ -726,7 +726,7 @@ canvas#overlay { position:absolute; top:0; left:0; pointer-events:none; }
     emit(img_src)
     emit([==[" draggable="false">
     <canvas id="overlay"></canvas>
-  </div>]==])
+  </div>
   <div id="zoom-ctrls">
     <button onclick="zoomIn()">+</button>
     <button onclick="zoomOut()">&minus;</button>
