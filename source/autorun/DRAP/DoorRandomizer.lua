@@ -74,6 +74,7 @@ local DOOR_REDIRECTS = {}
 
 -- Enable/disable randomization
 local randomization_enabled = false
+local suppressed = false  -- temporarily suppress redirects (e.g. during escort missions)
 
 -- Cache for HIT_DATA fields
 local hit_data_fields = {}
@@ -406,7 +407,7 @@ local function install_hook()
                     local was_redirected = false
                     local redirect_target = nil
 
-                    if randomization_enabled and DOOR_REDIRECTS[door_id] then
+                    if randomization_enabled and not suppressed and DOOR_REDIRECTS[door_id] then
                         local redirect = DOOR_REDIRECTS[door_id]
                         redirect_target = redirect.target_area
 
@@ -539,9 +540,22 @@ function M.clear_redirects()
     M.log("Door redirects cleared")
 end
 
---- Returns whether door randomization is enabled
+--- Returns whether door randomization is actively redirecting
 function M.is_enabled()
-    return randomization_enabled
+    return randomization_enabled and not suppressed
+end
+
+--- Temporarily suppress or unsuppress door redirects (e.g. during escort missions)
+function M.set_suppressed(value)
+    if suppressed ~= value then
+        suppressed = value
+        M.log("Door redirects " .. (value and "SUPPRESSED" or "UNSUPPRESSED"))
+    end
+end
+
+--- Returns whether door randomization is currently suppressed
+function M.is_suppressed()
+    return suppressed
 end
 
 --- Returns the current redirect count (how many times redirects have been applied)
@@ -663,7 +677,7 @@ local function scan_and_set_doors_disabled(disabled)
 end
 
 local function update_vehicle_door_blocking()
-    if not randomization_enabled then return end
+    if not randomization_enabled or suppressed then return end
 
     local in_vehicle = is_player_in_vehicle()
     if in_vehicle == player_was_in_vehicle then return end
@@ -785,7 +799,8 @@ end
 re.on_draw_ui(function()
     if imgui.tree_node("DRAP: DoorRandomizer") then
         imgui.text("Hook Installed: " .. tostring(hook_installed))
-        imgui.text("Randomization: " .. (randomization_enabled and "ENABLED" or "DISABLED"))
+        imgui.text("Randomization: " .. (randomization_enabled and "ENABLED" or "DISABLED")
+            .. (suppressed and " (SUPPRESSED)" or ""))
         imgui.text("Redirects Configured: " .. tostring(M.get_redirect_config_count()))
         imgui.text("Redirects Applied: " .. tostring(redirect_count))
         imgui.text("Player In Vehicle: " .. tostring(player_was_in_vehicle))

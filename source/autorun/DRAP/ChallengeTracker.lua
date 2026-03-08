@@ -39,8 +39,8 @@ local CHALLENGES = {
     },
     changeClothNum = {
         label   = "Outfit changes",
-        targets = { 5, 50 },
-        location_ids = { "Change into 5 new outfits", "Change into 50 new outfits" },
+        targets = { 5, 46 },
+        location_ids = { "Change into 5 new outfits", "Change into 46 new outfits" },
     },
     npcnum = {
         label   = "Total survivors encountered",
