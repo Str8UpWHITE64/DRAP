@@ -56,23 +56,42 @@ Currently, there is only one goal, to get Ending S and beat Brock. We may add mo
 11. Start a new game and enjoy!
 
 ## Gameplay Notes
+There are two main modes for this: ScoopSanity and regular.  ScoopSanity is the default and recommended mode as it adds a new way to play the game and more random-ness.
+
+### ScoopSanity
+
+All scoops, main story and side missions, are randomized.  Time is frozen after you complete the prologue mission "Get to the stairs!".  The order for main scoops is randomized and are sent as items to the player.  In order to progress through the now randomized story, you must be sent and complete each main scoop in order.
+
+Side scoops are also randomized, and are active the moment you receive them. This means that if you receive the side scoop "Above the Law", you can immediately go to Wonderland Plaza and fight Jo.  All side scoops are added to the pool of items to be sent to you, and all psychos and survivors are in the location pool to complete.  
+
+You can view the main scoops you have completed in the AP Client UI, and the side scoops you have active in the "Scoop Status" section of the AP Items Window.  You can also view the main scoop order in the spoiler log of the APWorld.
+
+### Non-ScoopSanity
+The main story scoops are in their normal order, but time-lock items are added to the pool.  This means that in order to progress through the story, you need to get sent items that allow you to progress time until the next main scoop.  There are 5 time-lock items, meaning that in order to win the game, you need to get each of the 5 time-locks and complete the main scoops. 
+
+
+### General
 - There are two main ways items are handled in this mod: Granted items and Restricted items.  This is determined by the options selected in your APWorld YAML file.
   - Granted items show up in the AP Items window (see below) and can be spawned at any time.  These items are added to the list of items you have received from the APWorld, and can be spawned at any time.
   - Restricted items are items that you are allowed to pick up in the world after you have received them from the APWorld.  These items will show up in the AP Items window, but you cannot spawn them.  Instead, you must find them in the world like normal.  If you haven't gotten the item from the APWorld yet, you will not be able to pick it up in the world.
-- Door locks and time locks gate your progress.  If you can't get to an area, you likely need to find the key for it. If you notice time isn't progressing towards a main scoop, you likely need an item.
-- If you disconnect while playing, you will send challenge and level locations on reconnect, but events and PP stickers wont go automatically.  I will try to add this in the future.
-- To open the ItemSpawner window, go into the REFramework window, scroll down to "Script Generated UI" and check "Show AP Items Window".  This will open a new window where you can spawn items you have received from the APWorld.
+- Door locks and time locks gate your progress.  If you can't get to an area, you likely need to find the key for it. If you notice time isn't progressing towards a main scoop, you likely need an item.  Time-locks are sent on connection for ScoopSanity, and missions are sent to you as items.  DoorSanity also grants all door-locks on first connection.
+- With DoorSanity enabled, you can generate a map HTML file with each of the door redirections.  You can find this in the "Doors" section of the Archipelago window.
+- If you disconnect while playing, you will send challenge and level locations on reconnect.
+- To open the ItemSpawner window, go into the REFramework window, scroll down to "Script Generated UI" and check "Show AP Items Window".  This will open a new window where you can spawn items you have received from the APWorld, view your scoop statuses, your keys to areas, and generate your DoorSanity HTML file.
 
 ## Known Bugs
+
+### **If playing on ScoopSanity, leaving 10 or more NPCs behind in an area will cause the game to crash.  If you have 10 or more NPCs with you, make sure they come with you to the next area.**
+
 Spawning items is by far the most buggy part of this mod.  When spawning items using the AP Items Window, try not to spam the spawn button.  Wait a few seconds after spawning an item before spawning another one.  If you do spawn multiple items quickly, you increase your chances of the game crashing.
 
-Some users are experiencing an issue where they are unable to save after connecting to the APWorld.  If you have this issue, close the game, open the AP_DRDR_main.lua file in a text file editor and change ``local redirect_save_path = true`` to ``local redirect_save_path = false``.  This will make it so the AP saves will use your default save directory, so make sure you are only loading saves for the APWorld. 
-
-PP Stickers are a little iffy.  They usually send without issue, but I have seen them not send until you leave the area and re-enter it.  I have also seen them send the wrong one, too.  Nothing too major, just keep it in mind.
+Some users are experiencing an issue where they are unable to save after connecting to the APWorld.  If you have this issue, close the game, and go to your save location at "C:\Program Files (x86)\Steam\userdata\{Your SteamID}\2527390\remote", delete any leftover AP saves, then open the game again.  If this doesn't work, you can also disable the "Redirect" option in the Archipelago Connect window. This will make it so the AP saves will use your default save directory, so make sure you are only loading saves for the APWorld. 
 
 ## Final note
 I spent countless hours playing the original game when I was younger, and spent plenty playing this version when it came out.  I hope you enjoy this implementation, and I look forward to seeing how people play it!
 
-A lot of time went into making this, and I hope to continue improving it.  Please be patient as I work through bugs and add new features.  This is my first time making an REFramework mod, and it will show.
+A lot of time went into making this, and I hope to continue improving it.  Shoutout to Razgriz for spending tons of their free time helping me get ScoopSanity implemented.  We probably each added a few hundred hours to our play time to make sure its in as good a spot as it is now.
+
+Please be patient as I work through bugs and add new features.  This is my first time making an REFramework mod, and it will show.
 
 Shoutout to ArsonAssassin for the APWorld help.  Check out his GitHub page [here](https://github.com/ArsonAssassin) for other mods he has done.

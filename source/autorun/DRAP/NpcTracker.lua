@@ -69,7 +69,6 @@ local survivor_json_loaded = false
 local baseinfo_name_field = nil
 local baseinfo_state_field = nil
 
-local survivor_states = {}    -- key: tostring(npc_info) -> last state
 local rescued_survivors = {}  -- key: npc_id -> true once rescued
 
 ------------------------------------------------------------
@@ -201,7 +200,6 @@ end
 npc_mgr.on_instance_changed = function(old, new)
     baseinfo_name_field = nil
     baseinfo_state_field = nil
-    survivor_states = {}
 end
 
 function M.on_frame()
@@ -242,23 +240,9 @@ function M.on_frame()
                 local ok_state, state_raw = pcall(baseinfo_state_field.get_data, baseinfo_state_field, npc_info)
                 local state_index = (ok_state and state_raw) and (tonumber(state_raw) or 0) or 0
 
-                -- Track state changes
-                local key = tostring(npc_info)
-                local prev_state = survivor_states[key]
-
-                if prev_state == nil then
-                    survivor_states[key] = state_index
-                elseif prev_state ~= state_index then
-                    survivor_states[key] = state_index
-
-                    -- FOUND / JOIN -> ENTER_SAFTY_AREA / SAFTY_AREA = rescue
-                    local is_join_to_safe =
-                        (prev_state == LIVE_STATE.JOIN or prev_state == LIVE_STATE.FOUND) and
-                        (state_index == LIVE_STATE.ENTER_SAFTY_AREA or state_index == LIVE_STATE.SAFTY_AREA)
-
-                    if is_join_to_safe then
-                        on_survivor_rescued_internal(npc_id, state_index)
-                    end
+                -- NPC is in the safe room → count as rescued
+                if state_index == LIVE_STATE.ENTER_SAFTY_AREA or state_index == LIVE_STATE.SAFTY_AREA then
+                    on_survivor_rescued_internal(npc_id, state_index)
                 end
             end
         end
