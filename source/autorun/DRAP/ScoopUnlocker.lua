@@ -297,7 +297,7 @@ local SCOOP_DATA = {
     },
 
     -- Special
-    ["Maintenance Tunnel Access key"] = {
+    ["Maintenance Tunnel Access Key"] = {
         flags = { 2082 },
         npcs = { "" },
         category = "Special",
@@ -470,7 +470,7 @@ local SCOOP_PREREQUISITES = {
 local COMPLETION_FLAGS = {
     [769] = { event = "Meet Jessie in the Service Hallway", scoop = "Meet Jessie in the Service Hallway" },
     [270] = { event = "Complete Backup for Brad" },
-    [2280] = { event = "Escort Brad to see Dr Barnaby", scoop = "Backup for Brad" },
+    [2308] = { event = "Escort Brad to see Dr Barnaby", scoop = "Backup for Brad" },
     [273] = { event = "Complete Temporary Agreement", scoop = "A Temporary Agreement" },
     [275] = { event = "Complete Image in the Monitor", scoop = "Image in the Monitor" },
     [277] = { event = "Complete Rescue the Professor", scoop = "Rescue the Professor" },
@@ -503,9 +503,12 @@ local CASCADE_FLAGS = {
     [1282] = "Backup for Brad",
     [418]  = "Backup for Brad",
 
-    -- An Odd Old Man (merged into Backup for Brad)
+    -- An Odd Old Man
     [270]  = "Backup for Brad",
     [271]  = "Backup for Brad",
+
+    -- Another Source
+    [2433] = "Another Source",
 
     -- Rescue the Professor
     --[276]  = "Rescue the Professor",
@@ -517,15 +520,23 @@ local CASCADE_FLAGS = {
     [280]  = "Medicine Run",
     [281]  = "Medicine Run",
     [408]  = "Medicine Run",
+    [834]  = "Medicine Run",
     [1287] = "Medicine Run",
     [2192] = "Medicine Run",
+    [2434] = "Medicine Run",
+    [2435] = "Medicine Run",
 
     -- Girl Hunting
     [285]  = "Girl Hunting",
     [1288] = "Girl Hunting",
+    [2436] = "Girl Hunting",
+
+    -- A Promise to Isabela
+    [2437]  = "A Promise to Isabela",
 
     -- Santa Cabeza
     [295]  = "Santa Cabeza",
+    [2438] = "Santa Cabeza",
 
     -- The Last Resort
     [296]  = "The Last Resort",
@@ -539,15 +550,16 @@ local CASCADE_FLAGS = {
     [452]  = "The Last Resort",
     [2193] = "The Last Resort",
     [2194] = "The Last Resort",
+    [2439] = "The Last Resort",
 
     -- Hideout
     [392]  = "Hideout",
-    --[355]  = "Hideout",
 
     -- The Butcher
     [304]  = "The Butcher",
     [1285] = "The Butcher",
     [409]  = "The Butcher",
+    [2440] = "The Butcher",
 }
 
 local ap_received = {}
@@ -574,6 +586,8 @@ local on_ap_activated_callback = nil
 local on_time_freeze_callback = nil
 local on_time_unfreeze_callback = nil
 local endgame_reached = false       -- true after Get bit! or Ending A (persisted)
+local professor_276_disabled = false -- tracks one-time disable of flag 276 for Rescue the Professor
+local hideout_key_deferred = false   -- true when Hideout scoop deferred (waiting for Hideout key)
 local save_filename = nil
 
 local MILESTONE_EVENTS = {
@@ -589,6 +603,11 @@ function M.is_currently_unlocking()
 end
 
 local function count_keys(t) local n = 0; for _ in pairs(t) do n = n + 1 end; return n end
+
+local function has_hideout_key()
+    local bridge = AP and AP.AP_BRIDGE
+    return bridge and bridge.has_item_name and bridge.has_item_name("Hideout key")
+end
 
 local function raw_check_flag(flag_id)
     local efm = efm_mgr:get()
@@ -876,31 +895,8 @@ local function enforce_flags()
         end
     end
 
-    -- Enable Entrance Plaza door (flag 276) only while in Paradise Plaza.
-    -- 276 is tied to Rescue the Professor ending, so we suppress it elsewhere.
-    -- Exception: when Rescue the Professor is active, let the game manage 276.
-    if ap_activated then
-        local professor_active = (M.get_current_chain_scoop() == "Rescue the Professor")
-        if not professor_active then
-            if get_current_area_index() == PARADISE_PLAZA_AREA_INDEX then
-                if not raw_check_flag(276) then
-                    currently_unlocking = true
-                    raw_set_flag_on(276)
-                    currently_unlocking = false
-                    if verbose_logging then
-                        M.log("Entrance Plaza door: enabled flag 276 (player in Paradise Plaza)")
-                    end
-                end
-            else
-                if raw_check_flag(276) then
-                    raw_set_flag_off(276)
-                    if verbose_logging then
-                        M.log("Entrance Plaza door: disabled flag 276 (player left Paradise Plaza)")
-                    end
-                end
-            end
-        end
-    end
+    -- NOTE: Flag 276 (Entrance Plaza door / Rescue the Professor) management
+    -- has been moved to on_frame() so it runs regardless of scoop_sanity_enabled.
 
     -- Toggle flag 355 based on area: ON in North Plaza, OFF in Hideout.
     -- While Hideout is active (received + not completed), skip area toggling
@@ -1377,6 +1373,16 @@ function M.unlock_scoop(scoop_name)
         end
     end
 
+    -- Hideout requires the Hideout key — defer until player has it
+    if scoop_name == "Hideout" then
+        if not has_hideout_key() then
+            hideout_key_deferred = true
+            M.log("Hideout deferred: waiting for Hideout key")
+            return false, 0
+        end
+        hideout_key_deferred = false
+    end
+
     received_scoops[scoop_name] = true
     currently_unlocking = true
 
@@ -1437,6 +1443,27 @@ function M.complete_scoop(scoop_name)
     end
 
     try_advance_conflict_group(scoop_name)
+
+    -- Retry unlocking side scoops that were blocked by this main scoop.
+    -- When a main scoop completes, any side scoops it was blocking may now
+    -- be eligible for activation (if no other blocker is active).
+    local blocked_sides = MAIN_BLOCKS_SIDE[scoop_name]
+    if blocked_sides then
+        for _, side_name in ipairs(blocked_sides) do
+            if ap_received[side_name] and not received_scoops[side_name] then
+                local still_blocked, new_blocker = is_blocked_by_active_main(side_name)
+                if not still_blocked then
+                    M.log(string.format("Retrying deferred side scoop '%s' (blocker '%s' completed)",
+                        side_name, scoop_name))
+                    M.unlock_scoop(side_name)
+                else
+                    M.log(string.format("Side scoop '%s' still blocked by '%s'",
+                        side_name, tostring(new_blocker)))
+                end
+            end
+        end
+    end
+
     save_state()
     return true
 end
@@ -1547,6 +1574,7 @@ function M.get_all_status()
     local status = {}
     for name, data in pairs(SCOOP_DATA) do
         local blocked, blocker = is_conflict_blocked(name)
+        local main_blocked, main_blocker = is_blocked_by_active_main(name)
         local conflict_info = SCOOP_TO_CONFLICT_GROUP[name]
         table.insert(status, {
             name = name,
@@ -1556,6 +1584,8 @@ function M.get_all_status()
             completed = M.is_scoop_completed(name),
             conflict_blocked = blocked,
             conflict_blocker = blocker,
+            main_blocked = main_blocked,
+            main_blocker = main_blocker,
             conflict_group = conflict_info and conflict_info.group or nil,
             npcs = data.npcs,
             category = data.category,
@@ -2081,13 +2111,19 @@ function M.draw_tab_content(debug)
         end
     end
 
+    if hideout_key_deferred then
+        imgui.text_colored("Hideout deferred: waiting for Hideout key", 0xFF00AAFF)
+    end
+
     for _, s in ipairs(status_list) do
         local show = true
+        local is_deferred = s.ap_item_received and (s.conflict_blocked or s.main_blocked)
         if filter_category ~= "All" and s.category ~= filter_category then show = false end
-        if show_only_received and not s.received then show = false end
+        if show_only_received and not s.received and not is_deferred then show = false end
         if hide_completed and s.completed then show = false end
         if not debug and s.category == "Main" then show = false end
-        if not debug and s.category ~= "Main" and not s.received then show = false end
+        -- Show side scoops that are received OR deferred (AP item received but blocked)
+        if not debug and s.category ~= "Main" and not s.received and not is_deferred then show = false end
 
         if show then
             local color = CATEGORY_COLORS[s.category] or 0xFFFFFFFF
@@ -2102,9 +2138,12 @@ function M.draw_tab_content(debug)
             elseif is_current_chain then
                 status_str = " [CURRENT]"
                 color = 0xFF00AAFF          -- orange: current + not received
+            elseif s.main_blocked and s.ap_item_received then
+                status_str = " - deferred (" .. tostring(s.main_blocker) .. " active)"
+                color = 0xFF00AAFF          -- orange: blocked by active main
             elseif s.conflict_blocked and s.ap_item_received then
-                status_str = " [DEFERRED]"
-                color = 0xFF00AAFF
+                status_str = " - deferred (" .. tostring(s.conflict_blocker) .. " active)"
+                color = 0xFF00AAFF          -- orange: blocked by conflict group
             elseif s.received and s.category == "Main" then
                 status_str = " [RECV]"
                 color = 0xFFFF8800          -- blue: received + not current (main)
@@ -2258,6 +2297,65 @@ function M.on_frame()
                 TimeGate.turbo_advance_to(active_time_skip.target_mdate)
             end
         end
+    end
+
+    -- Suppress door randomization while Hideout is active so Isabela follows
+    -- through doors correctly. Uses flag checks so it works with or without ScoopSanity.
+    -- Flag 776 = Hideout primary, flag 2322 = Hideout completion.
+    if door_randomizer_enabled and efm_mgr:get() then
+        local hideout_flag_on = raw_check_flag(776)
+        local hideout_done    = raw_check_flag(2322) or completed_scoops["Hideout"]
+        local should_suppress = hideout_flag_on and not hideout_done
+        local dr = AP and AP.DoorRandomizer
+        if dr and dr.set_suppressed then
+            dr.set_suppressed(should_suppress == true)
+        end
+    end
+
+    -- Manage Entrance Plaza door (flag 276) for Rescue the Professor.
+    -- Uses raw flag checks so it works with or without ScoopSanity.
+    -- Flag 275 = Rescue the Professor primary flag.
+    -- When professor is active: one-time disable of 276, then hands-off so
+    -- the game can re-enable it during the completion cutscene.
+    -- When professor is NOT active: enable 276 in Paradise Plaza, disable elsewhere.
+    if ap_activated and efm_mgr:get() then
+        local professor_flag_on = raw_check_flag(275)
+        local professor_done = completed_scoops["Rescue the Professor"]
+        local professor_active = professor_flag_on and not professor_done
+
+        if professor_active then
+            -- One-time disable: turn 276 OFF the first frame after
+            -- Rescue the Professor becomes active.
+            if not professor_276_disabled then
+                if raw_check_flag(276) then
+                    raw_set_flag_off(276)
+                    M.log("Entrance Plaza door: disabled flag 276 (Rescue the Professor activated)")
+                end
+                professor_276_disabled = true
+            end
+            -- After one-time disable, leave 276 alone — the game will
+            -- enable it at the right moment for the completion cutscene.
+        else
+            professor_276_disabled = false  -- reset for next activation
+            if get_current_area_index() == PARADISE_PLAZA_AREA_INDEX then
+                if not raw_check_flag(276) then
+                    currently_unlocking = true
+                    raw_set_flag_on(276)
+                    currently_unlocking = false
+                end
+            else
+                if raw_check_flag(276) then
+                    raw_set_flag_off(276)
+                end
+            end
+        end
+    end
+
+    -- Hideout key deferral: retry activating Hideout once the player has the key
+    if hideout_key_deferred and has_hideout_key() then
+        hideout_key_deferred = false
+        M.log("Hideout key received — retrying Hideout activation")
+        try_advance_chain()
     end
 
     enforce_flags()
