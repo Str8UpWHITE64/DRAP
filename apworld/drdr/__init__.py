@@ -615,9 +615,9 @@ class DRWorld(World):
 
         set_rule(self.multiworld.get_location("Complete Rescue the Professor", self.player), lambda state: state.can_reach_location("Complete Image in the Monitor", self.player))
 
-        set_rule(self.multiworld.get_location("Meet Steven", self.player), lambda state: state.can_reach_location("Complete Rescue the Professor", self.player) and state.can_reach_region("North Plaza", self.player) and state.can_reach_region("Grocery Store", self.player))
+        set_rule(self.multiworld.get_location("Meet Steven", self.player), lambda state: state.can_reach_location("Complete Rescue the Professor", self.player) and state.can_reach_region("North Plaza", self.player) and state.can_reach_region("Grocery Store", self.player) and (not self.options.scoop_sanity or state.has("Medicine Run", self.player)))
 
-        set_rule(self.multiworld.get_location("Clean up... Register 6!", self.player), lambda state: state.can_reach_location("Meet Steven", self.player))
+        set_rule(self.multiworld.get_location("Clean up... Register 6!", self.player), lambda state: state.can_reach_location("Meet Steven", self.player) and (not self.options.scoop_sanity or state.has("Medicine Run", self.player)))
 
         set_rule(self.multiworld.get_location("Complete Medicine Run", self.player), lambda state: state.can_reach_location("Clean up... Register 6!", self.player))
 
@@ -625,13 +625,13 @@ class DRWorld(World):
 
         set_rule(self.multiworld.get_location("Complete Girl Hunting", self.player), lambda state: state.can_reach_location("Complete Professor's Past", self.player))
 
-        set_rule(self.multiworld.get_location("Beat up Isabela", self.player), lambda state: state.can_reach_location("Complete Girl Hunting", self.player))
+        set_rule(self.multiworld.get_location("Beat up Isabela", self.player), lambda state: state.can_reach_location("Complete Girl Hunting", self.player) and (not self.options.scoop_sanity or state.has("Girl Hunting", self.player)))
 
-        set_rule(self.multiworld.get_location("Complete Promise to Isabela", self.player), lambda state: state.can_reach_location("Beat up Isabela", self.player) and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.has("DAY3_00_AM", self.player))
+        set_rule(self.multiworld.get_location("Complete Promise to Isabela", self.player), lambda state: state.can_reach_location("Beat up Isabela", self.player) and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.has("DAY3_00_AM", self.player) and (not self.options.scoop_sanity or state.has("A Promise to Isabela", self.player)))
 
-        set_rule(self.multiworld.get_location("Save Isabela from the zombie", self.player), lambda state: state.can_reach_location("Complete Promise to Isabela", self.player))
+        set_rule(self.multiworld.get_location("Save Isabela from the zombie", self.player), lambda state: state.can_reach_location("Complete Promise to Isabela", self.player) and (not self.options.scoop_sanity or state.has("A Promise to Isabela", self.player)))
 
-        set_rule(self.multiworld.get_location("Complete Transporting Isabela", self.player), lambda state: state.can_reach_location("Save Isabela from the zombie", self.player))
+        set_rule(self.multiworld.get_location("Complete Transporting Isabela", self.player), lambda state: state.can_reach_location("Save Isabela from the zombie", self.player) and (not self.options.scoop_sanity or state.has("A Promise to Isabela", self.player)))
 
         set_rule(self.multiworld.get_location("Carry Isabela back to the Safe Room", self.player), lambda state: state.can_reach_location("Complete Transporting Isabela", self.player))
 
@@ -653,7 +653,7 @@ class DRWorld(World):
 
         set_rule(self.multiworld.get_location("Complete Jessie's Discovery", self.player), lambda state: state.can_reach_location("Escort Isabela to the Hideout and have a chat", self.player))
 
-        set_rule(self.multiworld.get_location("Meet Larry", self.player), lambda state: state.can_reach_location("Complete Jessie's Discovery", self.player))
+        set_rule(self.multiworld.get_location("Meet Larry", self.player), lambda state: state.can_reach_location("Complete Jessie's Discovery", self.player) and (not self.options.scoop_sanity or state.has("The Butcher", self.player)))
 
         set_rule(self.multiworld.get_location("Complete The Butcher", self.player), lambda state: state.can_reach_location("Meet Larry", self.player))
 
