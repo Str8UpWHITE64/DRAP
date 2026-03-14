@@ -258,7 +258,7 @@ class DRWorld(World):
             # Generate door redirects for this player using per-slot random
             # This ensures each player gets a unique door layout even with the same server seed
             self.door_redirects = generate_door_randomization_for_ap(
-                self.multiworld.per_slot_randoms[self.player],
+                self.random,
                 mode=door_mode
             )
 
@@ -267,7 +267,7 @@ class DRWorld(World):
             for time_key in TIME_KEY_NAMES:
                 self.multiworld.push_precollected(self.create_item(time_key))
             scoop_order = list(MAIN_SCOOP_NAMES)
-            self.multiworld.per_slot_randoms[self.player].shuffle(scoop_order)
+            self.random.shuffle(scoop_order)
             self.scoop_order = scoop_order
 
         # Softlock prevention
