@@ -1305,7 +1305,7 @@ local function activate_ap(reason)
     ap_activated = true
     M.log(reason or "AP enforcement activated")
     -- Enable flags needed after Meet Jessie
-    local post_jessie_flags = { 265, 267, 315 }
+    local post_jessie_flags = { 265, 267, 315, 514 }
     for _, fid in ipairs(post_jessie_flags) do
         if not raw_check_flag(fid) then
             raw_set_flag_on(fid)
