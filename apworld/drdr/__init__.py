@@ -470,7 +470,7 @@ class DRWorld(World):
 
 
     def get_filler_item_name(self) -> str:
-        return "1 PP"
+        return "Rotten Pizza"
 
     def pre_fill(self) -> None:
         """Guarantee early key placement so the player isn't stuck in Sphere 0.
