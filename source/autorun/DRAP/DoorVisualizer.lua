@@ -66,46 +66,44 @@ local function load_mall_png_base64()
 end
 
 ------------------------------------------------------------
--- Static Data: Area Colors (17 areas)
+-- Static Data
+-- AREA_COLORS / AREA_SHORT_NAMES are visualization-specific (the colors
+-- map to area chip backgrounds and connection-line strokes; the short
+-- names fit the sidebar layout). DOOR_MAP_POSITIONS / VANILLA_DOORS
+-- describe every door in the game keyed on the canonical door-id format
+-- "<from_area>|<area_jump_name>|door<door_no>".
 ------------------------------------------------------------
 
 local AREA_COLORS = {
     s200 = "#FF1744",  -- Paradise Plaza
     sa00 = "#FF6D00",  -- Food Court
-    s135 = "#FFD600",  -- Helipad
-    s401 = "#76FF03",  -- Hideout
-    s136 = "#00C853",  -- Safe Room
+    s135 = "#FFD600",  -- Heliport
+    s401 = "#76FF03",  -- Carlito's Hideout
+    s136 = "#00C853",  -- Security Room
     s100 = "#00BFA5",  -- Entrance Plaza
     s700 = "#00E5FF",  -- Leisure Park
     s231 = "#2979FF",  -- Rooftop
     s503 = "#304FFE",  -- Colby's
     s300 = "#AA00FF",  -- Wonderland Plaza
-    s230 = "#D500F9",  -- Service Hallway
+    s230 = "#D500F9",  -- Warehouse
     s400 = "#FF4081",  -- North Plaza
     s601 = "#8D6E63",  -- Butcher
     s600 = "#78909C",  -- Maintenance Tunnel
-    s500 = "#FFFFFF",  -- Grocery Store
+    s500 = "#FFFFFF",  -- Seon's Food and Stuff
     s501 = "#CE93D8",  -- Crislip's
     s900 = "#AED581",  -- Al Fresca Plaza
 }
 
-------------------------------------------------------------
--- Static Data: Area Short Names
-------------------------------------------------------------
-
 local AREA_SHORT_NAMES = {
-    s135 = "Helipad",       s136 = "Safe Room",     s231 = "Rooftop",
-    s230 = "Svc Hall",      s200 = "Paradise",      s100 = "Entrance",
+    s135 = "Heliport",      s136 = "Security Rm",   s231 = "Rooftop",
+    s230 = "Warehouse",     s200 = "Paradise",      s100 = "Entrance",
     s900 = "Al Fresca",     sa00 = "Food Court",    s300 = "Wonderland",
     s400 = "North Plaza",   s700 = "Leisure Pk",    s501 = "Crislip's",
-    s503 = "Colby's",       s401 = "Hideout",       s600 = "Tunnels",
-    s500 = "Grocery",       s601 = "Butcher",
+    s503 = "Colby's",       s401 = "Carlito's",     s600 = "Tunnels",
+    s500 = "Seon's",        s601 = "Butcher",
 }
 
-------------------------------------------------------------
--- Static Data: Door Map Positions (pixel x,y on Mall.png)
-------------------------------------------------------------
-
+-- Pixel positions on Mall.png for each door's source endpoint.
 local DOOR_MAP_POSITIONS = {
     ["SCN_s900|s100|door0"] = {496.2, 513.2},
     ["SCN_s900|s600|door0"] = {354.2, 582.1},
@@ -160,11 +158,8 @@ local DOOR_MAP_POSITIONS = {
     ["SCN_s300|sa00|door0"] = {204.2, 497.4},
 }
 
-------------------------------------------------------------
--- Static Data: Vanilla Door Definitions
--- from_area, to_area, door_no for each door in the game
-------------------------------------------------------------
-
+-- Vanilla door definitions: every passable door in the game with its
+-- source area, target area, and door number.
 local VANILLA_DOORS = {
     ["SCN_s100|s136|door0"] = {from_area = "s100", to_area = "s136", door_no = 0},
     ["SCN_s100|s200|door0"] = {from_area = "s100", to_area = "s200", door_no = 0},
@@ -1384,11 +1379,5 @@ function M.draw_tab_content(debug)
     imgui.text_colored("The map shows all door connections overlaid on the mall map.", 0xFFAAAAAA)
     imgui.text_colored("Redirected doors are highlighted in red.", 0xFFAAAAAA)
 end
-
-------------------------------------------------------------
--- Module Init
-------------------------------------------------------------
-
-M.log("DoorVisualizer loaded")
 
 return M

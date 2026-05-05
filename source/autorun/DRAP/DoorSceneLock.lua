@@ -14,28 +14,10 @@ local am_mgr   = M:add_singleton("am", "app.solid.gamemastering.AreaManager")
 local ahlm_mgr = M:add_singleton("ahlm", "app.solid.gamemastering.AreaHitLayoutManager")
 
 ------------------------------------------------------------
--- Scene Metadata
+-- Scene Metadata (shared with DoorRandomizer via DRAP/Shared)
 ------------------------------------------------------------
 
-local SCENE_INFO = {
-    s140 = { name = "Title Screen",             index = 292  },
-    s135 = { name = "Helipad",                  index = 287  },
-    s136 = { name = "Safe Room",                index = 288  },
-    s231 = { name = "Rooftop",                  index = 535  },
-    s230 = { name = "Service Hallway",          index = 534  },
-    s200 = { name = "Paradise Plaza",           index = 512  },
-    s503 = { name = "Colby's Movie Theater",    index = 1283 },
-    s700 = { name = "Leisure Park",             index = 1792 },
-    s400 = { name = "North Plaza",              index = 1024 },
-    s501 = { name = "Crislip's Hardware Store", index = 1281 },
-    sa00 = { name = "Food Court",               index = 2560 },
-    s300 = { name = "Wonderland Plaza",         index = 768  },
-    s900 = { name = "Al Fresca Plaza",          index = 2304 },
-    s100 = { name = "Entrance Plaza",           index = 256  },
-    s500 = { name = "Grocery Store",            index = 1280 },
-    s600 = { name = "Maintenance Tunnel",       index = 1536 },
-    s401 = { name = "Hideout",                  index = 1025 },
-}
+local SCENE_INFO = Shared.SCENE_INFO
 
 ------------------------------------------------------------
 -- Lock State

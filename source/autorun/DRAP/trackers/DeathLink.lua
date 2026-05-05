@@ -1,4 +1,4 @@
--- DRAP/DeathLink.lua
+-- DRAP/trackers/DeathLink.lua
 -- Tracks player death via PlayerVitalController
 -- and provides a DeathLink-compatible "kill player" trigger
 

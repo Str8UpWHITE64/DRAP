@@ -1,10 +1,11 @@
--- DRAP/PPStickerTracker.lua
+-- DRAP/trackers/PPStickerTracker.lua
 -- Tracks PP sticker captures using:
 --   1. EventFlagsManager.evFlagCheck() for stickers with valid FlagIDs
 --   2. AreaManager.OmList.mChecked for stickers without flags (FlagID = 0)
 -- Authoritative flag-based tracking - no false positives
 
 local Shared = require("DRAP/Shared")
+local SharedData = require("DRAP/SharedData")
 
 local M = Shared.create_module("PPStickerTracker")
 M:set_throttle(0.5)
@@ -13,7 +14,6 @@ M:set_throttle(0.5)
 -- Configuration
 ------------------------------------------------------------
 
-local PP_JSON_PATH = "PPstickers.json"
 local CAPTURED_JSON_DIR = "AP_DRDR_Stickers"
 local CAPTURED_JSON_FILE = nil  -- Set via set_save_filename()
 
@@ -238,9 +238,9 @@ end
 local function load_sticker_data()
     if data_loaded then return true end
 
-    local rows = Shared.load_json(PP_JSON_PATH, M.log)
-    if not rows then
-        M.log("Failed to load " .. PP_JSON_PATH)
+    local rows = SharedData.stickers()
+    if type(rows) ~= "table" or #rows == 0 then
+        M.log("SharedData.stickers() returned empty or invalid data")
         return false
     end
 

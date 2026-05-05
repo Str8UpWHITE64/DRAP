@@ -13,6 +13,21 @@ M:set_throttle(0.25)  -- CHECK_INTERVAL
 
 local SUCCESS_COOLDOWN     = 0.35     -- delay after a successful spawn
 
+-- Spawn path selector.
+-- "world"     -- ItemManager.instantiateItem (5-arg) auto-preloads the prefab
+--               then drops the item at the player's feet. Bypasses the
+--               buggy Inventory.setEventItem path that the README flags as
+--               a frequent crash source.
+-- "inventory" -- Legacy path: Inventory.setEventItem(id, false). Direct
+--               inventory injection. Kept for fast revert if the world path
+--               regresses.
+local SPAWN_PATH = "world"
+
+-- World-spawn tunables.
+local WORLD_SPAWN_OFFSET_Y = 1.0      -- spawn slightly above the floor so it
+                                       -- doesn't sink through level geometry
+local WORLD_PRELOAD_TIMEOUT_S = 5.0   -- max wait for prefab preload
+
 ------------------------------------------------------------
 -- Restricted item mode: Spawning Control
 ------------------------------------------------------------
@@ -67,13 +82,10 @@ end
 
 local function get_bridge()
     if AP_BRIDGE then return AP_BRIDGE end
-
-    -- Try to get from AP global
     if AP and AP.AP_BRIDGE then
         AP_BRIDGE = AP.AP_BRIDGE
         return AP_BRIDGE
     end
-
     return nil
 end
 
@@ -109,30 +121,21 @@ local function ensure_inventory()
         return false
     end
 
-    -- Always re-read inventory instance (can change during loads)
+    -- Re-read every call: PlayerInventory swaps on scene load / save load.
     local current_inv = Shared.safe_get_field(ps, inv_field)
-
     if current_inv ~= inv_instance then
-        if inv_instance ~= nil and current_inv == nil then
-            M.log("PlayerInventory became nil (leaving gameplay?).")
-        elseif inv_instance == nil and current_inv ~= nil then
-            M.log("PlayerInventory became available.")
-        elseif inv_instance ~= nil and current_inv ~= nil then
-            M.log("PlayerInventory instance changed (scene load / save load).")
-        end
-
+        local from = inv_instance and "live" or "nil"
+        local to   = current_inv  and "live" or "nil"
+        M.log(string.format("PlayerInventory %s -> %s (scene/save transition)", from, to))
         reset_inv_cache()
         inv_instance = current_inv
-
-        -- Give a short global cooldown after inventory swap
+        -- Short cooldown after inventory swap so a queued spawn doesn't fire
+        -- against the half-initialized new inventory.
         global_not_before = math.max(global_not_before, now_time() + 1.5)
     end
 
-    if not inv_instance then
-        return false
-    end
+    if not inv_instance then return false end
 
-    -- Get type definition
     if not inv_td then
         local ok, td = pcall(inv_instance.get_type_definition, inv_instance)
         if not ok or not td then
@@ -142,7 +145,6 @@ local function ensure_inventory()
         inv_td = td
     end
 
-    -- Get setEventItem method
     if not set_event_method then
         set_event_method = inv_td:get_method("setEventItem")
         if not set_event_method then
@@ -200,44 +202,157 @@ local function can_accept_more_items()
     return current < maxv
 end
 
+-- For the world path, inventory-full doesn't matter: items drop on the floor
+-- for later pickup. Only the legacy inventory path is gated by capacity.
+local function inventory_full_blocks_spawn()
+    if SPAWN_PATH ~= "inventory" then return false end
+    return not can_accept_more_items()
+end
+
+------------------------------------------------------------
+-- World-spawn helpers (ItemManager.instantiateItem 5-arg path)
+------------------------------------------------------------
+
+local IM_TYPE_NAME = "app.solid.gamemastering.ItemManager"
+local PM_TYPE_NAME = "app.solid.PlayerManager"
+
+local function get_item_manager()
+    return sdk.get_managed_singleton(IM_TYPE_NAME)
+end
+
+local function get_player_pos_xyz()
+    local pmgr = sdk.get_managed_singleton(PM_TYPE_NAME)
+    if not pmgr then return nil end
+    local cond = nil
+    pcall(function() cond = pmgr:get_field("_CurrentPlayerCondition") end)
+    if not cond then return nil end
+    local pos = nil
+    pcall(function() pos = cond:get_field("LastPlayerPos") end)
+    if not pos then return nil end
+    local x, y, z
+    pcall(function() x = pos.x; y = pos.y; z = pos.z end)
+    if not (x and y and z) then return nil end
+    return x, y, z
+end
+
+local function build_vec3(x, y, z)
+    if Vector3f and Vector3f.new then
+        local ok, v = pcall(Vector3f.new, x, y, z)
+        if ok then return v end
+    end
+    return nil
+end
+
+-- Identity rotation. Quaternion.new takes (w, x, y, z) -- confirmed via
+-- drap_npc_probe / drap_item_probe investigation.
+local function build_identity_rot()
+    if Quaternion and Quaternion.new then
+        local ok, q = pcall(Quaternion.new, 1, 0, 0, 0)
+        if ok then return q end
+    end
+    return nil
+end
+
+-- Track which prefabs we've preloaded so we don't double-register.
+local world_preloaded = {}
+
+local function preload_prefab(im, item_no)
+    if world_preloaded[item_no] then return true end
+    local ok = pcall(function() im:call("setPreloadedItemPrefab", item_no) end)
+    if ok then world_preloaded[item_no] = true; return true end
+    return false
+end
+
+local function is_prefab_ready(im, item_no)
+    local standby = nil
+    pcall(function() standby = im:get_field("ItemStandbyPrefab") end)
+    if not standby then return false end
+    local has = nil
+    pcall(function() has = standby:call("ContainsKey", item_no) end)
+    return has == true
+end
+
+-- Async spawn: preload, wait for prefab, then instantiate. Returns immediately;
+-- the actual item appears in the world after the prefab finishes streaming.
+-- on_done(success, err_string) fires once when the operation completes (success
+-- or timeout).
+local function world_spawn_async(item_no, on_done)
+    local im = get_item_manager()
+    if not im then
+        if on_done then on_done(false, "ItemManager singleton not available") end
+        return
+    end
+
+    local px, py, pz = get_player_pos_xyz()
+    if not px then
+        if on_done then on_done(false, "Player position not available") end
+        return
+    end
+    local pos = build_vec3(px, py + WORLD_SPAWN_OFFSET_Y, pz)
+    local rot = build_identity_rot()
+    if not pos or not rot then
+        if on_done then on_done(false, "Failed to construct vec3/Quaternion") end
+        return
+    end
+
+    preload_prefab(im, item_no)
+
+    -- Poll for prefab readiness, then call the 5-arg instantiateItem.
+    local started = os.clock()
+    local fired = false
+    re.on_frame(function()
+        if fired then return end
+        if is_prefab_ready(im, item_no) then
+            fired = true
+            local ok, err = pcall(function()
+                im:call(
+                    "instantiateItem(app.MTData.ITEM_NO, via.vec3, via.Quaternion, System.Action`1<via.GameObject>, via.Folder)",
+                    item_no, pos, rot, nil, nil)
+            end)
+            if on_done then on_done(ok, ok and nil or tostring(err)) end
+            return
+        end
+        if os.clock() - started > WORLD_PRELOAD_TIMEOUT_S then
+            fired = true
+            if on_done then on_done(false, "Prefab preload timeout") end
+        end
+    end)
+end
+
 ------------------------------------------------------------
 -- Item Spawning Logic
 ------------------------------------------------------------
 
-local function try_spawn_item(item_entry)
-    if not item_entry then return false, "No item provided" end
-
-    -- Check if spawning is disabled (restricted item mode)
+-- Shared pre-checks: cooldown, restricted-mode, time gate, inventory full,
+-- and item-no resolution. Returns (game_item_no, item_name) on success, or
+-- (nil, err_string) on failure.
+local function precheck_spawn(item_entry)
+    if not item_entry then return nil, "No item provided" end
     if spawning_disabled then
-        return false, "Spawning disabled (restricted item mode active)"
+        return nil, "Spawning disabled (restricted item mode active)"
     end
-
-    local t = now_time()
-    if t < global_not_before then
-        return false, "Cooldown active"
+    if now_time() < global_not_before then
+        return nil, "Cooldown active"
     end
-
     if not ensure_inventory() then
-        return false, "Inventory not available"
+        return nil, "Inventory not available"
     end
 
     -- Optional "don't spawn before time loads" gate
     if AP and AP.TimeGate and AP.TimeGate.get_current_mdate then
         local ok_tg, mdate = pcall(AP.TimeGate.get_current_mdate)
         if ok_tg and mdate and mdate < 11200 then
-            return false, "Game time not ready"
+            return nil, "Game time not ready"
         end
     end
 
-    if not can_accept_more_items() then
-        return false, "Inventory full"
+    if inventory_full_blocks_spawn() then
+        return nil, "Inventory full"
     end
 
-    -- Get the game item number - try stored value first, then lookup by name
     local game_item_no = item_entry.game_item_no
-    local item_name = item_entry.item_name or "Unknown Item"
+    local item_name    = item_entry.item_name or "Unknown Item"
 
-    -- If no game_item_no stored, try to look it up from the bridge
     if not game_item_no then
         local bridge = get_bridge()
         if bridge and bridge.get_game_item_number then
@@ -247,10 +362,19 @@ local function try_spawn_item(item_entry)
 
     if not game_item_no then
         M.log(string.format("No game item number for: %s", item_name))
-        return false, "No game item number mapped"
+        return nil, "No game item number mapped"
     end
 
-    M.log(string.format("Spawning item: %s (GameItemNo=%s)",
+    return game_item_no, item_name
+end
+
+-- Legacy path: Inventory.setEventItem direct injection.
+-- Kept for fast revert via SPAWN_PATH = "inventory".
+local function try_spawn_item_inventory(item_entry)
+    local game_item_no, item_name = precheck_spawn(item_entry)
+    if not game_item_no then return false, item_name end
+
+    M.log(string.format("Spawning item (inventory): %s (GameItemNo=%s)",
         tostring(item_name), tostring(game_item_no)))
 
     local ok, err = pcall(function()
@@ -268,50 +392,70 @@ local function try_spawn_item(item_entry)
     end
 end
 
+-- New path: ItemManager.instantiateItem 5-arg with auto-preload.
+-- Drops the item at the player's feet (offset slightly above floor so it
+-- doesn't sink). Async -- the call returns immediately; the actual item
+-- appears once the prefab finishes streaming.
+local function try_spawn_item_world(item_entry)
+    local game_item_no, item_name = precheck_spawn(item_entry)
+    if not game_item_no then return false, item_name end
+
+    M.log(string.format("Spawning item (world): %s (GameItemNo=%s)",
+        tostring(item_name), tostring(game_item_no)))
+
+    -- Apply the cooldown immediately on dispatch so rapid clicks don't queue
+    -- many concurrent spawns. The actual instantiation happens async.
+    global_not_before = now_time() + SUCCESS_COOLDOWN
+
+    world_spawn_async(game_item_no, function(ok, err)
+        if ok then
+            M.log("instantiateItem succeeded for: " .. tostring(item_name))
+        else
+            M.log(string.format("instantiateItem FAILED for: %s -- %s",
+                tostring(item_name), tostring(err)))
+        end
+    end)
+
+    -- Return optimistically -- async result is logged separately.
+    return true, nil
+end
+
+-- Dispatcher: routes to the configured spawn path.
+local function try_spawn_item(item_entry)
+    if SPAWN_PATH == "inventory" then
+        return try_spawn_item_inventory(item_entry)
+    end
+    return try_spawn_item_world(item_entry)
+end
+
 ------------------------------------------------------------
 -- Public API
 ------------------------------------------------------------
 
---- Gets the count of items from the bridge
---- @return number The count
-function M.item_count()
-    local items = get_received_items_from_bridge()
-    return #items
-end
-
---- Gets all received items from the bridge
---- @return table The items list
-function M.get_received_items()
-    return get_received_items_from_bridge()
-end
-
---- Clears selection
-function M.clear_selection()
-    selected_item_name = nil
-    M.log("Cleared selection")
-end
-
---- Gets the current item count
---- @return number The count
-function M.pending_count()
-    return M.item_count()
-end
-
-------------------------------------------------------------
--- Restricted item mode: Spawning Control Public API
-------------------------------------------------------------
-
---- Sets whether spawning is disabled (for restricted item mode)
---- @param disabled boolean Whether to disable spawning
+--- Restricted-item-mode toggle. When disabled, the Spawn Selected button
+--- is greyed out and try_spawn_item returns "spawning disabled".
 function M.set_spawning_disabled(disabled)
     spawning_disabled = (disabled == true)
     M.log("Spawning disabled: " .. tostring(spawning_disabled))
 end
 
---- Gets whether spawning is disabled
---- @return boolean True if spawning is disabled
-function M.is_spawning_disabled()
-    return spawning_disabled
+--- Console-accessible spawn-path toggle. "world" routes through
+--- ItemManager.instantiateItem (5-arg) which auto-preloads the prefab and
+--- drops the item at the player's feet. "inventory" routes through the
+--- legacy Inventory.setEventItem path -- kept as a fast-revert option in
+--- case the world path regresses in production.
+function M.set_spawn_path(path)
+    if path == "world" or path == "inventory" then
+        SPAWN_PATH = path
+        M.log("SPAWN_PATH set to: " .. path)
+    else
+        M.log("Invalid spawn path: " .. tostring(path) ..
+            " (expected 'world' or 'inventory')")
+    end
+end
+
+function M.get_spawn_path()
+    return SPAWN_PATH
 end
 
 ------------------------------------------------------------
@@ -326,6 +470,15 @@ local function get_scoop_unlocker()
         return ScoopUnlocker
     end
     return nil
+end
+
+-- Lazy-loaded PlayerStats (covers Progressive *Upgrade* and the 21 SKILL items)
+local PlayerStats_mod = nil
+local function get_player_stats()
+    if PlayerStats_mod then return PlayerStats_mod end
+    local ok, mod = pcall(require, "DRAP/effects/PlayerStats")
+    if ok and mod then PlayerStats_mod = mod end
+    return PlayerStats_mod
 end
 
 local function is_effect_item(item_name)
@@ -353,6 +506,21 @@ local function is_effect_item(item_name)
 
     -- Filter out day/time items (DAY2_06_AM, DAY3_00_AM, etc.)
     if string.find(item_name, "^DAY%d") then
+        return true
+    end
+
+    -- Filter out PlayerStats-handled items: the 21 skill items + the
+    -- Progressive *Upgrade* stat items. These apply via PlayerStats.apply()
+    -- on slot-connect/grant; spawning them into the world does nothing.
+    local ps = get_player_stats()
+    if ps and ps.is_handled_item and ps.is_handled_item(item_name) then
+        return true
+    end
+
+    -- Filter out Book items ("Book [Title]" pattern). Books grant passive
+    -- combat/score modifiers via the Brain item path -- they have no
+    -- standalone world prefab worth spawning.
+    if string.find(item_name, "^Book %[") then
         return true
     end
 
@@ -423,7 +591,7 @@ function M.draw_tab_content(debug)
     local selected_entry = selected_item_name and item_counts[selected_item_name] and item_counts[selected_item_name].entry or nil
 
     local can_spawn = selected_entry and
-                      can_accept_more_items() and
+                      not inventory_full_blocks_spawn() and
                       ensure_inventory() and
                       not spawning_disabled
 
@@ -447,7 +615,7 @@ function M.draw_tab_content(debug)
     if selected_entry then
         if spawning_disabled then
             imgui.text_colored("Restricted mode!", 0xFFFF4444)
-        elseif not can_accept_more_items() then
+        elseif inventory_full_blocks_spawn() then
             imgui.text_colored("Inventory full!", 0xFFFF8800)
         elseif not ensure_inventory() then
             imgui.text_colored("Not in-game", 0xFFFF8800)

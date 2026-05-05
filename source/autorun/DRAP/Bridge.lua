@@ -1,10 +1,33 @@
--- ap_drdr_bridge.lua
+-- DRAP/Bridge.lua
 -- Bridge between Archipelago client and Dead Rising mod
 
 local Shared = require("DRAP/Shared")
 local AP_REF = require("AP_REF/core")
+local ItemEffects = require("DRAP/ItemEffects")
 
-local M = Shared.create_module("AP-DRDR-Bridge")
+local M = Shared.create_module("Bridge")
+
+------------------------------------------------------------
+-- Module-level state. Declared up front so every function in the file
+-- can reference them, regardless of source position. Lua module-level
+-- locals are only visible to code that follows their declaration --
+-- declaring late means earlier functions silently fall through to the
+-- (nil) global lookup, which is what caused checks/items to never
+-- record locally.
+------------------------------------------------------------
+
+local COMPLETED_CHECKS = {}
+local COMPLETED_CHECKS_FILE = nil
+local RECEIVED_ITEMS = {}
+local RECEIVED_ITEMS_BY_NAME = {}
+local last_item_index = -1
+local RECEIVED_ITEMS_FILE = nil
+
+-- Forward-declared local functions. Same reason as the state above --
+-- M.check (early in the file) calls save_completed_checks (defined later),
+-- so without this declaration the call resolves to a nil global.
+local save_completed_checks
+local save_received_items
 
 ------------------------------------------------------------
 -- Data Package
@@ -213,6 +236,8 @@ local function resolve_location_id(name)
     return nil
 end
 
+local _warned_no_checks_file = false
+
 function M.check(loc_name)
     M.log("Sending location check: " .. tostring(loc_name))
 
@@ -222,6 +247,11 @@ function M.check(loc_name)
             COMPLETED_CHECKS[loc_name] = true
             save_completed_checks()
         end
+    elseif loc_name and not _warned_no_checks_file then
+        _warned_no_checks_file = true
+        M.log("WARNING: COMPLETED_CHECKS_FILE is nil; checks are NOT being recorded "
+            .. "locally. slot-connect may have failed early. Run drap_bridge_diag to "
+            .. "inspect state, drap_bridge_force_init to recover.")
     end
 
     if not AP_REF.APClient then
@@ -259,10 +289,9 @@ end
 
 ------------------------------------------------------------
 -- Completed Checks Persistence (resend on reconnect)
+-- (COMPLETED_CHECKS / COMPLETED_CHECKS_FILE declared at top of file)
 ------------------------------------------------------------
 
-local COMPLETED_CHECKS = {}
-local COMPLETED_CHECKS_FILE = nil
 
 function M.set_completed_checks_filename(slot_name, seed)
     local slot = safe_filename(slot_name)
@@ -270,7 +299,7 @@ function M.set_completed_checks_filename(slot_name, seed)
     COMPLETED_CHECKS_FILE = "./AP_DRDR_Items/AP_DRDR_checks_" .. slot .. "_" .. sd .. ".json"
 end
 
-local function save_completed_checks()
+save_completed_checks = function()
     if not COMPLETED_CHECKS_FILE then return end
     local list = {}
     for name, _ in pairs(COMPLETED_CHECKS) do
@@ -295,6 +324,14 @@ function M.load_completed_checks()
     M.log(string.format("Loaded %d completed checks from file", #data.checks))
 end
 
+-- Public getter: has this location already been recorded as checked? Used by
+-- AP_LocationTriggers to bootstrap per-counted-entry counters on startup --
+-- e.g. if "Walk on 4 Treadmills" was sent in a previous session, the
+-- treadmill counter starts at 4 so the 5th walk correctly sends count 5.
+function M.is_completed(loc_name)
+    return COMPLETED_CHECKS[loc_name] == true
+end
+
 function M.resend_all_checks()
     local count = 0
     for loc_name, _ in pairs(COMPLETED_CHECKS) do
@@ -312,6 +349,77 @@ function M.reset_completed_checks()
     COMPLETED_CHECKS = {}
     save_completed_checks()
     M.log("Completed checks reset")
+end
+
+-- Returns true if the given location name has been checked in this slot/seed
+-- (as recorded by the persistent COMPLETED_CHECKS map). Used by effect modules
+-- that need to reconstruct per-location state after a reload.
+function M.has_completed_check(loc_name)
+    return COMPLETED_CHECKS[loc_name] == true
+end
+
+-- Returns a fresh array of all completed-check location names. Used for
+-- diagnostics ("what's actually in here?") rather than per-name queries.
+function M.get_completed_checks()
+    local list = {}
+    for name, _ in pairs(COMPLETED_CHECKS) do
+        table.insert(list, name)
+    end
+    return list
+end
+
+-- Diagnostic: returns the file paths and counts so we can verify slot-connect
+-- ran set_*_filename properly. Called from drap_bridge_diag console command.
+function M.get_diag_state()
+    local cc_count = 0
+    for _ in pairs(COMPLETED_CHECKS) do cc_count = cc_count + 1 end
+    return {
+        completed_checks_file  = COMPLETED_CHECKS_FILE,
+        received_items_file    = RECEIVED_ITEMS_FILE,
+        completed_checks_count = cc_count,
+        received_items_count   = #RECEIVED_ITEMS,
+        last_item_index        = last_item_index,
+    }
+end
+
+-- Force-set the filenames using a provided slot/seed. Recovery path when
+-- slot-connect fired but somehow didn't reach the set_*_filename calls
+-- (e.g. an unhandled exception earlier in the slot-connect handler).
+function M.force_init_files(slot, seed)
+    slot = slot or (AP_REF and AP_REF.APSlot) or "unknown"
+    seed = seed or "unknown"
+    M.set_received_items_filename(slot, seed)
+    M.set_completed_checks_filename(slot, seed)
+    M.load_completed_checks()
+    M.log(string.format("force_init_files: slot=%s seed=%s -> CC_FILE=%s RI_FILE=%s",
+        slot, seed,
+        tostring(COMPLETED_CHECKS_FILE), tostring(RECEIVED_ITEMS_FILE)))
+end
+
+_G.drap_bridge_diag = function()
+    local s = M.get_diag_state()
+    print(string.format("[Bridge-diag] COMPLETED_CHECKS_FILE = %s", tostring(s.completed_checks_file)))
+    print(string.format("[Bridge-diag] RECEIVED_ITEMS_FILE   = %s", tostring(s.received_items_file)))
+    print(string.format("[Bridge-diag] completed_checks count = %d", s.completed_checks_count))
+    print(string.format("[Bridge-diag] received_items count   = %d", s.received_items_count))
+    print(string.format("[Bridge-diag] last_item_index        = %s", tostring(s.last_item_index)))
+    print(string.format("[Bridge-diag] AP_REF.APSlot          = %s",
+        tostring(AP_REF and AP_REF.APSlot)))
+end
+
+-- Manual recovery: re-initialize the file paths if slot-connect didn't
+-- complete. Pass slot + seed (look at the existing JSON filenames in the
+-- data dir to find them; e.g. AP_DRDR_checks_<slot>_<seed>.json).
+_G.drap_bridge_force_init = function(slot, seed)
+    slot = slot or (AP_REF and AP_REF.APSlot)
+    if not slot or not seed then
+        print("[Bridge-init] Usage: drap_bridge_force_init('slot_name', 'seed_name')")
+        print("[Bridge-init] Look at the JSON filenames in your reframework/data/AP_DRDR_Items/ dir")
+        print("[Bridge-init] e.g. AP_DRDR_checks_<slot>_<seed>.json -> drap_bridge_force_init('<slot>', '<seed>')")
+        return
+    end
+    M.force_init_files(slot, seed)
+    print("[Bridge-init] Done. Run drap_bridge_diag to verify.")
 end
 
 re.on_config_save(save_completed_checks)
@@ -340,12 +448,10 @@ end
 
 ------------------------------------------------------------
 -- Item Tracking & Persistence
+-- (RECEIVED_ITEMS / RECEIVED_ITEMS_BY_NAME / last_item_index /
+--  RECEIVED_ITEMS_FILE declared at top of file)
 ------------------------------------------------------------
 
-local RECEIVED_ITEMS = {}
-local RECEIVED_ITEMS_BY_NAME = {}
-local last_item_index = -1
-local RECEIVED_ITEMS_FILE = nil
 
 function M.set_received_items_filename(slot_name, seed)
     local slot = safe_filename(slot_name)
@@ -377,8 +483,12 @@ function M.load_received_items()
     rebuild_name_counts()
 end
 
-local function save_received_items()
-    local data = { last_item_index = last_item_index, items = RECEIVED_ITEMS }
+save_received_items = function()
+    if not RECEIVED_ITEMS_FILE then return end
+    local data = {
+        last_item_index = last_item_index or -1,
+        items = RECEIVED_ITEMS or {},
+    }
     Shared.save_json(RECEIVED_ITEMS_FILE, data, 4, M.log)
 end
 
@@ -389,6 +499,43 @@ function M.reset_received_items()
     last_item_index = -1
     pending_items = {}
     save_received_items()
+end
+
+-- Restore RECEIVED_ITEMS / last_item_index from disk on slot connect. The
+-- on_items_received filter (`index > last_item_index`) then naturally splits
+-- the server's item-history replay into:
+--   * already-applied items  -> skipped (index <= last_item_index)
+--   * received-while-offline  -> applied as fresh (index > last_item_index)
+-- Without this, reset_received_items() wipes last_item_index back to -1 and
+-- every history item gets re-applied as fresh -- which causes traps with
+-- on_replay="skip" to fire again on every reconnect, since on_replay is
+-- only consulted by the manual reapply path, not the on-connect dispatch.
+function M.load_received_items()
+    if not RECEIVED_ITEMS_FILE then
+        M.log("load_received_items: filename not set yet")
+        return
+    end
+    local data = Shared.load_json(RECEIVED_ITEMS_FILE, M.log)
+    if not data then
+        M.log("No existing received-items file; starting fresh")
+        RECEIVED_ITEMS = {}
+        RECEIVED_ITEMS_BY_NAME = {}
+        last_item_index = -1
+        pending_items = {}
+        return
+    end
+    RECEIVED_ITEMS = data.items or {}
+    RECEIVED_ITEMS_BY_NAME = {}
+    for _, entry in ipairs(RECEIVED_ITEMS) do
+        local n = entry and entry.item_name
+        if n and n ~= "" then
+            RECEIVED_ITEMS_BY_NAME[n] = (RECEIVED_ITEMS_BY_NAME[n] or 0) + 1
+        end
+    end
+    last_item_index = tonumber(data.last_item_index) or -1
+    pending_items = {}
+    M.log(string.format("Loaded %d received items, last_item_index=%d",
+        #RECEIVED_ITEMS, last_item_index))
 end
 
 re.on_config_save(save_received_items)
@@ -409,16 +556,31 @@ end
 ------------------------------------------------------------
 -- Item Handlers Registry
 ------------------------------------------------------------
+--
+-- The actual registry lives in DRAP/ItemEffects.lua. The two functions below
+-- are legacy shims: they forward (name, fn) / (id, fn) registrations into the
+-- new declarative registry with on_replay="apply" (the pre-ItemEffects default
+-- behavior). New code should call ItemEffects.register(...) directly so it can
+-- opt into category dispatch and on_replay="skip" semantics (traps).
 
-local ITEM_HANDLERS_BY_NAME = {}
-local ITEM_HANDLERS_BY_ID = {}
+-- Silent: the legacy path feeds in per-item auto-registrations where duplicate
+-- display names are expected (e.g. multiple "Chair" variants in drdr_items.json).
+-- A collision between two NEW effect modules -- which is a real bug signal --
+-- still warns because those callers use ItemEffects.register() directly.
+local SHIM_OPTS = { silent = true }
 
 function M.register_item_handler_by_name(name, fn)
-    ITEM_HANDLERS_BY_NAME[name] = fn
+    ItemEffects.register(name, {
+        apply = function(ctx) fn(ctx.net_item, ctx.item_name, ctx.sender_name) end,
+        on_replay = "apply",
+    }, SHIM_OPTS)
 end
 
 function M.register_item_handler_by_id(id, fn)
-    ITEM_HANDLERS_BY_ID[id] = fn
+    ItemEffects.register_by_id(id, {
+        apply = function(ctx) fn(ctx.net_item, ctx.item_name, ctx.sender_name) end,
+        on_replay = "apply",
+    }, SHIM_OPTS)
 end
 
 function M.default_item_handler(net_item, item_name, sender_name)
@@ -458,15 +620,28 @@ local function handle_net_item(net_item, is_replay)
         if item_name and item_name ~= "" then
             RECEIVED_ITEMS_BY_NAME[item_name] = (RECEIVED_ITEMS_BY_NAME[item_name] or 0) + 1
         end
+
+        -- Persist immediately so a crash/reset doesn't lose the receipt.
+        -- Mirrors the per-check save in M.check above.
+        save_received_items()
     end
 
-    local handler = ITEM_HANDLERS_BY_ID[item_id]
-        or (item_name and ITEM_HANDLERS_BY_NAME[item_name])
-        or M.default_item_handler
+    local handled = ItemEffects.dispatch(net_item, item_name, sender_name, is_replay)
+    if not handled then
+        M.default_item_handler(net_item, item_name, sender_name)
+    end
 
-    local ok, err = pcall(handler, net_item, item_name, sender_name)
-    if not ok then
-        M.log("Error in handler for id=" .. tostring(item_id) .. ": " .. tostring(err))
+    -- Native in-game toast for the item-receive (skip replays -- those are
+    -- save-load reapplies, not new items, so no notification noise).
+    -- Lazy require so Notify only loads if/when an item actually arrives.
+    if not is_replay and AP_REF.APClient then
+        local ok_n, Notify = pcall(require, "DRAP/Notify")
+        if ok_n and Notify then
+            local self_player = AP_REF.APClient:get_player_number()
+            local is_self = (sender == self_player)
+            local flags = tonumber(net_item.flags) or 0
+            pcall(Notify.item_received, item_name, flags, sender_name, is_self)
+        end
     end
 end
 
@@ -485,6 +660,48 @@ AP_REF.on_items_received = function(items)
                 handle_net_item(net_item, false)
             end
         end
+    end
+end
+
+-- Sent-item toast: when an "ItemSend" PrintJSON arrives where WE are the
+-- source and the receiver is someone else, show a native notification with
+-- the same color scheme as item_received (item-flag colored, names bold).
+-- The imgui Archipelago client window already shows these in its chat log;
+-- this just mirrors them on the in-game UI.
+AP_REF.on_print_json = function(msg, extra)
+    if not extra or not AP_REF.APClient then return end
+    -- Only ItemSend (other types: Hint, ItemCheat, Tutorial, etc. -- skip)
+    if extra.type ~= "ItemSend" then return end
+    if not extra.item or not extra.receiving then return end
+
+    local self_player = AP_REF.APClient:get_player_number()
+    local sender_slot = tonumber(extra.item.player)
+    local receiver_slot = tonumber(extra.receiving)
+    if not sender_slot or not receiver_slot then return end
+
+    -- Skip cases handled elsewhere:
+    --   * Self -> self ("Found your X") -- already toasted by on_items_received
+    --   * Anyone -> us -- already toasted by on_items_received
+    -- We only want WE -> others.
+    if sender_slot ~= self_player then return end
+    if receiver_slot == self_player then return end
+
+    local item_id = tonumber(extra.item.item)
+    local item_flags = tonumber(extra.item.flags) or 0
+    if not item_id then return end
+
+    local recv_game = AP_REF.APClient:get_player_game(receiver_slot)
+    local item_name_raw = AP_REF.APClient:get_item_name(item_id, recv_game)
+    if not item_name_raw or item_name_raw == "" or item_name_raw == "Unknown" then
+        return
+    end
+    local item_name = Shared.clean_string(item_name_raw)
+    local sender_name = Shared.clean_string(AP_REF.APClient:get_player_alias(sender_slot))
+    local recv_name = Shared.clean_string(AP_REF.APClient:get_player_alias(receiver_slot))
+
+    local ok_n, Notify = pcall(require, "DRAP/Notify")
+    if ok_n and Notify then
+        pcall(Notify.item_sent, sender_name, item_name, item_flags, recv_name)
     end
 end
 

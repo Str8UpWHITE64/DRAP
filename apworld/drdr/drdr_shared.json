@@ -1,0 +1,2617 @@
+{
+  "schema_version": 1,
+  "areas": [
+    {
+      "name": "Heliport",
+      "key_item": "Heliport key",
+      "scene_code": "s135",
+      "in_item_pool": false
+    },
+    {
+      "name": "Security Room",
+      "key_item": "Security Room key",
+      "scene_code": "s136",
+      "in_item_pool": false
+    },
+    {
+      "name": "Rooftop",
+      "key_item": "Rooftop key",
+      "scene_code": "s231",
+      "in_item_pool": true
+    },
+    {
+      "name": "Warehouse",
+      "key_item": "Warehouse key",
+      "scene_code": "s230",
+      "in_item_pool": true
+    },
+    {
+      "name": "Paradise Plaza",
+      "key_item": "Paradise Plaza key",
+      "scene_code": "s200",
+      "in_item_pool": true
+    },
+    {
+      "name": "Colby's Movieland",
+      "key_item": "Colby's Movieland key",
+      "scene_code": "s503",
+      "in_item_pool": true
+    },
+    {
+      "name": "Leisure Park",
+      "key_item": "Leisure Park key",
+      "scene_code": "s700",
+      "in_item_pool": true
+    },
+    {
+      "name": "North Plaza",
+      "key_item": "North Plaza key",
+      "scene_code": "s400",
+      "in_item_pool": true
+    },
+    {
+      "name": "Crislip's Home Saloon",
+      "key_item": "Crislip's Home Saloon key",
+      "scene_code": "s501",
+      "in_item_pool": true
+    },
+    {
+      "name": "Food Court",
+      "key_item": "Food Court key",
+      "scene_code": "sa00",
+      "in_item_pool": true
+    },
+    {
+      "name": "Wonderland Plaza",
+      "key_item": "Wonderland Plaza key",
+      "scene_code": "s300",
+      "in_item_pool": true
+    },
+    {
+      "name": "Al Fresca Plaza",
+      "key_item": "Al Fresca Plaza key",
+      "scene_code": "s900",
+      "in_item_pool": true
+    },
+    {
+      "name": "Entrance Plaza",
+      "key_item": "Entrance Plaza key",
+      "scene_code": "s100",
+      "in_item_pool": true
+    },
+    {
+      "name": "Seon's Food and Stuff",
+      "key_item": "Seon's Food and Stuff key",
+      "scene_code": "s500",
+      "in_item_pool": true
+    },
+    {
+      "name": "Maintenance Tunnel",
+      "key_item": "Maintenance Tunnel key",
+      "scene_code": "s600",
+      "in_item_pool": true
+    },
+    {
+      "name": "Carlito's Hideout",
+      "key_item": "Carlito's Hideout key",
+      "scene_code": "s401",
+      "in_item_pool": true
+    }
+  ],
+  "time_keys": [
+    {
+      "name": "DAY2_06_AM",
+      "cap_constant": "DAY2_06_AM",
+      "unlock_function": "unlock_day2_6am"
+    },
+    {
+      "name": "DAY2_11_AM",
+      "cap_constant": "DAY2_11_AM",
+      "unlock_function": "unlock_day2_11am"
+    },
+    {
+      "name": "DAY3_00_AM",
+      "cap_constant": "DAY3_00_AM",
+      "unlock_function": "unlock_day3_12am"
+    },
+    {
+      "name": "DAY3_11_AM",
+      "cap_constant": "DAY3_11_AM",
+      "unlock_function": "unlock_day3_11am"
+    },
+    {
+      "name": "DAY4_12_PM",
+      "cap_constant": "DAY4_12_PM",
+      "unlock_function": "unlock_all_time"
+    }
+  ],
+  "items": [
+    {
+      "name": "",
+      "game_id": "ITEM_NO_NONE",
+      "item_number": 0
+    },
+    {
+      "name": "Pylon",
+      "game_id": "ITEM_NO_PYLON",
+      "item_number": 1
+    },
+    {
+      "name": "Shopping Cart",
+      "game_id": "ITEM_NO_SHOPPING_CART",
+      "item_number": 2
+    },
+    {
+      "name": "",
+      "game_id": "ITEM_NO_VULCAN",
+      "item_number": 3
+    },
+    {
+      "name": "Baseball Bat",
+      "game_id": "ITEM_NO_BASEBALL_BAT",
+      "item_number": 4
+    },
+    {
+      "name": "Garbage Can",
+      "game_id": "ITEM_NO_GARBAGE_CAN",
+      "item_number": 5
+    },
+    {
+      "name": "Chair",
+      "game_id": "ITEM_NO_CHAIR_0",
+      "item_number": 6
+    },
+    {
+      "name": "Shovel",
+      "game_id": "ITEM_NO_SHOVEL",
+      "item_number": 7
+    },
+    {
+      "name": "Push Broom",
+      "game_id": "ITEM_NO_PUSH_BROOM",
+      "item_number": 8
+    },
+    {
+      "name": "Push Broom Handle",
+      "game_id": "ITEM_NO_PUSH_BROOM_HANDLE",
+      "item_number": 9
+    },
+    {
+      "name": "",
+      "game_id": "ITEM_NO_SCRUBBRUSH_HEAD",
+      "item_number": 10
+    },
+    {
+      "name": "Laser Sword",
+      "game_id": "ITEM_NO_BEAM_SWORD",
+      "item_number": 12
+    },
+    {
+      "name": "Paint Can",
+      "game_id": "ITEM_NO_PAINT_CAN",
+      "item_number": 14
+    },
+    {
+      "name": "",
+      "game_id": "ITEM_NO_DRINK_CAN",
+      "item_number": 15
+    },
+    {
+      "name": "Hockey Stick",
+      "game_id": "ITEM_NO_HOCKEY_STICK",
+      "item_number": 16
+    },
+    {
+      "name": "Handbag",
+      "game_id": "ITEM_NO_HANDBAG",
+      "item_number": 17
+    },
+    {
+      "name": "Chair",
+      "game_id": "ITEM_NO_CHAIR_6",
+      "item_number": 18
+    },
+    {
+      "name": "Cleaver",
+      "game_id": "ITEM_NO_CLEAVER",
+      "item_number": 19
+    },
+    {
+      "name": "Skateboard",
+      "game_id": "ITEM_NO_SKATEBOARD",
+      "item_number": 20
+    },
+    {
+      "name": "Toy Cube",
+      "game_id": "ITEM_NO_TOY_CUBE",
+      "item_number": 21
+    },
+    {
+      "name": "Gems",
+      "game_id": "ITEM_NO_GEMS",
+      "item_number": 22
+    },
+    {
+      "name": "Battle Axe",
+      "game_id": "ITEM_NO_BATTLE_AXE",
+      "item_number": 23
+    },
+    {
+      "name": "Store Display",
+      "game_id": "ITEM_NO_STORE_DISPLAY_0",
+      "item_number": 24
+    },
+    {
+      "name": "Store Display",
+      "game_id": "ITEM_NO_STORE_DISPLAY_1",
+      "item_number": 25
+    },
+    {
+      "name": "Bass Guitar",
+      "game_id": "ITEM_NO_BASS_GUITAR",
+      "item_number": 26
+    },
+    {
+      "name": "Acoustic Guitar",
+      "game_id": "ITEM_NO_ACOUSTIC_GUITAR",
+      "item_number": 27
+    },
+    {
+      "name": "Store Display",
+      "game_id": "ITEM_NO_STORE_DISPLAY_2",
+      "item_number": 28
+    },
+    {
+      "name": "Grenade",
+      "game_id": "ITEM_NO_GRENADE",
+      "item_number": 29
+    },
+    {
+      "name": "Water Gun",
+      "game_id": "ITEM_NO_WATER_GUN",
+      "item_number": 30
+    },
+    {
+      "name": "Toy Laser Sword",
+      "game_id": "ITEM_NO_TOY_LASER_SWORD",
+      "item_number": 32
+    },
+    {
+      "name": "Pickaxe",
+      "game_id": "ITEM_NO_PICK_AX",
+      "item_number": 33
+    },
+    {
+      "name": "Chair",
+      "game_id": "ITEM_NO_CHAIR_7",
+      "item_number": 35
+    },
+    {
+      "name": "Golf Club",
+      "game_id": "ITEM_NO_GOLF_CLUB",
+      "item_number": 36
+    },
+    {
+      "name": "Soccer Ball",
+      "game_id": "ITEM_NO_SOCCER_BALL",
+      "item_number": 37
+    },
+    {
+      "name": "Snack",
+      "game_id": "ITEM_NO_SNACK",
+      "item_number": 38
+    },
+    {
+      "name": "Raw Meat",
+      "game_id": "ITEM_NO_RAW_MEAT",
+      "item_number": 42
+    },
+    {
+      "name": "Well Done Steak",
+      "game_id": "ITEM_NO_WELL_DONE_STEAK",
+      "item_number": 43
+    },
+    {
+      "name": "Spoiled Meat",
+      "game_id": "ITEM_NO_SPOILED_MEAT",
+      "item_number": 44
+    },
+    {
+      "name": "Fire Extinguisher",
+      "game_id": "ITEM_NO_FIRE_EXTINGUISHER",
+      "item_number": 46
+    },
+    {
+      "name": "Book [Camera 2]",
+      "game_id": "ITEM_NO_BOOK_CAMERA_2",
+      "item_number": 47
+    },
+    {
+      "name": "Parasol",
+      "game_id": "ITEM_NO_PARASOL",
+      "item_number": 48
+    },
+    {
+      "name": "Fire Ax",
+      "game_id": "ITEM_NO_FIRE_AX",
+      "item_number": 49
+    },
+    {
+      "name": "Sledgehammer",
+      "game_id": "ITEM_NO_SLEDGEHAMMER",
+      "item_number": 50
+    },
+    {
+      "name": "Frying Pan",
+      "game_id": "ITEM_NO_FRYING_PAN",
+      "item_number": 51
+    },
+    {
+      "name": "Katana",
+      "game_id": "ITEM_NO_KATANA",
+      "item_number": 52
+    },
+    {
+      "name": "Chainsaw",
+      "game_id": "ITEM_NO_CHAINSAW",
+      "item_number": 53
+    },
+    {
+      "name": "Dumbbell",
+      "game_id": "ITEM_NO_DUMBBELL",
+      "item_number": 54
+    },
+    {
+      "name": "Hanger",
+      "game_id": "ITEM_NO_HANGER",
+      "item_number": 55
+    },
+    {
+      "name": "Book [Survival]",
+      "game_id": "ITEM_NO_BOOK_SURVIVAL",
+      "item_number": 56
+    },
+    {
+      "name": "Potted Plant",
+      "game_id": "ITEM_NO_POTTED_PLANT",
+      "item_number": 57
+    },
+    {
+      "name": "Real Mega Buster",
+      "game_id": "ITEM_NO_MEGA_MAN_BUSTER",
+      "item_number": 58
+    },
+    {
+      "name": "Shotgun",
+      "game_id": "ITEM_NO_SHOTGUN",
+      "item_number": 60
+    },
+    {
+      "name": "Sickle",
+      "game_id": "ITEM_NO_SICKLE",
+      "item_number": 64
+    },
+    {
+      "name": "",
+      "game_id": "ITEM_NO_JEWELS_ONE",
+      "item_number": 65
+    },
+    {
+      "name": "Vase",
+      "game_id": "ITEM_NO_VASE",
+      "item_number": 66
+    },
+    {
+      "name": "Painting",
+      "game_id": "ITEM_NO_PAINTING",
+      "item_number": 67
+    },
+    {
+      "name": "Book [Brainwashing Tips]",
+      "game_id": "ITEM_NO_BOOK_CULT_INITIATION_GUIDE",
+      "item_number": 68
+    },
+    {
+      "name": "Queen",
+      "game_id": "ITEM_NO_QUEEN",
+      "item_number": 69
+    },
+    {
+      "name": "Lawn Mower",
+      "game_id": "ITEM_NO_LAWN_MOWER",
+      "item_number": 70
+    },
+    {
+      "name": "Bowling Ball",
+      "game_id": "ITEM_NO_BOWING_BALL",
+      "item_number": 71
+    },
+    {
+      "name": "Stun Gun",
+      "game_id": "ITEM_NO_STUN_GUN",
+      "item_number": 72
+    },
+    {
+      "name": "Hedge Trimmer",
+      "game_id": "ITEM_NO_HEDGE_TRIMMER",
+      "item_number": 74
+    },
+    {
+      "name": "Handgun",
+      "game_id": "ITEM_NO_HANDGUN",
+      "item_number": 75
+    },
+    {
+      "name": "Hunting Knife",
+      "game_id": "ITEM_NO_KNIFE",
+      "item_number": 76
+    },
+    {
+      "name": "Propane Tank",
+      "game_id": "ITEM_NO_PROPANE_TANK",
+      "item_number": 77
+    },
+    {
+      "name": "Lead Pipe",
+      "game_id": "ITEM_NO_LEAD_PIPE",
+      "item_number": 79
+    },
+    {
+      "name": "Sign",
+      "game_id": "ITEM_NO_SIGN_1",
+      "item_number": 80
+    },
+    {
+      "name": "TV",
+      "game_id": "ITEM_NO_TV",
+      "item_number": 81
+    },
+    {
+      "name": "Submachine Gun",
+      "game_id": "ITEM_NO_SUBMACHINE_GUN",
+      "item_number": 82
+    },
+    {
+      "name": "Mannequin Male",
+      "game_id": "ITEM_NO_MANNEQUIN_M",
+      "item_number": 83
+    },
+    {
+      "name": "Mannequin Male Torso",
+      "game_id": "ITEM_NO_MANNEQUIN_LIMB_M_0",
+      "item_number": 84
+    },
+    {
+      "name": "Mannequin Male Right Arm",
+      "game_id": "ITEM_NO_MANNEQUIN_LIMB_M_1",
+      "item_number": 85
+    },
+    {
+      "name": "Mannequin Male Left Arm",
+      "game_id": "ITEM_NO_MANNEQUIN_LIMB_M_2",
+      "item_number": 86
+    },
+    {
+      "name": "Mannequin Male Right Leg",
+      "game_id": "ITEM_NO_MANNEQUIN_LIMB_M_3",
+      "item_number": 87
+    },
+    {
+      "name": "Mannequin Male Left Leg",
+      "game_id": "ITEM_NO_MANNEQUIN_LIMB_M_4",
+      "item_number": 88
+    },
+    {
+      "name": "Mannequin Female",
+      "game_id": "ITEM_NO_MANNEQUIN_F",
+      "item_number": 89
+    },
+    {
+      "name": "Mannequin Female Torso",
+      "game_id": "ITEM_NO_MANNEQUIN_LIMB_F_0",
+      "item_number": 90
+    },
+    {
+      "name": "Mannequin Female Right Arm",
+      "game_id": "ITEM_NO_MANNEQUIN_LIMB_F_1",
+      "item_number": 91
+    },
+    {
+      "name": "Mannequin Female Left Arm",
+      "game_id": "ITEM_NO_MANNEQUIN_LIMB_F_2",
+      "item_number": 92
+    },
+    {
+      "name": "Mannequin Female Right Leg",
+      "game_id": "ITEM_NO_MANNEQUIN_LIMB_F_3",
+      "item_number": 93
+    },
+    {
+      "name": "Mannequin Female Left Leg",
+      "game_id": "ITEM_NO_MANNEQUIN_LIMB_F_4",
+      "item_number": 94
+    },
+    {
+      "name": "Potted Plant Bamboo",
+      "game_id": "ITEM_NO_POTTED_PLANT_0",
+      "item_number": 95
+    },
+    {
+      "name": "Potted Plant Tall Bush",
+      "game_id": "ITEM_NO_POTTED_PLANT_1",
+      "item_number": 96
+    },
+    {
+      "name": "Cactus",
+      "game_id": "ITEM_NO_CACTUS",
+      "item_number": 97
+    },
+    {
+      "name": "Potted Plant Small Fern",
+      "game_id": "ITEM_NO_POTTED_PLANT_3",
+      "item_number": 98
+    },
+    {
+      "name": "Potted Plant",
+      "game_id": "ITEM_NO_POTTED_PLANT_4",
+      "item_number": 99
+    },
+    {
+      "name": "Potted Plant",
+      "game_id": "ITEM_NO_POTTED_PLANT_5",
+      "item_number": 100
+    },
+    {
+      "name": "Barbell",
+      "game_id": "ITEM_NO_BARBELL",
+      "item_number": 101
+    },
+    {
+      "name": "Wine Cask",
+      "game_id": "ITEM_NO_WINE_CASK",
+      "item_number": 102
+    },
+    {
+      "name": "Gumball Machine",
+      "game_id": "ITEM_NO_GUMBALL_MACHINE",
+      "item_number": 105
+    },
+    {
+      "name": "Mega Buster",
+      "game_id": "ITEM_NO_MEGA_MAN_BUSTER_TOY",
+      "item_number": 106
+    },
+    {
+      "name": "MegaMan Buster Ball",
+      "game_id": "ITEM_NO_MEGAMANBUSTER_BALL",
+      "item_number": 107
+    },
+    {
+      "name": "HDTV",
+      "game_id": "ITEM_NO_PLASMA_TV",
+      "item_number": 108
+    },
+    {
+      "name": "Microwave Pizza",
+      "game_id": "ITEM_NO_MICROWAVE_PIZZA",
+      "item_number": 109
+    },
+    {
+      "name": "Uncooked Pizza",
+      "game_id": "ITEM_NO_UNCOOKED_PIZZA",
+      "item_number": 110
+    },
+    {
+      "name": "Golden Brown Pizza",
+      "game_id": "ITEM_NO_GOLDEN_BROWN_PIZZA",
+      "item_number": 111
+    },
+    {
+      "name": "Rotten Pizza",
+      "game_id": "ITEM_NO_ROTTEN_PIZZA",
+      "item_number": 112
+    },
+    {
+      "name": "Pie",
+      "game_id": "ITEM_NO_PIE",
+      "item_number": 113
+    },
+    {
+      "name": "Nail Gun",
+      "game_id": "ITEM_NO_NAILGUN",
+      "item_number": 114
+    },
+    {
+      "name": "Smokestack",
+      "game_id": "ITEM_NO_SMOKESTACK",
+      "item_number": 115
+    },
+    {
+      "name": "Chair",
+      "game_id": "ITEM_NO_CHAIR_8",
+      "item_number": 116
+    },
+    {
+      "name": "Stepladder",
+      "game_id": "ITEM_NO_STEPLADDER",
+      "item_number": 117
+    },
+    {
+      "name": "Toolbox",
+      "game_id": "ITEM_NO_TOOLBOX",
+      "item_number": 118
+    },
+    {
+      "name": "Excavator",
+      "game_id": "ITEM_NO_EXCAVATOR",
+      "item_number": 119
+    },
+    {
+      "name": "Small Chainsaw",
+      "game_id": "ITEM_NO_SMALL_CHAINSAW",
+      "item_number": 127
+    },
+    {
+      "name": "",
+      "game_id": "ITEM_NO_BALLOON",
+      "item_number": 131
+    },
+    {
+      "name": "Chair",
+      "game_id": "ITEM_NO_CHAIR_9",
+      "item_number": 132
+    },
+    {
+      "name": "Chair",
+      "game_id": "ITEM_NO_CHAIR_10",
+      "item_number": 133
+    },
+    {
+      "name": "Machinegun",
+      "game_id": "ITEM_NO_MACHINEGUN",
+      "item_number": 134
+    },
+    {
+      "name": "Sniper Rifle",
+      "game_id": "ITEM_NO_SNIPER_RIFLE",
+      "item_number": 135
+    },
+    {
+      "name": "2 x 4",
+      "game_id": "ITEM_NO_2X4",
+      "item_number": 136
+    },
+    {
+      "name": "Boomerang",
+      "game_id": "ITEM_NO_BOOMERANG",
+      "item_number": 137
+    },
+    {
+      "name": "Bucket",
+      "game_id": "ITEM_NO_BUCKET",
+      "item_number": 138
+    },
+    {
+      "name": "Nightstick",
+      "game_id": "ITEM_NO_NIGHTSTICK",
+      "item_number": 139
+    },
+    {
+      "name": "Wine",
+      "game_id": "ITEM_NO_WINE",
+      "item_number": 140
+    },
+    {
+      "name": "Electric Guitar",
+      "game_id": "ITEM_NO_ELECTRIC_GUITAR",
+      "item_number": 141
+    },
+    {
+      "name": "King Salmon",
+      "game_id": "ITEM_NO_KING_SALMON",
+      "item_number": 143
+    },
+    {
+      "name": "Adam's Small Chainsaw",
+      "game_id": "ITEM_NO_REAL_SMALL_CHAINSAW",
+      "item_number": 144
+    },
+    {
+      "name": "Zucchini",
+      "game_id": "ITEM_NO_ZUCCHINI",
+      "item_number": 145
+    },
+    {
+      "name": "Meat Cleaver",
+      "game_id": "ITEM_NO_CHINESE_CLEAVER",
+      "item_number": 147
+    },
+    {
+      "name": "Book [Japanese Conversation]",
+      "game_id": "ITEM_NO_BOOK_JAPANESE_CONVERSATION",
+      "item_number": 149
+    },
+    {
+      "name": "Oil Bucket",
+      "game_id": "ITEM_NO_OIL_BUCKET",
+      "item_number": 152
+    },
+    {
+      "name": "Cash Register",
+      "game_id": "ITEM_NO_CASH_REGISTER",
+      "item_number": 153
+    },
+    {
+      "name": "Propane Tank",
+      "game_id": "ITEM_NO_PROPANE_TANK_S",
+      "item_number": 154
+    },
+    {
+      "name": "Book [Wrestling]",
+      "game_id": "ITEM_NO_BOOK_WRESTLING",
+      "item_number": 155
+    },
+    {
+      "name": "",
+      "game_id": "ITEM_NO_ROCKET_R",
+      "item_number": 157
+    },
+    {
+      "name": "",
+      "game_id": "ITEM_NO_NONE158",
+      "item_number": 158
+    },
+    {
+      "name": "Rock",
+      "game_id": "ITEM_NO_ROCK",
+      "item_number": 159
+    },
+    {
+      "name": "Dishes",
+      "game_id": "ITEM_NO_DISHES",
+      "item_number": 160
+    },
+    {
+      "name": "",
+      "game_id": "ITEM_NO_PLATE_ONE",
+      "item_number": 161
+    },
+    {
+      "name": "",
+      "game_id": "ITEM_NO_RC_BOMB",
+      "item_number": 165
+    },
+    {
+      "name": "Weapon Cart",
+      "game_id": "ITEM_NO_WEAPON_CART",
+      "item_number": 166
+    },
+    {
+      "name": "Sword",
+      "game_id": "ITEM_NO_SWORD",
+      "item_number": 168
+    },
+    {
+      "name": "",
+      "game_id": "ITEM_NO_DYNAMITE",
+      "item_number": 169
+    },
+    {
+      "name": "Book [Toy]",
+      "game_id": "ITEM_NO_BOOK_TOY",
+      "item_number": 170
+    },
+    {
+      "name": "Book [Firework]",
+      "game_id": "ITEM_NO_BOOK_FIREWORK",
+      "item_number": 171
+    },
+    {
+      "name": "Book [Hypnosis]",
+      "game_id": "ITEM_NO_BOOK_HYPNOSIS",
+      "item_number": 172
+    },
+    {
+      "name": "Book [Focus]",
+      "game_id": "ITEM_NO_BOOK_FOCUS",
+      "item_number": 173
+    },
+    {
+      "name": "Book [Blender]",
+      "game_id": "ITEM_NO_BOOK_BLENDER",
+      "item_number": 174
+    },
+    {
+      "name": "Book [Monster Pitcher]",
+      "game_id": "ITEM_NO_BOOK_MONSTER_PITCHER",
+      "item_number": 175
+    },
+    {
+      "name": "Book [Recycle]",
+      "game_id": "ITEM_NO_BOOK_RECYCLE",
+      "item_number": 176
+    },
+    {
+      "name": "Book [Martial Arts]",
+      "game_id": "ITEM_NO_BOOK_MARTIAL_ART",
+      "item_number": 177
+    },
+    {
+      "name": "Book [Fashion]",
+      "game_id": "ITEM_NO_BOOK_FASHION",
+      "item_number": 178
+    },
+    {
+      "name": "Book [Firearms]",
+      "game_id": "ITEM_NO_BOOK_FIREARMS",
+      "item_number": 179
+    },
+    {
+      "name": "Book [Infinite Durability]",
+      "game_id": "ITEM_NO_BOOK_INFINITE_DURABILITY",
+      "item_number": 180
+    },
+    {
+      "name": "Cardboard Box",
+      "game_id": "ITEM_NO_CARDBORD_BOX",
+      "item_number": 181
+    },
+    {
+      "name": "Shower Head",
+      "game_id": "ITEM_NO_SHOWER_HEAD",
+      "item_number": 184
+    },
+    {
+      "name": "Antimaterial Rifle",
+      "game_id": "ITEM_NO_ANTIMATERIAL_RIFLE",
+      "item_number": 186
+    },
+    {
+      "name": "Pipe Bomb",
+      "game_id": "ITEM_NO_SMALLBOMB",
+      "item_number": 187
+    },
+    {
+      "name": "",
+      "game_id": "ITEM_NO_SMALLBOMB_CLIFF",
+      "item_number": 188
+    },
+    {
+      "name": "Machete",
+      "game_id": "ITEM_NO_COMBAT_KNIFE",
+      "item_number": 189
+    },
+    {
+      "name": "Molotov Cocktail",
+      "game_id": "ITEM_NO_MOLOTOVCOCKTAIL",
+      "item_number": 190
+    },
+    {
+      "name": "",
+      "game_id": "ITEM_NO_ICEHOCKEY_PAC",
+      "item_number": 192
+    },
+    {
+      "name": "Book [Hobby]",
+      "game_id": "ITEM_NO_BOOK_HOBBY",
+      "item_number": 193
+    },
+    {
+      "name": "",
+      "game_id": "ITEM_NO_COFFIN",
+      "item_number": 194
+    },
+    {
+      "name": "Ceremonial Sword",
+      "game_id": "ITEM_NO_CEREMONIAL_SWORD",
+      "item_number": 195
+    },
+    {
+      "name": "Novelty Mask (Bear)",
+      "game_id": "ITEM_NO_NOVELTY_MASK_0",
+      "item_number": 196
+    },
+    {
+      "name": "Novelty Mask (Horse)",
+      "game_id": "ITEM_NO_NOVELTY_MASK_1",
+      "item_number": 197
+    },
+    {
+      "name": "Novelty Mask (Servbot)",
+      "game_id": "ITEM_NO_NOVELTY_MASK_2",
+      "item_number": 198
+    },
+    {
+      "name": "Novelty Mask (Ghoul)",
+      "game_id": "ITEM_NO_NOVELTY_MASK_3",
+      "item_number": 199
+    },
+    {
+      "name": "Painting",
+      "game_id": "ITEM_NO_PAINTING_4",
+      "item_number": 200
+    },
+    {
+      "name": "Bench",
+      "game_id": "ITEM_NO_BENCH",
+      "item_number": 202
+    },
+    {
+      "name": "Steel Rack",
+      "game_id": "ITEM_NO_STEEL_RACK",
+      "item_number": 203
+    },
+    {
+      "name": "Shelf",
+      "game_id": "ITEM_NO_SHELF",
+      "item_number": 204
+    },
+    {
+      "name": "Sausage Rack",
+      "game_id": "ITEM_NO_SAUSAGE_RACK",
+      "item_number": 205
+    },
+    {
+      "name": "Corn",
+      "game_id": "ITEM_NO_CORN",
+      "item_number": 208
+    },
+    {
+      "name": "Squash",
+      "game_id": "ITEM_NO_SQUASH",
+      "item_number": 209
+    },
+    {
+      "name": "Cabbage",
+      "game_id": "ITEM_NO_CABBAGE",
+      "item_number": 210
+    },
+    {
+      "name": "Japanese Radish",
+      "game_id": "ITEM_NO_JAPANESE_RADISH",
+      "item_number": 211
+    },
+    {
+      "name": "Lettuce",
+      "game_id": "ITEM_NO_LETTUCE",
+      "item_number": 212
+    },
+    {
+      "name": "Red Cabbage",
+      "game_id": "ITEM_NO_RED_CABBAGE",
+      "item_number": 213
+    },
+    {
+      "name": "Baguette",
+      "game_id": "ITEM_NO_BAGUETTE",
+      "item_number": 214
+    },
+    {
+      "name": "Melon",
+      "game_id": "ITEM_NO_MELON",
+      "item_number": 215
+    },
+    {
+      "name": "Grapefruit",
+      "game_id": "ITEM_NO_GRAPEFRUIT",
+      "item_number": 216
+    },
+    {
+      "name": "Orange",
+      "game_id": "ITEM_NO_ORANGE",
+      "item_number": 217
+    },
+    {
+      "name": "Orange Juice",
+      "game_id": "ITEM_NO_ORANGE_JUICE",
+      "item_number": 218
+    },
+    {
+      "name": "Milk",
+      "game_id": "ITEM_NO_MILK_L",
+      "item_number": 219
+    },
+    {
+      "name": "Coffee Creamer",
+      "game_id": "ITEM_NO_COFFEE_CREAMER",
+      "item_number": 220
+    },
+    {
+      "name": "Yogurt",
+      "game_id": "ITEM_NO_YOGURT",
+      "item_number": 221
+    },
+    {
+      "name": "Cheese",
+      "game_id": "ITEM_NO_CHEESE",
+      "item_number": 222
+    },
+    {
+      "name": "",
+      "game_id": "ITEM_NO_P90",
+      "item_number": 225
+    },
+    {
+      "name": "",
+      "game_id": "ITEM_NO_FLARE",
+      "item_number": 227
+    },
+    {
+      "name": "Shampoo",
+      "game_id": "ITEM_NO_SHAMPOO",
+      "item_number": 228
+    },
+    {
+      "name": "Pet Food",
+      "game_id": "ITEM_NO_PET_FOOD",
+      "item_number": 229
+    },
+    {
+      "name": "Cookies",
+      "game_id": "ITEM_NO_COOKIES",
+      "item_number": 230
+    },
+    {
+      "name": "Baking Ingredients",
+      "game_id": "ITEM_NO_BAKING_INGREDIENTS",
+      "item_number": 231
+    },
+    {
+      "name": "Cooking Oil",
+      "game_id": "ITEM_NO_COOKING_OIL",
+      "item_number": 232
+    },
+    {
+      "name": "Condiment",
+      "game_id": "ITEM_NO_CONDIMENT",
+      "item_number": 233
+    },
+    {
+      "name": "Canned Sauce",
+      "game_id": "ITEM_NO_CANNED_SAUCE",
+      "item_number": 234
+    },
+    {
+      "name": "Canned Food",
+      "game_id": "ITEM_NO_CANNED_FOOD",
+      "item_number": 235
+    },
+    {
+      "name": "Can Drinks",
+      "game_id": "ITEM_NO_DRINK_CANS",
+      "item_number": 236
+    },
+    {
+      "name": "Frozen Vegetables",
+      "game_id": "ITEM_NO_FROZEN_VEGETABLES",
+      "item_number": 237
+    },
+    {
+      "name": "Apple",
+      "game_id": "ITEM_NO_APPLE",
+      "item_number": 238
+    },
+    {
+      "name": "Ice Pops",
+      "game_id": "ITEM_NO_ICE_POPS",
+      "item_number": 239
+    },
+    {
+      "name": "Milk",
+      "game_id": "ITEM_NO_MILK_S",
+      "item_number": 240
+    },
+    {
+      "name": "Rat Stick",
+      "game_id": "ITEM_NO_RAT_STICK",
+      "item_number": 241
+    },
+    {
+      "name": "Rat Saucer",
+      "game_id": "ITEM_NO_RAT_SAUCER",
+      "item_number": 242
+    },
+    {
+      "name": "Painting",
+      "game_id": "ITEM_NO_PAINTING_3",
+      "item_number": 243
+    },
+    {
+      "name": "Saw Blade",
+      "game_id": "ITEM_NO_SAW_BLADE",
+      "item_number": 244
+    },
+    {
+      "name": "",
+      "game_id": "ITEM_NO_WELDINGBURNER",
+      "item_number": 245
+    },
+    {
+      "name": "Skylight",
+      "game_id": "ITEM_NO_SKYLIGHT",
+      "item_number": 246
+    },
+    {
+      "name": "Fence",
+      "game_id": "ITEM_NO_FENCE",
+      "item_number": 247
+    },
+    {
+      "name": "Painting",
+      "game_id": "ITEM_NO_PAINTING_2",
+      "item_number": 248
+    },
+    {
+      "name": "",
+      "game_id": "ITEM_NO_BEAMRIFLE",
+      "item_number": 250
+    },
+    {
+      "name": "Stuffed Bear",
+      "game_id": "ITEM_NO_STUFFED_BEAR",
+      "item_number": 251
+    },
+    {
+      "name": "Mailbox",
+      "game_id": "ITEM_NO_MAILBOX",
+      "item_number": 252
+    },
+    {
+      "name": "Mailbox Post",
+      "game_id": "ITEM_NO_MAILBOX_POST",
+      "item_number": 254
+    },
+    {
+      "name": "Painting",
+      "game_id": "ITEM_NO_PAINTING_1",
+      "item_number": 255
+    },
+    {
+      "name": "Sign",
+      "game_id": "ITEM_NO_SIGN_2",
+      "item_number": 256
+    },
+    {
+      "name": "Hunk of Meat",
+      "game_id": "ITEM_NO_SEVERED_ARM",
+      "item_number": 257
+    },
+    {
+      "name": "Plywood Panel",
+      "game_id": "ITEM_NO_PLYWOOD_PANEL",
+      "item_number": 260
+    },
+    {
+      "name": "CDs",
+      "game_id": "ITEM_NO_CD",
+      "item_number": 264
+    },
+    {
+      "name": "Heavy Machinegun",
+      "game_id": "ITEM_NO_HEAVY_MACHINE_GUN_2",
+      "item_number": 265
+    },
+    {
+      "name": "Perfume Prop",
+      "game_id": "ITEM_NO_PERFUME_PROP",
+      "item_number": 269
+    },
+    {
+      "name": "Lipstick Prop",
+      "game_id": "ITEM_NO_LIPSTICK_PROP",
+      "item_number": 270
+    },
+    {
+      "name": "",
+      "game_id": "ITEM_NO_CD_ONE",
+      "item_number": 271
+    },
+    {
+      "name": "Book [Cooking]",
+      "game_id": "ITEM_NO_BOOK_COOKING",
+      "item_number": 272
+    },
+    {
+      "name": "Book [Lifestyle Magazine]",
+      "game_id": "ITEM_NO_BOOK_LIFESTYLE_MAGAZINE",
+      "item_number": 273
+    },
+    {
+      "name": "Book [Engineering]",
+      "game_id": "ITEM_NO_BOOK_TOOLS",
+      "item_number": 274
+    },
+    {
+      "name": "Book [Sports]",
+      "game_id": "ITEM_NO_BOOK_SPORTS",
+      "item_number": 275
+    },
+    {
+      "name": "Book [Criminal Biography]",
+      "game_id": "ITEM_NO_BOOK_CRIMINAL_BIOGRAPHY",
+      "item_number": 276
+    },
+    {
+      "name": "Book [Travel]",
+      "game_id": "ITEM_NO_BOOK_TRAVEL",
+      "item_number": 277
+    },
+    {
+      "name": "Book [Interior Design]",
+      "game_id": "ITEM_NO_BOOK_INTERIOR_DESIGN",
+      "item_number": 278
+    },
+    {
+      "name": "Book [Entertainment]",
+      "game_id": "ITEM_NO_BOOK_ENTERTAINMENT",
+      "item_number": 279
+    },
+    {
+      "name": "Book [Camera 1]",
+      "game_id": "ITEM_NO_BOOK_CAMERA_1",
+      "item_number": 280
+    },
+    {
+      "name": "Book [Skateboarding]",
+      "game_id": "ITEM_NO_BOOK_SKATEBOARDING",
+      "item_number": 281
+    },
+    {
+      "name": "Book [Wartime Photography]",
+      "game_id": "ITEM_NO_BOOK_WARTIME_PHOTOGRAPHY",
+      "item_number": 282
+    },
+    {
+      "name": "Book [Weekly Photo Magazine]",
+      "game_id": "ITEM_NO_BOOK_WEEKLY_PHOTO_MAGAZINE",
+      "item_number": 283
+    },
+    {
+      "name": "Book [Horror Novel 1]",
+      "game_id": "ITEM_NO_BOOK_HORROR_NOVRL_1",
+      "item_number": 284
+    },
+    {
+      "name": "Book [World News]",
+      "game_id": "ITEM_NO_BOOK_WORLD_NEWS",
+      "item_number": 285
+    },
+    {
+      "name": "Book [Health 1]",
+      "game_id": "ITEM_NO_BOOK_HEALTH_1",
+      "item_number": 286
+    },
+    {
+      "name": "Book [Cycling]",
+      "game_id": "ITEM_NO_BOOK_CYCLING",
+      "item_number": 287
+    },
+    {
+      "name": "Book [Health 2]",
+      "game_id": "ITEM_NO_BOOK_HEALTH_2",
+      "item_number": 288
+    },
+    {
+      "name": "Book [Horror Novel 2]",
+      "game_id": "ITEM_NO_BOOK_HORROR_NOVEL_2",
+      "item_number": 289
+    },
+    {
+      "name": "Electric Guitar",
+      "game_id": "ITEM_NO_ELECTRIC_GUITAR_2",
+      "item_number": 290
+    },
+    {
+      "name": "Chair",
+      "game_id": "ITEM_NO_CHAIR_1",
+      "item_number": 291
+    },
+    {
+      "name": "Chair",
+      "game_id": "ITEM_NO_CHAIR_2",
+      "item_number": 292
+    },
+    {
+      "name": "Chair",
+      "game_id": "ITEM_NO_CHAIR_3",
+      "item_number": 293
+    },
+    {
+      "name": "Stool",
+      "game_id": "ITEM_NO_STOOL",
+      "item_number": 294
+    },
+    {
+      "name": "Chair",
+      "game_id": "ITEM_NO_CHAIR_5",
+      "item_number": 295
+    },
+    {
+      "name": "Juice [Quickstep]",
+      "game_id": "ITEM_NO_JUICE_QUICK_STEP",
+      "item_number": 302
+    },
+    {
+      "name": "Juice [Randomizer]",
+      "game_id": "ITEM_NO_JUICE_RANDOMIZER",
+      "item_number": 303
+    },
+    {
+      "name": "Juice [Untouchable]",
+      "game_id": "ITEM_NO_JUICE_UNTOUCHABLE",
+      "item_number": 304
+    },
+    {
+      "name": "Juice [Spitfire]",
+      "game_id": "ITEM_NO_JUICE_SPITFIRE",
+      "item_number": 305
+    },
+    {
+      "name": "Juice [Nectar]",
+      "game_id": "ITEM_NO_JUICE_NECTAR",
+      "item_number": 306
+    },
+    {
+      "name": "Juice [Energizer]",
+      "game_id": "ITEM_NO_JUICE_ENERGIZER",
+      "item_number": 307
+    },
+    {
+      "name": "Juice [Zombait]",
+      "game_id": "ITEM_NO_JUICE_ZOMBAIT",
+      "item_number": 308
+    },
+    {
+      "name": "Melted Ice Pops",
+      "game_id": "ITEM_NO_MELTED_ICE_POPS",
+      "item_number": 312
+    },
+    {
+      "name": "Thawed Vegetables",
+      "game_id": "ITEM_NO_THAWED_VEGETABLES",
+      "item_number": 313
+    }
+  ],
+  "survivors": [
+    {
+      "name": "Burt Thompson",
+      "game_id": "Npc00_Burt",
+      "item_number": 0
+    },
+    {
+      "name": "Heather Tompkins",
+      "game_id": "Npc01_Heather",
+      "item_number": 1
+    },
+    {
+      "name": "Natalie Meyer",
+      "game_id": "Npc02_Natalie",
+      "item_number": 2
+    },
+    {
+      "name": "Gordon Stalworth",
+      "game_id": "Npc03_Gordon",
+      "item_number": 3
+    },
+    {
+      "name": "Aaron Swoop",
+      "game_id": "Npc04_Aaron",
+      "item_number": 4
+    },
+    {
+      "name": "Jeff Meyer",
+      "game_id": "Npc05_Jeff",
+      "item_number": 5
+    },
+    {
+      "name": "Pamela Tompkins",
+      "game_id": "Npc06_Pamela",
+      "item_number": 6
+    },
+    {
+      "name": "Kindell Johnson",
+      "game_id": "Npc07_Kindell",
+      "item_number": 7
+    },
+    {
+      "name": "Jolie Wu",
+      "game_id": "Npc08_Jolie",
+      "item_number": 8
+    },
+    {
+      "name": "Rachel Decker",
+      "game_id": "Npc09_Rachel",
+      "item_number": 9
+    },
+    {
+      "name": "Susan Walsh",
+      "game_id": "Npc0A_Susan",
+      "item_number": 10
+    },
+    {
+      "name": "Ronald Shiner",
+      "game_id": "Npc0B_Ronald",
+      "item_number": 11
+    },
+    {
+      "name": "Leah Stein",
+      "game_id": "Npc0C_Leah",
+      "item_number": 12
+    },
+    {
+      "name": "David Bailey",
+      "game_id": "Npc0D_David",
+      "item_number": 13
+    },
+    {
+      "name": "Floyd Sanders",
+      "game_id": "Npc0E_Floyd",
+      "item_number": 14
+    },
+    {
+      "name": "Yuu Tanaka",
+      "game_id": "Npc0F_Yuu",
+      "item_number": 15
+    },
+    {
+      "name": "Shinji Kitano",
+      "game_id": "Npc10_Shinji",
+      "item_number": 16
+    },
+    {
+      "name": "Tonya Waters",
+      "game_id": "Npc11_Tonya",
+      "item_number": 17
+    },
+    {
+      "name": "Ross Folk",
+      "game_id": "Npc12_Ross",
+      "item_number": 18
+    },
+    {
+      "name": "Wayne Blackwell",
+      "game_id": "Npc13_Wayne",
+      "item_number": 19
+    },
+    {
+      "name": "Bill Brenton",
+      "game_id": "Npc14_Bill",
+      "item_number": 20
+    },
+    {
+      "name": "Sally Mills",
+      "game_id": "Npc15_Sally",
+      "item_number": 21
+    },
+    {
+      "name": "Nick Evans",
+      "game_id": "Npc16_Nick",
+      "item_number": 22
+    },
+    {
+      "name": "Leroy McKenna",
+      "game_id": "Npc17_Leroy",
+      "item_number": 23
+    },
+    {
+      "name": "Simone Ravendark",
+      "game_id": "Npc18_Simone",
+      "item_number": 24
+    },
+    {
+      "name": "Gil Jiminez",
+      "game_id": "Npc19_Gil",
+      "item_number": 25
+    },
+    {
+      "name": "Brett Styles",
+      "game_id": "Npc1A_Brett",
+      "item_number": 26
+    },
+    {
+      "name": "Jonathan Picardson",
+      "game_id": "Npc1B_Jonathan",
+      "item_number": 27
+    },
+    {
+      "name": "Alyssa Laurent",
+      "game_id": "Npc1D_Alyssa",
+      "item_number": 28
+    },
+    {
+      "name": "Paul Carson",
+      "game_id": "Npc1E_Paul",
+      "item_number": 29
+    },
+    {
+      "name": "Sophie Richard",
+      "game_id": "Npc1F_Sophie",
+      "item_number": 30
+    },
+    {
+      "name": "Jennifer Gorman",
+      "game_id": "Npc20_Jennifer",
+      "item_number": 31
+    },
+    {
+      "name": "Kent Swanson",
+      "game_id": "Npc21_Kent",
+      "item_number": 32
+    },
+    {
+      "name": "Brad Garrison",
+      "game_id": "Npc2A_Brad",
+      "item_number": 33
+    },
+    {
+      "name": "Isabela Keyes",
+      "game_id": "Npc2B_Isabela",
+      "item_number": 34
+    },
+    {
+      "name": "Isabela Keyes",
+      "game_id": "Npc2C_Isabela",
+      "item_number": 35
+    },
+    {
+      "name": "Isabela Keyes",
+      "game_id": "Npc2D_Isabela",
+      "item_number": 36
+    },
+    {
+      "name": "Brad Garrison",
+      "game_id": "Npc30_Brad",
+      "item_number": 37
+    },
+    {
+      "name": "Jessica McCarney",
+      "game_id": "Npc31_Jessie",
+      "item_number": 38
+    },
+    {
+      "name": "Dr Russel Barnaby",
+      "game_id": "Npc33_DrBarnaby",
+      "item_number": 39
+    },
+    {
+      "name": "Otis Washington",
+      "game_id": "Npc34_Otis",
+      "item_number": 40
+    },
+    {
+      "name": "Ray Mathison",
+      "game_id": "Npc40_Ray",
+      "item_number": 41
+    },
+    {
+      "name": "Nathan Crabbe",
+      "game_id": "Npc42_Nathan",
+      "item_number": 42
+    },
+    {
+      "name": "Michelle Feltz",
+      "game_id": "Npc44_Michelle",
+      "item_number": 43
+    },
+    {
+      "name": "Cheryl Jones",
+      "game_id": "Npc45_Cheryl",
+      "item_number": 44
+    },
+    {
+      "name": "Beth Shrake",
+      "game_id": "Npc46_Beth",
+      "item_number": 45
+    },
+    {
+      "name": "Josh Manning",
+      "game_id": "Npc4C_Josh",
+      "item_number": 48
+    },
+    {
+      "name": "Barbara Patterson",
+      "game_id": "Npc4D_Barbara",
+      "item_number": 49
+    },
+    {
+      "name": "Rich Atkins",
+      "game_id": "Npc4E_Rich",
+      "item_number": 50
+    },
+    {
+      "name": "Mindy Baker",
+      "game_id": "Npc4F_Mindy",
+      "item_number": 51
+    },
+    {
+      "name": "Debbie Willet",
+      "game_id": "Npc50_Debbie",
+      "item_number": 52
+    },
+    {
+      "name": "Tad Hawthorne",
+      "game_id": "Npc52_Tad",
+      "item_number": 53
+    },
+    {
+      "name": "Greg Simpson",
+      "game_id": "Npc54_Greg",
+      "item_number": 54
+    },
+    {
+      "name": "Kay Nelson",
+      "game_id": "Npc56_Kay",
+      "item_number": 55
+    },
+    {
+      "name": "Lilly Deacon",
+      "game_id": "Npc57_Lilly",
+      "item_number": 56
+    },
+    {
+      "name": "Kelly Carpenter",
+      "game_id": "Npc59_Kelly",
+      "item_number": 57
+    },
+    {
+      "name": "Janet Star",
+      "game_id": "Npc5A_Janet",
+      "item_number": 58
+    },
+    {
+      "name": "Special Force",
+      "game_id": "Npc70_SpecialForce",
+      "item_number": 59
+    },
+    {
+      "name": "Brad Garrison",
+      "game_id": "Npc80_Brad",
+      "item_number": 60
+    },
+    {
+      "name": "Jessica McCarney",
+      "game_id": "Npc81_Jessie",
+      "item_number": 61
+    },
+    {
+      "name": "Carlito Keyes",
+      "game_id": "Npc82_Carlito",
+      "item_number": 62
+    },
+    {
+      "name": "Isabela Keyes",
+      "game_id": "Npc83_Isabela",
+      "item_number": 63
+    },
+    {
+      "name": "Dr Russel Barnaby",
+      "game_id": "Npc84_DrBarnaby",
+      "item_number": 64
+    },
+    {
+      "name": "Lindsay Harris",
+      "game_id": "Npc85_Lindsay",
+      "item_number": 65
+    },
+    {
+      "name": "Otis Washington",
+      "game_id": "Npc86_Otis",
+      "item_number": 66
+    },
+    {
+      "name": "Carlito Keyes",
+      "game_id": "Npc89_Carlito",
+      "item_number": 67
+    },
+    {
+      "name": "Brad Garrison",
+      "game_id": "Npc8A_Brad",
+      "item_number": 68
+    },
+    {
+      "name": "Brad Garrison",
+      "game_id": "Npc8B_Brad",
+      "item_number": 69
+    },
+    {
+      "name": "Brad Garrison",
+      "game_id": "Npc8C_Brad",
+      "item_number": 70
+    },
+    {
+      "name": "Carlito Keyes",
+      "game_id": "Npc8E_Carlito",
+      "item_number": 71
+    },
+    {
+      "name": "Dr Russel Barnaby",
+      "game_id": "Npc8F_DrBarnaby",
+      "item_number": 72
+    },
+    {
+      "name": "Ryan LaRosa",
+      "game_id": "Npc90_Ryan",
+      "item_number": 73
+    },
+    {
+      "name": "Chris Hines",
+      "game_id": "Npc91_Chris",
+      "item_number": 74
+    },
+    {
+      "name": "Todd Mendel",
+      "game_id": "Npc92_Todd",
+      "item_number": 75
+    },
+    {
+      "name": "Brian Reynolds",
+      "game_id": "Npc93_Brian",
+      "item_number": 76
+    },
+    {
+      "name": "Dana Simms",
+      "game_id": "Npc94_Dana",
+      "item_number": 77
+    },
+    {
+      "name": "Verlene Willis",
+      "game_id": "Npc95_Verlene",
+      "item_number": 78
+    },
+    {
+      "name": "Mark Quemada",
+      "game_id": "Npc96_Mark",
+      "item_number": 79
+    },
+    {
+      "name": "Kathy Peterson",
+      "game_id": "Npc97_Kathy",
+      "item_number": 80
+    },
+    {
+      "name": "Alan Peterson",
+      "game_id": "Npc98_Alan",
+      "item_number": 81
+    },
+    {
+      "name": "James Ramsey",
+      "game_id": "Npc99_James",
+      "item_number": 82
+    },
+    {
+      "name": "Sid",
+      "game_id": "Npc9A_Sid",
+      "item_number": 83
+    },
+    {
+      "name": "Freddie May",
+      "game_id": "Npc9C_Freddie",
+      "item_number": 84
+    }
+  ],
+  "stickers": [
+    {
+      "PhotoID": 143,
+      "LocationName": "Photograph PP Sticker 1",
+      "ItemNumber": 1,
+      "FlagID": 3841
+    },
+    {
+      "PhotoID": 153,
+      "LocationName": "Photograph PP Sticker 2",
+      "ItemNumber": 2,
+      "FlagID": 3843
+    },
+    {
+      "PhotoID": 163,
+      "LocationName": "Photograph PP Sticker 3",
+      "ItemNumber": 3,
+      "FlagID": 3845
+    },
+    {
+      "PhotoID": 164,
+      "LocationName": "Photograph PP Sticker 4",
+      "ItemNumber": 4,
+      "FlagID": 3847
+    },
+    {
+      "PhotoID": 165,
+      "LocationName": "Photograph PP Sticker 5",
+      "ItemNumber": 5,
+      "FlagID": 3849
+    },
+    {
+      "PhotoID": 183,
+      "LocationName": "Photograph PP Sticker 6",
+      "ItemNumber": 6,
+      "FlagID": 3851
+    },
+    {
+      "PhotoID": 184,
+      "LocationName": "Photograph PP Sticker 7",
+      "ItemNumber": 7,
+      "FlagID": 3853
+    },
+    {
+      "PhotoID": 145,
+      "LocationName": "Photograph PP Sticker 8",
+      "ItemNumber": 8,
+      "FlagID": 3855
+    },
+    {
+      "PhotoID": 154,
+      "LocationName": "Photograph PP Sticker 9",
+      "ItemNumber": 9,
+      "FlagID": 3857
+    },
+    {
+      "PhotoID": 144,
+      "LocationName": "Photograph PP Sticker 10",
+      "ItemNumber": 10,
+      "FlagID": 3859
+    },
+    {
+      "PhotoID": 167,
+      "LocationName": "Photograph PP Sticker 11",
+      "ItemNumber": 11,
+      "FlagID": 3861
+    },
+    {
+      "PhotoID": 168,
+      "LocationName": "Photograph PP Sticker 12",
+      "ItemNumber": 12,
+      "FlagID": 3863
+    },
+    {
+      "PhotoID": 128,
+      "LocationName": "Photograph PP Sticker 13",
+      "ItemNumber": 13,
+      "FlagID": 3865
+    },
+    {
+      "PhotoID": 162,
+      "LocationName": "Photograph PP Sticker 14",
+      "ItemNumber": 14,
+      "FlagID": 3867
+    },
+    {
+      "PhotoID": 195,
+      "LocationName": "Photograph PP Sticker 15",
+      "ItemNumber": 15,
+      "FlagID": 3869
+    },
+    {
+      "PhotoID": 194,
+      "LocationName": "Photograph PP Sticker 16",
+      "ItemNumber": 16,
+      "FlagID": 3871
+    },
+    {
+      "PhotoID": 131,
+      "LocationName": "Photograph PP Sticker 17",
+      "ItemNumber": 17,
+      "FlagID": 3873
+    },
+    {
+      "PhotoID": 198,
+      "LocationName": "Photograph PP Sticker 18",
+      "ItemNumber": 18,
+      "FlagID": 3875
+    },
+    {
+      "PhotoID": 199,
+      "LocationName": "Photograph PP Sticker 19",
+      "ItemNumber": 19,
+      "FlagID": 3877
+    },
+    {
+      "PhotoID": 200,
+      "LocationName": "Photograph PP Sticker 20",
+      "ItemNumber": 20,
+      "FlagID": 3879
+    },
+    {
+      "PhotoID": 201,
+      "LocationName": "Photograph PP Sticker 21",
+      "ItemNumber": 21,
+      "FlagID": 3881
+    },
+    {
+      "PhotoID": 130,
+      "LocationName": "Photograph PP Sticker 22",
+      "ItemNumber": 22,
+      "FlagID": 3883
+    },
+    {
+      "PhotoID": 197,
+      "LocationName": "Photograph PP Sticker 23",
+      "ItemNumber": 23,
+      "FlagID": 3885
+    },
+    {
+      "PhotoID": 196,
+      "LocationName": "Photograph PP Sticker 24",
+      "ItemNumber": 24,
+      "FlagID": 3887
+    },
+    {
+      "PhotoID": 190,
+      "LocationName": "Photograph PP Sticker 25",
+      "ItemNumber": 25,
+      "FlagID": 0
+    },
+    {
+      "PhotoID": 191,
+      "LocationName": "Photograph PP Sticker 26",
+      "ItemNumber": 26,
+      "FlagID": 3891
+    },
+    {
+      "PhotoID": 166,
+      "LocationName": "Photograph PP Sticker 27",
+      "ItemNumber": 27,
+      "FlagID": 3893
+    },
+    {
+      "PhotoID": 225,
+      "LocationName": "Photograph PP Sticker 28",
+      "ItemNumber": 28,
+      "FlagID": 3895
+    },
+    {
+      "PhotoID": 223,
+      "LocationName": "Photograph PP Sticker 29",
+      "ItemNumber": 29,
+      "FlagID": 3897
+    },
+    {
+      "PhotoID": 159,
+      "LocationName": "Photograph PP Sticker 30",
+      "ItemNumber": 30,
+      "FlagID": 0
+    },
+    {
+      "PhotoID": 169,
+      "LocationName": "Photograph PP Sticker 31",
+      "ItemNumber": 31,
+      "FlagID": 3901
+    },
+    {
+      "PhotoID": 170,
+      "LocationName": "Photograph PP Sticker 32",
+      "ItemNumber": 32,
+      "FlagID": 3903
+    },
+    {
+      "PhotoID": 172,
+      "LocationName": "Photograph PP Sticker 33",
+      "ItemNumber": 33,
+      "FlagID": 3905
+    },
+    {
+      "PhotoID": 171,
+      "LocationName": "Photograph PP Sticker 34",
+      "ItemNumber": 34,
+      "FlagID": 3907
+    },
+    {
+      "PhotoID": 139,
+      "LocationName": "Photograph PP Sticker 35",
+      "ItemNumber": 35,
+      "FlagID": 3909
+    },
+    {
+      "PhotoID": 137,
+      "LocationName": "Photograph PP Sticker 36",
+      "ItemNumber": 36,
+      "FlagID": 3911
+    },
+    {
+      "PhotoID": 138,
+      "LocationName": "Photograph PP Sticker 37",
+      "ItemNumber": 37,
+      "FlagID": 3913
+    },
+    {
+      "PhotoID": 218,
+      "LocationName": "Photograph PP Sticker 38",
+      "ItemNumber": 38,
+      "FlagID": 3915
+    },
+    {
+      "PhotoID": 212,
+      "LocationName": "Photograph PP Sticker 39",
+      "ItemNumber": 39,
+      "FlagID": 3917
+    },
+    {
+      "PhotoID": 213,
+      "LocationName": "Photograph PP Sticker 40",
+      "ItemNumber": 40,
+      "FlagID": 3919
+    },
+    {
+      "PhotoID": 214,
+      "LocationName": "Photograph PP Sticker 41",
+      "ItemNumber": 41,
+      "FlagID": 3921
+    },
+    {
+      "PhotoID": 215,
+      "LocationName": "Photograph PP Sticker 42",
+      "ItemNumber": 42,
+      "FlagID": 3923
+    },
+    {
+      "PhotoID": 216,
+      "LocationName": "Photograph PP Sticker 43",
+      "ItemNumber": 43,
+      "FlagID": 3925
+    },
+    {
+      "PhotoID": 217,
+      "LocationName": "Photograph PP Sticker 44",
+      "ItemNumber": 44,
+      "FlagID": 3927
+    },
+    {
+      "PhotoID": 219,
+      "LocationName": "Photograph PP Sticker 45",
+      "ItemNumber": 45,
+      "FlagID": 3929
+    },
+    {
+      "PhotoID": 140,
+      "LocationName": "Photograph PP Sticker 46",
+      "ItemNumber": 46,
+      "FlagID": 3931
+    },
+    {
+      "PhotoID": 141,
+      "LocationName": "Photograph PP Sticker 47",
+      "ItemNumber": 47,
+      "FlagID": 3933
+    },
+    {
+      "PhotoID": 142,
+      "LocationName": "Photograph PP Sticker 48",
+      "ItemNumber": 48,
+      "FlagID": 3935
+    },
+    {
+      "PhotoID": 149,
+      "LocationName": "Photograph PP Sticker 49",
+      "ItemNumber": 49,
+      "FlagID": 3937
+    },
+    {
+      "PhotoID": 146,
+      "LocationName": "Photograph PP Sticker 50",
+      "ItemNumber": 50,
+      "FlagID": 3939
+    },
+    {
+      "PhotoID": 220,
+      "LocationName": "Photograph PP Sticker 51",
+      "ItemNumber": 51,
+      "FlagID": 3941
+    },
+    {
+      "PhotoID": 221,
+      "LocationName": "Photograph PP Sticker 52",
+      "ItemNumber": 52,
+      "FlagID": 3943
+    },
+    {
+      "PhotoID": 147,
+      "LocationName": "Photograph PP Sticker 53",
+      "ItemNumber": 53,
+      "FlagID": 3945
+    },
+    {
+      "PhotoID": 148,
+      "LocationName": "Photograph PP Sticker 54",
+      "ItemNumber": 54,
+      "FlagID": 3947
+    },
+    {
+      "PhotoID": 129,
+      "LocationName": "Photograph PP Sticker 55",
+      "ItemNumber": 55,
+      "FlagID": 3949
+    },
+    {
+      "PhotoID": 222,
+      "LocationName": "Photograph PP Sticker 56",
+      "ItemNumber": 56,
+      "FlagID": 3951
+    },
+    {
+      "PhotoID": 150,
+      "LocationName": "Photograph PP Sticker 57",
+      "ItemNumber": 57,
+      "FlagID": 3953
+    },
+    {
+      "PhotoID": 177,
+      "LocationName": "Photograph PP Sticker 58",
+      "ItemNumber": 58,
+      "FlagID": 3955
+    },
+    {
+      "PhotoID": 176,
+      "LocationName": "Photograph PP Sticker 59",
+      "ItemNumber": 59,
+      "FlagID": 3957
+    },
+    {
+      "PhotoID": 135,
+      "LocationName": "Photograph PP Sticker 60",
+      "ItemNumber": 60,
+      "FlagID": 3961
+    },
+    {
+      "PhotoID": 175,
+      "LocationName": "Photograph PP Sticker 61",
+      "ItemNumber": 61,
+      "FlagID": 3959
+    },
+    {
+      "PhotoID": 136,
+      "LocationName": "Photograph PP Sticker 62",
+      "ItemNumber": 62,
+      "FlagID": 3963
+    },
+    {
+      "PhotoID": 185,
+      "LocationName": "Photograph PP Sticker 63",
+      "ItemNumber": 63,
+      "FlagID": 3965
+    },
+    {
+      "PhotoID": 189,
+      "LocationName": "Photograph PP Sticker 64",
+      "ItemNumber": 64,
+      "FlagID": 3967
+    },
+    {
+      "PhotoID": 186,
+      "LocationName": "Photograph PP Sticker 65",
+      "ItemNumber": 65,
+      "FlagID": 3969
+    },
+    {
+      "PhotoID": 187,
+      "LocationName": "Photograph PP Sticker 66",
+      "ItemNumber": 66,
+      "FlagID": 3971
+    },
+    {
+      "PhotoID": 188,
+      "LocationName": "Photograph PP Sticker 67",
+      "ItemNumber": 67,
+      "FlagID": 3973
+    },
+    {
+      "PhotoID": 173,
+      "LocationName": "Photograph PP Sticker 68",
+      "ItemNumber": 68,
+      "FlagID": 3975
+    },
+    {
+      "PhotoID": 178,
+      "LocationName": "Photograph PP Sticker 69",
+      "ItemNumber": 69,
+      "FlagID": 3977
+    },
+    {
+      "PhotoID": 134,
+      "LocationName": "Photograph PP Sticker 70",
+      "ItemNumber": 70,
+      "FlagID": 3979
+    },
+    {
+      "PhotoID": 160,
+      "LocationName": "Photograph PP Sticker 71",
+      "ItemNumber": 71,
+      "FlagID": 3981
+    },
+    {
+      "PhotoID": 133,
+      "LocationName": "Photograph PP Sticker 72",
+      "ItemNumber": 72,
+      "FlagID": 3983
+    },
+    {
+      "PhotoID": 152,
+      "LocationName": "Photograph PP Sticker 73",
+      "ItemNumber": 73,
+      "FlagID": 3989
+    },
+    {
+      "PhotoID": 192,
+      "LocationName": "Photograph PP Sticker 74",
+      "ItemNumber": 74,
+      "FlagID": 4009
+    },
+    {
+      "PhotoID": 193,
+      "LocationName": "Photograph PP Sticker 75",
+      "ItemNumber": 75,
+      "FlagID": 4003
+    },
+    {
+      "PhotoID": 179,
+      "LocationName": "Photograph PP Sticker 76",
+      "ItemNumber": 76,
+      "FlagID": 3985
+    },
+    {
+      "PhotoID": 180,
+      "LocationName": "Photograph PP Sticker 77",
+      "ItemNumber": 77,
+      "FlagID": 3987
+    },
+    {
+      "PhotoID": 158,
+      "LocationName": "Photograph PP Sticker 78",
+      "ItemNumber": 78,
+      "FlagID": 3995
+    },
+    {
+      "PhotoID": 157,
+      "LocationName": "Photograph PP Sticker 79",
+      "ItemNumber": 79,
+      "FlagID": 3993
+    },
+    {
+      "PhotoID": 156,
+      "LocationName": "Photograph PP Sticker 80",
+      "ItemNumber": 80,
+      "FlagID": 3997
+    },
+    {
+      "PhotoID": 155,
+      "LocationName": "Photograph PP Sticker 81",
+      "ItemNumber": 81,
+      "FlagID": 3999
+    },
+    {
+      "PhotoID": 151,
+      "LocationName": "Photograph PP Sticker 82",
+      "ItemNumber": 82,
+      "FlagID": 3991
+    },
+    {
+      "PhotoID": 132,
+      "LocationName": "Photograph PP Sticker 83",
+      "ItemNumber": 83,
+      "FlagID": 4001
+    },
+    {
+      "PhotoID": 182,
+      "LocationName": "Photograph PP Sticker 84",
+      "ItemNumber": 84,
+      "FlagID": 4005
+    },
+    {
+      "PhotoID": 181,
+      "LocationName": "Photograph PP Sticker 85",
+      "ItemNumber": 85,
+      "FlagID": 4007
+    },
+    {
+      "PhotoID": 161,
+      "LocationName": "Photograph PP Sticker 86",
+      "ItemNumber": 86,
+      "FlagID": 4011
+    },
+    {
+      "PhotoID": 209,
+      "LocationName": "Photograph PP Sticker 87",
+      "ItemNumber": 87,
+      "FlagID": 4013
+    },
+    {
+      "PhotoID": 210,
+      "LocationName": "Photograph PP Sticker 88",
+      "ItemNumber": 88,
+      "FlagID": 4015
+    },
+    {
+      "PhotoID": 211,
+      "LocationName": "Photograph PP Sticker 89",
+      "ItemNumber": 89,
+      "FlagID": 4017
+    },
+    {
+      "PhotoID": 202,
+      "LocationName": "Photograph PP Sticker 90",
+      "ItemNumber": 90,
+      "FlagID": 4019
+    },
+    {
+      "PhotoID": 203,
+      "LocationName": "Photograph PP Sticker 91",
+      "ItemNumber": 91,
+      "FlagID": 4021
+    },
+    {
+      "PhotoID": 204,
+      "LocationName": "Photograph PP Sticker 92",
+      "ItemNumber": 92,
+      "FlagID": 4023
+    },
+    {
+      "PhotoID": 205,
+      "LocationName": "Photograph PP Sticker 93",
+      "ItemNumber": 93,
+      "FlagID": 4025
+    },
+    {
+      "PhotoID": 206,
+      "LocationName": "Photograph PP Sticker 94",
+      "ItemNumber": 94,
+      "FlagID": 4027
+    },
+    {
+      "PhotoID": 207,
+      "LocationName": "Photograph PP Sticker 95",
+      "ItemNumber": 95,
+      "FlagID": 4029
+    },
+    {
+      "PhotoID": 208,
+      "LocationName": "Photograph PP Sticker 96",
+      "ItemNumber": 96,
+      "FlagID": 4031
+    },
+    {
+      "PhotoID": 226,
+      "LocationName": "Photograph PP Sticker 97",
+      "ItemNumber": 97,
+      "FlagID": 3840
+    },
+    {
+      "PhotoID": 227,
+      "LocationName": "Photograph PP Sticker 98",
+      "ItemNumber": 98,
+      "FlagID": 0
+    },
+    {
+      "PhotoID": 224,
+      "LocationName": "Photograph PP Sticker 99",
+      "ItemNumber": 99,
+      "FlagID": 0
+    },
+    {
+      "PhotoID": 174,
+      "LocationName": "Photograph PP Sticker 100",
+      "ItemNumber": 100,
+      "FlagID": 0
+    }
+  ],
+  "scoop_survivors": {
+    "A Mother's Lament": [
+      "Leah Stein"
+    ],
+    "A Sick Man": [
+      "Leroy McKenna"
+    ],
+    "A Strange Group": [
+      "Ray Mathison",
+      "Nathan Crabbe",
+      "Michelle Feltz",
+      "Cheryl Jones",
+      "Beth Shrake"
+    ],
+    "A Woman in Despair": [
+      "Simone Ravendark"
+    ],
+    "Above the Law": [
+      "Kay Nelson",
+      "Lilly Deacon",
+      "Kelly Carpenter",
+      "Janet Star"
+    ],
+    "Antique Lover": [
+      "Floyd Sanders"
+    ],
+    "Barricade Pair": [
+      "Burt Thompson",
+      "Aaron Swoop"
+    ],
+    "Dressed for Action": [
+      "Kindell Johnson"
+    ],
+    "Gun Shop Standoff": [
+      "Brett Styles",
+      "Alyssa Laurent",
+      "Jonathan Picardson"
+    ],
+    "Hanging by a Thread": [
+      "Nick Evans",
+      "Sally Mills"
+    ],
+    "Japanese Tourists": [
+      "Yuu Tanaka",
+      "Shinji Kitano"
+    ],
+    "Long Haired Punk": [
+      "Paul Carson",
+      "Mindy Baker",
+      "Debbie Willet"
+    ],
+    "Lovers": [
+      "Tonya Waters",
+      "Ross Folk"
+    ],
+    "Mark of the Sniper": [
+      "Wayne Blackwell"
+    ],
+    "Out of Control": [
+      "Greg Simpson"
+    ],
+    "Photographer's Pride": [
+      "Tad Hawthorne"
+    ],
+    "Restaurant Man": [
+      "Ronald Shiner"
+    ],
+    "Shadow of the North Plaza": [
+      "David Bailey"
+    ],
+    "The Convicts": [
+      "Sophie Richard"
+    ],
+    "The Coward": [
+      "Gordon Stalworth"
+    ],
+    "The Cult": [
+      "Jennifer Gorman"
+    ],
+    "The Drunkard": [
+      "Gil Jiminez"
+    ],
+    "The Hatchet Man": [
+      "Josh Manning",
+      "Barbara Patterson",
+      "Rich Atkins"
+    ],
+    "The Woman Left Behind": [
+      "Susan Walsh"
+    ],
+    "The Woman Who Didn't Make it": [
+      "Jolie Wu",
+      "Rachel Decker"
+    ],
+    "Twin Sisters": [
+      "Heather Tompkins",
+      "Pamela Tompkins"
+    ]
+  },
+  "ap_trigger_locations": [
+    {
+      "id": "todo_maint_key",
+      "list": "ToDo",
+      "msg_no": 3,
+      "type": "single",
+      "location_name": "Obtain Maintenance Tunnel Key",
+      "region": "Maintenance Tunnel",
+      "alt_item": "Maintenance Tunnel Access Key"
+    },
+    {
+      "id": "todo_mall_map",
+      "list": "ToDo",
+      "msg_no": 6,
+      "type": "single",
+      "location_name": "Obtain Mall Map and Transceiver",
+      "region": "Security Room"
+    },
+    {
+      "id": "todo_first_aid",
+      "list": "ToDo",
+      "msg_no": 15,
+      "type": "single",
+      "location_name": "Obtain First Aid Kit",
+      "region": "Seon's Food and Stuff",
+      "requires_location": "Clean up... Register 6!"
+    },
+    {
+      "id": "pp_servbot_head",
+      "list": "Status",
+      "msg_no": 271,
+      "type": "single",
+      "location_name": "Realign Servbot Head",
+      "region": "Paradise Plaza"
+    },
+    {
+      "id": "pp_ride",
+      "list": "Status",
+      "msg_no": 272,
+      "type": "single",
+      "location_name": "Ride the Space Rider",
+      "region": "Wonderland Plaza"
+    },
+    {
+      "id": "pp_treadmill",
+      "list": "Status",
+      "msg_no": 278,
+      "all_msg_no": 279,
+      "type": "counted",
+      "max_count": 6,
+      "location_template_singular": "Walk on 1 Treadmill",
+      "location_template_plural": "Walk on {n} Treadmills",
+      "all_location_name": "Walk on All Treadmills",
+      "region": "Al Fresca Plaza"
+    },
+    {
+      "id": "pp_sandbag",
+      "list": "Status",
+      "msg_no": 269,
+      "all_msg_no": 270,
+      "type": "counted",
+      "max_count": 4,
+      "location_template_singular": "Destroy 1 Sandbag",
+      "location_template_plural": "Destroy {n} Sandbags",
+      "all_location_name": "Destroy All Sandbags",
+      "region": "Al Fresca Plaza"
+    },
+    {
+      "id": "pp_display_rack",
+      "list": "Status",
+      "msg_no": 265,
+      "all_msg_no": 266,
+      "type": "counted",
+      "max_count": 4,
+      "location_template_singular": "Spin 1 Display Rack",
+      "location_template_plural": "Spin {n} Display Racks",
+      "all_location_name": "Spin All Display Racks",
+      "region": "Entrance Plaza"
+    },
+    {
+      "id": "pp_food_court_dish",
+      "list": "Status",
+      "msg_no": 267,
+      "type": "counted",
+      "max_count": 18,
+      "location_template_singular": "Break 1 Food Court Wall Plate",
+      "location_template_plural": "Break {n} Food Court Wall Plates",
+      "region": "Food Court"
+    },
+    {
+      "id": "pp_microwave",
+      "list": "Status",
+      "msg_no": 261,
+      "all_msg_no": 262,
+      "type": "counted",
+      "max_count": 9,
+      "location_template_singular": "Use 1 Microwave",
+      "location_template_plural": "Use {n} Microwaves",
+      "all_location_name": "Use All Microwaves",
+      "count_tiers": [
+        {"max_count": 1, "regions": ["Paradise Plaza"]},
+        {"max_count": 7, "regions": ["Paradise Plaza", "Food Court"]},
+        {"max_count": 9, "regions": ["Paradise Plaza", "Food Court", "Al Fresca Plaza"]}
+      ],
+      "restricted_mode_items_any": ["Uncooked Pizza", "Raw Meat"]
+    },
+    {
+      "id": "pp_stove",
+      "list": "Status",
+      "msg_no": 263,
+      "all_msg_no": 264,
+      "type": "counted",
+      "max_count": 5,
+      "location_template_singular": "Heat a pan on 1 stove",
+      "location_template_plural": "Heat a pan on {n} stoves",
+      "all_location_name": "Heat a pan on all stoves",
+      "count_tiers": [
+        {"max_count": 2, "regions": ["Paradise Plaza"]},
+        {"max_count": 4, "regions": ["Paradise Plaza", "Food Court"]},
+        {"max_count": 5, "regions": ["Paradise Plaza", "Food Court", "Al Fresca Plaza"]}
+      ],
+      "restricted_mode_items_any": ["Frying Pan"]
+    }
+  ]
+}

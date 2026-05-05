@@ -188,7 +188,7 @@ local function evaluate_turbo()
     if not turbo_active or not turbo_target_mdate then return end
 
     -- Keep turbo value set (just a property, doesn't reset the speed mode).
-    -- Do NOT call switchTimeSpeedMode every frame — that resets the game's
+    -- Do NOT call switchTimeSpeedMode every frame -- that resets the game's
     -- internal speed accumulator and prevents time from advancing properly.
     -- start_turbo() already set speed mode to 2; the game maintains it.
     local gts = gts_mgr:get()
@@ -301,12 +301,8 @@ function M.set_mdate(new_mdate)
     return write_scq_mdate(new_mdate)
 end
 
---- Turbo-advance time to a target mDate
---- Unfreezes time, sets turbo speed, then re-freezes on arrival
---- @param target_mdate number The target mDate value
---- @return boolean Whether turbo started successfully
---- Turbo-advance time to a target mDate
---- Unfreezes time, sets turbo speed, then re-freezes on arrival
+--- Turbo-advance time to a target mDate. Unfreezes time, sets turbo
+--- speed, then re-freezes on arrival.
 --- @param target_mdate number The target mDate value
 --- @param on_complete function|nil Optional callback when target is reached
 --- @return boolean Whether turbo started successfully
@@ -391,12 +387,6 @@ function M.unlock_all_time()
     M.log("All time restrictions cleared.")
     apply_gate_state()
 end
-
--- Named unlock functions
-function M.unlock_day2_6am()  M.set_time_cap(TIME_CAPS.DAY2_06_AM) end
-function M.unlock_day2_11am() M.set_time_cap(TIME_CAPS.DAY2_11_AM) end
-function M.unlock_day3_12am() M.set_time_cap(TIME_CAPS.DAY3_00_AM) end
-function M.unlock_day3_11am() M.set_time_cap(TIME_CAPS.DAY3_11_AM) end
 
 --- Sets testing mode (disables time gating)
 --- @param enabled boolean Whether testing mode is enabled

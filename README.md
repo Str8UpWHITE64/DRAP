@@ -18,7 +18,7 @@ These include:
 - Level ups
 - Challenges
 
-I have implemented door locking and time locking.  This means that in order to go to any areas past the Safe Room, you will need to get a key for it.  That means, if you are playing solo and cant get to the Rooftop, you likely can do some checks in the Entrance Plaza in the opening sequence. Which leads to:
+I have implemented door locking and time locking.  This means that in order to go to any areas past the Security Room, you will need to get a key for it.  That means, if you are playing solo and cant get to the Rooftop, you likely can do some checks in the Entrance Plaza in the opening sequence. Which leads to:
 
 It is possible to soft lock yourself, so don't be hesitant to start the game over on top of your current progress to focus on side missions. When you start a new game, any items you received over the run will be granted again at the start.
 
@@ -45,9 +45,7 @@ Currently, there is only one goal, to get Ending S and beat Brock. We may add mo
         ├── ap_drdr_bridge.lua
         ├── AP_DRDR_main.lua
     └── data
-        ├── drdr_items.json
-        ├── PPStickers.json
-        └── survivors.json
+        └── drdr_shared.json
 ```
 7. Download and place the lua-apclientpp.dll into the Dead Rising Deluxe Remaster installation folder from [here](https://github.com/TheRealSolidusSnake/RE3R_AP_Client/blob/main/lua-apclientpp.dll).  I don't yet have permission to post this myself, but will do so if and when I do. 
 8. Upon loading into the game, you should see the AP client connect window pop up, along with the REFramework window.  If you do not see the AP client connect window, scroll down in the REFramework window to "Script Generated UI" and make sure "Show Archipelago Client UI" is checked.

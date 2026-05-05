@@ -1,4 +1,4 @@
--- DRAP/NpcInvestigation.lua
+-- DRAP/NpcCarryover.lua
 -- NPC Carry-Over Handler for Door Randomizer
 -- Rewrites NPC destinations when player goes through randomized doors
 
@@ -24,12 +24,10 @@ local hook_install_attempted = false
 
 local npc_replace_list_field = nil
 local check_carry_over_method = nil
-local replace_npc_method = nil
 local npc_manager_td = nil
 
-local vec3_td = sdk.find_type_definition("via.vec3")
-
--- Spread NPCs out slightly when teleporting
+-- Spread carried-over NPCs apart slightly so they don't all stack on the
+-- player on arrival.
 local carry_over_counter = 0
 local CARRY_OVER_OFFSET_STEP = 0.40
 
@@ -37,37 +35,8 @@ local CARRY_OVER_OFFSET_STEP = 0.40
 -- Helpers
 ------------------------------------------------------------
 
-local function safe_tostring(val)
-    if val == nil then return "nil" end
-    local ok, str = pcall(tostring, val)
-    return ok and str or "?"
-end
-
-local function extract_vec3(vec3_obj)
-    if not vec3_obj then return nil end
-    local result = {}
-    pcall(function() result.x = vec3_obj.x end)
-    pcall(function() result.y = vec3_obj.y end)
-    pcall(function() result.z = vec3_obj.z end)
-    return result
-end
-
-local function make_vec3(x, y, z)
-    if Vector3f and Vector3f.new then
-        local ok, vec = pcall(Vector3f.new, x, y, z)
-        if ok and vec then return vec end
-    end
-    if vec3_td then
-        local ok, inst = pcall(sdk.create_instance, vec3_td)
-        if ok and inst then
-            pcall(function() inst.x = x end)
-            pcall(function() inst.y = y end)
-            pcall(function() inst.z = z end)
-            return inst
-        end
-    end
-    return nil
-end
+local extract_vec3 = Shared.vec3_extract
+local make_vec3    = Shared.vec3_create
 
 local function get_player_position()
     local player_mgr = sdk.get_managed_singleton("app.solid.PlayerManager")
@@ -147,7 +116,7 @@ end
 local function rewrite_single_npc(npc_obj, dest, index)
     if not npc_obj or not dest then return false end
 
-    -- Increment counter for position offset
+    -- Stagger arrivals along x so 6 carry-overs don't stack on the player.
     carry_over_counter = carry_over_counter + 1
     local offset = CARRY_OVER_OFFSET_STEP * (carry_over_counter % 6)
 
@@ -156,16 +125,13 @@ local function rewrite_single_npc(npc_obj, dest, index)
     local new_y = dest.pos and dest.pos.y or 0
     local new_z = dest.pos and dest.pos.z or 0
 
-    -- Set mAreaNo
     pcall(function() npc_obj:set_field("mAreaNo", new_area) end)
 
-    -- Set mPos
     local new_pos = make_vec3(new_x, new_y, new_z)
     if new_pos then
         pcall(function() npc_obj:set_field("mPos", new_pos) end)
     end
 
-    -- Ensure mCarryOverFlag is true
     pcall(function() npc_obj:set_field("mCarryOverFlag", true) end)
 
     return true
@@ -177,29 +143,25 @@ local function rewrite_npc_list(npc_list, dest, player_area, player_pos)
     local count = Shared.get_collection_count(npc_list)
     if count == 0 then return 0 end
 
+    -- Filter chain: only rewrite NPCs that are (1) party members
+    -- (mLiveState == 2), (2) currently in the player's area, and (3)
+    -- physically near the player. Anything else is unrelated to this
+    -- carry-over event.
     local rewritten = 0
     for i = 0, count - 1 do
         local item = Shared.get_collection_item(npc_list, i)
         if item then
-            -- Read NPC state
             local live_state, npc_area, npc_pos = nil, nil, nil
             pcall(function() live_state = Shared.to_int(item:get_field("mLiveState")) end)
             pcall(function() npc_area = Shared.to_int(item:get_field("mAreaNo")) end)
             pcall(function() npc_pos = extract_vec3(item:get_field("mPos")) end)
 
-            -- Filter 1: Must be party member (mLiveState == 2)
-            if live_state ~= 2 then
-                -- Skip: not a party member
-            -- Filter 2: Must be in same area as player
-            elseif player_area and npc_area and npc_area ~= player_area then
-                -- Skip: not in player's area
-            -- Filter 3: Must be near player
-            elseif player_pos and npc_pos and not is_npc_near_player(npc_pos, player_pos) then
-                -- Skip: too far from player
-            else
-                if rewrite_single_npc(item, dest, i) then
-                    rewritten = rewritten + 1
-                end
+            local include = live_state == 2
+                and (not player_area or not npc_area or npc_area == player_area)
+                and (not player_pos or not npc_pos or is_npc_near_player(npc_pos, player_pos))
+
+            if include and rewrite_single_npc(item, dest, i) then
+                rewritten = rewritten + 1
             end
         end
     end
@@ -221,12 +183,8 @@ local function discover_methods()
     for _, method in ipairs(methods) do
         if method then
             local ok, name = pcall(method.get_name, method)
-            if ok and name then
-                if name == "checkCarryOverNpc" then
-                    check_carry_over_method = method
-                elseif name == "replaceNpc" then
-                    replace_npc_method = method
-                end
+            if ok and name and name == "checkCarryOverNpc" then
+                check_carry_over_method = method
             end
         end
     end
@@ -308,16 +266,6 @@ local function install_hooks()
         return
     end
 
-    -- Hook replaceNpc
-    if replace_npc_method then
-        pcall(function()
-            sdk.hook(replace_npc_method,
-                function(args) return args end,
-                function(retval) return retval end
-            )
-        end)
-    end
-
     hooks_installed = true
     M.log("Hooks installed successfully")
 end
@@ -335,11 +283,5 @@ function M.on_frame()
     if not Shared.is_in_game() then return end
     install_hooks()
 end
-
-------------------------------------------------------------
--- Initialize
-------------------------------------------------------------
-
-M.log("NpcCarryOver module loaded")
 
 return M

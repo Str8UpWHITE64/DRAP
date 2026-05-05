@@ -3,6 +3,7 @@
 -- Players cannot pick up items unless they've been sent by Archipelago
 
 local Shared = require("DRAP/Shared")
+local SharedData = require("DRAP/SharedData")
 
 local M = Shared.create_module("ItemRestriction")
 M:set_throttle(0.25)  -- CHECK_INTERVAL
@@ -20,7 +21,6 @@ local am_mgr   = M:add_singleton("am", "app.solid.gamemastering.AreaManager")
 ------------------------------------------------------------
 
 M.enabled = false  -- Restricted Item Mode is OFF by default
-local ITEMS_JSON_PATH = "drdr_items.json"
 
 ------------------------------------------------------------
 -- Internal State
@@ -52,60 +52,35 @@ local function load_known_items()
     -- If already loaded successfully, don't reload
     if known_items_loaded then return true end
 
-    -- Use REFramework's json.load_file for proper parsing
-    local items = json.load_file(ITEMS_JSON_PATH)
-    if not items then
-        -- Don't set known_items_loaded = true, so we retry next time
-        return false
-    end
-
+    local items = SharedData.items()
     if type(items) ~= "table" or #items == 0 then
-        M.log("WARNING: " .. ITEMS_JSON_PATH .. " loaded but appears empty or invalid")
+        -- Don't set known_items_loaded = true, so we retry next time
+        M.log("WARNING: SharedData.items() returned empty or invalid data")
         return false
     end
 
     KNOWN_ITEM_NUMBERS = {}
     local count = 0
-    local name_to_number = {}  -- For debugging duplicate detection
 
+    -- Only track items with a non-empty name -- those are the AP-tracked
+    -- items. Items with empty names are vanilla world items that we never
+    -- restrict (they'd be unobtainable otherwise).
     for _, def in ipairs(items) do
-        -- Only track items with non-empty names (these are the AP-tracked items)
         if def.name and def.name ~= "" and def.item_number then
             local item_num = tonumber(def.item_number)
             if item_num then
                 KNOWN_ITEM_NUMBERS[item_num] = true
                 count = count + 1
-
-                -- Track for duplicate detection logging
-                if name_to_number[def.name] then
-                    -- M.log(string.format("  Note: '%s' has multiple item_numbers: %d and %d",
-                    --     def.name, name_to_number[def.name], item_num))
-                else
-                    name_to_number[def.name] = item_num
-                end
             end
         end
     end
 
     if count == 0 then
-        M.log("WARNING: No valid items found in " .. ITEMS_JSON_PATH)
+        M.log("WARNING: No valid items found in SharedData")
         return false
     end
 
-    M.log(string.format("SUCCESS: Loaded %d known item numbers from %s", count, ITEMS_JSON_PATH))
-
-    -- Log some sample entries to verify parsing worked
-    -- M.log("Sample known items (first 10):")
-    -- local sample_count = 0
-    -- for item_no, _ in pairs(KNOWN_ITEM_NUMBERS) do
-    --     if sample_count < 10 then
-    --         M.log(string.format("  Item #%d", item_no))
-    --         sample_count = sample_count + 1
-    --     else
-    --         break
-    --     end
-    -- end
-
+    M.log(string.format("SUCCESS: Loaded %d known item numbers from SharedData", count))
     known_items_loaded = true
     return true
 end
@@ -119,24 +94,9 @@ function M.reload_known_items()
     return success
 end
 
---- Checks if an item number is a known AP item
---- @param item_no number The game item number
---- @return boolean True if this is a known AP item
 local function is_known_item(item_no)
     if not item_no then return false end
-    local result = KNOWN_ITEM_NUMBERS[item_no] == true
-    return result
-end
-
---- Debug function to check if an item number is known
---- @param item_no number The game item number
-function M.debug_check_item(item_no)
-    load_known_items()
-    local is_known = KNOWN_ITEM_NUMBERS[item_no] == true
-    local is_allowed = is_item_allowed(item_no)
-    M.log(string.format("DEBUG: Item #%d - known=%s, allowed=%s, allowed_count=%d",
-        item_no, tostring(is_known), tostring(is_allowed), ALLOWED_ITEM_COUNTS[item_no] or 0))
-    return is_known, is_allowed
+    return KNOWN_ITEM_NUMBERS[item_no] == true
 end
 
 ------------------------------------------------------------
@@ -178,31 +138,14 @@ local function rebuild_allowed_items()
     end
 end
 
---- Checks if an item number is allowed to be picked up
---- @param item_no number The game item number
---- @return boolean True if the item can be picked up
+-- An item is allowed iff: restricted mode is off, OR the item is not a
+-- known AP item (we never restrict vanilla-only items), OR the player has
+-- received at least one copy of it from AP this run.
 local function is_item_allowed(item_no)
-    if not M.enabled then return true end  -- If restricted item mode is off, all items allowed
-    if not item_no then return true end  -- Unknown items are allowed (safety)
-
-    -- If the item is NOT a known AP item, allow it (don't restrict unknown items)
-    if not is_known_item(item_no) then
-        return true
-    end
-
-    -- For known items, check if player has received it from AP
+    if not M.enabled then return true end
+    if not item_no then return true end
+    if not is_known_item(item_no) then return true end
     return (ALLOWED_ITEM_COUNTS[item_no] or 0) > 0
-end
-
---- Decrements the allowed count for an item (called when picked up)
---- @param item_no number The game item number
-function M.consume_allowed_item(item_no)
-    if not item_no then return end
-    local current = ALLOWED_ITEM_COUNTS[item_no] or 0
-    if current > 0 then
-        ALLOWED_ITEM_COUNTS[item_no] = current - 1
-        M.log(string.format("Consumed allowed item %d, remaining: %d", item_no, current - 1))
-    end
 end
 
 ------------------------------------------------------------
@@ -255,41 +198,36 @@ local function scan_item_list(items_list, source_name)
             end
 
             if item_no then
-                local is_known = is_known_item(item_no)
                 local allowed = is_item_allowed(item_no)
                 local item_key = tostring(item)
 
-                -- Check if item has setTakeable method
                 local item_td = item:get_type_definition()
                 if item_td then
                     local set_takeable = item_td:get_method("setTakeable")
 
                     if set_takeable then
                         if allowed then
-                            -- Item should be takeable
                             if GROUND_ITEM_PATCHES[item_key] then
-                                -- Restore it
                                 local ok = pcall(set_takeable.call, set_takeable, item, true)
                                 if ok then
-                                    -- M.log(string.format("[%s] RESTORED item #%d (known=%s)", source_name, item_no, tostring(is_known)))
                                     GROUND_ITEM_PATCHES[item_key] = nil
                                     restored_count = restored_count + 1
                                 end
                             end
                         else
-                            -- Item should NOT be takeable (it's a known item we haven't received)
+                            -- Known item we haven't received -- make it untakeable.
                             if not GROUND_ITEM_PATCHES[item_key] then
                                 local ok = pcall(set_takeable.call, set_takeable, item, false)
                                 if ok then
-                                    -- M.log(string.format("[%s] DISABLED item #%d (known=%s)", source_name, item_no, tostring(is_known)))
                                     GROUND_ITEM_PATCHES[item_key] = { item_no = item_no, source = source_name }
                                     patched_count = patched_count + 1
                                 end
                             else
-                                -- Already patched - verify it's still disabled
+                                -- Defensive re-check: if mTakeable drifted back to
+                                -- true (engine may flip it during respawn), force
+                                -- it back off.
                                 local mTakeable = Shared.get_field_value(item, {"mTakeable", "<mTakeable>k__BackingField"})
                                 if mTakeable == true then
-                                    -- M.log(string.format("[%s] WARNING: item #%d mTakeable=true but should be false! Re-disabling...", source_name, item_no))
                                     pcall(set_takeable.call, set_takeable, item, false)
                                 end
                             end
@@ -347,10 +285,6 @@ local function scan_ground_items()
             end
         end
     end
-
-    -- if total_patched > 0 or total_restored > 0 then
-    --     M.log(string.format("Ground items scan complete: disabled %d, restored %d", total_patched, total_restored))
-    -- end
 end
 
 ------------------------------------------------------------
@@ -611,56 +545,19 @@ function M.is_enabled()
     return M.enabled
 end
 
---- Called when new items are received from AP
---- Triggers a rescan to allow newly received items
+--- Called when new items are received from AP. Triggers a rescan so the
+--- newly-received items become takeable on the player's next pickup attempt.
 function M.on_items_received()
     if not M.enabled then return end
-    -- M.log("=== NEW ITEMS RECEIVED FROM AP ===")
-
-    -- -- Log what we're about to allow
-    -- local bridge = get_bridge()
-    -- if bridge and bridge.get_all_received_items then
-    --     local received = bridge.get_all_received_items()
-    --     if received then
-    --         local last_few = {}
-    --         local start_idx = math.max(1, #received - 4)  -- Show last 5 items
-    --         for i = start_idx, #received do
-    --             local entry = received[i]
-    --             if entry then
-    --                 table.insert(last_few, string.format("  [%d] %s (game_item_no=%s)",
-    --                     i, tostring(entry.item_name), tostring(entry.game_item_no)))
-    --             end
-    --         end
-    --         M.log("Recent items received:")
-    --         for _, line in ipairs(last_few) do
-    --             M.log(line)
-    --         end
-    --     end
-    -- end
-
-    -- M.log("Rescanning all items...")
     rescan_all_items()
 end
 
---- Forces a full rescan of all items
+--- Forces a full rescan of all items (console helper).
 function M.force_rescan()
     rescan_all_items()
 end
 
---- Gets the count of allowed items for debugging
---- @return table Map of item_no -> count
-function M.get_allowed_items()
-    return ALLOWED_ITEM_COUNTS
-end
-
---- Gets the known item numbers for debugging
---- @return table Map of item_no -> true
-function M.get_known_items()
-    load_known_items()
-    return KNOWN_ITEM_NUMBERS
-end
-
---- Dumps all known item numbers to the log
+--- Dumps all known item numbers to the log (console helper).
 function M.dump_known_items()
     load_known_items()
     M.log("=== FULL KNOWN ITEMS DUMP ===")

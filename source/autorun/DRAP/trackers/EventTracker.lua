@@ -1,4 +1,4 @@
--- DRAP/EventTracker.lua
+-- DRAP/trackers/EventTracker.lua
 -- Tracks:
 --   - app.solid.gamemastering.GameManager.mEventNo
 --   - app.solid.SolidLogManager.SuccessSCQList
@@ -42,7 +42,7 @@ local TRACKED_EVENT_IDS = {
     [10]  = 'Complete Backup for Brad',
     -- [12]  = 'Escort Brad to see Dr Barnaby',
     [81]  = 'Survive until 7pm on day 1',
-    -- [15]  = 'Meet back at the Safe Room at 6am day 2',
+    -- [15]  = 'Meet back at the Security Room at 6am day 2',
     [15]  = 'Complete Image in the Monitor', --Updated from 16
     [17]  = 'Complete Rescue the Professor',
     [21]  = 'Meet Steven',
@@ -51,13 +51,13 @@ local TRACKED_EVENT_IDS = {
     [30]  = 'Complete Promise to Isabela',
     [31]  = 'Save Isabela from the zombie',
     [33]  = 'Complete Transporting Isabela',
-    [37]  = 'Meet at Safe Room at 11am day 3',
+    [37]  = 'Meet at Security Room at 11am day 3',
     [38]  = 'Beat Drivin Carlito',
-    [41]  = 'Meet at Safe Room at 5pm day 3',
-    [80]  = 'Escort Isabela to the Hideout and have a chat',
+    [41]  = 'Meet at Security Room at 5pm day 3',
+    [80]  = "Escort Isabela to Carlito's Hideout and have a chat",
     [43]  = "Complete Jessie's Discovery",
     [44]  = 'Meet Larry',
-    [49]  = 'Head back to the safe room at the end of day 3',
+    [49]  = 'Head back to the Security Room at the end of day 3',
     [53]  = 'Get bit!',
     [131] = 'Gather the suppressants and generator and talk to Isabela',
     [126] = 'Give Isabela 5 queens',
@@ -90,10 +90,10 @@ local TRACKED_EVENT_IDS = {
 local TRACKED_SCQ_IDS = {
     ["0x7A"] = "Help barricade the door!",
     ["0x7B"] = "Get to the stairs!",
-    ["0x7C"] = "Meet Jessie in the Service Hallway",
+    ["0x7C"] = "Meet Jessie in the Warehouse",
     ["0x03"] = "Complete Professor's Past",
     -- ["0x04"] = "Beat up Isabela",
-    -- ["0x05"] = "Carry Isabela back to the Safe Room",
+    -- ["0x05"] = "Carry Isabela back to the Security Room",
     ["0x06"] = "Complete Santa Cabeza",
     ["0x07"] = "Complete Bomb Collector",
     ["0x08"] = "Complete The Butcher",

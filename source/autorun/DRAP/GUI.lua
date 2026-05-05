@@ -1,10 +1,10 @@
--- DRAP/DRAP_GUI.lua
+-- DRAP/GUI.lua
 -- Unified GUI window for Archipelago modules
 -- Combines ItemSpawner and ScoopUnlocker into a single tabbed window
 
 local Shared = require("DRAP/Shared")
 
-local M = Shared.create_module("DRAP_GUI")
+local M = Shared.create_module("GUI")
 
 ------------------------------------------------------------
 -- Module References (lazy-loaded)
@@ -146,6 +146,6 @@ end)
 
 _G.ap_gui = function() M.show_window() end
 
-M.log("DRAP_GUI loaded")
+M.log("GUI loaded")
 
 return M

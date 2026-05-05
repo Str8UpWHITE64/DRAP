@@ -58,18 +58,126 @@ function Shared.create_logger(tag)
     end
 end
 
---- Safe string.format that cleans all string arguments first
---- @param fmt string The format string
---- @param ... any The arguments
---- @return string The formatted string
-function Shared.safe_format(fmt, ...)
-    local args = {...}
-    for i, arg in ipairs(args) do
-        if type(arg) == "string" then
-            args[i] = Shared.clean_string(arg)
+------------------------------------------------------------
+-- Pcall Helpers
+------------------------------------------------------------
+
+--- Generic pcall wrapper. Returns the function's first return value, or nil
+--- on error. Used by modules that frequently wrap engine calls in pcall.
+--- @param fn function The function to call
+--- @param ... any Arguments to pass to fn
+--- @return any|nil The first return value, or nil on error
+function Shared.safe(fn, ...)
+    local ok, v = pcall(fn, ...)
+    if ok then return v end
+    return nil
+end
+
+------------------------------------------------------------
+-- Vector3 Helpers
+------------------------------------------------------------
+
+--- Extracts a vec3-like value (userdata Vector3f, via.vec3, or table) to a
+--- plain {x, y, z} table. Returns nil for nil input.
+--- @param v any A Vector3f userdata or a table with x/y/z (or [1]/[2]/[3])
+--- @return table|nil A new {x, y, z} table, or nil if v is nil
+function Shared.vec3_extract(v)
+    if v == nil then return nil end
+    if type(v) == "table" then
+        return {
+            x = v.x or v[1] or 0,
+            y = v.y or v[2] or 0,
+            z = v.z or v[3] or 0,
+        }
+    end
+    -- Userdata: pcall each component so a bad field access doesn't propagate.
+    local result = {}
+    local ok_x, x = pcall(function() return v.x end)
+    local ok_y, y = pcall(function() return v.y end)
+    local ok_z, z = pcall(function() return v.z end)
+    result.x = (ok_x and x) or 0
+    result.y = (ok_y and y) or 0
+    result.z = (ok_z and z) or 0
+    return result
+end
+
+--- Creates a Vector3f userdata from scalars, a {x,y,z} table, or returns
+--- the input unchanged if it's already userdata. Falls back to
+--- sdk.create_instance("via.vec3") when Vector3f.new isn't available.
+--- @param x number|table|userdata x scalar, or {x,y,z} table, or userdata
+--- @param y number|nil y scalar (ignored if x is a table/userdata)
+--- @param z number|nil z scalar (ignored if x is a table/userdata)
+--- @return userdata|nil Vector3f userdata, or nil on failure
+function Shared.vec3_create(x, y, z)
+    if type(x) == "userdata" then return x end
+    if type(x) == "table" then
+        local t = x
+        x = t.x or t[1] or 0
+        y = t.y or t[2] or 0
+        z = t.z or t[3] or 0
+    end
+    x, y, z = x or 0, y or 0, z or 0
+    if Vector3f and Vector3f.new then
+        local ok, vec = pcall(Vector3f.new, x, y, z)
+        if ok and vec then return vec end
+    end
+    local td = sdk.find_type_definition("via.vec3")
+    if td then
+        local ok, inst = pcall(sdk.create_instance, td)
+        if ok and inst then
+            pcall(function() inst.x = x end)
+            pcall(function() inst.y = y end)
+            pcall(function() inst.z = z end)
+            return inst
         end
     end
-    return string.format(fmt, table.unpack(args))
+    return nil
+end
+
+--- Formats a vec3 table for log lines: "(1.23, 4.56, 7.89)".
+--- @param v table|nil A {x, y, z} table
+--- @return string The formatted string, or "nil" for nil input
+function Shared.vec3_format(v)
+    if not v then return "nil" end
+    return string.format("(%.2f, %.2f, %.2f)", v.x or 0, v.y or 0, v.z or 0)
+end
+
+------------------------------------------------------------
+-- Scene Metadata
+------------------------------------------------------------
+
+--- Engine scene-code → {name, index} lookup. The index is the AreaManager
+--- mAreaIndex value the engine uses for area-jump-name resolution; the name
+--- is the human-readable area name. Used by door modules to translate between
+--- the scene path string ("SCN_s100") and the engine's numeric index (256).
+---
+--- This is a Lua-only constant because the index field is engine-side and
+--- isn't carried in drdr_shared.json (which only has scene_code + name).
+Shared.SCENE_INFO = {
+    s140 = { name = "Title Screen",          index = 292  },
+    s135 = { name = "Heliport",              index = 287  },
+    s136 = { name = "Security Room",         index = 288  },
+    s231 = { name = "Rooftop",               index = 535  },
+    s230 = { name = "Warehouse",             index = 534  },
+    s200 = { name = "Paradise Plaza",        index = 512  },
+    s503 = { name = "Colby's Movieland",     index = 1283 },
+    s700 = { name = "Leisure Park",          index = 1792 },
+    s400 = { name = "North Plaza",           index = 1024 },
+    s501 = { name = "Crislip's Home Saloon", index = 1281 },
+    sa00 = { name = "Food Court",            index = 2560 },
+    s300 = { name = "Wonderland Plaza",      index = 768  },
+    s900 = { name = "Al Fresca Plaza",       index = 2304 },
+    s100 = { name = "Entrance Plaza",        index = 256  },
+    s500 = { name = "Seon's Food and Stuff", index = 1280 },
+    s600 = { name = "Maintenance Tunnel",    index = 1536 },
+    s401 = { name = "Carlito's Hideout",     index = 1025 },
+    s601 = { name = "Butcher",               index = 1537 },
+}
+
+--- Reverse map: engine area index → scene code. Built once at module load.
+Shared.INDEX_TO_SCENE = {}
+for code, info in pairs(Shared.SCENE_INFO) do
+    Shared.INDEX_TO_SCENE[info.index] = code
 end
 
 ------------------------------------------------------------
@@ -241,17 +349,6 @@ function Shared.safe_get_field(obj, field)
     local ok, val = pcall(field.get_data, field, obj)
     if ok then return val end
     return nil
-end
-
---- Safely sets a field on an object
---- @param obj any The managed object
---- @param field_name string The field name
---- @param value any The value to set
---- @return boolean True if successful
-function Shared.safe_set_field(obj, field_name, value)
-    if not obj then return false end
-    local ok, err = pcall(obj.set_field, obj, field_name, value)
-    return ok
 end
 
 --- Gets all fields from a type definition as a plain Lua array
@@ -456,133 +553,6 @@ function Shared.create_throttle(interval)
     end
 end
 
---- Creates a frame-count based throttle
---- @param frame_interval number Number of frames between executions
---- @return function A function that returns true every N frames
-function Shared.create_frame_throttle(frame_interval)
-    local counter = 0
-    return function()
-        counter = counter + 1
-        if counter >= frame_interval then
-            counter = 0
-            return true
-        end
-        return false
-    end
-end
-
-------------------------------------------------------------
--- State Tracking
-------------------------------------------------------------
-
---- Creates a state tracker that detects value changes
---- @param on_change function|nil Callback(old_value, new_value) when value changes
---- @return table State tracker object
-function Shared.create_state_tracker(on_change)
-    local tracker = {
-        value = nil,
-        initialized = false,
-        on_change = on_change,
-    }
-
-    --- Updates the tracked value
-    --- @param new_value any The new value
-    --- @return boolean True if the value changed
-    function tracker:update(new_value)
-        if not self.initialized then
-            self.value = new_value
-            self.initialized = true
-            return false
-        end
-
-        if new_value ~= self.value then
-            local old = self.value
-            self.value = new_value
-
-            if self.on_change then
-                pcall(self.on_change, old, new_value)
-            end
-
-            return true
-        end
-
-        return false
-    end
-
-    --- Resets the tracker to uninitialized state
-    function tracker:reset()
-        self.value = nil
-        self.initialized = false
-    end
-
-    return tracker
-end
-
---- Creates a threshold tracker for numeric values
---- @param thresholds table Array of threshold values
---- @param on_threshold function|nil Callback(index, threshold, prev, current) when crossed
---- @return table Threshold tracker object
-function Shared.create_threshold_tracker(thresholds, on_threshold)
-    local tracker = {
-        thresholds = thresholds,
-        reached = {},
-        last_value = nil,
-        on_threshold = on_threshold,
-    }
-
-    -- Initialize reached flags
-    for i = 1, #thresholds do
-        tracker.reached[i] = false
-    end
-
-    --- Updates with a new value, firing callbacks for any newly crossed thresholds
-    --- @param current number The current value
-    function tracker:update(current)
-        if type(current) ~= "number" then return end
-
-        -- First read: check all thresholds already met
-        if self.last_value == nil then
-            self.last_value = current
-            for i, threshold in ipairs(self.thresholds) do
-                if current >= threshold and not self.reached[i] then
-                    self.reached[i] = true
-                    if self.on_threshold then
-                        pcall(self.on_threshold, i, threshold, current, current)
-                    end
-                end
-            end
-            return
-        end
-
-        local prev = self.last_value
-        if current == prev then return end
-
-        -- Only care about increases
-        if current > prev then
-            for i, threshold in ipairs(self.thresholds) do
-                if not self.reached[i] and current >= threshold and prev < threshold then
-                    self.reached[i] = true
-                    if self.on_threshold then
-                        pcall(self.on_threshold, i, threshold, prev, current)
-                    end
-                end
-            end
-        end
-
-        self.last_value = current
-    end
-
-    --- Resets all tracking state
-    function tracker:reset()
-        self.last_value = nil
-        for i = 1, #self.thresholds do
-            self.reached[i] = false
-        end
-    end
-
-    return tracker
-end
-
 ------------------------------------------------------------
 -- JSON Helpers
 ------------------------------------------------------------
@@ -665,6 +635,25 @@ function Shared.create_module(name)
 
     log("Module created.")
     return mod
+end
+
+------------------------------------------------------------
+-- Notify Helper
+------------------------------------------------------------
+
+--- Returns a closure that fires a Notify.trap_fired toast. Lazily requires
+--- DRAP/Notify on first call to avoid load-order issues at module init time;
+--- caches the result so the require only runs once.
+--- @return function A function (name, detail) that fires the toast
+function Shared.lazy_notify_trap()
+    local _notify
+    return function(name, detail)
+        if _notify == nil then
+            local ok, mod = pcall(require, "DRAP/Notify")
+            if ok and mod then _notify = mod else _notify = false end
+        end
+        if _notify then pcall(_notify.trap_fired, name, detail) end
+    end
 end
 
 ------------------------------------------------------------

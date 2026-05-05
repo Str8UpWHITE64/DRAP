@@ -29,19 +29,19 @@ from DoorRandomization import (
 AREA_COLORS = {
     "s200": "#FF1744",  # Paradise Plaza     — Red
     "sa00": "#FF6D00",  # Food Court         — Orange
-    "s135": "#FFD600",  # Helipad            — Yellow
-    "s401": "#76FF03",  # Hideout            — Lime
-    "s136": "#00C853",  # Safe Room          — Green
+    "s135": "#FFD600",  # Heliport            — Yellow
+    "s401": "#76FF03",  # Carlito's Hideout            — Lime
+    "s136": "#00C853",  # Security Room          — Green
     "s100": "#00BFA5",  # Entrance Plaza     — Teal
     "s700": "#00E5FF",  # Leisure Park       — Cyan
     "s231": "#2979FF",  # Rooftop            — Blue
     "s503": "#304FFE",  # Colby's            — Indigo
     "s300": "#AA00FF",  # Wonderland Plaza   — Violet
-    "s230": "#D500F9",  # Service Hallway    — Purple
+    "s230": "#D500F9",  # Warehouse    — Purple
     "s400": "#FF4081",  # North Plaza        — Hot Pink
     "s601": "#8D6E63",  # Butcher            — Brown
     "s600": "#78909C",  # Maintenance Tunnel — Blue Gray
-    "s500": "#FFFFFF",  # Grocery Store      — White
+    "s500": "#FFFFFF",  # Seon's Food and Stuff      — White
     "s501": "#CE93D8",  # Crislip's          — Lavender
     "s900": "#AED581",  # Al Fresca Plaza    — Soft Green
 }
@@ -110,8 +110,8 @@ MALL_PNG_BASE64 = "iVBORw0KGgoAAAANSUhEUgAAAyAAAAMOCAIAAABptPV5AAAABGdBTUEAALGPC
 def get_short_name(area_code: str) -> str:
     """Get a short display name for an area"""
     names = {
-        "s135": "Helipad",
-        "s136": "Safe Room",
+        "s135": "Heliport",
+        "s136": "Security Room",
         "s231": "Rooftop",
         "s230": "Svc Hall",
         "s200": "Paradise",
@@ -123,7 +123,7 @@ def get_short_name(area_code: str) -> str:
         "s700": "Leisure Pk",
         "s501": "Crislip's",
         "s503": "Colby's",
-        "s401": "Hideout",
+        "s401": "Carlito's Hideout",
         "s600": "Tunnels",
         "s500": "Grocery",
         "s601": "Butcher",
@@ -1452,7 +1452,7 @@ def generate_text_report(randomizer: DoorRandomizer) -> str:
     ])
 
     if randomizer.is_fully_connected(rando_graph):
-        lines.append("✓ All areas are reachable from Safe Room")
+        lines.append("✓ All areas are reachable from Security Room")
     else:
         lines.append("✗ WARNING: Some areas may be unreachable!")
 

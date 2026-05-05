@@ -12,8 +12,8 @@ local FLAG_BLACKLIST = {
 }
 
 local FLAG_TRIGGERS = {
-    [392] = { enable = { 300 } },   -- Hideout: enable 300 so player can enter
-    [355] = { disable = { 300 } },  -- Hideout: disable 300 once inside (kills NPCs if left on)
+    [392] = { enable = { 300 } },   -- Carlito's Hideout: enable 300 so player can enter
+    [355] = { disable = { 300 } },  -- Carlito's Hideout: disable 300 once inside (kills NPCs if left on)
 }
 
 local TIME_SKIP_TRIGGERS = {
@@ -23,6 +23,29 @@ local TIME_SKIP_TRIGGERS = {
 local HIDEOUT_AREA_INDEX = 1025
 local NORTH_PLAZA_AREA_INDEX = 1024
 local PARADISE_PLAZA_AREA_INDEX = 512
+local ENTRANCE_PLAZA_AREA_INDEX = 256   -- AreaManager mAreaIndex for s100
+
+-- ScoopSanity-only EP-shutter trigger box: when the player enters this AABB
+-- inside Entrance Plaza, we fire flag 270 once (which plays the
+-- SCN_evm13_EV "Backup for Brad" cutscene that opens the EP shutter).
+--
+-- Default values were verified in playtest 2026-04-29 (alex). Adjust with
+-- _G.drap_ep270_set_box(...) and _G.drap_ep270_show_pos() if needed.
+local EP270_TRIGGER_BOX = {
+    min_x = 120.0, max_x = 130.0,
+    min_y = 0.0,   max_y = 3.0,
+    min_z = 130.0, max_z = 140.0,
+}
+
+-- Flags whose ON state is the engine's "EP-shutter cutscene played" marker.
+-- The cutscene's tail sets both. Neither is in any CASCADE_FLAGS table and
+-- neither is a COMPLETION_FLAGS entry, so they only ever transition off->on
+-- via that one cutscene. They live in the game's save state, so reloading
+-- an earlier save automatically restores them to off and our trigger fires
+-- again on the next EP visit -- no DRAP-side persistence needed.
+--   765  = EV_RADIO_MES_FLAG_S100  (radio message after the cutscene)
+--   2280 = EV_MESSAGE_68           (post-cutscene message banner)
+local EP270_GATE_FLAGS = { 765, 2280 }
 
 local time_skips_fired = {}
 local active_time_skip = nil
@@ -60,7 +83,7 @@ local SCOOP_DATA = {
     ["A Promise to Isabela"] = {
         primary_flag = 773, secondary_flags = { 286 }, disable_flags = { 292 },
         category = "Main", order = 10,
-        completion_event = "Carry Isabela back to the Safe Room",
+        completion_event = "Carry Isabela back to the Security Room",
     },
     ["Santa Cabeza"] = {
         primary_flag = 292, secondary_flags = { 774 }, category = "Main", order = 11,
@@ -70,7 +93,7 @@ local SCOOP_DATA = {
         primary_flag = 294, secondary_flags = { 775, 313 }, category = "Main", order = 12,
         completion_event = "Complete Bomb Collector",
     },
-    ["Hideout"] = {
+    ["Carlito's Hideout"] = {
         primary_flag = 776, secondary_flags = { 265 }, disable_flags = { 304 },
         disable_on_unlock = { 355 },
         category = "Main", order = 13,
@@ -290,7 +313,7 @@ local SCOOP_DATA = {
     },
 
     ["The Cult"] = {
-        flags = { 787, 811, 2699 }, --326, 1222
+        flags = { 787, 811, 2699 },
         npcs = { "Raincoats", "Jennifer Gorman" },
         category = "Psychopath",
         completion_event = "Witness Sean in Paradise Plaza",
@@ -311,12 +334,12 @@ local SCOOP_DESCRIPTIONS = {
         description = "Help Brad fight Carlito.",
     },
     ["A Temporary Agreement"] = {
-        location = "Safe Room",
+        location = "Security Room",
         trigger = "Enter the Security Room front door",
-        description = "Speak to Brad and Jessie in the Safe Room.",
+        description = "Speak to Brad and Jessie in the Security Room.",
     },
     ["Image in the Monitor"] = {
-        location = "Safe Room",
+        location = "Security Room",
         trigger = "Walk through the Security Room rear door",
         description = "Watch the monitor cutscene with Jessie.",
     },
@@ -326,18 +349,18 @@ local SCOOP_DESCRIPTIONS = {
         description = "Rescue Dr. Barnaby from Carlito.",
     },
     ["Medicine Run"] = {
-        location = "Grocery Store",
-        trigger = "Open the back office hallway door in the Grocery Store",
+        location = "Seon's Food and Stuff",
+        trigger = "Open the back office hallway door in the Seon's Food and Stuff",
         description = "Find medicine for Brad and return to the Security Room.",
     },
     ["Professor's Past"] = {
-        location = "Safe Room",
+        location = "Security Room",
         trigger = "Enter the Security Room",
         description = "Speak with Dr. Barnaby.",
     },
     ["Girl Hunting"] = {
         location = "North Plaza",
-        trigger = "Approach the Grocery Store entrance",
+        trigger = "Approach the Seon's Food and Stuff entrance",
         description = "Fight Isabela on her motorcycle.",
     },
     ["A Promise to Isabela"] = {
@@ -346,22 +369,22 @@ local SCOOP_DESCRIPTIONS = {
         description = "Escort Isabela to the Security Room.",
     },
     ["Santa Cabeza"] = {
-        location = "Safe Room",
+        location = "Security Room",
         trigger = "Enter the Security Room",
         description = "Speak with Isabela about Santa Cabeza.",
     },
     ["The Last Resort"] = {
-        location = "Safe Room",
+        location = "Security Room",
         trigger = "Walk through the Security Room rear door",
         description = "Collect all bombs in the Maintenance Tunnels and return them.",
     },
-    ["Hideout"] = {
-        location = "Safe Room",
+    ["Carlito's Hideout"] = {
+        location = "Security Room",
         trigger = "Walk through the Security Room rear door",
-        description = "Escort Isabela from the Safe Room to the hideout.",
+        description = "Escort Isabela from the Security Room to Carlito's Hideout.",
     },
     ["Jessie's Discovery"] = {
-        location = "Safe Room",
+        location = "Security Room",
         trigger = "Enter the Security Room",
         description = "Speak with Jessie.",
     },
@@ -371,9 +394,9 @@ local SCOOP_DESCRIPTIONS = {
         description = "Fight the butcher.",
     },
     ["The Facts"] = {
-        location = "Safe Room",
+        location = "Security Room",
         trigger = "Walk into Paradise Plaza",
-        description = "Head back to the Safe Room to talk to Jessie.",
+        description = "Head back to the Security Room to talk to Jessie. If time doesn't speed up after killing Zombie Jessie, go to the bench in the Security Room and fast-forward to the ending.",
     },
 }
 
@@ -467,8 +490,30 @@ local SCOOP_PREREQUISITES = {
     ["Photographer's Pride"] = { "Cut from the Same Cloth", "Photo Challenge" },       -- Kent Day 3 needs Day 1+2 done
 }
 
+-- Engine-flag prerequisites: scoops that can't safely be unlocked until a
+-- specific flag (or any of a set) is on. Distinct from SCOOP_PREREQUISITES
+-- (which gates on other scoop completions). When the prerequisite flag isn't
+-- yet on, unlock_scoop bails and the scoop is parked in flag_prereq_deferred
+-- for retry on each on_frame tick (cheap: ~2 raw_check_flag calls per scoop).
+--
+-- Mark of the Sniper: gated on the EP shutter cutscene having played (flag
+-- 765 EV_RADIO_MES_FLAG_S100 OR flag 2280 EV_MESSAGE_68 -- the cutscene's
+-- post-completion markers, same set as ep270_gates_open()). Activating
+-- Mark of the Sniper before that cutscene leaves the EP scene state in a
+-- configuration where the shutter doesn't open even when our trigger fires
+-- flag 270, because the engine reconfigures s100 around the active sniper
+-- flags (798, 808). Deferring the unlock until 765/2280 are set means the
+-- player walks into EP, our trigger fires, the cutscene plays, and only
+-- then does Mark of the Sniper become eligible.
+--
+-- Each entry is a list of flag_ids -- the scoop unlocks when ANY are on.
+-- (Add a separate `all_of` map if a future scoop needs AND semantics.)
+local SCOOP_FLAG_PREREQUISITES = {
+    ["Mark of the Sniper"] = { 765, 2280 },
+}
+
 local COMPLETION_FLAGS = {
-    [769] = { event = "Meet Jessie in the Service Hallway", scoop = "Meet Jessie in the Service Hallway" },
+    [769] = { event = "Meet Jessie in the Warehouse", scoop = "Meet Jessie in the Warehouse" },
     [270] = { event = "Complete Backup for Brad" },
     [2308] = { event = "Escort Brad to see Dr Barnaby", scoop = "Backup for Brad" },
     [273] = { event = "Complete Temporary Agreement", scoop = "A Temporary Agreement" },
@@ -477,10 +522,10 @@ local COMPLETION_FLAGS = {
     [2192] = { event = "Complete Medicine Run", scoop = "Medicine Run" },
     [284] = { event = "Complete Professor's Past", scoop = "Professor's Past" },
     [1288] = { event = "Beat up Isabela", scoop = "Girl Hunting" },
-    [292] = { event = "Carry Isabela back to the Safe Room", scoop = "A Promise to Isabela" },
+    [292] = { event = "Carry Isabela back to the Security Room", scoop = "A Promise to Isabela" },
     [294] = { event = "Complete Santa Cabeza", scoop = "Santa Cabeza" },
     [839] = { event = "Complete Bomb Collector", scoop = "The Last Resort" },
-    [2322] = { event = "Escort Isabela to the Hideout and have a chat", scoop = "Hideout" },
+    [2322] = { event = "Escort Isabela to Carlito's Hideout and have a chat", scoop = "Carlito's Hideout" },
     [302] = { event = "Complete Jessie's Discovery", scoop = "Jessie's Discovery" },
     [304] = { event = "Complete The Butcher", scoop = "The Butcher" },
 
@@ -510,8 +555,8 @@ local CASCADE_FLAGS = {
     -- Another Source
     [2433] = "Another Source",
 
-    -- Rescue the Professor
-    --[276]  = "Rescue the Professor",
+    -- Rescue the Professor (276 deliberately omitted -- managed in on_frame
+    -- with area gating so the EP door is open when Professor isn't active)
     [415]  = "Rescue the Professor",
     [1283] = "Rescue the Professor",
     [137]  = "Rescue the Professor",
@@ -552,8 +597,8 @@ local CASCADE_FLAGS = {
     [2194] = "The Last Resort",
     [2439] = "The Last Resort",
 
-    -- Hideout
-    [392]  = "Hideout",
+    -- Carlito's Hideout
+    [392]  = "Carlito's Hideout",
 
     -- The Butcher
     [304]  = "The Butcher",
@@ -576,23 +621,33 @@ local COMPLETION_GRACE_SECONDS = 3
 local completion_times = {}
 local pending_suppress = {}
 local on_completion_detected_callback = nil
+
+-- Log-spam suppression: track the last cascade-clear signature and the set
+-- of completion-event names already logged. Without this, an oscillation
+-- between Post-Jessie's force-enable of flag 270 ("Complete Backup for Brad")
+-- and CASCADE_FLAGS clearing the same flag fires both logs every frame in
+-- Savior mode (verified in APLOG.txt run 2026-04-27).
+local _last_cascade_signature = nil
+local _logged_completion_events = {}   -- event_name -> true
 local scoop_order = {}
 local scoop_order_set = false
 local ap_activated = false
 local time_frozen = false
 local scoop_sanity_enabled = false
 local door_randomizer_enabled = false
+local goal_mode = 0   -- 0 = Ending S, 1 = Ending A, 2 = Savior
 local on_ap_activated_callback = nil
 local on_time_freeze_callback = nil
 local on_time_unfreeze_callback = nil
 local endgame_reached = false       -- true after Get bit! or Ending A (persisted)
 local professor_276_disabled = false -- tracks one-time disable of flag 276 for Rescue the Professor
-local hideout_key_deferred = false   -- true when Hideout scoop deferred (waiting for Hideout key)
+local hideout_key_deferred = false   -- true when Carlito's Hideout scoop deferred (waiting for Carlito's Hideout key)
+local flag_prereq_deferred = {}      -- { [scoop_name] = true } -- scoops blocked by SCOOP_FLAG_PREREQUISITES
 local save_filename = nil
 
 local MILESTONE_EVENTS = {
     ["Get to the stairs!"] = "time_freeze",
-    ["Meet Jessie in the Service Hallway"] = "activate",
+    ["Meet Jessie in the Warehouse"] = "activate",
     ["Get bit!"] = "time_freeze",
 }
 
@@ -606,7 +661,7 @@ local function count_keys(t) local n = 0; for _ in pairs(t) do n = n + 1 end; re
 
 local function has_hideout_key()
     local bridge = AP and AP.AP_BRIDGE
-    return bridge and bridge.has_item_name and bridge.has_item_name("Hideout key")
+    return bridge and bridge.has_item_name and bridge.has_item_name("Carlito's Hideout key")
 end
 
 local function raw_check_flag(flag_id)
@@ -746,6 +801,114 @@ local function has_prerequisites_met(scoop_name)
     return true
 end
 
+-- ANY-of semantics: a scoop with N flag prereqs unlocks as soon as any one
+-- is on. Returns (true, nil) if the prereqs are met (or unset for the
+-- scoop), else (false, list_of_flag_ids).
+local function has_flag_prerequisites_met(scoop_name)
+    local flag_list = SCOOP_FLAG_PREREQUISITES[scoop_name]
+    if not flag_list then return true, nil end
+    for _, fid in ipairs(flag_list) do
+        if raw_check_flag(fid) then return true, nil end
+    end
+    return false, flag_list
+end
+
+-- Live player position via PlayerManager.CurrentPlayerCondition.LastPlayerPos.
+-- Returns x, y, z numbers, or nil when the player isn't spawned (title menu /
+-- between scenes).
+local function get_player_pos_xyz()
+    local pm = sdk.get_managed_singleton("app.solid.PlayerManager")
+    if not pm then return nil end
+    local cond
+    pcall(function() cond = pm:call("get_CurrentPlayerCondition") end)
+    if not cond then return nil end
+    local pos
+    pcall(function() pos = cond:get_field("LastPlayerPos") end)
+    if not pos then return nil end
+    local x, y, z
+    pcall(function() x = pos.x; y = pos.y; z = pos.z end)
+    if not (x and y and z) then return nil end
+    return x, y, z
+end
+
+local function in_ep270_box(x, y, z)
+    return x >= EP270_TRIGGER_BOX.min_x and x <= EP270_TRIGGER_BOX.max_x
+       and y >= EP270_TRIGGER_BOX.min_y and y <= EP270_TRIGGER_BOX.max_y
+       and z >= EP270_TRIGGER_BOX.min_z and z <= EP270_TRIGGER_BOX.max_z
+end
+
+-- True iff the EP-shutter cutscene has already played in the currently
+-- loaded save. Reads the engine's own post-cutscene markers, so this
+-- automatically tracks across save/load and resets on rollback or new game.
+local function ep270_gates_open()
+    for _, fid in ipairs(EP270_GATE_FLAGS) do
+        if raw_check_flag(fid) then return true end
+    end
+    return false
+end
+
+-- Session-only timestamp of our last flag-270 fire. The cutscene takes a
+-- few seconds to land 765/2280; this grace window prevents a refire while
+-- the cutscene is mid-playback.
+local _ep_270_fired_at_clock = 0
+
+-- Pending flag clears scheduled from inside the evFlagOn pre-hook (e.g.
+-- after ss_block suppresses a pre-fired completion). Processed at the top
+-- of M.on_frame so the engine's evFlagOn implementation has already run
+-- and we're not racing it.
+local pending_flag_clears = {}
+
+-- ScoopSanity-only: fire flag 270 (EP-shutter cutscene) the first time the
+-- player walks into the configured AABB inside Entrance Plaza after AP has
+-- activated. Persistence is via the engine's flags 765/2280 (set by the
+-- cutscene tail and never cleared), not a DRAP-side state -- save reload
+-- and new game come for free.
+--
+-- Skipped while "Backup for Brad" is the player's current main scoop -- the
+-- player will trigger the cutscene naturally as part of completing it, so
+-- pre-firing would just race them and steal the legitimate completion path.
+local function try_fire_ep270_in_scoop_sanity()
+    if not scoop_sanity_enabled then return end
+    if not ap_activated then return end
+    if ep270_gates_open() then return end
+
+    -- Don't pre-fire if Backup for Brad is the player's active main scoop.
+    -- They'll get there on their own; our trigger would only short-circuit
+    -- the natural mission flow.
+    local current_chain = M.get_current_chain_scoop and M.get_current_chain_scoop()
+    if current_chain == "Backup for Brad" then return end
+    -- Same guard for the AP-received-but-not-yet-completed case (current
+    -- chain may not match if scoops aren't running in strict order).
+    if received_scoops["Backup for Brad"] and not completed_scoops["Backup for Brad"] then
+        return
+    end
+
+    -- Grace window after a fire in this session: 765/2280 land near the
+    -- end of the cutscene, so for ~few seconds after firing we'd still see
+    -- gates_open() == false. Don't refire during that window.
+    if (os.clock() - _ep_270_fired_at_clock) < 8.0 then return end
+
+    local am = am_mgr:get()
+    if not am then return end
+    local af = am_mgr:get_field("mAreaIndex", false)
+    if not af then return end
+    local area = Shared.to_int(Shared.safe_get_field(am, af))
+    if area ~= ENTRANCE_PLAZA_AREA_INDEX then return end
+    local x, y, z = get_player_pos_xyz()
+    if not x then return end
+    if not in_ep270_box(x, y, z) then return end
+
+    -- Suppress the evFlagOn -> COMPLETION_FLAGS[270] handler while we set
+    -- the flag (270 maps to "Complete Backup for Brad"; we don't want that
+    -- check sent before the player has earned the AP item).
+    currently_unlocking = true
+    raw_set_flag_on(270)
+    currently_unlocking = false
+    _ep_270_fired_at_clock = os.clock()
+    M.log(string.format("ScoopSanity: fired flag 270 (EP shutter cutscene) at (%.2f, %.2f, %.2f)",
+        x, y, z))
+end
+
 local function get_current_area_index()
     local am = am_mgr:get()
     if not am then return nil end
@@ -761,7 +924,7 @@ local function try_advance_conflict_group(completed_name)
     for _, member in ipairs(info.members) do
         if member ~= completed_name and ap_received[member] and not completed_scoops[member] then
             if not received_scoops[member] then
-                M.log(string.format("Conflict group '%s': '%s' completed → unlocking '%s'",
+                M.log(string.format("Conflict group '%s': '%s' completed -> unlocking '%s'",
                     info.group, completed_name, member))
                 M.unlock_scoop(member)
             end
@@ -792,8 +955,8 @@ end
 
 -- Primary flags the enforcement loop should not touch (conditionally or always).
 -- Each entry maps a flag to { scoop, [while_active] }.
---   scoop           – the CONTROLLED_FLAGS owner this protection applies to.
---   while_active    – (optional) only protect while this OTHER scoop is active
+--   scoop           - the CONTROLLED_FLAGS owner this protection applies to.
+--   while_active    - (optional) only protect while this OTHER scoop is active
 --                     (received + not completed). Omit for unconditional protection.
 --
 -- 292: Isabela NPC despawn after Promise to Isabela.  Santa Cabeza needs BOTH
@@ -865,14 +1028,14 @@ local function enforce_flags()
                 raw_set_flag_on(301)
                 currently_unlocking = false
                 if verbose_logging then
-                    M.log("Overtime: enabled flag 301 (player in Hideout)")
+                    M.log("Overtime: enabled flag 301 (player in Carlito's Hideout)")
                 end
             end
         else
             if raw_check_flag(301) then
                 raw_set_flag_off(301)
                 if verbose_logging then
-                    M.log("Overtime: disabled flag 301 (player left Hideout)")
+                    M.log("Overtime: disabled flag 301 (player left Carlito's Hideout)")
                 end
             end
         end
@@ -885,6 +1048,14 @@ local function enforce_flags()
     -- Ensure post-Jessie flags stay enabled (265, 267 = progression, 315 = queen spawning)
     if ap_activated then
         local post_jessie_flags = { 265, 267, 315, 513, 515 }
+        -- Savior mode (without ScoopSanity): force flag 270 always-on so the
+        -- EP-shutter cutscene plays naturally when the player walks into EP.
+        -- Under ScoopSanity, use the position-gated single-fire path
+        -- (try_fire_ep270_in_scoop_sanity) so the cutscene plays once and
+        -- doesn't loop after CASCADE_FLAGS clears 270.
+        if goal_mode == 2 and not scoop_sanity_enabled then
+            table.insert(post_jessie_flags, 270)
+        end
         for _, fid in ipairs(post_jessie_flags) do
             if not raw_check_flag(fid) then
                 raw_set_flag_on(fid)
@@ -898,13 +1069,13 @@ local function enforce_flags()
     -- NOTE: Flag 276 (Entrance Plaza door / Rescue the Professor) management
     -- has been moved to on_frame() so it runs regardless of scoop_sanity_enabled.
 
-    -- Toggle flag 355 based on area: ON in North Plaza, OFF in Hideout.
-    -- While Hideout is active (received + not completed), skip area toggling
+    -- Toggle flag 355 based on area: ON in North Plaza, OFF in Carlito's Hideout.
+    -- While Carlito's Hideout is active (received + not completed), skip area toggling
     -- so the game can manage 355 on its own (it enables 355 for a cutscene).
     -- The one-time disable at unlock (disable_on_unlock) ensures 355 starts OFF.
     if ap_activated then
-        local hideout_active = received_scoops["Hideout"]
-                           and not completed_scoops["Hideout"]
+        local hideout_active = received_scoops["Carlito's Hideout"]
+                           and not completed_scoops["Carlito's Hideout"]
         if not hideout_active then
             local area = get_current_area_index()
             if area == NORTH_PLAZA_AREA_INDEX then
@@ -920,7 +1091,7 @@ local function enforce_flags()
                 if raw_check_flag(355) then
                     raw_set_flag_off(355)
                     if verbose_logging then
-                        M.log("Area toggle: disabled flag 355 (player in Hideout)")
+                        M.log("Area toggle: disabled flag 355 (player in Carlito's Hideout)")
                     end
                 end
             end
@@ -930,7 +1101,7 @@ local function enforce_flags()
     -- After "A Strange Group" is completed, keep the Raincoat cult spawning.
     -- Suppress completion/death flags but enforce the three cult-spawn flags.
     -- Flags auto-re-enabled by 326 (1222, 327, 1157, 3722, 1217, 1219, 1221, 1223, 3600)
-    -- are left alone — the game handles those.
+    -- are left alone -- the game handles those.
     if completed_scoops["A Strange Group"] then
         -- Flags to keep ON for cult spawning
         local cult_on = { 326, 811, 1166, 2063 }
@@ -988,7 +1159,7 @@ local function enforce_flags()
         local scoop_name = CONTROLLED_FLAGS[flag_id]
         if scoop_name and is_protected_primary(flag_id, scoop_name) then
             if verbose_logging then
-                M.log(string.format("Protected primary flag %d (%s) — skipping suppression",
+                M.log(string.format("Protected primary flag %d (%s) -- skipping suppression",
                     flag_id, scoop_name))
             end
         elseif scoop_name and is_in_completion_grace(scoop_name) then
@@ -1054,7 +1225,18 @@ local function enforce_flags()
         end
     end
     if cascade_count > 0 and not verbose_logging then
-        M.log(string.format("Cascade: cleared %d flags: %s", cascade_count, table.concat(cascade_details, ", ")))
+        -- Dedup: only log when the set of cleared flags changes. Otherwise
+        -- the Post-Jessie flag 270 oscillation in Savior mode spams the
+        -- log every frame.
+        table.sort(cascade_details)
+        local sig = table.concat(cascade_details, ",")
+        if sig ~= _last_cascade_signature then
+            M.log(string.format("Cascade: cleared %d flags: %s",
+                cascade_count, table.concat(cascade_details, ", ")))
+            _last_cascade_signature = sig
+        end
+    elseif cascade_count == 0 then
+        _last_cascade_signature = nil   -- reset so a future clearing re-logs
     end
 
     -- disable_flags for all active scoops (Main, Psychopath, etc.)
@@ -1172,13 +1354,57 @@ local function install_hooks()
 
                 local completion = COMPLETION_FLAGS[flag_id]
                 if completion and not completed_scoops[completion.scoop] then
-                    M.log(string.format("COMPLETION: Flag %d → '%s'", flag_id, completion.event))
-                    if completion.scoop then
-                        M.complete_scoop(completion.scoop)
-                    end
-
-                    if on_completion_detected_callback then
-                        pcall(on_completion_detected_callback, completion.event, flag_id, completion.scoop)
+                    -- ScoopSanity guard: in ScoopSanity, a main scoop is only
+                    -- "really completed" once the player has received its AP
+                    -- item AND finished the mission. Suppress the AP check
+                    -- when the AP item isn't received yet -- this catches the
+                    -- case where our position-gated EP-shutter trigger
+                    -- (try_fire_ep270_in_scoop_sanity) plays the cutscene
+                    -- early, which fires flag 2308 ("Escort Brad...") despite
+                    -- the player never having received "Backup for Brad" as
+                    -- an AP item. Without this, the location ships before
+                    -- it should.
+                    -- Note: we deliberately don't mark _logged_completion_events
+                    -- here, so the legitimate completion can fire later when
+                    -- the AP item lands and the player completes the mission.
+                    local ss_block = scoop_sanity_enabled
+                                  and completion.scoop
+                                  and SCOOP_DATA[completion.scoop]
+                                  and SCOOP_DATA[completion.scoop].category == "Main"
+                                  and not received_scoops[completion.scoop]
+                    if ss_block then
+                        if verbose_logging then
+                            M.log(string.format(
+                                "ScoopSanity guard: flag %d -> '%s' suppressed ('%s' not yet received as AP item)",
+                                flag_id, completion.event, completion.scoop))
+                        end
+                        -- Schedule the flag for clearing on the next frame.
+                        -- We can't clear here in the pre-hook -- the engine's
+                        -- evFlagOn body runs after we return and would just
+                        -- re-set the flag. By next frame the engine is done,
+                        -- so the clear sticks. This makes the off->on hook
+                        -- transition available again for the legitimate
+                        -- completion later (when the player actually receives
+                        -- the AP item and finishes the mission).
+                        pending_flag_clears[flag_id] = true
+                    elseif not _logged_completion_events[completion.event] then
+                        -- Dedup: only fire the COMPLETION log + bridge.check once
+                        -- per event name per session. For event-only entries
+                        -- (no scoop field), the engine re-asserts the flag every
+                        -- frame, which would otherwise spam the log and resend
+                        -- the AP location check redundantly. The check is also
+                        -- idempotent server-side, but suppressing here avoids
+                        -- noise in both logs and AP traffic.
+                        _logged_completion_events[completion.event] = true
+                        M.log(string.format("COMPLETION: Flag %d -> '%s'",
+                            flag_id, completion.event))
+                        if completion.scoop then
+                            M.complete_scoop(completion.scoop)
+                        end
+                        if on_completion_detected_callback then
+                            pcall(on_completion_detected_callback,
+                                completion.event, flag_id, completion.scoop)
+                        end
                     end
                 end
 
@@ -1189,13 +1415,13 @@ local function install_hooks()
                         if trigger.enable then
                             for _, target in ipairs(trigger.enable) do
                                 raw_set_flag_on(target)
-                                M.log(string.format("Trigger: flag %d → enabled %d", flag_id, target))
+                                M.log(string.format("Trigger: flag %d -> enabled %d", flag_id, target))
                             end
                         end
                         if trigger.disable then
                             for _, target in ipairs(trigger.disable) do
                                 raw_set_flag_off(target)
-                                M.log(string.format("Trigger: flag %d → disabled %d", flag_id, target))
+                                M.log(string.format("Trigger: flag %d -> disabled %d", flag_id, target))
                             end
                         end
                     end
@@ -1208,7 +1434,7 @@ local function install_hooks()
                             target_mdate = skip.target_mdate,
                             name = skip.name,
                         }
-                        M.log(string.format("Time skip activated: flag %d → advance to %d (%s)",
+                        M.log(string.format("Time skip activated: flag %d -> advance to %d (%s)",
                             flag_id, skip.target_mdate, skip.name))
                     end
 
@@ -1265,7 +1491,7 @@ local function try_advance_chain()
                 return
             end
             if ap_received[name] then
-                M.log(string.format("Chain: Unlocking '%s' (%d/%d) — received and ready",
+                M.log(string.format("Chain: Unlocking '%s' (%d/%d) -- received and ready",
                     name, i, #scoop_order))
                 M.unlock_scoop(name)
             else
@@ -1281,7 +1507,7 @@ local function try_advance_chain()
     M.log("Chain: All main scoops completed!")
 
     if not received_scoops["The Facts"] and not completed_scoops["The Facts"] then
-        M.log("Chain: Triggering 'The Facts' — go back to the safe room")
+        M.log("Chain: Triggering 'The Facts' -- go back to the Security Room")
         M.unlock_scoop("The Facts")
     end
 end
@@ -1306,6 +1532,13 @@ local function activate_ap(reason)
     M.log(reason or "AP enforcement activated")
     -- Enable flags needed after Meet Jessie
     local post_jessie_flags = { 265, 267, 315, 514 }
+    -- Savior mode (without ScoopSanity): fire flag 270 immediately so the
+    -- EP-shutter cutscene plays naturally on EP entry. Under ScoopSanity,
+    -- the position-gated path (try_fire_ep270_in_scoop_sanity) handles it
+    -- so it fires once and doesn't loop after the cascade clears the flag.
+    if goal_mode == 2 and not scoop_sanity_enabled then
+        table.insert(post_jessie_flags, 270)
+    end
     for _, fid in ipairs(post_jessie_flags) do
         if not raw_check_flag(fid) then
             raw_set_flag_on(fid)
@@ -1315,6 +1548,11 @@ local function activate_ap(reason)
     try_advance_chain()
     flush_pending_side_scoops()
     if on_ap_activated_callback then pcall(on_ap_activated_callback) end
+    -- If the player is already standing in a fixup-eligible scene (e.g. s136
+    -- when Jessie is met), apply now since onLoadMapEvent won't fire again.
+    if _G.AP and _G.AP.SceneFixups and _G.AP.SceneFixups.apply_for_current_scene then
+        pcall(_G.AP.SceneFixups.apply_for_current_scene)
+    end
     save_state()
     return true
 end
@@ -1350,7 +1588,7 @@ function M.unlock_scoop(scoop_name)
     if received_scoops[scoop_name] then return true, 0 end
 
     if not ap_activated then
-        M.log(string.format("Activation deferred: '%s' — waiting for Meet Jessie", scoop_name))
+        M.log(string.format("Activation deferred: '%s' -- waiting for Meet Jessie", scoop_name))
         return false, 0
     end
 
@@ -1368,16 +1606,28 @@ function M.unlock_scoop(scoop_name)
             return false, 0
         end
         if not has_prerequisites_met(scoop_name) then
-            M.log(string.format("Prerequisite deferred: '%s' — missing required completions", scoop_name))
+            M.log(string.format("Prerequisite deferred: '%s' -- missing required completions", scoop_name))
             return false, 0
         end
     end
 
-    -- Hideout requires the Hideout key — defer until player has it
-    if scoop_name == "Hideout" then
+    -- Engine-flag prerequisite (e.g. Mark of the Sniper waits for the EP
+    -- shutter cutscene to have played). Park the scoop in flag_prereq_deferred
+    -- so on_frame retries when the gating flag flips on.
+    local flags_ok, missing_flags = has_flag_prerequisites_met(scoop_name)
+    if not flags_ok then
+        flag_prereq_deferred[scoop_name] = true
+        M.log(string.format("Flag-prereq deferred: '%s' -- waiting for any of flags %s",
+            scoop_name, table.concat(missing_flags, ",")))
+        return false, 0
+    end
+    flag_prereq_deferred[scoop_name] = nil
+
+    -- Carlito's Hideout requires Carlito's Hideout key -- defer until player has it
+    if scoop_name == "Carlito's Hideout" then
         if not has_hideout_key() then
             hideout_key_deferred = true
-            M.log("Hideout deferred: waiting for Hideout key")
+            M.log("Carlito's Hideout deferred: waiting for Carlito's Hideout key")
             return false, 0
         end
         hideout_key_deferred = false
@@ -1386,10 +1636,10 @@ function M.unlock_scoop(scoop_name)
     received_scoops[scoop_name] = true
     currently_unlocking = true
 
-    -- disable_flags BEFORE enabling mission flags — prevents stale flags from
+    -- disable_flags BEFORE enabling mission flags -- prevents stale flags from
     -- triggering immediate completion (e.g. 292 left over from Santa Cabeza).
     -- disable_on_unlock is the same but only fires here (not in the enforcement
-    -- loop), so the game can re-enable the flag later (e.g. 355 for Hideout cutscene).
+    -- loop), so the game can re-enable the flag later (e.g. 355 for Carlito's Hideout cutscene).
     for _, list in ipairs({ scoop.disable_flags, scoop.disable_on_unlock }) do
         if list then
             for _, flag_id in ipairs(list) do
@@ -1478,7 +1728,7 @@ function M.on_event_tracked(event_desc)
 
     if ENDGAME_EVENTS[event_desc] and not endgame_reached then
         endgame_reached = true
-        M.log(string.format("Endgame reached: '%s' — enforcing flags 2052, 514", event_desc))
+        M.log(string.format("Endgame reached: '%s' -- enforcing flags 2052, 514", event_desc))
         save_state()
     end
 
@@ -1644,6 +1894,7 @@ function M.reset_all()
     time_skips_fired = {}
     active_time_skip = nil
     endgame_reached = false
+    flag_prereq_deferred = {}
     M.log("Reset all scoop tracking")
     save_state()
 end
@@ -1663,7 +1914,7 @@ function M.is_new_game()
 end
 
 function M.reset_for_new_game()
-    M.log("NEW GAME detected — resetting side scoop progress")
+    M.log("NEW GAME detected -- resetting side scoop progress")
 
     local side_reset, main_preserved = 0, 0
 
@@ -1693,6 +1944,11 @@ function M.reset_for_new_game()
     time_skips_fired = {}
     active_time_skip = nil
     endgame_reached = false
+    flag_prereq_deferred = {}
+
+    -- Reset log-spam dedup state so a fresh run logs anew.
+    _last_cascade_signature = nil
+    _logged_completion_events = {}
 
     M.log(string.format("Reset %d side scoops, preserved %d main completions",
         side_reset, main_preserved))
@@ -1749,7 +2005,7 @@ function M.generate_random_test_order()
         ap_received[name] = true
     end
 
-    M.log(string.format("Random test order generated: %d main scoops shuffled — waiting for milestones", #mains))
+    M.log(string.format("Random test order generated: %d main scoops shuffled -- waiting for milestones", #mains))
 end
 
 function M.set_verbose_logging(enabled)
@@ -1787,7 +2043,7 @@ function M.add_trigger(trigger_flag, enable_flags, disable_flags)
         enable = enable_flags,
         disable = disable_flags,
     }
-    M.log(string.format("Added trigger: flag %d → enable %s, disable %s",
+    M.log(string.format("Added trigger: flag %d -> enable %s, disable %s",
         trigger_flag,
         enable_flags and table.concat(enable_flags, ",") or "none",
         disable_flags and table.concat(disable_flags, ",") or "none"))
@@ -1865,6 +2121,16 @@ end
 function M.set_scoop_sanity_enabled(enabled)
     scoop_sanity_enabled = enabled
     M.log("ScoopSanity " .. (enabled and "ENABLED" or "DISABLED"))
+end
+
+function M.is_scoop_sanity_enabled()
+    return scoop_sanity_enabled
+end
+
+function M.set_goal_mode(goal)
+    goal_mode = tonumber(goal) or 0
+    local names = { [0] = "Ending S", [1] = "Ending A", [2] = "Savior" }
+    M.log("Goal mode: " .. (names[goal_mode] or tostring(goal_mode)))
 end
 
 function M.set_door_randomizer_enabled(enabled)
@@ -1968,7 +2234,7 @@ function M.draw_tab_content(debug)
             M.set_scoop_sanity_enabled(not scoop_sanity_enabled)
         end
         if active_time_skip then
-            imgui.text_colored(string.format("TIME SKIP: %s → %d",
+            imgui.text_colored(string.format("TIME SKIP: %s -> %d",
                 active_time_skip.name, active_time_skip.target_mdate), 0xFF00FFFF)
         end
 
@@ -2012,7 +2278,7 @@ function M.draw_tab_content(debug)
                 elseif name == current_chain_name and has_item then
                     color = 0xFF00FF00          -- green: current + received
                 elseif name == current_chain_name then
-                    color = 0xFF44DDFF          -- orange: current + not received
+                    color = 0xFF0000FF          -- red: current + not received (yellow was confusing)
                 elseif has_item then
                     color = 0xFFFF8800          -- blue: received + not current
                 else
@@ -2024,7 +2290,7 @@ function M.draw_tab_content(debug)
             local chain_idx = M.get_current_chain_index()
             if current_chain_name then
                 imgui.text_colored(
-                    string.format("Chain: %d/%d → %s", chain_idx, #scoop_order, current_chain_name),
+                    string.format("Chain: %d/%d -> %s", chain_idx, #scoop_order, current_chain_name),
                     0xFF00FFFF)
             else
                 imgui.text_colored(
@@ -2112,7 +2378,7 @@ function M.draw_tab_content(debug)
     end
 
     if hideout_key_deferred then
-        imgui.text_colored("Hideout deferred: waiting for Hideout key", 0xFF00AAFF)
+        imgui.text_colored("Carlito's Hideout deferred: waiting for Carlito's Hideout key", 0xFF00AAFF)
     end
 
     for _, s in ipairs(status_list) do
@@ -2149,6 +2415,18 @@ function M.draw_tab_content(debug)
                 color = 0xFFFF8800          -- blue: received + not current (main)
             elseif s.received and debug then
                 status_str = " [RECV]"
+            end
+
+            -- Partial-rescue signal: if the scoop has rescuable survivors and
+            -- some (but not all) have been rescued, tint amber so the player
+            -- knows they're missing someone. Overrides the cascade above
+            -- (except completion, which always wins -- see s.completed branch).
+            if not s.completed and AP.effects and AP.effects.SurvivorScoopCompletion then
+                local n_rescued, total = AP.effects.SurvivorScoopCompletion.progress(s.name)
+                if total > 0 and n_rescued > 0 and n_rescued < total then
+                    color = 0xFFFFAA00  -- amber: partially rescued
+                    status_str = status_str .. string.format(" [%d/%d rescued]", n_rescued, total)
+                end
             end
 
             if debug then
@@ -2228,13 +2506,31 @@ function M.on_frame()
         end
     end
 
+    -- Process flag clears scheduled from the evFlagOn pre-hook (e.g. the
+    -- ss_block guard suppressing a pre-fired completion). One-frame delay
+    -- ensures the engine's evFlagOn body has finished setting the flag, so
+    -- our clear sticks instead of racing it.
+    if next(pending_flag_clears) then
+        for fid, _ in pairs(pending_flag_clears) do
+            if raw_check_flag(fid) then
+                raw_set_flag_off(fid)
+                if verbose_logging then
+                    M.log(string.format(
+                        "ScoopSanity guard: cleared flag %d (suppressed completion -> allow legitimate refire)",
+                        fid))
+                end
+            end
+            pending_flag_clears[fid] = nil
+        end
+    end
+
     -- Detect save reload (flag 769 off = pre-Jessie)
     if ap_activated then
         local jessie_on = raw_check_flag(JESSIE_FLAG)
         if jessie_on == false then
             ap_activated = false
             time_frozen = false
-            M.log("RELOAD DETECTED: Flag 769 off — deactivating until Meet Jessie replays")
+            M.log("RELOAD DETECTED: Flag 769 off -- deactivating until Meet Jessie replays")
 
             local cleared = 0
             for scoop_name, _ in pairs(received_scoops) do
@@ -2253,7 +2549,7 @@ function M.on_frame()
     elseif not ap_activated and scoop_sanity_enabled then
         local jessie_on = raw_check_flag(JESSIE_FLAG)
         if jessie_on == true then
-            activate_ap("RELOAD DETECTED: Flag 769 on — activating AP enforcement")
+            activate_ap("RELOAD DETECTED: Flag 769 on -- activating AP enforcement")
         end
     end
 
@@ -2270,7 +2566,7 @@ function M.on_frame()
             save_state()
         elseif not past_stairs and not jessie_on and time_frozen then
             time_frozen = false
-            M.log("ScoopSanity: pre-stairs — clearing time freeze")
+            M.log("ScoopSanity: pre-stairs -- clearing time freeze")
             if on_time_unfreeze_callback then pcall(on_time_unfreeze_callback) end
         end
     end
@@ -2292,25 +2588,29 @@ function M.on_frame()
                 end
                 TimeGate.enable()
             elseif not TimeGate.is_turbo_active() then
-                M.log(string.format("Time skip re-triggering turbo → %d (%s)",
+                M.log(string.format("Time skip re-triggering turbo -> %d (%s)",
                     active_time_skip.target_mdate, active_time_skip.name))
                 TimeGate.turbo_advance_to(active_time_skip.target_mdate)
             end
         end
     end
 
-    -- Suppress door randomization while Hideout is active so Isabela follows
+    -- Suppress door randomization while Carlito's Hideout is active so Isabela follows
     -- through doors correctly. Uses flag checks so it works with or without ScoopSanity.
-    -- Flag 776 = Hideout primary, flag 2322 = Hideout completion.
+    -- Flag 776 = Carlito's Hideout primary, flag 2322 = Carlito's Hideout completion.
     if door_randomizer_enabled and efm_mgr:get() then
         local hideout_flag_on = raw_check_flag(776)
-        local hideout_done    = raw_check_flag(2322) or completed_scoops["Hideout"]
+        local hideout_done    = raw_check_flag(2322) or completed_scoops["Carlito's Hideout"]
         local should_suppress = hideout_flag_on and not hideout_done
         local dr = AP and AP.DoorRandomizer
         if dr and dr.set_suppressed then
             dr.set_suppressed(should_suppress == true)
         end
     end
+
+    -- ScoopSanity EP-shutter trigger: position-gated, single-fire,
+    -- persisted via in-game flags 765/2280.
+    try_fire_ep270_in_scoop_sanity()
 
     -- Manage Entrance Plaza door (flag 276) for Rescue the Professor.
     -- Uses raw flag checks so it works with or without ScoopSanity.
@@ -2333,7 +2633,7 @@ function M.on_frame()
                 end
                 professor_276_disabled = true
             end
-            -- After one-time disable, leave 276 alone — the game will
+            -- After one-time disable, leave 276 alone -- the game will
             -- enable it at the right moment for the completion cutscene.
         else
             professor_276_disabled = false  -- reset for next activation
@@ -2351,11 +2651,29 @@ function M.on_frame()
         end
     end
 
-    -- Hideout key deferral: retry activating Hideout once the player has the key
+    -- Carlito's Hideout key deferral: retry activating Carlito's Hideout once the player has the key
     if hideout_key_deferred and has_hideout_key() then
         hideout_key_deferred = false
-        M.log("Hideout key received — retrying Hideout activation")
+        M.log("Carlito's Hideout key received -- retrying Carlito's Hideout activation")
         try_advance_chain()
+    end
+
+    -- Flag-prereq deferral: retry parked scoops when their prereq flags
+    -- have flipped on. Only checks scoops that previously deferred, so the
+    -- normal case (no deferred entries) is a single `next()` test.
+    if next(flag_prereq_deferred) then
+        local to_retry = {}
+        for scoop_name, _ in pairs(flag_prereq_deferred) do
+            if has_flag_prerequisites_met(scoop_name)
+                    and ap_received[scoop_name]
+                    and not received_scoops[scoop_name] then
+                table.insert(to_retry, scoop_name)
+            end
+        end
+        for _, scoop_name in ipairs(to_retry) do
+            M.log(string.format("Flag-prereq met -- retrying '%s' activation", scoop_name))
+            M.unlock_scoop(scoop_name)
+        end
     end
 
     enforce_flags()
@@ -2373,8 +2691,48 @@ _G.scoop_activate   = function() M.force_activate() end
 _G.scoop_newgame_reset = function() M.reset_for_new_game() end
 _G.scoop_blacklist     = function(flag_id, reason) M.blacklist_flag(flag_id, reason) end
 _G.scoop_unblacklist   = function(flag_id) M.unblacklist_flag(flag_id) end
+
+-- ScoopSanity EP-shutter (flag 270) tuning helpers. Use these to identify the
+-- right trigger area while standing in Entrance Plaza, then tighten the box.
+_G.drap_ep270_show_pos = function()
+    local x, y, z = get_player_pos_xyz()
+    if not x then
+        M.log("EP270: player not spawned (no position available)")
+        return
+    end
+    local area = get_current_area_index()
+    local f765 = raw_check_flag(765)
+    local f2280 = raw_check_flag(2280)
+    M.log(string.format(
+        "EP270: pos=(%.2f, %.2f, %.2f) area=%s in_box=%s gates_open=%s (765=%s 2280=%s)",
+        x, y, z, tostring(area), tostring(in_ep270_box(x, y, z)),
+        tostring(ep270_gates_open()), tostring(f765), tostring(f2280)))
+end
+_G.drap_ep270_set_box = function(min_x, max_x, min_y, max_y, min_z, max_z)
+    EP270_TRIGGER_BOX = {
+        min_x = tonumber(min_x), max_x = tonumber(max_x),
+        min_y = tonumber(min_y), max_y = tonumber(max_y),
+        min_z = tonumber(min_z), max_z = tonumber(max_z),
+    }
+    M.log(string.format(
+        "EP270: trigger box -> x=[%.2f, %.2f] y=[%.2f, %.2f] z=[%.2f, %.2f]",
+        EP270_TRIGGER_BOX.min_x, EP270_TRIGGER_BOX.max_x,
+        EP270_TRIGGER_BOX.min_y, EP270_TRIGGER_BOX.max_y,
+        EP270_TRIGGER_BOX.min_z, EP270_TRIGGER_BOX.max_z))
+end
+-- Force-clear the engine's gate flags (765 and 2280). Use only for testing
+-- when you want to re-trigger the cutscene without rolling back the save.
+-- In normal play, just load an earlier save; the gate flags reset naturally.
+_G.drap_ep270_force_retry = function()
+    currently_unlocking = true
+    raw_set_flag_off(765)
+    raw_set_flag_off(2280)
+    currently_unlocking = false
+    _ep_270_fired_at_clock = 0
+    M.log("EP270: cleared gate flags 765 and 2280 -- next EP entry will re-fire")
+end
 _G.scoop_gui = function()
-    local gui = require("DRAP/DRAP_GUI")
+    local gui = require("DRAP/GUI")
     if gui then gui.show_window() end
 end
 _G.scoop_verbose = function(on)

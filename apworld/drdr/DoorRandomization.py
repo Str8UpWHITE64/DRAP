@@ -29,10 +29,10 @@ class AreaInfo:
 
 
 AREA_NAMES = {
-    "s135": "Helipad",
-    "s136": "Safe Room",
+    "s135": "Heliport",
+    "s136": "Security Room",
     "s231": "Rooftop",
-    "s230": "Service Hallway",
+    "s230": "Warehouse",
     "s200": "Paradise Plaza",
     "s100": "Entrance Plaza",
     "s900": "Al Fresca Plaza",
@@ -40,17 +40,17 @@ AREA_NAMES = {
     "s300": "Wonderland Plaza",
     "s400": "North Plaza",
     "s700": "Leisure Park",
-    "s501": "Crislip's Hardware Store",
-    "s503": "Colby's Movie Theater",
-    "s401": "Hideout",
+    "s501": "Crislip's Home Saloon",
+    "s503": "Colby's Movieland",
+    "s401": "Carlito's Hideout",
     "s600": "Maintenance Tunnel",
-    "s500": "Grocery Store",
+    "s500": "Seon's Food and Stuff",
     "s601": "Butcher",
 }
 
 PROTECTED_AREAS = {
-    "s135",  # Helipad
-    "s136",  # Safe Room
+    "s135",  # Heliport
+    "s136",  # Security Room
     "s601",  # Butcher
 }
 
@@ -62,6 +62,38 @@ DEAD_END_AREAS = {
     "s601": ["s600"],
 }
 
+# Vanilla door edges that exist in the scene data for cutscene/story reasons
+# but are NOT walkable in normal gameplay. The validator must exclude these
+# from its reachability check — if it doesn't, it grants false connectivity
+# via Security Room and accepts seeds where the real walkable graph (Security
+# Room stairs -> Rooftop -> Warehouse -> randomized doors) actually deadlocks.
+# These edges touch protected areas so they never get randomized; filtering
+# them is purely a validator-side concern.
+#
+# Only the Entrance Plaza <-> Security Room pair is a pure cutscene in vanilla
+# — the game transports the player there once via cinematic and it's never
+# walkable again. Heliport <-> Security Room IS walkable (door-randomizer
+# precollects the Heliport key, which unlocks that door), so it stays in the
+# reachability graph.
+#
+# Under ScoopSanity, the Entrance Plaza <-> Security Room pair becomes
+# walkable after the player meets Jessie in the Warehouse: the cutscene
+# permanently opens that door. ScoopSanity callers therefore pass an empty
+# narrative-only set and add these doors to the randomizable pool by clearing
+# `s136` from PROTECTED_AREAS for these specific edges (see
+# `set_scoop_sanity_unlocks_sr_ep`).
+NARRATIVE_ONLY_EDGES: Set[Tuple[str, str]] = {
+    ("s136", "s100"),  # Security Room -> Entrance Plaza (cutscene only in vanilla)
+    ("s100", "s136"),  # Entrance Plaza -> Security Room (cutscene only in vanilla)
+}
+
+# Edges that are normally protected (touch a PROTECTED_AREAS entrypoint) but
+# become randomizable+walkable when ScoopSanity unlocks the SR <-> EP pathway.
+SR_EP_EDGES: Set[Tuple[str, str]] = {
+    ("s136", "s100"),  # Security Room -> Entrance Plaza
+    ("s100", "s136"),  # Entrance Plaza -> Security Room
+}
+
 START_AREA = "s136"
 
 
@@ -71,6 +103,24 @@ class DoorRandomizer:
         self.doors: Dict[str, DoorEndpoint] = {}
         self.areas: Dict[str, AreaInfo] = {}
         self.redirects: Dict[str, str] = {}
+        # Ordered pairs (from_area, to_area) of directed edges that should NOT
+        # be randomized — they keep their vanilla destinations. Both directions
+        # of a bidirectional edge must be added separately.
+        self.excluded_edges: Set[Tuple[str, str]] = set()
+        # Directed edges to treat as randomizable+walkable even when one of
+        # their endpoints is in PROTECTED_AREAS. Empty by default; ScoopSanity
+        # populates this with SR_EP_EDGES so the player's now-walkable
+        # Security Room <-> Entrance Plaza path joins the door pool.
+        self.scoop_sanity_unlocked_edges: Set[Tuple[str, str]] = set()
+
+    def set_excluded_edges(self, edges: Set[Tuple[str, str]]) -> None:
+        self.excluded_edges = set(edges)
+
+    def set_scoop_sanity_unlocked_edges(self, edges: Set[Tuple[str, str]]) -> None:
+        """Mark a set of directed edges as randomizable+walkable, overriding
+        their PROTECTED_AREAS / NARRATIVE_ONLY_EDGES exclusion. Used by the
+        ScoopSanity caller for SR <-> EP."""
+        self.scoop_sanity_unlocked_edges = set(edges)
 
     def load_doors_from_json(self, door_data: dict) -> None:
         doors_dict = door_data.get("doors", door_data)
@@ -107,7 +157,7 @@ class DoorRandomizer:
             self.areas[to_area].incoming_doors.append(door_id)
 
     def add_missing_doors(self) -> None:
-        """Add placeholder data for missing doors (Grocery Store connections)."""
+        """Add placeholder data for missing doors (Seon's Food and Stuff connections)."""
         missing_doors = [
             DoorEndpoint("SCN_s400|s500|door0", "s400", "s500", (0, 5, -180), (0, 1.5, 0), 0),
             DoorEndpoint("SCN_s500|s400|door0", "s500", "s400", (0, 0, 0), (0, -1.5, 0), 0),
@@ -153,22 +203,45 @@ class DoorRandomizer:
         return pairs
 
     def get_randomizable_doors(self) -> List[str]:
-        """Get door IDs that can be randomized (excluding protected areas)."""
-        return [
-            door_id for door_id, door in self.doors.items()
-            if door.from_area not in PROTECTED_AREAS and door.to_area not in PROTECTED_AREAS
-        ]
+        """Get door IDs that can be randomized (excluding protected areas and
+        any edges the caller has listed via set_excluded_edges).
+
+        Edges in `scoop_sanity_unlocked_edges` bypass the PROTECTED_AREAS
+        check — they're explicitly opted in by the caller (currently used for
+        SR <-> EP under ScoopSanity)."""
+        out = []
+        for door_id, door in self.doors.items():
+            edge = (door.from_area, door.to_area)
+            if edge in self.excluded_edges:
+                continue
+            if edge in self.scoop_sanity_unlocked_edges:
+                out.append(door_id)
+                continue
+            if door.from_area in PROTECTED_AREAS or door.to_area in PROTECTED_AREAS:
+                continue
+            out.append(door_id)
+        return out
 
     def build_adjacency_graph(self, use_redirects: bool = False) -> Dict[str, Set[str]]:
-        """Build area connection graph, optionally following redirects."""
+        """Build area connection graph, optionally following redirects.
+
+        Narrative-only vanilla edges (Security Room <-> Entrance Plaza in
+        non-ScoopSanity) are excluded so the reachability check reflects
+        what the player can actually walk through in gameplay. Edges in
+        `scoop_sanity_unlocked_edges` are walkable and counted normally,
+        even if they're also listed in NARRATIVE_ONLY_EDGES.
+        """
         graph: Dict[str, Set[str]] = {area: set() for area in self.areas}
 
         for door_id, door in self.doors.items():
             if use_redirects and door_id in self.redirects:
                 target_door = self.doors[self.redirects[door_id]]
-                graph[door.from_area].add(target_door.to_area)
+                edge = (door.from_area, target_door.to_area)
             else:
-                graph[door.from_area].add(door.to_area)
+                edge = (door.from_area, door.to_area)
+            if edge in NARRATIVE_ONLY_EDGES and edge not in self.scoop_sanity_unlocked_edges:
+                continue
+            graph[edge[0]].add(edge[1])
 
         return graph
 
@@ -360,6 +433,9 @@ class DoorRandomizer:
                 return self.redirects
 
         print(f"Could not find valid paired randomization after {max_attempts} attempts with current seed")
+        # Reset so a failed attempt's stale (unvalidated) redirects don't
+        # leak out via self.redirects into export_redirects_for_lua.
+        self.redirects = {}
         return None
 
     def randomize_paired_with_retry(self, max_attempts_per_seed: int = 500, max_reseeds: int = 100) -> Dict[str, str]:
@@ -376,6 +452,9 @@ class DoorRandomizer:
 
         print(f"ERROR: Could not find valid paired randomization after {max_reseeds} reseeds!")
         print("Returning empty redirects (vanilla door layout)")
+        # Also clear self.redirects so export_redirects_for_lua doesn't pick
+        # up a stale unvalidated map from the last failed inner attempt.
+        self.redirects = {}
         return {}
 
     def randomize_with_validation(self, max_attempts: int = 100) -> Dict[str, str]:
@@ -600,15 +679,46 @@ EMBEDDED_DOOR_DATA = {
 DOOR_MODE_CHAOS = 0
 DOOR_MODE_PAIRED = 1
 
+# Directed edges excluded when the Rooftop <-> Warehouse option is off.
+# Both directions must be listed so neither half of the pair is shuffled.
+ROOFTOP_SERVICE_HALLWAY_EDGES: Set[Tuple[str, str]] = {
+    ("s231", "s230"),  # Rooftop -> Warehouse
+    ("s230", "s231"),  # Warehouse -> Rooftop
+}
 
-def generate_door_randomization_for_ap(random_source, mode: int = DOOR_MODE_CHAOS, use_embedded: bool = True) -> Dict[str, dict]:
-    """Generate door randomization for Archipelago world generation."""
+
+def generate_door_randomization_for_ap(
+    random_source,
+    mode: int = DOOR_MODE_CHAOS,
+    use_embedded: bool = True,
+    randomize_rooftop_service_hallway: bool = False,
+    scoop_sanity: bool = False,
+) -> Dict[str, dict]:
+    """Generate door randomization for Archipelago world generation.
+
+    When randomize_rooftop_service_hallway is False (the default), the two
+    doors connecting Rooftop and Warehouse stay vanilla even though
+    their areas aren't in PROTECTED_AREAS. This preserves the opening-sequence
+    path for players who find the randomization of that specific edge too
+    confusing.
+
+    When scoop_sanity is True, the Security Room <-> Entrance Plaza door pair
+    becomes randomizable+walkable. In ScoopSanity, the cutscene that opens
+    that door fires after the player meets Jessie and the door stays open
+    for the rest of the run, so it's no longer narrative-only.
+    """
     randomizer = DoorRandomizer(seed=random_source.randint(0, 2 ** 31))
 
     if use_embedded:
         randomizer.load_doors_from_json({"doors": EMBEDDED_DOOR_DATA})
 
     randomizer.add_missing_doors()
+
+    if not randomize_rooftop_service_hallway:
+        randomizer.set_excluded_edges(ROOFTOP_SERVICE_HALLWAY_EDGES)
+
+    if scoop_sanity:
+        randomizer.set_scoop_sanity_unlocked_edges(SR_EP_EDGES)
 
     if mode == DOOR_MODE_PAIRED:
         randomizer.randomize_paired_with_retry(max_attempts_per_seed=500, max_reseeds=100)
@@ -631,10 +741,10 @@ def generate_door_map_html(redirects: Dict[str, dict], title: str = "Door Random
     }
 
     short_names = {
-        "s135": "Helipad", "s136": "Safe Room", "s231": "Rooftop", "s230": "Svc Hall",
+        "s135": "Heliport", "s136": "Security Room", "s231": "Rooftop", "s230": "Svc Hall",
         "s200": "Paradise", "s100": "Entrance", "s900": "Al Fresca", "sa00": "Food Court",
         "s300": "Wonderland", "s400": "North Plaza", "s700": "Leisure Pk", "s501": "Crislip's",
-        "s503": "Colby's", "s401": "Hideout", "s600": "Tunnels", "s500": "Grocery",
+        "s503": "Colby's", "s401": "Carlito's Hideout", "s600": "Tunnels", "s500": "Grocery",
         "s601": "Butcher",
     }
 

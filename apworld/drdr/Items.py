@@ -13,6 +13,9 @@ class DRItemCategory(IntEnum):
     LOCK = 5,
     WEAPON = 6,
     SCOOP = 7,
+    SKILL = 8,         # 21 player-skill items (Useful)
+    UPGRADE = 9,       # 6 progressive stat upgrades (Useful)
+    BUFF = 10,         # 7 filler buff items (juice effects + Heal/Berserker/PP)
 
 
 class DRItemData(NamedTuple):
@@ -250,18 +253,18 @@ _all_items = [DRItemData(row[0], row[1], row[2]) for row in [
 
     # Area locks
     ("Al Fresca Plaza key", 1000, DRItemCategory.LOCK),
-    ("Colby's Movie Theater key", 1001, DRItemCategory.LOCK),
-    ("Crislip's Hardware Store key", 1002, DRItemCategory.LOCK),
+    ("Colby's Movieland key", 1001, DRItemCategory.LOCK),
+    ("Crislip's Home Saloon key", 1002, DRItemCategory.LOCK),
     ("Entrance Plaza key", 1003, DRItemCategory.LOCK),
     ("Food Court key", 1004, DRItemCategory.LOCK),
-    ("Grocery Store key", 1005, DRItemCategory.LOCK),
-    ("Hideout key", 1006, DRItemCategory.LOCK),
+    ("Seon's Food and Stuff key", 1005, DRItemCategory.LOCK),
+    ("Carlito's Hideout key", 1006, DRItemCategory.LOCK),
     ("Leisure Park key", 1007, DRItemCategory.LOCK),
     ("Maintenance Tunnel key", 1008, DRItemCategory.LOCK),
     ("North Plaza key", 1009, DRItemCategory.LOCK),
     ("Paradise Plaza key", 1010, DRItemCategory.LOCK),
     ("Rooftop key", 1011, DRItemCategory.LOCK),
-    ("Service Hallway key", 1012, DRItemCategory.LOCK),
+    ("Warehouse key", 1012, DRItemCategory.LOCK),
     ("Wonderland Plaza key", 1013, DRItemCategory.LOCK),
 
     # Special Items
@@ -285,7 +288,7 @@ _all_items = [DRItemData(row[0], row[1], row[2]) for row in [
     ("A Promise to Isabela", 3007, DRItemCategory.SCOOP),
     ("Santa Cabeza", 3008, DRItemCategory.SCOOP),
     ("The Last Resort", 3009, DRItemCategory.SCOOP),
-    ("Hideout", 3010, DRItemCategory.SCOOP),
+    ("Carlito's Hideout", 3010, DRItemCategory.SCOOP),
     ("Jessie's Discovery", 3011, DRItemCategory.SCOOP),
     ("The Butcher", 3012, DRItemCategory.SCOOP),
     # ("The Facts", 3013, DRItemCategory.SCOOP),
@@ -324,6 +327,60 @@ _all_items = [DRItemData(row[0], row[1], row[2]) for row in [
     ("Mark of the Sniper", 3210, DRItemCategory.SCOOP),
     ("The Cult", 3211, DRItemCategory.SCOOP),
 
+    # Player skills (21) — handled by DRAP/effects/PlayerStats.lua
+    # Each maps to a bit in PSM.PlayerSkill (PL_SKILL_BITS).
+    ("Jump Kick",        4000, DRItemCategory.SKILL),
+    ("Zombie Ride",      4001, DRItemCategory.SKILL),
+    ("Kick Back",        4002, DRItemCategory.SKILL),
+    ("Power Push",       4003, DRItemCategory.SKILL),
+    ("Judo Throw",       4004, DRItemCategory.SKILL),
+    ("Knee Drop",        4005, DRItemCategory.SKILL),
+    ("Lift Up",          4006, DRItemCategory.SKILL),
+    ("Wall Kick",        4007, DRItemCategory.SKILL),
+    ("Face Crusher",     4008, DRItemCategory.SKILL),
+    ("Football Tackle",  4009, DRItemCategory.SKILL),
+    ("Giant Swing",      4010, DRItemCategory.SKILL),
+    ("Hammer Throw",     4011, DRItemCategory.SKILL),
+    ("Neck Twist",       4012, DRItemCategory.SKILL),
+    ("Roundhouse Kick",  4013, DRItemCategory.SKILL),
+    ("Disembowel",       4014, DRItemCategory.SKILL),
+    ("Somersault Kick",  4015, DRItemCategory.SKILL),
+    ("Flying Dodge",     4016, DRItemCategory.SKILL),
+    ("Double Lariat",    4017, DRItemCategory.SKILL),
+    ("Karate Chop",      4018, DRItemCategory.SKILL),
+    ("Zombie Walk",      4019, DRItemCategory.SKILL),
+    ("Suplex",           4020, DRItemCategory.SKILL),
+
+    # Progressive stat upgrades (6 categories) — quantity per category controlled
+    # by Options.enable_stat_items + enable_extra_stat_buffs in BuildItemPool.
+    ("Progressive Health Upgrade",    4030, DRItemCategory.UPGRADE),
+    ("Progressive Attack Upgrade",    4031, DRItemCategory.UPGRADE),
+    ("Progressive Throw Upgrade",     4032, DRItemCategory.UPGRADE),
+    ("Progressive Item Slot Upgrade", 4033, DRItemCategory.UPGRADE),
+    ("Progressive Run Level Upgrade", 4034, DRItemCategory.UPGRADE),
+    ("Progressive Speed Upgrade",     4035, DRItemCategory.UPGRADE),
+
+    # Filler buffs (handled by DRAP/effects/PlayerBuffs.lua)
+    ("Fleetfoot Effect",   4050, DRItemCategory.BUFF),
+    ("Untouchable Effect", 4051, DRItemCategory.BUFF),
+    ("Spitfire Effect",    4052, DRItemCategory.BUFF),
+    ("Energizer Effect",   4053, DRItemCategory.BUFF),
+    ("Toughness Effect",   4054, DRItemCategory.BUFF),
+    ("Heal",               4055, DRItemCategory.BUFF),
+    ("Berserker Mode",     4056, DRItemCategory.BUFF),
+    ("PP Boost",           4057, DRItemCategory.BUFF),
+
+    # Filler traps (handled by DRAP/effects/PlayerBuffs.lua + HostileSurvivorTrap.lua)
+    # All trap items end with "Trap" so they're obviously traps in the AP UI.
+    ("Stomach Ache Trap",   4070, DRItemCategory.TRAP),
+    ("Zombait Trap",        4071, DRItemCategory.TRAP),
+    ("Slow Trap",           4072, DRItemCategory.TRAP),
+    ("Damage Player Trap",  4073, DRItemCategory.TRAP),
+    ("Hostile NPC Trap",    4074, DRItemCategory.TRAP),
+    ("Special Forces Trap", 4075, DRItemCategory.TRAP),
+    # Note: Night Mode + Hardcore Zombies are NOT items — they are YAML
+    # options (`night_mode_enabled`, `hardcore_zombies_enabled` in Options.py)
+    # applied at slot-connect by DRAP/effects/ZombieEffects.lua.
 ]]
 
 item_descriptions = {}
@@ -340,20 +397,51 @@ specialty_items = {
     "Handgun",
     "Orange Juice",
     "Parasol",
+    # Required for PP-bonus location gating in restricted_item_mode:
+    "Frying Pan",      # gates "Heat a pan on N stoves" locations
+    "Uncooked Pizza",  # gates "Use N Microwaves" (alongside Raw Meat)
+    "Raw Meat",        # gates "Use N Microwaves" (alongside Uncooked Pizza)
+}
+
+# Items widely considered overpowered. Removed from the filler pool when
+# Options.exclude_overpowered_items is on. Guaranteed-items overrides still
+# win — listing one here AND in Guaranteed Items will keep it in the pool.
+overpowered_items = {
+    "Book [Infinite Durability]",  # weapons never break
+    "Book [Martial Arts]",          # massively-boosted unarmed damage
+    "Laser Sword",                  # high-damage, high-durability weapon
+    "Real Mega Buster",             # high-damage ranged weapon
+}
+
+# Skill items that gate logic when Options.enable_skill_items is on, and
+# therefore must be classified as progression (not Useful) so AP's fill
+# algorithm treats them as real keys. Without this, any rule that calls
+# state.has("X", player) for a skill in this set raises FillError because
+# AP only considers progression items when checking accessibility.
+#
+# Zombie Ride: gates "Ride zombies for 50 feet" challenge.
+progression_skills = {
+    "Zombie Ride",
 }
 
 
-def BuildItemPool(multiworld, count, options):
+def BuildItemPool(multiworld, count, options, excluded_scoop_names=()):
+    """Build the item pool for this world.
+
+    excluded_scoop_names: iterable of scoop item names to omit from the pool
+    even when ScoopSanity is enabled. Used by the Savior goal to drop main
+    scoops (they would advance story state the goal doesn't need).
+    """
     item_pool = []
     included_itemcount = 0
 
     # Area keys to skip when door randomizer is enabled
     area_key_names = {
-        "Rooftop key", "Service Hallway key", "Paradise Plaza key",
-        "Colby's Movie Theater key", "Leisure Park key", "North Plaza key",
-        "Crislip's Hardware Store key", "Food Court key", "Wonderland Plaza key",
-        "Al Fresca Plaza key", "Entrance Plaza key", "Grocery Store key",
-        "Maintenance Tunnel key", "Hideout key", "Maintenance Tunnel Access Key"
+        "Rooftop key", "Warehouse key", "Paradise Plaza key",
+        "Colby's Movieland key", "Leisure Park key", "North Plaza key",
+        "Crislip's Home Saloon key", "Food Court key", "Wonderland Plaza key",
+        "Al Fresca Plaza key", "Entrance Plaza key", "Seon's Food and Stuff key",
+        "Maintenance Tunnel key", "Carlito's Hideout key", "Maintenance Tunnel Access Key"
     }
 
     # Time keys to skip when scoop sanity is enabled
@@ -380,7 +468,26 @@ def BuildItemPool(multiworld, count, options):
     scoopList = [item for item in _all_items if item.category == DRItemCategory.SCOOP]
     consumableList = [item for item in _all_items if item.category == DRItemCategory.CONSUMABLE]
     weaponList = [item for item in _all_items if item.category == DRItemCategory.WEAPON]
-    fillerList = [item for item in itemList if item.category in (DRItemCategory.MISC, DRItemCategory.TRAP, DRItemCategory.WEAPON, DRItemCategory.CONSUMABLE)]
+    skillList = [item for item in _all_items if item.category == DRItemCategory.SKILL]
+    upgradeList = [item for item in _all_items if item.category == DRItemCategory.UPGRADE]
+    buffList = [item for item in _all_items if item.category == DRItemCategory.BUFF]
+
+    # Trap subset of fillers — gated by options.trap_percentage on a per-roll
+    # basis when filling remaining slots.
+    trapList = [item for item in _all_items if item.category == DRItemCategory.TRAP]
+    nonTrapFiller = [item for item in itemList if item.category in (
+        DRItemCategory.MISC, DRItemCategory.WEAPON, DRItemCategory.CONSUMABLE,
+        DRItemCategory.BUFF
+    )]
+
+    # Strip overpowered filler entries when the option is on. Guaranteed
+    # Items (added unconditionally above) and Restricted-mode specialty
+    # items (none of which overlap with overpowered_items) are unaffected.
+    if getattr(options, "exclude_overpowered_items",
+               type("X", (), {"value": False})()).value:
+        nonTrapFiller = [it for it in nonTrapFiller if it.name not in overpowered_items]
+
+    fillerList = nonTrapFiller + trapList
 
     for lock in lockList:
         # Skip area keys if door randomizer is enabled (they're precollected)
@@ -396,9 +503,14 @@ def BuildItemPool(multiworld, count, options):
         included_itemcount = included_itemcount + 1
 
     if options.scoop_sanity:
+        excluded = set(excluded_scoop_names)
         for scoop in scoopList:
             # Skip "Out of Control" if door randomizer is also enabled (it's precollected for softlock prevention)
             if options.door_randomizer and scoop.name == "Out of Control":
+                continue
+            # Skip scoops the caller has explicitly excluded (e.g. main scoops
+            # under the Savior goal).
+            if scoop.name in excluded:
                 continue
             item = item_dictionary[scoop.name]
             item_pool.append(item)
@@ -406,17 +518,96 @@ def BuildItemPool(multiworld, count, options):
             included_itemcount = included_itemcount + 1
 
 
-    # Add filler items, ensuring each unique item appears once before any duplicates
-    shuffled_filler = list(fillerList)
-    multiworld.random.shuffle(shuffled_filler)
-    filler_index = 0
-    for _ in range(remaining_count):
-        if filler_index >= len(shuffled_filler):
-            # All unique fillers added once; reshuffle for the next pass
-            multiworld.random.shuffle(shuffled_filler)
-            filler_index = 0
-        item_pool.append(shuffled_filler[filler_index])
-        filler_index += 1
+    # Useful items: skills + stat upgrades. Quantity per stat depends on
+    # whether extras are enabled. Modes:
+    #   * vanilla_only    — neither skills nor stat upgrades added
+    #   * replace         — full core pool (extras add more if enabled)
+    #   * extra_buffs_only — only the extra/over-vanilla pool added
+    progression_mode = getattr(options, "vanilla_progression",
+                               type("X", (), {"value": 1})()).value
+    # Match Options.py Choice: 0=vanilla_only, 1=replace, 2=extra_buffs_only
+    extras_enabled = bool(getattr(options, "enable_extra_stat_buffs",
+                                  type("X", (), {"value": False})()).value)
+
+    if getattr(options, "enable_skill_items",
+               type("X", (), {"value": True})()).value and progression_mode != 0:
+        if progression_mode != 2:   # skills only in replace, not extra_buffs_only
+            for skill in skillList:
+                item_pool.append(skill)
+                remaining_count -= 1
+                included_itemcount += 1
+
+    # Per-stat counts: (base_when_replace, extras_addition_if_enabled)
+    UPGRADE_COUNTS = {
+        "Progressive Health Upgrade":    (8, 4),
+        "Progressive Attack Upgrade":    (6, 10),
+        "Progressive Throw Upgrade":     (4, 8),
+        "Progressive Item Slot Upgrade": (8, 3),
+        "Progressive Run Level Upgrade": (2, 0),
+        "Progressive Speed Upgrade":     (0, 10),    # extras-only category
+    }
+    if getattr(options, "enable_stat_items",
+               type("X", (), {"value": True})()).value and progression_mode != 0:
+        for upg in upgradeList:
+            base, extra = UPGRADE_COUNTS.get(upg.name, (0, 0))
+            count_to_add = 0
+            if progression_mode == 1:   # replace
+                count_to_add = base + (extra if extras_enabled else 0)
+            elif progression_mode == 2:   # extra_buffs_only
+                count_to_add = extra
+            for _ in range(count_to_add):
+                item_pool.append(upg)
+                remaining_count -= 1
+                included_itemcount += 1
+
+    # Fill remaining filler slots. trap_percentage controls what fraction of
+    # those slots become traps; the rest are random non-trap fillers.
+    #
+    # Earlier revisions used a per-encounter roll (walk the shuffled
+    # nonTrapFiller+trapList, roll trap_pct% to keep each trap candidate).
+    # That approach produced a far lower trap rate than advertised because
+    # trap candidates were only ~5/155 of the shuffled list -- the
+    # effective trap density was trap_pct% * 3%, so the default of 25%
+    # produced under one trap per run on average. Testers reported never
+    # seeing certain trap types (Hostile NPC Trap in particular).
+    #
+    # The two-bucket approach below makes trap_percentage mean what the
+    # docstring says it means. Trap slots are filled by cycling through a
+    # shuffled trapList, so every trap type appears at least once before
+    # any repeats -- this guarantees Hostile NPC Trap and the others all
+    # show up in the pool whenever the trap-slot count is >= len(trapList).
+    trap_pct = int(getattr(options, "trap_percentage",
+                            type("X", (), {"value": 25})()).value)
+    remaining_count = max(0, remaining_count)
+    trap_slot_count = (
+        min(int(round(remaining_count * trap_pct / 100)), remaining_count)
+        if trapList else 0
+    )
+    non_trap_slot_count = remaining_count - trap_slot_count
+
+    # Trap slots: round-robin through a shuffled trapList so each trap type
+    # gets equal representation (with a fresh shuffle on every full cycle).
+    if trap_slot_count > 0 and trapList:
+        trap_cycle = []
+        for _ in range(trap_slot_count):
+            if not trap_cycle:
+                trap_cycle = list(trapList)
+                multiworld.random.shuffle(trap_cycle)
+            item_pool.append(trap_cycle.pop())
+
+    # Non-trap filler slots: shuffle once, walk in order, reshuffle on
+    # wrap-around. This keeps the existing "unique-first, then duplicates"
+    # property of the original algorithm.
+    if non_trap_slot_count > 0 and nonTrapFiller:
+        shuffled_filler = list(nonTrapFiller)
+        multiworld.random.shuffle(shuffled_filler)
+        filler_index = 0
+        for _ in range(non_trap_slot_count):
+            if filler_index >= len(shuffled_filler):
+                multiworld.random.shuffle(shuffled_filler)
+                filler_index = 0
+            item_pool.append(shuffled_filler[filler_index])
+            filler_index += 1
 
     multiworld.random.shuffle(item_pool)
     return item_pool

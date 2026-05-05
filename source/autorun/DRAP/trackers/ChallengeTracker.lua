@@ -1,4 +1,4 @@
--- DRAP/ChallengeTracker.lua
+-- DRAP/trackers/ChallengeTracker.lua
 -- Tracks app.solid.SolidStorage.SolidSave (mSaveWork) fields for challenge-style goals
 
 local Shared = require("DRAP/Shared")
@@ -362,5 +362,57 @@ function M.on_frame()
         end
     end
 end
+
+------------------------------------------------------------
+-- Diagnostics
+------------------------------------------------------------
+
+-- Read the current value of a tracked challenge field and report whether
+-- each target threshold has fired. Use when a tracker-driven location
+-- (e.g. "Bowl over 5 zombies") didn't fire as expected -- this answers
+-- whether the field is being read at all and whether the threshold has
+-- been seen.
+local function dump_challenge(field_name)
+    local def = CHALLENGES[field_name]
+    if not def then
+        M.log(string.format("dump: no challenge named '%s'", field_name))
+        return
+    end
+    local state = challenge_state[field_name]
+    if not state then
+        M.log(string.format("dump: %s -- no state yet (tracker hasn't seen SolidSave)", field_name))
+        return
+    end
+    local ss = ss_mgr:get()
+    local save_obj
+    if ss then
+        local sf = ss_mgr:get_field("mSaveWork")
+        if sf then
+            local ok, s = pcall(sf.get_data, sf, ss); if ok then save_obj = s end
+        end
+    end
+    local cur = "?"
+    if state.field and save_obj then
+        local ok, v = pcall(state.field.get_data, state.field, save_obj)
+        if ok and type(v) == "number" then cur = tostring(v) end
+    end
+    M.log(string.format("[%s] field_resolved=%s current=%s last_value=%s",
+        field_name, tostring(state.field ~= nil), cur, tostring(state.last_value)))
+    if def.targets then
+        for i, t in ipairs(def.targets) do
+            local loc = (def.location_ids and def.location_ids[i]) or "?"
+            M.log(string.format("  target[%d]=%d reached=%s -> %s",
+                i, t, tostring(state.reached and state.reached[i]), loc))
+        end
+    end
+end
+
+function M.dump(field_name)
+    if field_name then dump_challenge(field_name); return end
+    for name, _ in pairs(CHALLENGES) do dump_challenge(name) end
+end
+
+_G.drap_challenge_dump   = function(name) M.dump(name) end
+_G.drap_challenge_bowling = function() M.dump("StrikeHitMax") end
 
 return M

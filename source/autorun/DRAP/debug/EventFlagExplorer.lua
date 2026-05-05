@@ -1,11 +1,28 @@
--- DRAP/EventFlagExplorer.lua
+-- DRAP/debug/EventFlagExplorer.lua
 -- Tool for discovering, monitoring, and manipulating game event flags
 -- Enhanced version with flag name extraction
+--
+-- Per-flag print output and JSON persistence are gated on the "Debug Mode"
+-- checkbox in GUI. In-memory state (discovered_flags, recent_changes,
+-- mission records) keeps updating regardless so the GUI and manual REPL
+-- inspection still work; only noisy logs and disk writes are suppressed.
 
 local Shared = require("DRAP/Shared")
+local GUI = require("DRAP/GUI")
 
 local M = Shared.create_module("EventFlagExplorer")
 M:set_throttle(0.25)
+
+local function is_dev_mode()
+    return GUI.is_debug()
+end
+
+-- dev_log: like M.log, but only prints when Debug Mode is on. Use for
+-- load-time diagnostic output (type/field dumps, command banners, loaded-N
+-- lines). Error messages and user-initiated action feedback stay on M.log.
+local function dev_log(msg)
+    if is_dev_mode() then M.log(msg) end
+end
 
 ------------------------------------------------------------
 -- Configuration
@@ -77,12 +94,12 @@ local function explore_event_flag_type()
         local td = sdk.find_type_definition(type_name)
         if td then
             event_flag_td = td
-            M.log(string.format("Found EventFlag type: %s", type_name))
+            dev_log(string.format("Found EventFlag type: %s", type_name))
 
             -- Get all fields
             local fields = td:get_fields()
             if fields then
-                M.log("=== EventFlag Fields ===")
+                dev_log("=== EventFlag Fields ===")
                 for i, field in ipairs(fields) do
                     if field then
                         local ok, name = pcall(field.get_name, field)
@@ -107,7 +124,7 @@ local function explore_event_flag_type()
                             }
 
                             if value ~= nil then
-                                M.log(string.format("  %s = %s (%s, static=%s)",
+                                dev_log(string.format("  %s = %s (%s, static=%s)",
                                     name, tostring(value), tostring(field_type), tostring(is_static)))
 
                                 -- If this is a number, it's likely a flag ID
@@ -117,27 +134,27 @@ local function explore_event_flag_type()
                                     flag_names_cache[num_val] = name
                                 end
                             else
-                                M.log(string.format("  %s (%s, static=%s)",
+                                dev_log(string.format("  %s (%s, static=%s)",
                                     name, tostring(field_type), tostring(is_static)))
                             end
                         end
                     end
                 end
-                M.log("=== End Fields ===")
+                dev_log("=== End Fields ===")
             end
 
             -- Also check for nested types or enums
             local nested = nil
             pcall(function() nested = td:get_nested_types() end)
             if nested then
-                M.log("=== Nested Types ===")
+                dev_log("=== Nested Types ===")
                 for i, nt in ipairs(nested) do
                     if nt then
                         local ok, name = pcall(nt.get_full_name, nt)
-                        if ok then M.log("  " .. tostring(name)) end
+                        if ok then dev_log("  " .. tostring(name)) end
                     end
                 end
-                M.log("=== End Nested ===")
+                dev_log("=== End Nested ===")
             end
 
             return true
@@ -277,6 +294,11 @@ function M.dump_all_names()
 end
 
 function M.save_names()
+    if not is_dev_mode() then
+        M.log("save_names skipped (Debug Mode is off)")
+        return
+    end
+
     local data = {
         version = 1,
         last_updated = os.time(),
@@ -298,7 +320,7 @@ function M.load_names()
                 count = count + 1
             end
         end
-        M.log(string.format("Loaded %d flag names from file", count))
+        dev_log(string.format("Loaded %d flag names from file", count))
     end
 end
 
@@ -558,11 +580,15 @@ end
 local function process_changes()
     local changes = M.detect_changes()
 
+    local log_enabled = is_dev_mode()
+
     for _, change in ipairs(changes) do
         local action = change.new_val and "SET" or "CLEARED"
         local name = change.name or "Unknown"
 
-        M.log(string.format("FLAG %s: %d (%s)", action, change.flag_id, name))
+        if log_enabled then
+            M.log(string.format("FLAG %s: %d (%s)", action, change.flag_id, name))
+        end
 
         -- Record for mission if recording
         record_change_for_mission(change)
@@ -589,6 +615,11 @@ end
 ------------------------------------------------------------
 
 function M.save_discovered()
+    if not is_dev_mode() then
+        M.log("save_discovered skipped (Debug Mode is off)")
+        return
+    end
+
     local data = {
         version = 1,
         last_updated = os.time(),
@@ -616,8 +647,12 @@ function M.load_discovered()
     M.load_names()
 end
 
-re.on_script_reset(function() M.save_discovered() end)
-re.on_config_save(function() M.save_discovered() end)
+-- Silent auto-save hooks: fire frequently during dev reloads / config writes,
+-- so we skip without logging when Debug Mode is off to avoid spam.
+-- Manual save paths (GUI "Save All" button, direct API calls) surface the
+-- skip through save_discovered()'s own log.
+re.on_script_reset(function() if is_dev_mode() then M.save_discovered() end end)
+re.on_config_save(function() if is_dev_mode() then M.save_discovered() end end)
 
 ------------------------------------------------------------
 -- GUI
@@ -1294,12 +1329,12 @@ end
 ------------------------------------------------------------
 
 M.load_discovered()
-M.log("EventFlagExplorer v3 loaded")
-M.log("Commands: eflag_check(id), eflag_on(id), eflag_off(id), eflag_scan(s,e)")
-M.log("          eflag_name(id), eflag_explore(), eflag_extract(s,e), eflag_dump()")
-M.log("          eflag_gui()")
-M.log("Recording: eflag_rec(mission), eflag_rec_stop(), eflag_rec_mission(name)")
-M.log("           eflag_rec_save(), eflag_rec_load(), eflag_rec_show()")
+dev_log("EventFlagExplorer v3 loaded")
+dev_log("Commands: eflag_check(id), eflag_on(id), eflag_off(id), eflag_scan(s,e)")
+dev_log("          eflag_name(id), eflag_explore(), eflag_extract(s,e), eflag_dump()")
+dev_log("          eflag_gui()")
+dev_log("Recording: eflag_rec(mission), eflag_rec_stop(), eflag_rec_mission(name)")
+dev_log("           eflag_rec_save(), eflag_rec_load(), eflag_rec_show()")
 
 -- Auto-explore on load
 explore_event_flag_type()

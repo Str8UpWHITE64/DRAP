@@ -14,35 +14,11 @@ local AHLM_TYPE_NAME = "app.solid.gamemastering.AreaHitLayoutManager"
 local HIT_DATA_TYPE_NAME = "app.solid.gamemastering.HIT_DATA"
 
 ------------------------------------------------------------
--- Scene Information
+-- Scene Information (shared with DoorSceneLock via DRAP/Shared)
 ------------------------------------------------------------
 
-local SCENE_INFO = {
-    s140 = { name = "Title Screen",             index = 292  },
-    s135 = { name = "Helipad",                  index = 287  },
-    s136 = { name = "Safe Room",                index = 288  },
-    s231 = { name = "Rooftop",                  index = 535  },
-    s230 = { name = "Service Hallway",          index = 534  },
-    s200 = { name = "Paradise Plaza",           index = 512  },
-    s503 = { name = "Colby's Movie Theater",    index = 1283 },
-    s700 = { name = "Leisure Park",             index = 1792 },
-    s400 = { name = "North Plaza",              index = 1024 },
-    s501 = { name = "Crislip's Hardware Store", index = 1281 },
-    sa00 = { name = "Food Court",               index = 2560 },
-    s300 = { name = "Wonderland Plaza",         index = 768  },
-    s900 = { name = "Al Fresca Plaza",          index = 2304 },
-    s100 = { name = "Entrance Plaza",           index = 256  },
-    s500 = { name = "Grocery Store",            index = 1280 },
-    s600 = { name = "Maintenance Tunnel",       index = 1536 },
-    s401 = { name = "Hideout",                  index = 1025 },
-    s601 = { name = "Butcher",                  index = 1537 },
-}
-
--- Reverse lookup: index -> scene code
-local INDEX_TO_SCENE = {}
-for code, info in pairs(SCENE_INFO) do
-    INDEX_TO_SCENE[info.index] = code
-end
+local SCENE_INFO = Shared.SCENE_INFO
+local INDEX_TO_SCENE = Shared.INDEX_TO_SCENE
 
 ------------------------------------------------------------
 -- Module State (exposed for NPC carry-over)
@@ -60,7 +36,13 @@ function M.get_last_final_destination()
 end
 
 ------------------------------------------------------------
--- Internal State
+-- Module-level state. Declared up front so every function in the file
+-- can reference them, regardless of source position. (Lua module-level
+-- locals are only visible to code that follows their declaration; an
+-- earlier version of this file had `clear_redirects` reset
+-- `vehicle_blocked_doors` and `player_was_in_vehicle` before they were
+-- declared, which silently set globals instead of clearing the locals.
+-- Same hazard pattern as Bridge.lua's pre-fix scoping bug.)
 ------------------------------------------------------------
 
 local hook_installed = false
@@ -69,19 +51,24 @@ local area_jump_method = nil
 local ahlm_td = nil
 local hit_data_td = nil
 
--- Mapping for door randomization (loaded from AP)
+-- DOOR_REDIRECTS: slot-data redirects (gated by randomization_enabled).
+-- STATIC_REDIRECTS: always-on, gameplay-driven redirects (e.g. SceneFixups'
+--   EP->s138 -> s136 redirect when AP is active). Survive set_redirects().
 local DOOR_REDIRECTS = {}
+local STATIC_REDIRECTS = {}
 
--- Enable/disable randomization
 local randomization_enabled = false
-local suppressed = false  -- temporarily suppress redirects (e.g. during escort missions)
+local suppressed = false  -- temporary; e.g. during escort missions
 
--- Cache for HIT_DATA fields
 local hit_data_fields = {}
 local hit_data_fields_discovered = false
 
--- Stats
 local redirect_count = 0
+
+-- Vehicle door-blocking state. While in a vehicle with door randomization
+-- active, every area-jump HIT_DATA is set Disabled=true. Restored on dismount.
+local vehicle_blocked_doors = {}   -- layout_info -> jump_name
+local player_was_in_vehicle = false
 
 ------------------------------------------------------------
 -- Singleton Managers
@@ -109,18 +96,6 @@ local function area_jump_name_to_area_no(area_jump_name)
     return info and info.index or nil
 end
 
-local function vec3_any_to_table(v)
-    if not v then return nil end
-    if type(v) == "table" then
-        return {
-            x = v.x or v[1] or 0,
-            y = v.y or v[2] or 0,
-            z = v.z or v[3] or 0,
-        }
-    end
-    return nil
-end
-
 ------------------------------------------------------------
 -- HIT_DATA Field Discovery and Extraction
 ------------------------------------------------------------
@@ -145,93 +120,36 @@ local function discover_hit_data_fields()
     return true
 end
 
-local function extract_vec3(vec3_obj)
-    if not vec3_obj then return nil end
+local extract_vec3 = Shared.vec3_extract
+local to_vector3f  = Shared.vec3_create
 
-    local result = { _raw = vec3_obj }
-
-    local ok_x, x = pcall(function() return vec3_obj.x end)
-    local ok_y, y = pcall(function() return vec3_obj.y end)
-    local ok_z, z = pcall(function() return vec3_obj.z end)
-
-    if ok_x then result.x = x end
-    if ok_y then result.y = y end
-    if ok_z then result.z = z end
-
-    return result
-end
-
-local function format_vec3(vec3_data)
-    if not vec3_data then return "nil" end
-    return string.format("(%.2f, %.2f, %.2f)",
-        vec3_data.x or 0, vec3_data.y or 0, vec3_data.z or 0)
-end
-
-local function to_vector3f(val)
-    if val == nil then return nil end
-
-    if type(val) == "userdata" then return val end
-
-    if type(val) == "table" then
-        local x = val.x or val[1] or 0
-        local y = val.y or val[2] or 0
-        local z = val.z or val[3] or 0
-
-        if Vector3f and Vector3f.new then
-            local ok, vec = pcall(Vector3f.new, x, y, z)
-            if ok and vec then return vec end
-        end
-
-        local vec3_td = sdk.find_type_definition("via.vec3")
-        if vec3_td then
-            local ok, vec = pcall(function()
-                local v = sdk.create_instance(vec3_td)
-                if v then
-                    v.x = x
-                    v.y = y
-                    v.z = z
-                end
-                return v
-            end)
-            if ok and vec then return vec end
-        end
-
-        return val
-    end
-
+-- Named field reader: returns the raw field value, or nil on miss/error.
+local function read_hit_data_field(hit_data_obj, name)
+    local f = hit_data_fields[name]
+    if not f then return nil end
+    local ok, v = pcall(f.get_data, f, hit_data_obj)
+    if ok then return v end
     return nil
 end
 
+-- Extracts the four fields the redirect pipeline actually consumes:
+-- mAreaJumpName (string), mDoorNo (number), and the position/angle vectors
+-- (returned as {x, y, z} tables). Anything else on HIT_DATA is ignored.
 local function extract_hit_data(hit_data_obj)
     if not hit_data_obj then return nil end
     if not discover_hit_data_fields() then return nil end
 
-    local data = {}
+    local jump_name  = read_hit_data_field(hit_data_obj, "mAreaJumpName")
+    local jump_pos   = read_hit_data_field(hit_data_obj, "mAreaJumpPos")
+    local jump_angle = read_hit_data_field(hit_data_obj, "mAreaJumpAngle")
+    local door_no    = read_hit_data_field(hit_data_obj, "mDoorNo")
 
-    for name, field in pairs(hit_data_fields) do
-        local ok, value = pcall(field.get_data, field, hit_data_obj)
-        if ok and value ~= nil then
-            local val_type = type(value)
-            if val_type == "userdata" then
-                if name == "mAreaJumpPos" or name == "mAreaJumpAngle" then
-                    local vec_data = extract_vec3(value)
-                    data[name] = format_vec3(vec_data)
-                    data[name .. "_raw"] = value
-                    data[name .. "_vec"] = vec_data
-                else
-                    local ok_str, str = pcall(tostring, value)
-                    data[name] = ok_str and str or "<userdata>"
-                    data[name .. "_raw"] = value
-                end
-            elseif val_type == "boolean" or val_type == "number" or val_type == "string" then
-                data[name] = value
-            else
-                data[name] = tostring(value)
-            end
-        end
-    end
-
-    return data
+    return {
+        mAreaJumpName       = jump_name and tostring(jump_name) or nil,
+        mAreaJumpPos_vec    = jump_pos and extract_vec3(jump_pos) or nil,
+        mAreaJumpAngle_vec  = jump_angle and extract_vec3(jump_angle) or nil,
+        mDoorNo             = door_no,
+    }
 end
 
 local function generate_door_id(data, from_area_code)
@@ -403,19 +321,31 @@ local function install_hook()
                     local door_id = generate_door_id(door_data, level_path)
                     local original_dest = door_data.mAreaJumpName or "?"
 
-                    -- Check for redirect
+                    -- Check for redirect -- static redirects (always-on,
+                    -- gameplay-driven) take precedence over slot-data ones.
                     local was_redirected = false
                     local redirect_target = nil
+                    local active_redirect = STATIC_REDIRECTS[door_id]
+                    if (not active_redirect) and randomization_enabled and not suppressed then
+                        active_redirect = DOOR_REDIRECTS[door_id]
+                    end
 
-                    if randomization_enabled and not suppressed and DOOR_REDIRECTS[door_id] then
-                        local redirect = DOOR_REDIRECTS[door_id]
-                        redirect_target = redirect.target_area
+                    -- Static redirects may be either a table or a function
+                    -- that returns a table -- function form lets the redirect
+                    -- branch on live runtime state (e.g. NPC escort count).
+                    if type(active_redirect) == "function" then
+                        local ok, resolved = pcall(active_redirect, door_id, door_data)
+                        active_redirect = (ok and type(resolved) == "table") and resolved or nil
+                    end
+
+                    if active_redirect then
+                        redirect_target = active_redirect.target_area
 
                         local mod_ok = modify_hit_data_destination(
                             hit_data_mo,
-                            redirect.target_area,
-                            redirect.target_pos,
-                            redirect.target_angle
+                            active_redirect.target_area,
+                            active_redirect.target_pos,
+                            active_redirect.target_angle
                         )
 
                         if mod_ok then
@@ -429,18 +359,17 @@ local function install_hook()
 
                     -- Store final destination for NPC carry-over
                     local final_area_jump_name = original_dest
-                    local final_pos = door_data.mAreaJumpPos_vec and vec3_any_to_table(door_data.mAreaJumpPos_vec) or nil
-                    local final_angle = door_data.mAreaJumpAngle_vec and vec3_any_to_table(door_data.mAreaJumpAngle_vec) or nil
+                    local final_pos = door_data.mAreaJumpPos_vec and extract_vec3(door_data.mAreaJumpPos_vec) or nil
+                    local final_angle = door_data.mAreaJumpAngle_vec and extract_vec3(door_data.mAreaJumpAngle_vec) or nil
                     local final_was_redirected = false
 
                     if was_redirected and redirect_target then
                         final_area_jump_name = redirect_target
                         final_was_redirected = true
 
-                        if DOOR_REDIRECTS[door_id] then
-                            local r = DOOR_REDIRECTS[door_id]
-                            if r.target_pos then final_pos = vec3_any_to_table(r.target_pos) end
-                            if r.target_angle then final_angle = vec3_any_to_table(r.target_angle) end
+                        if type(active_redirect) == "table" then
+                            if active_redirect.target_pos then final_pos = extract_vec3(active_redirect.target_pos) end
+                            if active_redirect.target_angle then final_angle = extract_vec3(active_redirect.target_angle) end
                         end
                     end
 
@@ -530,6 +459,51 @@ function M.set_redirects(redirects)
     end
 end
 
+--- Add a single always-on redirect (independent of slot-data and not affected
+--- by suppression). Used by gameplay-driven fixes like SceneFixups. The
+--- `data` parameter may be either:
+---   * a table { target_area, target_pos, target_angle [, template_door_id] }
+---   * a function() that returns such a table (resolved at door-crossing
+---     time -- useful for branching on live runtime state e.g. NPC escort)
+function M.add_static_redirect(door_id, data)
+    if type(door_id) ~= "string" then
+        M.log("add_static_redirect: door_id must be string")
+        return false
+    end
+    if type(data) == "function" then
+        STATIC_REDIRECTS[door_id] = data
+        M.log(string.format("Added static callback redirect: %s", door_id))
+        return true
+    elseif type(data) == "table" then
+        STATIC_REDIRECTS[door_id] = {
+            target_area = data.target_area,
+            target_pos = data.target_pos,
+            target_angle = data.target_angle,
+            template_door_id = data.template_door_id,
+        }
+        M.log(string.format("Added static redirect: %s -> %s",
+            door_id, tostring(data.target_area)))
+        return true
+    end
+    M.log("add_static_redirect: data must be table or function")
+    return false
+end
+
+--- Remove a static redirect. Returns true if one was actually removed.
+function M.remove_static_redirect(door_id)
+    if STATIC_REDIRECTS[door_id] then
+        STATIC_REDIRECTS[door_id] = nil
+        M.log("Removed static redirect: " .. door_id)
+        return true
+    end
+    return false
+end
+
+--- Returns the current static-redirect table (read-only inspection).
+function M.get_static_redirects()
+    return STATIC_REDIRECTS
+end
+
 --- Clears all redirects and disables randomization
 function M.clear_redirects()
     DOOR_REDIRECTS = {}
@@ -583,12 +557,9 @@ end
 
 ------------------------------------------------------------
 -- Vehicle Door Blocking
---
--- When door randomization is active and the player is riding
--- a vehicle, we disable all area-jump hit data so they cannot
--- transition through a door while in the vehicle.  When they
--- exit the vehicle, we re-enable the doors (respecting any
--- DoorSceneLock locks that may still apply).
+-- While in a vehicle, all area-jump doors are Disabled=true so the player
+-- can't transition through one. Restored on dismount, respecting any
+-- DoorSceneLock locks still in effect.
 ------------------------------------------------------------
 
 local DoorSceneLock = nil
@@ -599,9 +570,6 @@ local function get_door_scene_lock()
     end
     return DoorSceneLock
 end
-
-local vehicle_blocked_doors = {}   -- layout_info -> jump_name
-local player_was_in_vehicle = false
 
 local function is_player_in_vehicle()
     local pm = pm_mgr:get()
@@ -685,7 +653,7 @@ local function update_vehicle_door_blocking()
 
     local action = in_vehicle and "disabled" or "re-enabled"
     local count = scan_and_set_doors_disabled(in_vehicle)
-    M.log(string.format("Player %s vehicle — %s %d door(s)",
+    M.log(string.format("Player %s vehicle -- %s %d door(s)",
         in_vehicle and "entered" or "exited", action, count))
 end
 
@@ -731,8 +699,8 @@ local function find_existing_hit_data()
     return nil
 end
 
---- Simulates the s231->s136 door transition to warp the player to the Safe Room
-function M.warp_to_safe_room()
+--- Simulates the s231->s136 door transition to warp the player to the Security Room
+function M.warp_to_security_room()
     if not hook_installed or not area_jump_method then
         M.log("Cannot warp: areaJump hook not installed")
         return false
@@ -768,7 +736,7 @@ function M.warp_to_safe_room()
 
     local ok, err = pcall(area_jump_method.call, area_jump_method, ahlm, hit_data)
     if ok then
-        M.log("Warped to Safe Room via simulated door entry")
+        M.log("Warped to Security Room via simulated door entry")
         return true
     else
         M.log("Warp failed: " .. tostring(err))
@@ -808,18 +776,12 @@ re.on_draw_ui(function()
         for _ in pairs(vehicle_blocked_doors) do vbd_count = vbd_count + 1 end
         imgui.text("Vehicle-Blocked Doors: " .. tostring(vbd_count))
 
-        if imgui.button("Warp to Safe Room") then
-            M.warp_to_safe_room()
+        if imgui.button("Warp to Security Room") then
+            M.warp_to_security_room()
         end
 
         imgui.tree_pop()
     end
 end)
-
-------------------------------------------------------------
--- Module Initialization
-------------------------------------------------------------
-
-M.log("DoorRandomizer module loaded")
 
 return M

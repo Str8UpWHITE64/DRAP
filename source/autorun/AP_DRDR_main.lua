@@ -11,7 +11,7 @@ end
 -- Load Modules
 ------------------------------------------------------------
 
-local AP_BRIDGE = require("ap_drdr_bridge")
+local AP_BRIDGE = require("DRAP/Bridge")
 
 AP = AP or {}
 AP.AP_BRIDGE        = AP_BRIDGE
@@ -21,22 +21,27 @@ AP.DoorSceneLock    = require("DRAP/DoorSceneLock")
 AP.DoorRandomizer   = require("DRAP/DoorRandomizer")
 AP.DoorVisualizer   = require("DRAP/DoorVisualizer")
 AP.NpcCarryover     = require("DRAP/NpcCarryover")
-AP.ChallengeTracker = require("DRAP/ChallengeTracker")
-AP.LevelTracker     = require("DRAP/LevelTracker")
-AP.EventTracker     = require("DRAP/EventTracker")
-AP.NpcTracker       = require("DRAP/NpcTracker")
-AP.PPStickerTracker = require("DRAP/PPStickerTracker")
+AP.ChallengeTracker = require("DRAP/trackers/ChallengeTracker")
+AP.LevelTracker     = require("DRAP/trackers/LevelTracker")
+AP.EventTracker     = require("DRAP/trackers/EventTracker")
+AP.NpcTracker       = require("DRAP/trackers/NpcTracker")
+AP.PPStickerTracker = require("DRAP/trackers/PPStickerTracker")
 AP.SaveSlot         = require("DRAP/SaveSlot")
 AP.TimeGate         = require("DRAP/TimeGate")
 AP.Scene            = require("DRAP/Scene")
-AP.DeathLink        = require("DRAP/DeathLink")
+AP.DeathLink        = require("DRAP/trackers/DeathLink")
 AP.ScoopUnlocker     = require("DRAP/ScoopUnlocker")
-AP.GUI               = require("DRAP/DRAP_GUI")
+AP.SceneFixups       = require("DRAP/SceneFixups")
+AP.GUI               = require("DRAP/GUI")
+AP.Notify            = require("DRAP/Notify")
+AP.MsgEvents         = require("DRAP/MsgEvents")
 
--- Debug modules
-AP.EventFlagExplorer = require("DRAP/EventFlagExplorer")
+-- Debug modules. Noisy output (per-flag prints) and JSON persistence inside
+-- EventFlagExplorer gate themselves on GUI's "Debug Mode" checkbox.
+AP.EventFlagExplorer = require("DRAP/debug/EventFlagExplorer")
 
 local Shared = require("DRAP/Shared")
+local SharedData = require("DRAP/SharedData")
 local log = Shared.create_logger("DRAP")
 
 ------------------------------------------------------------
@@ -44,9 +49,9 @@ local log = Shared.create_logger("DRAP")
 ------------------------------------------------------------
 
 local function register_spawn_handlers_from_json()
-    local items = json.load_file("drdr_items.json")
-    if not items then
-        log("Failed to load item list JSON")
+    local items = SharedData.items()
+    if not items or #items == 0 then
+        log("Failed to load item list from SharedData")
         return
     end
 
@@ -81,114 +86,57 @@ end
 register_spawn_handlers_from_json()
 AP.ScoopUnlocker.register_with_ap_bridge(AP_BRIDGE)
 
-------------------------------------------------------------
--- Item Handlers: Area Keys
-------------------------------------------------------------
-
-local AREA_KEYS = {
-    { name = "Helipad key",                 scene = "s135" },
-    { name = "Safe Room key",               scene = "s136" },
-    { name = "Rooftop key",                 scene = "s231" },
-    { name = "Service Hallway key",         scene = "s230" },
-    { name = "Paradise Plaza key",          scene = "s200" },
-    { name = "Colby's Movie Theater key",   scene = "s503" },
-    { name = "Leisure Park key",            scene = "s700" },
-    { name = "North Plaza key",             scene = "s400" },
-    { name = "Crislip's Hardware Store key", scene = "s501" },
-    { name = "Food Court key",              scene = "sa00" },
-    { name = "Wonderland Plaza key",        scene = "s300" },
-    { name = "Al Fresca Plaza key",         scene = "s900" },
-    { name = "Entrance Plaza key",          scene = "s100" },
-    { name = "Grocery Store key",           scene = "s500" },
-    { name = "Maintenance Tunnel key",      scene = "s600" },
-    { name = "Hideout key",                 scene = "s401" },
-}
-
-for _, key in ipairs(AREA_KEYS) do
-    AP_BRIDGE.register_item_handler_by_name(key.name, function(net_item, item_name, sender_name)
-        log(string.format("Applying progression item '%s' from %s", tostring(item_name), tostring(sender_name or "?")))
-        AP.DoorSceneLock.unlock_scene(key.scene)
-    end)
-end
-
-------------------------------------------------------------
--- Item Handlers: Time Locks
-------------------------------------------------------------
-
-local TIME_CAPS = AP.TimeGate.TIME_CAPS
-
-local TIME_LOCK_CHAIN = {
-    { key = "DAY2_06_AM", cap = TIME_CAPS.DAY2_06_AM, unlock = function() AP.TimeGate.unlock_day2_6am() end },
-    { key = "DAY2_11_AM", cap = TIME_CAPS.DAY2_11_AM, unlock = function() AP.TimeGate.unlock_day2_11am() end },
-    { key = "DAY3_00_AM", cap = TIME_CAPS.DAY3_00_AM, unlock = function() AP.TimeGate.unlock_day3_12am() end },
-    { key = "DAY3_11_AM", cap = TIME_CAPS.DAY3_11_AM, unlock = function() AP.TimeGate.unlock_day3_11am() end },
-    { key = "DAY4_12_PM", cap = TIME_CAPS.DAY4_12_PM, unlock = function() AP.TimeGate.unlock_all_time() end },
-}
-
-local function apply_time_locks_from_ap()
-    if not AP.TimeGate.set_time_cap then return end
-    if not AP_BRIDGE.has_item_name then return end
-
-    local last_unlocked_index = 0
-
-    for i, step in ipairs(TIME_LOCK_CHAIN) do
-        if AP_BRIDGE.has_item_name(step.key) then
-            if i == last_unlocked_index + 1 then
-                step.unlock()
-                last_unlocked_index = i
-                log(string.format("Time chain unlocked: %s (step %d/%d)", step.key, i, #TIME_LOCK_CHAIN))
-            else
-                log(string.format("Time chain blocked: have %s but missing earlier step", step.key))
-                break
-            end
-        else
-            break
-        end
-    end
-
-    if last_unlocked_index >= #TIME_LOCK_CHAIN then
-        log("Time chain fully unlocked.")
-        return
-    end
-
-    local next_step = TIME_LOCK_CHAIN[last_unlocked_index + 1]
-    if next_step and next_step.cap then
-        AP.TimeGate.set_time_cap(next_step.cap)
-        log(string.format("Time cap set to: %s (cap=%s)", next_step.key, tostring(next_step.cap)))
+do
+    local ItemEffects = require("DRAP/ItemEffects")
+    local counts = ItemEffects.get_silent_overwrite_counts()
+    if counts.names > 0 or counts.ids > 0 then
+        log(string.format(
+            "Item handler registrations: %d duplicate display names overwrote earlier entries (pre-existing data; last wins)",
+            counts.names))
     end
 end
 
-local function on_time_item_received(net_item, item_name, sender_name)
-    log(string.format("Received time item '%s' from %s; re-evaluating time locks",
-        tostring(item_name), tostring(sender_name or "?")))
-    apply_time_locks_from_ap()
-end
-
-for _, step in ipairs(TIME_LOCK_CHAIN) do
-    AP_BRIDGE.register_item_handler_by_name(step.key, on_time_item_received)
-end
-
 ------------------------------------------------------------
--- Victory Handler
+-- Item Effect Modules
 ------------------------------------------------------------
+-- Each effect module registers its own handlers via ItemEffects.register(...)
+-- and exposes an optional reapply() for the save-load path. Add new effect
+-- files under DRAP/effects/ and wire them here.
 
-AP_BRIDGE.register_item_handler_by_name("Victory", function(net_item, item_name, sender_name)
-    log("Victory received! Sending goal completion to server...")
-    AP_BRIDGE.send_goal_complete()
-end)
+AP.effects = AP.effects or {}
+AP.effects.AreaKeyEffects             = require("DRAP/effects/AreaKeyEffects")
+AP.effects.TimeLockEffects            = require("DRAP/effects/TimeLockEffects")
+AP.effects.VictoryEffects             = require("DRAP/effects/VictoryEffects")
+AP.effects.SurvivorScoopCompletion    = require("DRAP/effects/SurvivorScoopCompletion")
+AP.effects.SaviorGoalEffects          = require("DRAP/effects/SaviorGoalEffects")
+AP.effects.BookSkills                 = require("DRAP/effects/BookSkills")
+AP.effects.BookGuards                 = require("DRAP/effects/BookGuards")
+AP.effects.PlayerStats                = require("DRAP/effects/PlayerStats")
+AP.effects.PlayerBuffs                = require("DRAP/effects/PlayerBuffs")
+AP.effects.HostileSurvivorTrap        = require("DRAP/effects/HostileSurvivorTrap")
+AP.effects.ZombieEffects              = require("DRAP/effects/ZombieEffects")
+AP.effects.CostumeRandomizer          = require("DRAP/effects/CostumeRandomizer")
+AP.effects.AP_LocationTriggers        = require("DRAP/effects/AP_LocationTriggers")
+AP.effects.DoorPromptOverlay          = require("DRAP/effects/DoorPromptOverlay")
 
-------------------------------------------------------------
--- Apply Permanent Effects
-------------------------------------------------------------
+AP.effects.AreaKeyEffects.register_all()
+AP.effects.TimeLockEffects.register_all()
+AP.effects.VictoryEffects.register_all()
+AP.effects.SurvivorScoopCompletion.register_all()
+AP.effects.SaviorGoalEffects.register_all()
+AP.effects.BookSkills.register_all()
+AP.effects.BookGuards.register_all()
+AP.effects.PlayerStats.register()
+AP.effects.PlayerBuffs.register()
+AP.effects.HostileSurvivorTrap.register()
+AP.effects.ZombieEffects.register()
+AP.effects.CostumeRandomizer.register()
+AP.effects.AP_LocationTriggers.register()
+AP.effects.DoorPromptOverlay.register()
 
-local function apply_permanent_effects_from_ap()
-    for _, key in ipairs(AREA_KEYS) do
-        if AP_BRIDGE.has_item_name(key.name) then
-            AP.DoorSceneLock.unlock_scene(key.scene)
-        end
-    end
-    AP.ScoopUnlocker.reapply_unlocked_scoops()
-end
+-- Per-scene fixups (e.g. disable s136 safe-room barricade once Jessie is met
+-- under ScoopSanity). Hooks AreaManager.onLoadMapEvent.
+AP.SceneFixups.register()
 
 ------------------------------------------------------------
 -- Hook Wiring: Level Tracker
@@ -239,6 +187,12 @@ end
 AP.NpcTracker.on_survivor_rescued = function(npc_id, state_index, friendly_name, game_id)
     log(string.format("Survivor rescued: %s", tostring(friendly_name)))
     AP_BRIDGE.check(string.format("Rescue %s", friendly_name))
+    if AP.effects.SurvivorScoopCompletion then
+        AP.effects.SurvivorScoopCompletion.on_survivor_rescued(friendly_name)
+    end
+    if AP.effects.SaviorGoalEffects then
+        AP.effects.SaviorGoalEffects.on_survivor_rescued(friendly_name)
+    end
 end
 
 ------------------------------------------------------------
@@ -268,7 +222,7 @@ AP.ScoopUnlocker.set_ap_activated_callback(function()
 end)
 
 -- When time freeze triggers (Get to the Stairs! milestone), apply it
--- Only used in ScoopSanity mode — time is frozen indefinitely until scoops progress
+-- Only used in ScoopSanity mode -- time is frozen indefinitely until scoops progress
 AP.ScoopUnlocker.set_time_freeze_callback(function()
     log("ScoopUnlocker: Time freeze triggered (ScoopSanity)")
     AP.TimeGate.enable()
@@ -351,8 +305,14 @@ AP_BRIDGE.AP_REF.on_slot_connected = function(slot_data)
     -- Goal option
     local goal = (type(slot_data) == "table" and slot_data.goal) or 0
     AP.Goal = goal
-    local goal_names = { [0] = "Ending S", [1] = "Ending A" }
+    local goal_names = { [0] = "Ending S", [1] = "Ending A", [2] = "Savior" }
     log("Goal: " .. (goal_names[goal] or tostring(goal)))
+
+    -- Number of survivors (only meaningful when goal == 2, Savior)
+    AP.NumberOfSurvivors = (type(slot_data) == "table" and tonumber(slot_data.number_of_survivors)) or 35
+    if goal == 2 then
+        log("Savior target: " .. tostring(AP.NumberOfSurvivors) .. " survivors")
+    end
 
     -- ScoopSanity option
     local scoop_sanity_enabled = (type(slot_data) == "table" and slot_data.scoop_sanity == true)
@@ -360,11 +320,90 @@ AP_BRIDGE.AP_REF.on_slot_connected = function(slot_data)
     AP.ScoopUnlocker.set_scoop_sanity_enabled(scoop_sanity_enabled)
     log("ScoopSanity enabled=" .. tostring(scoop_sanity_enabled))
 
+    -- Goal mode for ScoopUnlocker -- used to fire flag 270 (Backup for Brad
+    -- cutscene that opens EP shutters) on Meet-Jessie when goal is Savior.
+    AP.ScoopUnlocker.set_goal_mode(goal)
+
     -- Set up ScoopUnlocker persistence and ordering
     AP.ScoopUnlocker.set_save_filename(slot, seed)
     AP.ScoopUnlocker.load_save()
 
-    -- Re-apply time freeze if needed (ScoopSanity only — handles mid-game reconnect
+    -- PlayerStats persistence (skills + stat deltas survive script reload)
+    AP.effects.PlayerStats.set_save_filename(slot, seed)
+    AP.effects.PlayerStats.load_save()
+    -- Read slot-data progression mode if provided (default: replace)
+    local prog_mode = (type(slot_data) == "table" and slot_data.vanilla_progression) or "replace"
+    AP.effects.PlayerStats.set_progression_mode(prog_mode)
+
+    -- Hostile-Survivor trap spawn-count range from slot data (default 1-3)
+    local hs_min = (type(slot_data) == "table" and tonumber(slot_data.hostile_survivor_count_min)) or 1
+    local hs_max = (type(slot_data) == "table" and tonumber(slot_data.hostile_survivor_count_max)) or 3
+    AP.effects.HostileSurvivorTrap.set_spawn_count_range(hs_min, hs_max)
+
+    -- Zombie difficulty options (Night Mode / Hardcore Zombies). The slot_data
+    -- arrives with hardcore->night already auto-promoted (see fill_slot_data),
+    -- so we just honor the two flags directly.
+    local night_enabled = (type(slot_data) == "table" and slot_data.night_mode_enabled == true)
+    local hardcore_enabled = (type(slot_data) == "table" and slot_data.hardcore_zombies_enabled == true)
+    if AP.effects.ZombieEffects then
+        if night_enabled then
+            AP.effects.ZombieEffects.set_permanent_night(true)
+        else
+            AP.effects.ZombieEffects.set_permanent_night(false)
+        end
+        if hardcore_enabled then
+            AP.effects.ZombieEffects.set_permanent_hardcore(true)
+        else
+            AP.effects.ZombieEffects.set_permanent_hardcore(false)
+        end
+        log(string.format("Zombie difficulty: night=%s hardcore=%s",
+            tostring(night_enabled), tostring(hardcore_enabled)))
+    end
+
+    -- Costume randomizer toggles (3 independent options):
+    --   * random_starting_costume : one randomized outfit at session start
+    --   * costume_chaos_mode      : re-randomize on every area transition
+    --   * dlc_outfits_enabled     : expand Body pool to include DLC anchors (43..62)
+    if AP.effects.CostumeRandomizer then
+        local starting = (type(slot_data) == "table"
+                          and slot_data.random_starting_costume == true)
+        local chaos    = (type(slot_data) == "table"
+                          and slot_data.costume_chaos_mode == true)
+        local dlc      = (type(slot_data) == "table"
+                          and slot_data.dlc_outfits_enabled == true)
+        AP.effects.CostumeRandomizer.setup({
+            starting_costume = starting,
+            chaos_mode       = chaos,
+            dlc_enabled      = dlc,
+        })
+        log(string.format("Costume randomizer: starting=%s chaos=%s dlc=%s",
+            tostring(starting), tostring(chaos), tostring(dlc)))
+    end
+
+    -- PP-bonus AP location triggers. Slot data carries the per-entry mapping
+    -- (msg_no -> location_name(s)) so this Lua module just walks the list,
+    -- registers MsgEvents watchers, and fires AP_BRIDGE.check on each event.
+    -- Disabled cleanly if pp_bonus_locations is off (trigger_data is empty).
+    if AP.effects.AP_LocationTriggers then
+        local trigger_data = (type(slot_data) == "table"
+                              and slot_data.pp_bonus_trigger_data) or {}
+        AP.effects.AP_LocationTriggers.setup(trigger_data, AP_BRIDGE)
+        log(string.format("PP-bonus location triggers: %d entries",
+            type(trigger_data) == "table" and #trigger_data or 0))
+    end
+
+    -- Door-randomizer in-game overlay. Slot data carries a per-scene table
+    -- of redirected destinations keyed by the vanilla destination name.
+    -- The overlay shows whenever the player approaches a door whose
+    -- destination has been redirected for this seed. Empty table when
+    -- door_randomizer is off, in which case setup() disables cleanly.
+    if AP.effects.DoorPromptOverlay then
+        local overlay = (type(slot_data) == "table"
+                         and slot_data.door_overlay_data) or {}
+        AP.effects.DoorPromptOverlay.setup(overlay)
+    end
+
+    -- Re-apply time freeze if needed (ScoopSanity only -- handles mid-game reconnect
     -- where the Meet Jessie flag is already set but TimeGate lost its freeze state)
     if scoop_sanity_enabled and AP.ScoopUnlocker.is_time_frozen() then
         AP.TimeGate.enable()
@@ -377,6 +416,9 @@ AP_BRIDGE.AP_REF.on_slot_connected = function(slot_data)
         if scoop_order and type(scoop_order) == "table" and #scoop_order > 0 then
             AP.ScoopUnlocker.set_scoop_order(scoop_order)
             log("Scoop order set with " .. tostring(#scoop_order) .. " entries")
+        elseif goal == 2 then
+            -- Savior + ScoopSanity: main scoops are intentionally excluded.
+            log("Savior+ScoopSanity: main scoops disabled, no scoop order expected")
         else
             log("WARNING: ScoopSanity enabled but no scoop_order in slot data")
         end
@@ -388,11 +430,14 @@ AP_BRIDGE.AP_REF.on_slot_connected = function(slot_data)
         AP.SaveSlot.apply_for_slot(slot, seed)
     end
 
-    -- Reset received items file for a fresh sync from the server.
-    -- This ensures any previously corrupted item data is discarded and
-    -- rebuilt from the authoritative server replay.
+    -- Restore the persisted received-items list. The on_items_received
+    -- filter (`index > last_item_index`) then splits the server's full item
+    -- history into already-applied (skipped) vs received-while-offline
+    -- (applied as fresh). This is what stops traps from re-firing on every
+    -- reconnect -- on_replay="skip" is only consulted by the manual reapply
+    -- path, not the on-connect dispatch.
     AP_BRIDGE.set_received_items_filename(slot, seed)
-    AP_BRIDGE.reset_received_items()
+    AP_BRIDGE.load_received_items()
 
     -- Load completed checks list and resend all to the server.
     -- This catches any checks that were completed while disconnected.
@@ -428,7 +473,7 @@ local function try_reapply_if_ready()
     if not new_game_checked then
         new_game_checked = true
         if AP.ScoopUnlocker.is_new_game() then
-            log("New game detected — resetting side scoop progress")
+            log("New game detected -- resetting side scoop progress")
             AP.ScoopUnlocker.reset_for_new_game()
         end
     end
@@ -436,8 +481,12 @@ local function try_reapply_if_ready()
     log("Reapplying AP items")
     AP_BRIDGE.reapply_all_items()
     AP.ScoopUnlocker.reapply_unlocked_scoops()
-    apply_permanent_effects_from_ap()
-    apply_time_locks_from_ap()
+    AP.effects.AreaKeyEffects.reapply()
+    AP.effects.TimeLockEffects.reapply()
+    AP.effects.SurvivorScoopCompletion.reapply()
+    AP.effects.SaviorGoalEffects.reapply()
+    AP.effects.BookSkills.reapply()
+    AP.effects.PlayerStats.reapply()
 
     -- ScoopSanity: restore indefinite time freeze if milestone was reached
     if AP.ScoopSanityEnabled and AP.ScoopUnlocker.is_time_frozen() then
@@ -481,6 +530,7 @@ re.on_frame(function()
     safe_on_frame(AP.AP_BRIDGE,        "AP_BRIDGE")
     safe_on_frame(AP.PPStickerTracker, "PPStickerTracker")
     safe_on_frame(AP.SaveSlot,         "SaveSlot")
+    safe_on_frame(AP.effects.BookGuards, "BookGuards")
 
     -- Debug modules
     safe_on_frame(AP.EventFlagExplorer, "EventFlagExplorer")
@@ -511,6 +561,5 @@ _G.freeze     = function() AP.TimeGate.enable() end
 _G.cap        = function(code) AP.TimeGate.set_time_cap(code) end
 _G.show_items = function() AP.GUI.show_window() end
 _G.hide_items = function() AP.GUI.hide_window() end
-
 
 log("Main script loaded.")

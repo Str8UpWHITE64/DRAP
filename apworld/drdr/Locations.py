@@ -3,6 +3,11 @@ from typing import Optional, NamedTuple, Dict
 
 from BaseClasses import Location, Region
 from .Items import DRItem
+from .shared_data import (
+    AP_TRIGGER_LOCATIONS,
+    expand_trigger_location_names,
+    trigger_location_region,
+)
 
 
 class DRLocationCategory(IntEnum):
@@ -14,7 +19,8 @@ class DRLocationCategory(IntEnum):
     MAIN_SCOOP = 5,
     OVERTIME_SCOOP = 6,
     PSYCHO_SCOOP = 7,
-    CHALLENGE = 8
+    CHALLENGE = 8,
+    PP_BONUS = 9
 
 
 class DRLocationData(NamedTuple):
@@ -48,22 +54,22 @@ class DRLocation(Location):
         table_offset = 1000
 
         table_order = [
-            "Helipad",
-            "Safe Room",
+            "Heliport",
+            "Security Room",
             "Rooftop",
-            "Service Hallway",
+            "Warehouse",
             "Paradise Plaza",
             "Entrance Plaza",
             "Al Fresca Plaza",
             "Leisure Park",
             "Wonderland Plaza",
             "North Plaza",
-            "Grocery Store",
+            "Seon's Food and Stuff",
             "Food Court",
-            "Crislip's Hardware Store",
-            "Colby's Movie Theater",
+            "Crislip's Home Saloon",
+            "Colby's Movieland",
             "Maintenance Tunnel",
-            "Hideout",
+            "Carlito's Hideout",
             "Tunnels",
             "Level Ups",
             "Challenges"
@@ -88,9 +94,9 @@ class DRLocation(Location):
 
 # To ensure backwards compatibility, do not reorder locations or insert new ones in the middle of a list.
 location_tables = {
-    "Helipad": [
+    "Heliport": [
         DRLocationData("Victory", "Victory", DRLocationCategory.EVENT),
-        # Events in Helipad
+        # Events in Heliport
         DRLocationData("Get bit!", "Milk", DRLocationCategory.OVERTIME_SCOOP),
         DRLocationData("Ending A: Solve all of the cases and be on the helipad at 12pm", "Milk", DRLocationCategory.MAIN_SCOOP),
         # DRLocationData("Ending B: Don't solve all of the cases but be on the helipad at 12pm", "Milk", DRLocationCategory.MAIN_SCOOP),
@@ -98,8 +104,8 @@ location_tables = {
 
     ],
 
-    "Safe Room": [
-        # Events in Safe Room
+    "Security Room": [
+        # Events in Security Room
         # First events in Entrance Plaza
         DRLocationData("Entrance Plaza Cutscene 1", "Milk", DRLocationCategory.MAIN_SCOOP),
         DRLocationData("Help barricade the door!", "Milk", DRLocationCategory.MAIN_SCOOP),
@@ -108,23 +114,28 @@ location_tables = {
         # Main Events
         DRLocationData("Complete Temporary Agreement", "Milk", DRLocationCategory.MAIN_SCOOP),
         DRLocationData("Survive until 7pm on day 1", "Milk", DRLocationCategory.MAIN_SCOOP),
-        DRLocationData("Meet back at the Safe Room at 6am day 2", "Milk", DRLocationCategory.MAIN_SCOOP),
+        DRLocationData("Meet back at the Security Room at 6am day 2", "Milk", DRLocationCategory.MAIN_SCOOP),
         DRLocationData("Complete Image in the Monitor", "Milk", DRLocationCategory.MAIN_SCOOP),
         DRLocationData("Complete Medicine Run", "Milk", DRLocationCategory.MAIN_SCOOP),
         DRLocationData("Complete Professor's Past", "Milk", DRLocationCategory.MAIN_SCOOP),
         DRLocationData("Complete Transporting Isabela", "Milk", DRLocationCategory.MAIN_SCOOP),
-        DRLocationData("Carry Isabela back to the Safe Room", "Milk", DRLocationCategory.MAIN_SCOOP),
+        DRLocationData("Carry Isabela back to the Security Room", "Milk", DRLocationCategory.MAIN_SCOOP),
         DRLocationData("Complete Santa Cabeza", "Milk", DRLocationCategory.MAIN_SCOOP),
-        DRLocationData("Meet back at the safe room at 11am day 3", "Milk", DRLocationCategory.MAIN_SCOOP),
-        DRLocationData("Meet back at the safe room at 5pm day 3", "Milk", DRLocationCategory.MAIN_SCOOP),
+        DRLocationData("Meet back at the Security Room at 11am day 3", "Milk", DRLocationCategory.MAIN_SCOOP),
+        DRLocationData("Meet back at the Security Room at 5pm day 3", "Milk", DRLocationCategory.MAIN_SCOOP),
         DRLocationData("Complete Jessie's Discovery", "Milk", DRLocationCategory.MAIN_SCOOP),
-        DRLocationData("Head back to the safe room at the end of day 3", "Milk", DRLocationCategory.MAIN_SCOOP),
+        DRLocationData("Head back to the Security Room at the end of day 3", "Milk", DRLocationCategory.MAIN_SCOOP),
         # DRLocationData("Ending E: Don't solve all of the cases and don't be on the helipad at 12pm", "Milk", DRLocationCategory.MAIN_SCOOP),
         # DRLocationData("Ending F: Fail to collect all of the bombs in time", "Milk", DRLocationCategory.MAIN_SCOOP),
 
-        # PP Stickers in Safe Room
+        # PP Stickers in Security Room
         DRLocationData("Photograph PP Sticker 97", "Coffee Creamer", DRLocationCategory.PP_STICKER),
 
+        # Synthetic goal location for the Savior goal. Only populated as a real
+        # checkable location when Goal == Savior; otherwise created as an event
+        # with no ID. Lua sends this check once the player has rescued their
+        # target number of survivors.
+        DRLocationData("Savior: Rescue enough survivors to escape", "Victory", DRLocationCategory.EVENT),
     ],
 
     "Rooftop": [
@@ -137,10 +148,10 @@ location_tables = {
 
     ],
 
-    "Service Hallway": [
-        # Events in Service Hallway
+    "Warehouse": [
+        # Events in Warehouse
         # DRLocationData("Stomp the queen", "Milk", DRLocationCategory.MAIN_SCOOP),
-        DRLocationData("Meet Jessie in the Service Hallway", "Milk", DRLocationCategory.MAIN_SCOOP),
+        DRLocationData("Meet Jessie in the Warehouse", "Milk", DRLocationCategory.MAIN_SCOOP),
         DRLocationData("Witness Special Forces 10pm day 3", "Milk", DRLocationCategory.MAIN_SCOOP),
 
     ],
@@ -328,12 +339,12 @@ location_tables = {
         DRLocationData("Photograph PP Sticker 82", "Pie", DRLocationCategory.PP_STICKER),
 
     ],
-    "Grocery Store": [
-        # Events in Grocery Store
+    "Seon's Food and Stuff": [
+        # Events in Seon's Food and Stuff
         DRLocationData("Meet Steven", "Milk", DRLocationCategory.MAIN_SCOOP),
         DRLocationData("Clean up... Register 6!", "Milk", DRLocationCategory.MAIN_SCOOP),
 
-        # PP Stickers in Grocery Store
+        # PP Stickers in Seon's Food and Stuff
         DRLocationData("Photograph PP Sticker 83", "Baguette", DRLocationCategory.PP_STICKER),
         DRLocationData("Photograph PP Sticker 84", "Orange Juice", DRLocationCategory.PP_STICKER),
         DRLocationData("Photograph PP Sticker 85", "Uncooked Pizza", DRLocationCategory.PP_STICKER),
@@ -358,29 +369,29 @@ location_tables = {
         DRLocationData("Photograph PP Sticker 55", "Uncooked Pizza", DRLocationCategory.PP_STICKER),
         DRLocationData("Photograph PP Sticker 56", "Milk", DRLocationCategory.PP_STICKER),
     ],
-    "Crislip's Hardware Store": [
-        # Events in Crislip's Hardware Store
+    "Crislip's Home Saloon": [
+        # Events in Crislip's Home Saloon
         DRLocationData("Meet Cliff", "Milk", DRLocationCategory.PSYCHO_SCOOP),
         DRLocationData("Kill Cliff", "Milk", DRLocationCategory.PSYCHO_SCOOP),
 
-        # PP Stickers in Crislip's Hardware Store
+        # PP Stickers in Crislip's Home Saloon
         DRLocationData("Photograph PP Sticker 74", "Orange Juice", DRLocationCategory.PP_STICKER),
         DRLocationData("Photograph PP Sticker 75", "Uncooked Pizza", DRLocationCategory.PP_STICKER),
     ],
 
-    "Colby's Movie Theater": [
-        # Events in Colby's Movie Theater
+    "Colby's Movieland": [
+        # Events in Colby's Movieland
         DRLocationData("Meet Sean", "Milk", DRLocationCategory.PSYCHO_SCOOP),
         DRLocationData("Kill Sean", "Milk", DRLocationCategory.PSYCHO_SCOOP),
 
-        # Survivors rescued from Colby's Movie Theater
+        # Survivors rescued from Colby's Movieland
         DRLocationData("Rescue Beth Shrake", "Milk", DRLocationCategory.SURVIVOR),
         DRLocationData("Rescue Michelle Feltz", "Coffee Creamer", DRLocationCategory.SURVIVOR),
         DRLocationData("Rescue Nathan Crabbe", "Well Done Steak", DRLocationCategory.SURVIVOR),
         DRLocationData("Rescue Ray Mathison", "Yogurt", DRLocationCategory.SURVIVOR),
         DRLocationData("Rescue Cheryl Jones", "Apple", DRLocationCategory.SURVIVOR),
 
-        # PP Stickers in Colby's Movie Theater
+        # PP Stickers in Colby's Movieland
         DRLocationData("Photograph PP Sticker 15", "Uncooked Pizza", DRLocationCategory.PP_STICKER),
         DRLocationData("Photograph PP Sticker 16", "Milk", DRLocationCategory.PP_STICKER),
         DRLocationData("Photograph PP Sticker 17", "Coffee Creamer", DRLocationCategory.PP_STICKER),
@@ -410,9 +421,9 @@ location_tables = {
         DRLocationData("Photograph PP Sticker 96", "Milk", DRLocationCategory.PP_STICKER),
     ],
 
-    "Hideout":[
-        # Events in Hideout
-        DRLocationData("Escort Isabela to the Hideout and have a chat", "Milk", DRLocationCategory.MAIN_SCOOP),
+    "Carlito's Hideout":[
+        # Events in Carlito's Hideout
+        DRLocationData("Escort Isabela to Carlito's Hideout and have a chat", "Milk", DRLocationCategory.MAIN_SCOOP),
         DRLocationData("Complete Memories", "Milk", DRLocationCategory.MAIN_SCOOP),
         DRLocationData("Gather the suppressants and generator and talk to Isabela", "Milk", DRLocationCategory.OVERTIME_SCOOP),
         DRLocationData("Give Isabela 5 queens", "Milk", DRLocationCategory.OVERTIME_SCOOP),
@@ -539,6 +550,61 @@ location_tables = {
 
     ]
 }
+
+# ----------------------------------------------------------------------------
+# AP-trigger locations (PP-bonus events + key-item ToDo banners).
+#
+# Sourced from drdr_shared.json's "ap_trigger_locations" section. Each entry
+# expands to one or more locations: "single" types produce one location, and
+# "counted" types produce per-count + an optional all_location_name.
+#
+# Locations are APPENDED to the existing region tables to preserve the
+# backwards-compat ID assignment (see DRLocation.get_name_to_id) -- since
+# get_name_to_id assigns IDs by enumerating each region's list, appending
+# at the end keeps existing IDs stable.
+#
+# These locations are conditionally REMOVED later in __init__.create_regions
+# when the PpBonusLocations toggle is off, so the shared_data list always
+# represents the maximum possible set.
+# ----------------------------------------------------------------------------
+
+PP_BONUS_LOCATION_NAMES: list = []  # populated below; consumed by __init__
+
+for _entry in AP_TRIGGER_LOCATIONS:
+    _names = expand_trigger_location_names(_entry)
+    if not _names:
+        continue
+    _t = _entry.get("type")
+    if _t == "single":
+        _region = trigger_location_region(_entry)
+        if not _region or _region not in location_tables:
+            continue
+        for _name in _names:
+            location_tables[_region].append(
+                DRLocationData(_name, "Milk", DRLocationCategory.PP_BONUS)
+            )
+            PP_BONUS_LOCATION_NAMES.append(_name)
+    elif _t == "counted":
+        _max = int(_entry.get("max_count", 0))
+        # Per-count names placed in their tier's region
+        for _i, _name in enumerate(_names[:_max]):
+            _count = _i + 1
+            _region = trigger_location_region(_entry, count=_count)
+            if not _region or _region not in location_tables:
+                continue
+            location_tables[_region].append(
+                DRLocationData(_name, "Milk", DRLocationCategory.PP_BONUS)
+            )
+            PP_BONUS_LOCATION_NAMES.append(_name)
+        # all_location_name (if any) goes in the most-restrictive region
+        if len(_names) > _max:
+            _all_name = _names[-1]
+            _region = trigger_location_region(_entry, is_all_variant=True)
+            if _region and _region in location_tables:
+                location_tables[_region].append(
+                    DRLocationData(_all_name, "Milk", DRLocationCategory.PP_BONUS)
+                )
+                PP_BONUS_LOCATION_NAMES.append(_all_name)
 
 location_dictionary: Dict[str, DRLocationData] = {}
 for location_table in location_tables.values():

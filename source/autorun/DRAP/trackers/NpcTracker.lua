@@ -1,17 +1,12 @@
--- DRAP/NpcTracker.lua
+-- DRAP/trackers/NpcTracker.lua
 -- Tracks app.solid.gamemastering.NpcManager.NpcInfoList live state changes
--- and logs when survivors are rescued (enter the safe room).
+-- and logs when survivors are rescued (enter the Security Room).
 
 local Shared = require("DRAP/Shared")
+local SharedData = require("DRAP/SharedData")
 
-local M = Shared.create_module("SurvivorTracker")
+local M = Shared.create_module("NpcTracker")
 M:set_throttle(0.5)  -- CHECK_INTERVAL
-
-------------------------------------------------------------
--- Configuration
-------------------------------------------------------------
-
-local SURVIVOR_JSON_PATH = "survivors.json"
 
 ------------------------------------------------------------
 -- Live State Enum
@@ -84,25 +79,20 @@ M.on_survivor_rescued = nil
 local function load_survivor_json()
     if survivor_json_loaded then return end
 
-    local file = io.open(SURVIVOR_JSON_PATH, "r")
-    if not file then
-        M.log("Could not open " .. SURVIVOR_JSON_PATH)
+    local rows = SharedData.survivors()
+    if type(rows) ~= "table" or #rows == 0 then
+        M.log("SharedData.survivors() returned empty or invalid data")
         return
     end
-
-    local text = file:read("*a")
-    file:close()
 
     survivor_defs = {}
     survivor_id_to_name = {}
     survivor_id_to_gameid = {}
 
-    -- Simple JSON parsing
-    for obj in text:gmatch("{(.-)}") do
-        local name = obj:match('"name"%s*:%s*"(.-)"')
-        local game_id = obj:match('"game_id"%s*:%s*"(.-)"')
-        local item_num_str = obj:match('"item_number"%s*:%s*(%d+)')
-        local item_number = item_num_str and tonumber(item_num_str) or nil
+    for _, row in ipairs(rows) do
+        local name = row.name
+        local game_id = row.game_id
+        local item_number = tonumber(row.item_number)
 
         if name and game_id and item_number then
             table.insert(survivor_defs, {
@@ -116,7 +106,7 @@ local function load_survivor_json()
         end
     end
 
-    M.log(string.format("Loaded %d survivors from %s", #survivor_defs, SURVIVOR_JSON_PATH))
+    M.log(string.format("Loaded %d survivors from SharedData", #survivor_defs))
     survivor_json_loaded = true
 end
 
@@ -240,7 +230,7 @@ function M.on_frame()
                 local ok_state, state_raw = pcall(baseinfo_state_field.get_data, baseinfo_state_field, npc_info)
                 local state_index = (ok_state and state_raw) and (tonumber(state_raw) or 0) or 0
 
-                -- NPC is in the safe room → count as rescued
+                -- NPC is in the Security Room -> count as rescued
                 if state_index == LIVE_STATE.ENTER_SAFTY_AREA or state_index == LIVE_STATE.SAFTY_AREA then
                     on_survivor_rescued_internal(npc_id, state_index)
                 end

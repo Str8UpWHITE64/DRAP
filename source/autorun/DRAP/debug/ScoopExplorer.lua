@@ -1,4 +1,4 @@
--- DRAP/ScoopExplorer.lua
+-- DRAP/debug/ScoopExplorer.lua
 -- Focused exploration of Scoop/Mission data structures
 -- Goal: Find how "rescued" survivors are tracked
 
