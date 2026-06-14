@@ -117,7 +117,7 @@ SCOOP_REGION_REQUIREMENTS = {
     "Medicine Run": ["Seon's Food and Stuff"],
     "Girl Hunting": ["North Plaza"],
     "A Promise to Isabela": ["North Plaza"],
-    "The Last Resort": ["Maintenance Tunnel"],
+    "The Last Resort": ["Maintenance Tunnel", "Leisure Park key"],
     "Hideout": ["Carlito's Hideout"],
     "The Butcher": ["Maintenance Tunnel"],
 }
