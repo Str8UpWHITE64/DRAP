@@ -13,6 +13,7 @@ local M = Shared.create_module("GUI")
 local ItemSpawner = nil
 local ScoopUnlocker = nil
 local DoorVisualizer = nil
+local SaveDiagnostics = nil
 
 local function ensure_modules()
     if not ItemSpawner then
@@ -26,6 +27,10 @@ local function ensure_modules()
     if not DoorVisualizer then
         local ok, mod = pcall(require, "DRAP/DoorVisualizer")
         if ok then DoorVisualizer = mod end
+    end
+    if not SaveDiagnostics then
+        local ok, mod = pcall(require, "DRAP/SaveDiagnostics")
+        if ok then SaveDiagnostics = mod end
     end
 end
 
@@ -42,7 +47,7 @@ local active_tab = "Items"
 -- Drawing
 ------------------------------------------------------------
 
-local TAB_LIST = { "Items", "Keys", "Scoops", "Doors" }
+local TAB_LIST = { "Items", "Keys", "Scoops", "Doors", "Saves" }
 
 local function draw_window()
     if not window_visible then return end
@@ -97,6 +102,12 @@ local function draw_window()
             DoorVisualizer.draw_tab_content(debug_mode)
         else
             imgui.text_colored("DoorVisualizer not loaded", 0xFFFF8800)
+        end
+    elseif active_tab == "Saves" then
+        if SaveDiagnostics and SaveDiagnostics.draw_tab_content then
+            SaveDiagnostics.draw_tab_content(debug_mode)
+        else
+            imgui.text_colored("SaveDiagnostics not loaded", 0xFFFF8800)
         end
     end
 

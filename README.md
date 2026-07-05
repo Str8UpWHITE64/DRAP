@@ -75,13 +75,42 @@ The main story scoops are in their normal order, but time-lock items are added t
 - If you disconnect while playing, you will send challenge and level locations on reconnect.
 - To open the ItemSpawner window, go into the REFramework window, scroll down to "Script Generated UI" and check "Show AP Items Window".  This will open a new window where you can spawn items you have received from the APWorld, view your scoop statuses, your keys to areas, and generate your DoorSanity HTML file.
 
-## Known Bugs
+## Save Data and the "Failed to Save" Error
 
-### **If playing on ScoopSanity, leaving 10 or more NPCs behind in an area will cause the game to crash.  If you have 10 or more NPCs with you, make sure they come with you to the next area.**
+Steam limits this game's save data to roughly **200 MB total** — counted across *everything* in
+`C:\Program Files (x86)\Steam\userdata\{Your SteamID}\2527390\remote`, including your vanilla saves
+AND every AP seed's save folder (`win64_save_AP_*`). Each save slot is about 9 MB, so vanilla's 21
+slots alone nearly fill the limit, and every AP seed you play stacks on top of that. When you cross
+it, the game shows the generic "Failed to Save" error. Steam enforces this limit even if you have
+Steam Cloud disabled for the game.
+
+**To fix it:**
+
+1. **Disable Steam Cloud for this game** (recommended for AP players): in your Steam Library,
+   right-click *Dead Rising Deluxe Remaster* → **Properties** → **General**, and uncheck
+   **"Keep games saves in the Steam Cloud"**. This stops Steam from re-syncing old save folders
+   you delete. (The ~200 MB limit still applies to new saves, so step 2 is still needed.)
+2. **Delete old save folders.** Close the game, then open File Explorer and go to:
+   ```
+   C:\Program Files (x86)\Steam\userdata\{Your SteamID}\2527390\remote
+   ```
+   (If you don't know your SteamID, there is usually only one folder inside `userdata`.)
+   Inside `remote` you will see:
+   - `win64_save` — your **vanilla** saves. Don't delete this unless you also want those gone.
+   - `win64_save_AP_YourName_s123...` — one folder per AP seed you've played.
+
+   Delete the `win64_save_AP_*` folders for seeds you are finished with. Each one frees up to
+   ~190 MB depending on how many slots you used. You can also delete individual old save slots
+   from inside the game's load menu to free ~9 MB each.
+
+## Known Bugs
 
 Spawning items is by far the most buggy part of this mod.  When spawning items using the AP Items Window, try not to spam the spawn button.  Wait a few seconds after spawning an item before spawning another one.  If you do spawn multiple items quickly, you increase your chances of the game crashing.
 
-Some users are experiencing an issue where they are unable to save after connecting to the APWorld.  If you have this issue, close the game, and go to your save location at "C:\Program Files (x86)\Steam\userdata\{Your SteamID}\2527390\remote", delete any leftover AP saves, then open the game again.  If this doesn't work, you can also disable the "Redirect" option in the Archipelago Connect window. This will make it so the AP saves will use your default save directory, so make sure you are only loading saves for the APWorld. 
+Fixed in recent versions (update the mod if you're still seeing these):
+- Leaving 10+ party members behind in another area crashed the game shortly after a loading screen or cutscene. The mod now guards the HUD widget responsible; when your scattered party exceeds 8, the other-map HP readout pauses until you regroup.
+- "Use N Microwaves/Stoves/Clothing Racks" progress reset between play sessions.
+- Survivors occasionally spawning dead or not at all (the "Burt bug") — broken NPC records are now detected and repaired automatically on area transitions.
 
 ## Final note
 I spent countless hours playing the original game when I was younger, and spent plenty playing this version when it came out.  I hope you enjoy this implementation, and I look forward to seeing how people play it!
