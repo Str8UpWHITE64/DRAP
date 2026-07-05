@@ -2590,8 +2590,12 @@
       "location_template_plural": "Use {n} Microwaves",
       "all_location_name": "Use All Microwaves",
       "count_tiers": [
-        {"max_count": 1, "regions": ["Paradise Plaza"]},
+        {"max_count": 1, "regions": ["Paradise Plaza", "Seon's Food and Stuff"]},
+        {"max_count": 2, "regions": ["Al Fresca Plaza", "Seon's Food and Stuff"]},
+        {"max_count": 3, "regions": ["Paradise Plaza", "Al Fresca Plaza", "Seon's Food and Stuff"]},
+        {"max_count": 6, "regions": ["Food Court"]},
         {"max_count": 7, "regions": ["Paradise Plaza", "Food Court"]},
+        {"max_count": 8, "regions": ["Al Fresca Plaza", "Food Court"]},
         {"max_count": 9, "regions": ["Paradise Plaza", "Food Court", "Al Fresca Plaza"]}
       ],
       "restricted_mode_items_any": ["Uncooked Pizza", "Raw Meat"]
