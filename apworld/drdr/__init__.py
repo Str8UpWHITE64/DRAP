@@ -206,7 +206,7 @@ PP_STICKER_GROUPS = [
     (9, ["North Plaza"], []),                                                     # Stickers 72-73, 76-82
     (3, ["Seon's Food and Stuff"], []),                                           # Stickers 83-85
     (2, ["Crislip's Home Saloon"], []),                                           # Stickers 74-75
-    (10, ["Entrance Plaza"], []),                                                 # Stickers 25-34
+    (10, ["Entrance Plaza"], ["Escort Brad to see Dr Barnaby"]),                  # Stickers 25-34
     (7, ["Maintenance Tunnel"], []),                                              # Stickers 90-96
     (2, ["Paradise Plaza", "Leisure Park"], ["Get grabbed by the raincoats"]),    # Stickers 98-99
 ]
@@ -406,7 +406,12 @@ class DRWorld(World):
             create_connection("Seon's Food and Stuff", "North Plaza")
 
         create_connection("Al Fresca Plaza", "Entrance Plaza")
-        
+
+        # Paradise Plaza <-> Entrance Plaza are connected in-game. Open from
+        # the start in ScoopSanity (key-gated); in vanilla the shutter opens
+        # once the player can reach "Complete Rescue the Professor".
+        create_connection("Paradise Plaza", "Entrance Plaza")
+
         create_connection("Food Court", "Al Fresca Plaza")
         create_connection("Food Court", "Wonderland Plaza")
         create_connection("Wonderland Plaza", "North Plaza")
@@ -863,84 +868,49 @@ class DRWorld(World):
             set_rule(self.multiworld.get_entrance("North Plaza -> Carlito's Hideout", self.player), lambda state: state.has("Carlito's Hideout key", self.player))
             set_rule(self.multiworld.get_entrance("North Plaza -> Crislip's Home Saloon", self.player), lambda state: state.has("Crislip's Home Saloon key", self.player))
 
+            # Paradise Plaza <-> Entrance Plaza: open from the start in
+            # ScoopSanity (door key only); in vanilla the shutter opens once
+            # the player can complete Rescue the Professor.
+            if self.options.scoop_sanity:
+                set_rule(self.multiworld.get_entrance("Paradise Plaza -> Entrance Plaza", self.player),
+                         lambda state: state.has("Entrance Plaza key", self.player))
+            else:
+                set_rule(self.multiworld.get_entrance("Paradise Plaza -> Entrance Plaza", self.player),
+                         lambda state: state.can_reach_location("Complete Rescue the Professor", self.player))
+
             # ScoopSanity-only entrance rules:
             #   * Security Room -> Entrance Plaza requires Rooftop key +
             #     Warehouse key (the player must have been able to reach
             #     Jessie in the Warehouse for the cutscene to fire) plus
             #     Entrance Plaza key (the door itself).
-            #   * Also adding Maintenace Tunnel access through Entrance
-            #     and Paradise Plaza, as well as the new paths it adds.
+            #   * Maintenance Tunnel doors all take the Maintenance Tunnel
+            #     key + Access Key, plus the destination zone key on the way
+            #     out. Reaching the source zone already proves the path
+            #     there, so no extra keys are stacked on.
             if self.options.scoop_sanity:
                 set_rule(self.multiworld.get_entrance("Security Room -> Entrance Plaza", self.player),
                          lambda state: state.has("Rooftop key", self.player)
                                        and state.has("Warehouse key", self.player)
                                        and state.has("Entrance Plaza key", self.player))
                 set_rule(self.multiworld.get_entrance("Entrance Plaza -> Al Fresca Plaza", self.player),
-                         lambda state: state.has("Rooftop key", self.player)
-                                       and state.has("Warehouse key", self.player)
-                                       and state.has("Entrance Plaza key", self.player)
-                                       and state.has("Al Fresca Plaza key", self.player))
+                         lambda state: state.has("Al Fresca Plaza key", self.player))
                 set_rule(self.multiworld.get_entrance("Al Fresca Plaza -> Food Court", self.player),
-                         lambda state: state.has("Rooftop key", self.player)
-                                       and state.has("Warehouse key", self.player)
-                                       and state.has("Entrance Plaza key", self.player)
-                                       and state.has("Al Fresca Plaza key", self.player)
-                                       and state.has("Food Court key", self.player))
-                set_rule(self.multiworld.get_entrance("Entrance Plaza -> Maintenance Tunnel", self.player),
-                         lambda state: state.has("Rooftop key", self.player)
-                                       and state.has("Warehouse key", self.player)
-                                       and state.has("Entrance Plaza key", self.player)
-                                       and state.has("Maintenance Tunnel key", self.player)
-                                       and state.has("Maintenance Tunnel Access Key", self.player))
-                set_rule(self.multiworld.get_entrance("Paradise Plaza -> Maintenance Tunnel", self.player),
-                         lambda state: state.has("Rooftop key", self.player)
-                                       and state.has("Warehouse key", self.player)
-                                       and state.has("Paradise Plaza key", self.player)
-                                       and state.has("Maintenance Tunnel key", self.player)
-                                       and state.has("Maintenance Tunnel Access Key", self.player))
-                set_rule(self.multiworld.get_entrance("Maintenance Tunnel -> Al Fresca Plaza", self.player),
-                         lambda state: state.has("Rooftop key", self.player)
-                                       and state.has("Warehouse key", self.player)
-                                       and (state.has("Paradise Plaza key", self.player) or state.has("Entrance Plaza key", self.player))
-                                       and state.has("Maintenance Tunnel key", self.player)
-                                       and state.has("Maintenance Tunnel Access Key", self.player)
-                                       and state.has("Al Fresca Plaza key", self.player))
-                set_rule(self.multiworld.get_entrance("Maintenance Tunnel -> Food Court", self.player),
-                         lambda state: state.has("Rooftop key", self.player)
-                                       and state.has("Warehouse key", self.player)
-                                       and (state.has("Paradise Plaza key", self.player) or state.has("Entrance Plaza key", self.player))
-                                       and state.has("Maintenance Tunnel key", self.player)
-                                       and state.has("Maintenance Tunnel Access Key", self.player)
-                                       and state.has("Food Court key", self.player))
-                set_rule(self.multiworld.get_entrance("Maintenance Tunnel -> Wonderland Plaza", self.player),
-                         lambda state: state.has("Rooftop key", self.player)
-                                       and state.has("Warehouse key", self.player)
-                                       and (state.has("Paradise Plaza key", self.player) or state.has("Entrance Plaza key", self.player))
-                                       and state.has("Maintenance Tunnel key", self.player)
-                                       and state.has("Maintenance Tunnel Access Key", self.player)
-                                       and state.has("Wonderland Plaza key", self.player))
-                set_rule(self.multiworld.get_entrance("Maintenance Tunnel -> Seon's Food and Stuff", self.player),
-                         lambda state: state.has("Rooftop key", self.player)
-                                       and state.has("Warehouse key", self.player)
-                                       and (state.has("Paradise Plaza key", self.player) or state.has("Entrance Plaza key", self.player))
-                                       and state.has("Maintenance Tunnel key", self.player)
-                                       and state.has("Maintenance Tunnel Access Key", self.player)
-                                       and state.has("Seon's Food and Stuff key", self.player))
-                set_rule(self.multiworld.get_entrance("Maintenance Tunnel -> Leisure Park", self.player),
-                         lambda state: state.has("Rooftop key", self.player)
-                                       and state.has("Warehouse key", self.player)
-                                       and (state.has("Paradise Plaza key", self.player) or state.has("Entrance Plaza key", self.player))
-                                       and state.has("Maintenance Tunnel key", self.player)
-                                       and state.has("Maintenance Tunnel Access Key", self.player)
-                                       and state.has("Leisure Park key", self.player))
+                         lambda state: state.has("Food Court key", self.player))
                 set_rule(self.multiworld.get_entrance("Seon's Food and Stuff -> North Plaza", self.player),
-                         lambda state: state.has("Rooftop key", self.player)
-                                       and state.has("Warehouse key", self.player)
-                                       and (state.has("Paradise Plaza key", self.player) or state.has("Entrance Plaza key", self.player))
-                                       and state.has("Maintenance Tunnel key", self.player)
-                                       and state.has("Maintenance Tunnel Access Key", self.player)
-                                       and state.has("Seon's Food and Stuff key", self.player)
-                                       and state.has("North Plaza key", self.player))
+                         lambda state: state.has("North Plaza key", self.player))
+                for _mt_entrance, _dest_key in [
+                    ("Paradise Plaza -> Maintenance Tunnel", None),
+                    ("Entrance Plaza -> Maintenance Tunnel", None),
+                    ("Maintenance Tunnel -> Al Fresca Plaza", "Al Fresca Plaza key"),
+                    ("Maintenance Tunnel -> Food Court", "Food Court key"),
+                    ("Maintenance Tunnel -> Wonderland Plaza", "Wonderland Plaza key"),
+                    ("Maintenance Tunnel -> Seon's Food and Stuff", "Seon's Food and Stuff key"),
+                    ("Maintenance Tunnel -> Leisure Park", "Leisure Park key"),
+                ]:
+                    set_rule(self.multiworld.get_entrance(_mt_entrance, self.player),
+                             lambda state, k=_dest_key: state.has("Maintenance Tunnel key", self.player)
+                                           and state.has("Maintenance Tunnel Access Key", self.player)
+                                           and (k is None or state.has(k, self.player)))
 
         # "Meet Jessie in the Warehouse" is a prologue main scoop that
         # always exists (see PROLOGUE_MAIN_SCOOPS). Its rule is set outside
@@ -1102,16 +1072,12 @@ class DRWorld(World):
         set_rule(self.multiworld.get_location("Photograph PP Sticker 23", self.player), lambda state: state.can_reach_region("Colby's Movieland", self.player))
         set_rule(self.multiworld.get_location("Photograph PP Sticker 24", self.player), lambda state: state.can_reach_region("Colby's Movieland", self.player))
 
-        # PP Stickers in Entrance Plaza (KINDA JANKY, NEEDS FURTHER REVIEW)
+        # PP Stickers in Entrance Plaza
         # EP shutter gate (used by EP stickers, EP survivors, Hall Family).
-        # Vanilla: gated on Brad escort. ScoopSanity: gated on first scoop
-        # received (plus the escort if Backup for Brad is first). Savior+SS:
-        # gated on Warehouse reach (Meet Jessie milestone fires flag 514).
-        if self.options.scoop_sanity and self.scoop_order:
-            first_scoop = self.scoop_order[0]
-            ep_shutter = lambda state, fs=first_scoop: state.has(fs, self.player) and (fs != "Backup for Brad" or state.can_reach_location("Escort Brad to see Dr Barnaby", self.player))
-        elif self.options.scoop_sanity:
-            # Savior+ScoopSanity path — shutter gated on Warehouse access.
+        # Vanilla: gated on Brad escort. ScoopSanity: the shutters open once
+        # the player has met Jessie (Warehouse reach) and can get to
+        # Entrance Plaza — every use site already checks EP reachability.
+        if self.options.scoop_sanity:
             ep_shutter = lambda state: state.can_reach_region("Warehouse", self.player)
         else:
             ep_shutter = None
@@ -1195,7 +1161,7 @@ class DRWorld(World):
         set_rule(self.multiworld.get_location("Photograph PP Sticker 88", self.player), lambda state: state.can_reach_region("Leisure Park", self.player))
         set_rule(self.multiworld.get_location("Photograph PP Sticker 89", self.player), lambda state: state.can_reach_region("Leisure Park", self.player))
 
-        # PP Stickers in Maintenance Tunnrl
+        # PP Stickers in Maintenance Tunnel
         set_rule(self.multiworld.get_location("Photograph PP Sticker 90", self.player), lambda state: state.can_reach_region("Maintenance Tunnel", self.player))
         set_rule(self.multiworld.get_location("Photograph PP Sticker 91", self.player), lambda state: state.can_reach_region("Maintenance Tunnel", self.player))
         set_rule(self.multiworld.get_location("Photograph PP Sticker 92", self.player), lambda state: state.can_reach_region("Maintenance Tunnel", self.player))
@@ -1230,7 +1196,7 @@ class DRWorld(World):
         # Survivors in Leisure Park
         set_rule(self.multiworld.get_location("Rescue Sophie Richard", self.player), lambda state: state.can_reach_region("Leisure Park", self.player) and ((not self.options.scoop_sanity) or (self.options.scoop_sanity and state.has("The Convicts", self.player))))
 
-        # Survivors in Food Couty
+        # Survivors in Food Court
         set_rule(self.multiworld.get_location("Rescue Gil Jiminez", self.player), lambda state: state.can_reach_region("Food Court", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.has("DAY3_00_AM", self.player)) or (self.options.scoop_sanity and state.has("The Drunkard", self.player))))
 
         # Survivors in Al Fresca Plaza
@@ -1410,37 +1376,46 @@ class DRWorld(World):
                      and (not gated or state.has("Zombie Ride", self.player)))
         set_rule(self.multiworld.get_location("Change into 46 new outfits", self.player), lambda state: state.can_reach_region("Leisure Park", self.player) and state.can_reach_region("Al Fresca Plaza", self.player) and state.can_reach_region("Wonderland Plaza", self.player) and state.can_reach_region("North Plaza", self.player) and state.can_reach_region("Entrance Plaza", self.player) and state.can_reach_region("Food Court", self.player) and state.can_reach_region("Paradise Plaza", self.player) and state.can_reach_region("Seon's Food and Stuff", self.player) and state.can_reach_region("Crislip's Home Saloon", self.player) and state.can_reach_region("Colby's Movieland", self.player))
         set_rule(self.multiworld.get_location("Change into 5 new outfits", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player))
-        # PP Sticker group access for the "Photograph N PP Stickers" challenge
-        # rules. The vanilla table gates the EP sticker block (25-34) on
-        # "Escort Brad to see Dr Barnaby", a MAIN_SCOOP location that doesn't
-        # exist under Savior+ScoopSanity. Strip such gates when main scoops
-        # are disabled — in that mode the EP shutter opens on the Meet Jessie
-        # milestone instead, and the remaining region requirement already
-        # gates reachability correctly.
-        if self.main_scoops_enabled:
-            pp_sticker_groups = PP_STICKER_GROUPS
-        else:
+        # PP Sticker group access for the "Photograph N PP Stickers"
+        # challenge rules. Each group becomes (count, regions, locations,
+        # predicate). Vanilla gates the EP block (25-34) on the Brad escort;
+        # in ScoopSanity the EP shutter opens on Meet Jessie instead, so the
+        # escort gate is swapped for ep_shutter. Savior+SS additionally
+        # drops main-scoop locations that don't exist in that mode.
+        if not self.main_scoops_enabled:
             main_scoop_location_names = {
                 loc.name
                 for region_locs in location_tables.values()
                 for loc in region_locs
                 if loc.category == DRLocationCategory.MAIN_SCOOP
             }
-            pp_sticker_groups = [
-                (count, regions, [loc for loc in locs if loc not in main_scoop_location_names])
-                for (count, regions, locs) in PP_STICKER_GROUPS
-            ]
+        pp_sticker_groups = []
+        for (count, regions, locs) in PP_STICKER_GROUPS:
+            pred = None
+            if self.options.scoop_sanity and "Escort Brad to see Dr Barnaby" in locs:
+                locs = [l for l in locs if l != "Escort Brad to see Dr Barnaby"]
+                pred = ep_shutter
+            if not self.main_scoops_enabled:
+                locs = [l for l in locs if l not in main_scoop_location_names]
+            pp_sticker_groups.append((count, regions, locs, pred))
 
-        set_rule(self.multiworld.get_location("Photograph 10 PP Stickers", self.player), lambda state, groups=pp_sticker_groups: sum(g[0] for g in groups if all(state.can_reach_region(r, self.player) for r in g[1]) and all(state.can_reach_location(l, self.player) for l in g[2])) >= 10)
-        set_rule(self.multiworld.get_location("Photograph 20 PP Stickers", self.player), lambda state, groups=pp_sticker_groups: sum(g[0] for g in groups if all(state.can_reach_region(r, self.player) for r in g[1]) and all(state.can_reach_location(l, self.player) for l in g[2])) >= 20)
-        set_rule(self.multiworld.get_location("Photograph 30 PP Stickers", self.player), lambda state, groups=pp_sticker_groups: sum(g[0] for g in groups if all(state.can_reach_region(r, self.player) for r in g[1]) and all(state.can_reach_location(l, self.player) for l in g[2])) >= 30)
-        set_rule(self.multiworld.get_location("Photograph 40 PP Stickers", self.player), lambda state, groups=pp_sticker_groups: sum(g[0] for g in groups if all(state.can_reach_region(r, self.player) for r in g[1]) and all(state.can_reach_location(l, self.player) for l in g[2])) >= 40)
-        set_rule(self.multiworld.get_location("Photograph 50 PP Stickers", self.player), lambda state, groups=pp_sticker_groups: sum(g[0] for g in groups if all(state.can_reach_region(r, self.player) for r in g[1]) and all(state.can_reach_location(l, self.player) for l in g[2])) >= 50)
-        set_rule(self.multiworld.get_location("Photograph 60 PP Stickers", self.player), lambda state, groups=pp_sticker_groups: sum(g[0] for g in groups if all(state.can_reach_region(r, self.player) for r in g[1]) and all(state.can_reach_location(l, self.player) for l in g[2])) >= 60)
-        set_rule(self.multiworld.get_location("Photograph 70 PP Stickers", self.player), lambda state, groups=pp_sticker_groups: sum(g[0] for g in groups if all(state.can_reach_region(r, self.player) for r in g[1]) and all(state.can_reach_location(l, self.player) for l in g[2])) >= 70)
-        set_rule(self.multiworld.get_location("Photograph 80 PP Stickers", self.player), lambda state, groups=pp_sticker_groups: sum(g[0] for g in groups if all(state.can_reach_region(r, self.player) for r in g[1]) and all(state.can_reach_location(l, self.player) for l in g[2])) >= 80)
-        set_rule(self.multiworld.get_location("Photograph 90 PP Stickers", self.player), lambda state, groups=pp_sticker_groups: sum(g[0] for g in groups if all(state.can_reach_region(r, self.player) for r in g[1]) and all(state.can_reach_location(l, self.player) for l in g[2])) >= 90)
-        set_rule(self.multiworld.get_location("Photograph all PP Stickers", self.player), lambda state, groups=pp_sticker_groups: sum(g[0] for g in groups if all(state.can_reach_region(r, self.player) for r in g[1]) and all(state.can_reach_location(l, self.player) for l in g[2])) >= 100)
+        def _reachable_stickers(state, groups=pp_sticker_groups):
+            return sum(
+                count for (count, regions, locs, pred) in groups
+                if all(state.can_reach_region(r, self.player) for r in regions)
+                and all(state.can_reach_location(l, self.player) for l in locs)
+                and (pred is None or pred(state))
+            )
+
+        for _n, _name in [
+            (10, "Photograph 10 PP Stickers"), (20, "Photograph 20 PP Stickers"),
+            (30, "Photograph 30 PP Stickers"), (40, "Photograph 40 PP Stickers"),
+            (50, "Photograph 50 PP Stickers"), (60, "Photograph 60 PP Stickers"),
+            (70, "Photograph 70 PP Stickers"), (80, "Photograph 80 PP Stickers"),
+            (90, "Photograph 90 PP Stickers"), (100, "Photograph all PP Stickers"),
+        ]:
+            set_rule(self.multiworld.get_location(_name, self.player),
+                     lambda state, n=_n: _reachable_stickers(state) >= n)
         set_rule(self.multiworld.get_location("Get 10000 PP in one photo", self.player), lambda state: state.can_reach_region("Rooftop", self.player))
 
         set_rule(self.multiworld.get_location("Find Greg's secret passage", self.player), lambda state: state.can_reach_location("Kill Adam", self.player))
