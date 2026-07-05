@@ -48,3 +48,4 @@ luac.out
 /.idea/vcs.xml
 /.idea/git_toolbox_prj.xml
 /.idea/inspectionProfiles/Project_Default.xml
+__pycache__/
