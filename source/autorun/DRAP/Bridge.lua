@@ -4,6 +4,7 @@
 local Shared = require("DRAP/Shared")
 local AP_REF = require("AP_REF/core")
 local ItemEffects = require("DRAP/ItemEffects")
+local Ledger = require("DRAP/LocationLedger")
 
 local M = Shared.create_module("Bridge")
 
@@ -16,17 +17,25 @@ local M = Shared.create_module("Bridge")
 -- record locally.
 ------------------------------------------------------------
 
-local COMPLETED_CHECKS = {}
-local COMPLETED_CHECKS_FILE = nil
+-- Location checks live in DRAP/LocationLedger (one persisted document per
+-- slot/seed; Bug 5 Phases 1-2). These cache the identifiers between
+-- set_completed_checks_filename() and load_completed_checks(), and drive
+-- the sync-on-connect state machine in M.on_frame.
+local ledger_slot = nil
+local ledger_seed = nil
+local sync_needed = false
+local last_sync_try = 0.0
+local last_ack_pull = 0.0
+local pending_acks = {}   -- server-checked ids that arrived pre-init
+
 local RECEIVED_ITEMS = {}
 local RECEIVED_ITEMS_BY_NAME = {}
 local last_item_index = -1
 local RECEIVED_ITEMS_FILE = nil
 
--- Forward-declared local functions. Same reason as the state above --
--- M.check (early in the file) calls save_completed_checks (defined later),
--- so without this declaration the call resolves to a nil global.
-local save_completed_checks
+-- Forward-declared local functions. M.check (early in the file) references
+-- functions defined later; without these declarations the calls resolve to
+-- nil globals.
 local save_received_items
 
 ------------------------------------------------------------
@@ -35,6 +44,7 @@ local save_received_items
 
 local AP_ITEMS_BY_NAME = {}
 local AP_LOCATIONS_BY_NAME = {}
+local AP_LOCATIONS_BY_ID = {}
 local data_package_ready = false
 local pending_items = {}  -- Items received before data package was ready
 
@@ -49,6 +59,10 @@ AP_REF.on_data_package_changed = function(data_package)
 
     AP_ITEMS_BY_NAME = game_pkg.item_name_to_id or {}
     AP_LOCATIONS_BY_NAME = game_pkg.location_name_to_id or {}
+    AP_LOCATIONS_BY_ID = {}
+    for name, id in pairs(AP_LOCATIONS_BY_NAME) do
+        AP_LOCATIONS_BY_ID[tonumber(id) or id] = name
+    end
 
     local item_count, loc_count = 0, 0
     for _ in pairs(AP_ITEMS_BY_NAME) do item_count = item_count + 1 end
@@ -66,10 +80,14 @@ function M.get_location_id(name) return AP_LOCATIONS_BY_NAME[name] end
 -- Connection Helper
 ------------------------------------------------------------
 
+-- The apclientpp module (with its State enum) is exported as AP_REF.AP.
+-- The global AP is main.lua's module table and has no State field.
 local function is_connected()
     if not AP_REF.APClient then return false end
     local st = AP_REF.APClient:get_state()
-    return st ~= AP.State.DISCONNECTED
+    local ap_mod = AP_REF.AP
+    if not (ap_mod and ap_mod.State) then return true end  -- can't tell; assume up
+    return st ~= ap_mod.State.DISCONNECTED
 end
 
 function M.is_connected()
@@ -217,6 +235,14 @@ function M.bind_client()
         if AP_REF.on_slot_connected then AP_REF.on_slot_connected(slot_data) end
     end)
 
+    AP_REF.APClient:set_location_checked_handler(function(locations)
+        if AP_REF.on_location_checked then AP_REF.on_location_checked(locations) end
+    end)
+
+    AP_REF.APClient:set_retrieved_handler(function(map, keys, extra)
+        if AP_REF.on_retrieved then AP_REF.on_retrieved(map, keys, extra) end
+    end)
+
     AP_REF.APClient:set_room_info_handler(function()
         if AP_REF.on_room_info then AP_REF.on_room_info() end
     end)
@@ -238,42 +264,87 @@ end
 
 local _warned_no_checks_file = false
 
+-- Pre-connect journal: checks detected before the first slot-connect of a
+-- session have no per-slot/seed file yet. Without a journal they were lost
+-- permanently -- the trackers are edge-triggered and never refire. The
+-- journal is global (slot/seed unknown at write time) and is merged into
+-- whichever slot connects next, which is the save the player was playing.
+local PENDING_CHECKS_FILE = "./AP_DRDR_Items/AP_DRDR_checks_pending.json"
+local PENDING_CHECKS = {}
+
+local function save_pending_checks()
+    local list = {}
+    for name, _ in pairs(PENDING_CHECKS) do
+        table.insert(list, name)
+    end
+    table.sort(list)
+    Shared.save_json(PENDING_CHECKS_FILE, { checks = list }, 4, M.log)
+end
+
+local function load_pending_checks()
+    PENDING_CHECKS = {}
+    -- Existence check first: json.load_file logs a loud parse error for a
+    -- missing/empty file, which reads like data loss to players. io.open
+    -- resolves relative to reframework/data, same root as json.load_file
+    -- (verified: probe scripts' io.open logs land there).
+    local probe = io.open(PENDING_CHECKS_FILE, "r")
+    if not probe then return end
+    local has_content = probe:read(1) ~= nil
+    probe:close()
+    if not has_content then return end
+
+    local data = Shared.load_json(PENDING_CHECKS_FILE)
+    if data and data.checks then
+        for _, name in ipairs(data.checks) do
+            PENDING_CHECKS[name] = true
+        end
+    end
+end
+load_pending_checks()
+
 function M.check(loc_name)
     M.log("Sending location check: " .. tostring(loc_name))
 
     -- Record every check for resend-on-reconnect, even if the send fails
-    if loc_name and COMPLETED_CHECKS_FILE then
-        if not COMPLETED_CHECKS[loc_name] then
-            COMPLETED_CHECKS[loc_name] = true
-            save_completed_checks()
+    if loc_name and Ledger.is_init() then
+        Ledger.record(loc_name, "check")
+    elseif loc_name then
+        -- Not slot-connected yet: journal the check so the next slot-connect
+        -- merges and sends it.
+        if not PENDING_CHECKS[loc_name] then
+            PENDING_CHECKS[loc_name] = true
+            save_pending_checks()
         end
-    elseif loc_name and not _warned_no_checks_file then
-        _warned_no_checks_file = true
-        M.log("WARNING: COMPLETED_CHECKS_FILE is nil; checks are NOT being recorded "
-            .. "locally. slot-connect may have failed early. Run drap_bridge_diag to "
-            .. "inspect state, drap_bridge_force_init to recover.")
+        if not _warned_no_checks_file then
+            _warned_no_checks_file = true
+            M.log("Note: not slot-connected yet; checks are journaled to "
+                .. PENDING_CHECKS_FILE .. " and will merge+send on connect.")
+        end
     end
 
     if not AP_REF.APClient then
         M.log("APClient is nil")
+        sync_needed = true   -- the sync loop retries once connected
         return false
     end
 
-    local st = AP_REF.APClient:get_state()
-    if AP.State and st == AP.State.DISCONNECTED then
-        M.log("Disconnected; cannot send")
+    if not is_connected() then
+        M.log("Disconnected; cannot send (sync will retry)")
+        sync_needed = true
         return false
     end
 
     local loc_id = resolve_location_id(loc_name)
     if not loc_id then
-        M.log("Could not resolve location: " .. tostring(loc_name))
+        M.log("Could not resolve location: " .. tostring(loc_name) .. " (sync will retry)")
+        sync_needed = true
         return false
     end
 
     loc_id = tonumber(loc_id) or loc_id
     local ok, ret = pcall(AP_REF.APClient.LocationChecks, AP_REF.APClient, { loc_id })
     M.log("LocationChecks ok=" .. tostring(ok))
+    if not ok then sync_needed = true end
     return ok
 end
 
@@ -288,40 +359,154 @@ local function safe_filename(s)
 end
 
 ------------------------------------------------------------
--- Completed Checks Persistence (resend on reconnect)
--- (COMPLETED_CHECKS / COMPLETED_CHECKS_FILE declared at top of file)
+-- Location Ledger integration (Bug 5 Phases 1-2)
+--
+-- The ledger (DRAP/LocationLedger) is the single store for every location
+-- this slot/seed has detected. Bridge owns id resolution and traffic:
+--   * server acks arrive via AP_REF.on_location_checked (full checked set
+--     at connect + deltas), marking entries acked and reverse-importing
+--     server-known checks we lost locally;
+--   * a sync state machine (M.on_frame) batch-resends every unacked name
+--     once the data package can resolve ids, retrying every ~2s -- this
+--     replaces the old one-shot resend that silently dropped names when
+--     the data package raced the connect.
+-- The legacy per-name COMPLETED_CHECKS file is imported once and kept on
+-- disk for rollback; it is no longer written.
 ------------------------------------------------------------
 
-
-function M.set_completed_checks_filename(slot_name, seed)
-    local slot = safe_filename(slot_name)
-    local sd = safe_filename(seed)
-    COMPLETED_CHECKS_FILE = "./AP_DRDR_Items/AP_DRDR_checks_" .. slot .. "_" .. sd .. ".json"
-end
-
-save_completed_checks = function()
-    if not COMPLETED_CHECKS_FILE then return end
-    local list = {}
-    for name, _ in pairs(COMPLETED_CHECKS) do
-        table.insert(list, name)
+-- Sync diagnostics persist to a file (console prints don't reach the
+-- framework log).
+local function sync_diag(msg)
+    M.log(msg)
+    local f = io.open("drap_sync_diag.log", "a")
+    if f then
+        f:write(string.format("[%s] %s\n", os.date("%m-%d %H:%M:%S"), msg))
+        f:close()
     end
-    table.sort(list)
-    Shared.save_json(COMPLETED_CHECKS_FILE, { checks = list }, 4, M.log)
 end
 
-function M.load_completed_checks()
-    if not COMPLETED_CHECKS_FILE then return end
-    local data = Shared.load_json(COMPLETED_CHECKS_FILE, M.log)
-    if not data or not data.checks then
-        M.log("No existing completed-checks file; starting fresh")
-        COMPLETED_CHECKS = {}
+-- Coerce a location id from the binding (number, int64 userdata, or
+-- string) into the numeric key space used by AP_LOCATIONS_BY_ID.
+local function coerce_id(id)
+    local n = tonumber(id)
+    if n then return n end
+    local ok, v = pcall(sdk.to_int64, id)
+    if ok and v then
+        n = tonumber(v)
+        if n then return n end
+    end
+    return tonumber(tostring(id))
+end
+
+-- Resolve a location id to its name. The mirror table only fills when
+-- data_package_changed fires, which it doesn't when apclientpp's package
+-- cache is current -- so fall through to the client's own resolver.
+local function location_name_from_id(key)
+    local name = AP_LOCATIONS_BY_ID[key]
+    if name then return name end
+    if not AP_REF.APClient then return nil end
+    local ok, raw = pcall(function()
+        return AP_REF.APClient:get_location_name(key, nil)
+    end)
+    if not ok or raw == nil then return nil end
+    name = Shared.clean_string(raw)
+    if name == "" or name == "Unknown" then return nil end
+    return name
+end
+
+-- Apply a batch of server-checked location ids to the ledger.
+local function apply_ack_ids(ids)
+    local changed, imported = 0, 0
+    for _, id in ipairs(ids) do
+        local key = coerce_id(id)
+        local name = key and location_name_from_id(key)
+        if name then
+            local was_known = Ledger.is_checked(name)
+            if Ledger.mark_acked(name) then
+                changed = changed + 1
+                if not was_known then imported = imported + 1 end
+            end
+        end
+    end
+    if changed > 0 then
+        Ledger.flush()
+        sync_diag(string.format(
+            "server sync: %d location(s) confirmed%s", changed,
+            imported > 0 and (", " .. imported .. " imported from server") or ""))
+    end
+end
+
+-- Server acks can arrive before the ledger init; buffer them and drain
+-- from on_frame once it's ready. (Name resolution goes through the client
+-- itself, so the mirror table is not a precondition.)
+local function drain_pending_acks()
+    if #pending_acks == 0 then return end
+    if not Ledger.is_init() then return end
+    local ids = pending_acks
+    pending_acks = {}
+    apply_ack_ids(ids)
+end
+
+AP_REF.on_location_checked = function(locations)
+    if type(locations) ~= "table" then return end
+    if not Ledger.is_init() then
+        for _, id in ipairs(locations) do
+            table.insert(pending_acks, id)
+        end
         return
     end
-    COMPLETED_CHECKS = {}
-    for _, name in ipairs(data.checks) do
-        COMPLETED_CHECKS[name] = true
+    apply_ack_ids(locations)
+end
+
+function M.set_completed_checks_filename(slot_name, seed)
+    ledger_slot = slot_name
+    ledger_seed = seed
+end
+
+-- Initializes the ledger for the current slot/seed: loads (or creates) the
+-- ledger file, importing the legacy checks file once, then merges the
+-- pre-connect journal.
+function M.load_completed_checks()
+    if not ledger_slot then
+        M.log("load_completed_checks: slot/seed not set yet")
+        return
     end
-    M.log(string.format("Loaded %d completed checks from file", #data.checks))
+
+    -- Legacy import source (only consumed when no ledger file exists yet).
+    local legacy = nil
+    local legacy_file = "./AP_DRDR_Items/AP_DRDR_checks_"
+        .. safe_filename(ledger_slot) .. "_" .. safe_filename(ledger_seed) .. ".json"
+    local probe = io.open(legacy_file, "r")
+    if probe then
+        local has_content = probe:read(1) ~= nil
+        probe:close()
+        if has_content then
+            local data = Shared.load_json(legacy_file)
+            if data and type(data.checks) == "table" then
+                legacy = data.checks
+            end
+        end
+    end
+
+    Ledger.init(ledger_slot, ledger_seed, legacy)
+
+    -- Merge the pre-connect journal: checks detected before this connect
+    -- belong to this slot now; the sync loop sends them.
+    local merged = 0
+    for name, _ in pairs(PENDING_CHECKS) do
+        if Ledger.record(name, "pre-connect") then
+            merged = merged + 1
+        end
+    end
+    if next(PENDING_CHECKS) then
+        PENDING_CHECKS = {}
+        save_pending_checks()
+    end
+    if merged > 0 then
+        M.log(string.format("merged %d pre-connect check(s) into the ledger", merged))
+    end
+
+    drain_pending_acks()
 end
 
 -- Public getter: has this location already been recorded as checked? Used by
@@ -329,54 +514,285 @@ end
 -- e.g. if "Walk on 4 Treadmills" was sent in a previous session, the
 -- treadmill counter starts at 4 so the 5th walk correctly sends count 5.
 function M.is_completed(loc_name)
-    return COMPLETED_CHECKS[loc_name] == true
+    return Ledger.is_checked(loc_name)
 end
 
+-- Arms the sync machine: on the next on_frame ticks, every unacked ledger
+-- name is resolved and sent as ONE batched LocationChecks (the server
+-- dedups). Names that can't resolve yet (data package still loading) keep
+-- the machine armed and it retries every ~2s.
+function M.arm_sync()
+    sync_needed = true
+end
+
+-- Compat alias: main.lua's slot-connect handler calls this.
 function M.resend_all_checks()
-    local count = 0
-    for loc_name, _ in pairs(COMPLETED_CHECKS) do
-        local loc_id = resolve_location_id(loc_name)
-        if loc_id then
-            loc_id = tonumber(loc_id) or loc_id
-            pcall(AP_REF.APClient.LocationChecks, AP_REF.APClient, { loc_id })
-            count = count + 1
+    M.arm_sync()
+end
+
+-- Diagnostic ack pull via the DataStorage API: the server keeps a
+-- read-only key "_read_location_checks_{team}_{slot}" with the slot's
+-- checked location ids. Normal ack flow is the location_checked push
+-- (fires on RoomUpdate); this pull remains for manual diagnostics.
+local pull_diagnosed = false
+local ack_storage_key = nil
+
+local function ack_key()
+    if ack_storage_key then return ack_storage_key end
+    local ok, key = pcall(function()
+        local team = AP_REF.APClient:get_team_number()
+        local slot = AP_REF.APClient:get_player_number()
+        return string.format("_read_location_checks_%d_%d",
+            tonumber(team) or 0, tonumber(slot) or 0)
+    end)
+    if ok and key then
+        ack_storage_key = key
+    end
+    return ack_storage_key
+end
+
+local function pull_server_acks()
+    if not is_connected() then return end
+    if not Ledger.is_init() then return end
+
+    local key = ack_key()
+    if not key then return end
+
+    local ok, err = pcall(function()
+        AP_REF.APClient:Get({ key })
+    end)
+    if not pull_diagnosed then
+        pull_diagnosed = true
+        if ok then
+            sync_diag("ack pull: DataStorage Get sent for " .. key)
+        else
+            sync_diag("ack pull: DataStorage Get FAILED (" .. tostring(err)
+                .. ") -- acks disabled, resend-on-connect still covers sync")
         end
     end
-    M.log(string.format("Resent %d completed checks to server", count))
 end
 
+-- Retrieved responses arrive as three tables; which one carries the
+-- { [key] = value } map is undocumented, so probe all three. The first
+-- invocation logs a preview of each argument.
+local retrieved_diagnosed = false
+
+local function table_preview(t)
+    if type(t) ~= "table" then return type(t) end
+    local ks, n = {}, 0
+    for k, v in pairs(t) do
+        n = n + 1
+        if n <= 4 then
+            table.insert(ks, tostring(k) .. "=" .. type(v))
+        end
+    end
+    return string.format("table[%d]{%s}", n, table.concat(ks, ", "))
+end
+
+AP_REF.on_retrieved = function(a1, a2, a3)
+    if not retrieved_diagnosed then
+        retrieved_diagnosed = true
+        sync_diag(string.format("retrieved fired: a1=%s a2=%s a3=%s",
+            table_preview(a1), table_preview(a2), table_preview(a3)))
+    end
+
+    local key = ack_storage_key
+    if not key then return end
+    for _, cand in ipairs({ a1, a2, a3 }) do
+        if type(cand) == "table" then
+            local value = cand[key]
+            if type(value) == "table" and #value > 0 then
+                sync_diag(string.format(
+                    "ack retrieved: %d checked id(s) from datastorage", #value))
+                if not Ledger.is_init() then
+                    for _, id in ipairs(value) do
+                        table.insert(pending_acks, id)
+                    end
+                else
+                    apply_ack_ids(value)
+                end
+                return
+            end
+        end
+    end
+end
+
+-- Console: probe the binding's Get signature variants, logging each pcall
+-- outcome. Run while connected; then watch for "retrieved handler FIRED".
+_G.drap_bridge_get_test = function()
+    if not AP_REF.APClient or not is_connected() then
+        print("[Bridge] connect first")
+        return
+    end
+    local key = ack_key()
+    if not key then
+        print("[Bridge] could not derive datastorage key")
+        return
+    end
+    retrieved_diagnosed = false   -- re-log the arg preview for each response
+    for label, call in pairs({
+        ["Get({key})"]        = function() AP_REF.APClient:Get({ key }) end,
+        ["Get({key}, {})"]    = function() AP_REF.APClient:Get({ key }, {}) end,
+    }) do
+        local ok, err = pcall(call)
+        local msg = string.format("get test %s -> ok=%s%s", label, tostring(ok),
+            ok and "" or (" err=" .. tostring(err)))
+        print("[Bridge] " .. msg)
+        sync_diag(msg)
+    end
+    print("[Bridge] now wait ~10s and check drap_sync_diag.log for 'retrieved handler FIRED'")
+end
+
+local function try_sync()
+    if not is_connected() then return end
+
+    local unacked = Ledger.unacked_names()
+    if #unacked == 0 then
+        sync_needed = false
+        return
+    end
+
+    local ids, unresolved = {}, 0
+    for _, name in ipairs(unacked) do
+        local id = resolve_location_id(name)
+        if id then
+            table.insert(ids, tonumber(id) or id)
+        else
+            unresolved = unresolved + 1
+        end
+    end
+
+    -- Nothing resolves -> the data package almost certainly isn't loaded
+    -- yet; stay armed and retry.
+    if #ids == 0 then return end
+
+    local ok = pcall(AP_REF.APClient.LocationChecks, AP_REF.APClient, ids)
+    if ok then
+        sync_diag(string.format("sync: sent %d location check(s) in one batch%s",
+            #ids, unresolved > 0
+                and string.format(" (%d name(s) not in this seed's data package)", unresolved)
+                or ""))
+        sync_needed = false
+        -- The server answers this batch with a RoomUpdate carrying the full
+        -- checked set; the location_checked push applies it as acks.
+    end
+end
+
+-- Sync tick. Runs on its own re.on_frame below: the main loop only calls
+-- module on_frame while in-game, but connects happen at the title screen.
+local function sync_tick()
+    drain_pending_acks()
+    if sync_needed and os.clock() - last_sync_try > 2.0 then
+        last_sync_try = os.clock()
+        pcall(try_sync)
+    end
+    -- NOTE: no periodic datastorage pull. Acks arrive via the
+    -- location_checked push, which fires on every RoomUpdate -- and the
+    -- connect-time batch resend itself triggers one, so every session
+    -- reconciles without polling. (The datastorage Get response map also
+    -- marshals empty on this binding; drap_bridge_pull_acks remains for
+    -- diagnostics.)
+end
+
+-- Console: dump the APClient binding's available methods (sol2 usertype
+-- metatable walk). Used to discover whether this lua-apclientpp build
+-- exposes checked-location state under any name -- get_checked_locations
+-- is absent (verified 2026-07-05) and the location_checked push never
+-- fires, so if nothing shows up here, acks are permanently unavailable on
+-- this DLL and resend-on-connect is the accepted sync mechanism.
+_G.drap_bridge_client_methods = function()
+    if not AP_REF.APClient then
+        print("[Bridge] no APClient (connect first)")
+        return
+    end
+    local mt = getmetatable(AP_REF.APClient)
+    if not mt then
+        print("[Bridge] client has no metatable (unexpected)")
+        return
+    end
+    local names = {}
+    local function collect(t)
+        if type(t) ~= "table" then return end
+        for k, v in pairs(t) do
+            if type(k) == "string" then
+                table.insert(names, k .. " (" .. type(v) .. ")")
+            end
+        end
+    end
+    collect(mt)
+    local ok_idx = pcall(function() collect(mt.__index) end)
+    table.sort(names)
+    print(string.format("[Bridge] client metatable entries (%d):", #names))
+    for _, n in ipairs(names) do
+        print("  " .. n)
+    end
+    if #names == 0 then
+        print("  (none visible -- sol2 may hide members behind a function __index)")
+    end
+end
+
+-- Console: force an immediate ack pull, reporting every precondition so a
+-- no-op is never silent.
+_G.drap_bridge_pull_acks = function()
+    if not AP_REF.APClient then
+        print("[Bridge] pull blocked: no APClient (connect first)")
+        return
+    end
+    if not is_connected() then
+        print("[Bridge] pull blocked: not connected")
+        return
+    end
+    if not Ledger.is_init() then
+        print("[Bridge] pull blocked: ledger not initialized (slot-connect incomplete)")
+        return
+    end
+    pull_diagnosed = false   -- re-log the diagnostic verdict
+    pull_server_acks()
+    local s = Ledger.stats()
+    print(string.format("[Bridge] ledger: %d known, %d acked", s.total, s.acked))
+end
+
+local bound_once = false
+
+re.on_frame(function()
+    -- Handler rebinding must not wait for gameplay: connects happen at the
+    -- title screen, where main's module loop (which used to trigger this
+    -- via M.on_frame) never runs.
+    if not bound_once and AP_REF.APClient then
+        bound_once = true
+        pcall(M.bind_client)
+    end
+    pcall(sync_tick)
+end)
+
 function M.reset_completed_checks()
-    COMPLETED_CHECKS = {}
-    save_completed_checks()
+    Ledger.reset()
     M.log("Completed checks reset")
 end
 
--- Returns true if the given location name has been checked in this slot/seed
--- (as recorded by the persistent COMPLETED_CHECKS map). Used by effect modules
--- that need to reconstruct per-location state after a reload.
+-- Returns true if the given location name has been checked in this slot/seed.
+-- Used by effect modules that need to reconstruct per-location state after a
+-- reload.
 function M.has_completed_check(loc_name)
-    return COMPLETED_CHECKS[loc_name] == true
+    return Ledger.is_checked(loc_name)
 end
 
 -- Returns a fresh array of all completed-check location names. Used for
 -- diagnostics ("what's actually in here?") rather than per-name queries.
 function M.get_completed_checks()
-    local list = {}
-    for name, _ in pairs(COMPLETED_CHECKS) do
-        table.insert(list, name)
-    end
-    return list
+    return Ledger.all_names()
 end
 
 -- Diagnostic: returns the file paths and counts so we can verify slot-connect
 -- ran set_*_filename properly. Called from drap_bridge_diag console command.
 function M.get_diag_state()
-    local cc_count = 0
-    for _ in pairs(COMPLETED_CHECKS) do cc_count = cc_count + 1 end
+    local ls = Ledger.stats()
     return {
-        completed_checks_file  = COMPLETED_CHECKS_FILE,
+        ledger_file            = ls.file,
+        completed_checks_count = ls.total,
+        acked_count            = ls.acked,
+        sync_armed             = sync_needed,
         received_items_file    = RECEIVED_ITEMS_FILE,
-        completed_checks_count = cc_count,
         received_items_count   = #RECEIVED_ITEMS,
         last_item_index        = last_item_index,
     }
@@ -391,16 +807,19 @@ function M.force_init_files(slot, seed)
     M.set_received_items_filename(slot, seed)
     M.set_completed_checks_filename(slot, seed)
     M.load_completed_checks()
-    M.log(string.format("force_init_files: slot=%s seed=%s -> CC_FILE=%s RI_FILE=%s",
+    local ls = Ledger.stats()
+    M.log(string.format("force_init_files: slot=%s seed=%s -> LEDGER=%s RI_FILE=%s",
         slot, seed,
-        tostring(COMPLETED_CHECKS_FILE), tostring(RECEIVED_ITEMS_FILE)))
+        tostring(ls.file), tostring(RECEIVED_ITEMS_FILE)))
 end
 
 _G.drap_bridge_diag = function()
     local s = M.get_diag_state()
-    print(string.format("[Bridge-diag] COMPLETED_CHECKS_FILE = %s", tostring(s.completed_checks_file)))
+    print(string.format("[Bridge-diag] LEDGER_FILE           = %s", tostring(s.ledger_file)))
     print(string.format("[Bridge-diag] RECEIVED_ITEMS_FILE   = %s", tostring(s.received_items_file)))
-    print(string.format("[Bridge-diag] completed_checks count = %d", s.completed_checks_count))
+    print(string.format("[Bridge-diag] locations known        = %d (%d server-acked)",
+        s.completed_checks_count, s.acked_count))
+    print(string.format("[Bridge-diag] sync armed             = %s", tostring(s.sync_armed)))
     print(string.format("[Bridge-diag] received_items count   = %d", s.received_items_count))
     print(string.format("[Bridge-diag] last_item_index        = %s", tostring(s.last_item_index)))
     print(string.format("[Bridge-diag] AP_REF.APSlot          = %s",
@@ -422,8 +841,8 @@ _G.drap_bridge_force_init = function(slot, seed)
     print("[Bridge-init] Done. Run drap_bridge_diag to verify.")
 end
 
-re.on_config_save(save_completed_checks)
-re.on_script_reset(save_completed_checks)
+re.on_config_save(function() Ledger.flush() end)
+re.on_script_reset(function() Ledger.flush() end)
 
 ------------------------------------------------------------
 -- Game Item Number Mapping
@@ -457,30 +876,6 @@ function M.set_received_items_filename(slot_name, seed)
     local slot = safe_filename(slot_name)
     local sd = safe_filename(seed)
     RECEIVED_ITEMS_FILE = "./AP_DRDR_Items/AP_DRDR_items_" .. slot .. "_" .. sd .. ".json"
-end
-
-local function rebuild_name_counts()
-    RECEIVED_ITEMS_BY_NAME = {}
-    for _, it in ipairs(RECEIVED_ITEMS) do
-        if it.item_name and it.item_name ~= "" then
-            RECEIVED_ITEMS_BY_NAME[it.item_name] = (RECEIVED_ITEMS_BY_NAME[it.item_name] or 0) + 1
-        end
-    end
-end
-
-function M.load_received_items()
-    local data = Shared.load_json(RECEIVED_ITEMS_FILE, M.log)
-    if not data then
-        M.log("No existing received-items file; starting fresh")
-        RECEIVED_ITEMS = {}
-        RECEIVED_ITEMS_BY_NAME = {}
-        last_item_index = -1
-        return
-    end
-
-    RECEIVED_ITEMS = data.items or {}
-    last_item_index = data.last_item_index or -1
-    rebuild_name_counts()
 end
 
 save_received_items = function()
@@ -652,8 +1047,14 @@ AP_REF.on_items_received = function(items)
         if net_item.index and net_item.index > last_item_index then
             -- Check if data package is actually ready by testing name resolution
             local test_name = AP_REF.APClient:get_item_name(net_item.item, nil)
-            if test_name == "Unknown" or test_name == nil then
-                M.log("Queuing item index=" .. tostring(net_item.index) .. " id=" .. tostring(net_item.item) .. " (data package not ready)")
+            local resolvable = test_name ~= nil and test_name ~= "Unknown"
+            -- Queue when unresolvable, OR when older items are already queued:
+            -- processing this one now would advance last_item_index past the
+            -- queued indices, and the on_frame drain (index > last_item_index)
+            -- would then discard them forever.
+            if not resolvable or #pending_items > 0 then
+                M.log("Queuing item index=" .. tostring(net_item.index) .. " id=" .. tostring(net_item.item)
+                    .. (resolvable and " (preserving queue order)" or " (data package not ready)"))
                 table.insert(pending_items, net_item)
             else
                 last_item_index = net_item.index
@@ -722,13 +1123,9 @@ end
 -- Per-frame Update
 ------------------------------------------------------------
 
-local bound_once = false
-
 function M.on_frame()
-    if not bound_once and AP_REF.APClient then
-        bound_once = true
-        M.bind_client()
-    end
+    -- (Handler binding happens in the ungated re.on_frame hook above --
+    -- this in-game loop only drains the pending-items queue.)
 
     -- Process queued items once data package is actually available
     if #pending_items > 0 then
@@ -737,6 +1134,11 @@ function M.on_frame()
             M.log("Processing " .. tostring(#pending_items) .. " items queued before data package")
             local queue = pending_items
             pending_items = {}
+            -- Strictly ascending index order so last_item_index never jumps
+            -- past an unprocessed entry.
+            table.sort(queue, function(a, b)
+                return (a.index or 0) < (b.index or 0)
+            end)
             for _, queued in ipairs(queue) do
                 if queued.index and queued.index > last_item_index then
                     last_item_index = queued.index

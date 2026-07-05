@@ -51,9 +51,11 @@ local TRACKED_EVENT_IDS = {
     [30]  = 'Complete Promise to Isabela',
     [31]  = 'Save Isabela from the zombie',
     [33]  = 'Complete Transporting Isabela',
-    [37]  = 'Meet at Security Room at 11am day 3',
+    -- These strings ARE the AP location names -- they must match the
+    -- apworld exactly or the check silently never resolves.
+    [37]  = 'Meet back at the Security Room at 11am day 3',
     [38]  = 'Beat Drivin Carlito',
-    [41]  = 'Meet at Security Room at 5pm day 3',
+    [41]  = 'Meet back at the Security Room at 5pm day 3',
     [80]  = "Escort Isabela to Carlito's Hideout and have a chat",
     [43]  = "Complete Jessie's Discovery",
     [44]  = 'Meet Larry',
@@ -98,7 +100,7 @@ local TRACKED_SCQ_IDS = {
     ["0x07"] = "Complete Bomb Collector",
     ["0x08"] = "Complete The Butcher",
     ["0x09"] = "Complete Memories",
-    ["0x7F"] = "Witness Special Forces 10pm Day 3",
+    ["0x7F"] = "Witness Special Forces 10pm day 3",
     ["0x7E"] = "Ending A: Solve all of the cases and be on the helipad at 12pm",
     ["0x20"] = "Complete Kent's day 1 photoshoot",
     ["0x4A"] = 'Kill Roger and Jack (and Thomas if you want) and chat with Wayne',

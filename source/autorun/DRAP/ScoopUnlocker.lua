@@ -1,6 +1,7 @@
 -- DRAP/ScoopUnlocker.lua
 
 local Shared = require("DRAP/Shared")
+local Ledger = require("DRAP/LocationLedger")
 
 local M = Shared.create_module("ScoopUnlocker")
 
@@ -529,7 +530,9 @@ local COMPLETION_FLAGS = {
     [302] = { event = "Complete Jessie's Discovery", scoop = "Jessie's Discovery" },
     [304] = { event = "Complete The Butcher", scoop = "The Butcher" },
 
-    [1292] = { event = "Kill Kent on Day 3", scoop = "Photographer's Pride" },
+    -- Event strings must match apworld location names exactly -- a
+    -- mismatched name sends an unresolvable check, silently.
+    [1292] = { event = "Kill Kent on day 3", scoop = "Photographer's Pride" },
 
     -- Event-only checks (no scoop completion)
     [2356] = { event = "Complete Memories" },
@@ -652,6 +655,11 @@ local MILESTONE_EVENTS = {
 }
 
 local JESSIE_FLAG = 769  -- ON after talking to Jessie; OFF = player reloaded pre-Jessie save
+-- Reload-detector dwell: flag 769 must read CONFIRMED-false continuously
+-- this long before the (destructive) deactivation runs. Failed reads and
+-- brief pre-restore falses during load screens reset the timer.
+local RELOAD_CONFIRM_SECONDS = 2.0
+local jessie_false_since = nil
 
 function M.is_currently_unlocking()
     return currently_unlocking
@@ -664,13 +672,19 @@ local function has_hideout_key()
     return bridge and bridge.has_item_name and bridge.has_item_name("Carlito's Hideout key")
 end
 
+-- Returns true/false for a confirmed flag read, nil when the read failed
+-- (EFM missing or call error -- typical during load screens). Never treat
+-- nil as "flag off": the reload detector and time-freeze sync used to
+-- clobber persisted state during load windows because of that conflation.
+-- Plain boolean uses behave exactly as before.
 local function raw_check_flag(flag_id)
     local efm = efm_mgr:get()
     if not efm then return nil end
     local ok, result = pcall(function()
         return efm:call("evFlagCheck", flag_id)
     end)
-    return ok and result == true
+    if not ok then return nil end
+    return result == true
 end
 
 local function raw_set_flag_on(flag_id)
@@ -685,6 +699,16 @@ local function raw_set_flag_off(flag_id)
     if not efm then return false end
     local ok = pcall(function() efm:call("evFlagOff", flag_id) end)
     return ok
+end
+
+-- True while a play session exists (gameplay or cutscene -- the player
+-- object persists through cutscenes). False at the title screen, where
+-- the EFM holds cleared/menu flag state that enforcement must not fight.
+local function is_player_session()
+    local pm = sdk.get_managed_singleton("app.solid.PlayerManager")
+    if not pm then return false end
+    local ok, player = pcall(function() return pm:call("get_CurrentPlayer") end)
+    return ok and player ~= nil
 end
 
 local function save_state()
@@ -712,24 +736,40 @@ local function save_state()
         ap_received = ap_received_list,
     }
 
-    local ok = pcall(json.dump_file, save_filename, data)
+    -- The run ledger (one file per seed) is the primary store; the legacy
+    -- standalone file is only written as a fallback pre-connect.
+    local ok
+    if Ledger.is_init() then
+        ok = Ledger.set_section("scoops", data)
+    else
+        ok = pcall(json.dump_file, save_filename, data)
+    end
     if ok then
         if verbose_logging then
-            M.log(string.format("Saved state (%d completed) to %s", #completed_list, save_filename))
+            M.log(string.format("Saved state (%d completed)", #completed_list))
         end
     else
-        M.log("ERROR: Failed to save state to " .. tostring(save_filename))
+        M.log("ERROR: Failed to save scoop state")
     end
     return ok
 end
 
 local function load_state()
-    if not save_filename then return false end
-
-    local data = json.load_file(save_filename)
+    -- Prefer the run ledger; fall back to (and migrate from) the legacy
+    -- standalone file for seeds saved by older versions.
+    local data = Ledger.is_init() and Ledger.get_section("scoops") or nil
+    local from_legacy = false
+    if not data and save_filename then
+        data = Shared.load_json_if_exists(save_filename)
+        from_legacy = data ~= nil
+    end
     if not data then
-        M.log("No existing save at " .. save_filename)
+        M.log("No existing scoop state (ledger or legacy file)")
         return false
+    end
+    if from_legacy and Ledger.is_init() then
+        Ledger.set_section("scoops", data)
+        M.log("Migrated scoop state into the run ledger")
     end
 
     if data.ap_activated then
@@ -801,6 +841,25 @@ local function has_prerequisites_met(scoop_name)
     return true
 end
 
+-- Returns the name of any completed main-category scoop, or nil if none.
+-- Used by:
+--   * try_fire_ep270_in_scoop_sanity -- skip the EP-shutter cutscene if
+--     the world has already progressed past it via a later main scoop.
+--   * has_flag_prerequisites_met (Mark of the Sniper special case) -- if
+--     a later main has completed, the EP scene is in a post-shutter state
+--     and MOTS can safely activate without 765/2280 being set.
+--   * unlock_scoop's "Backup for Brad" conditional EP-shutter reset --
+--     skip clearing 270/765/2280 when a later main is already done so we
+--     don't re-close shutters that progression has rightfully opened.
+local function find_completed_main_scoop()
+    for name, data in pairs(SCOOP_DATA) do
+        if data.category == "Main" and completed_scoops[name] then
+            return name
+        end
+    end
+    return nil
+end
+
 -- ANY-of semantics: a scoop with N flag prereqs unlocks as soon as any one
 -- is on. Returns (true, nil) if the prereqs are met (or unset for the
 -- scoop), else (false, list_of_flag_ids).
@@ -809,6 +868,14 @@ local function has_flag_prerequisites_met(scoop_name)
     if not flag_list then return true, nil end
     for _, fid in ipairs(flag_list) do
         if raw_check_flag(fid) then return true, nil end
+    end
+    -- Mark of the Sniper bypass: the 765/2280 prereq exists to ensure the
+    -- EP shutter cutscene has played before MOTS reconfigures s100. If any
+    -- *other* main scoop has already completed, the EP scene has been
+    -- progressed past the shutter-closed state by that mission, and MOTS
+    -- can activate safely without the cutscene having explicitly fired.
+    if scoop_name == "Mark of the Sniper" and find_completed_main_scoop() then
+        return true, nil
     end
     return false, flag_list
 end
@@ -847,21 +914,6 @@ local function ep270_gates_open()
     return false
 end
 
--- Returns the name of any completed main-category scoop, or nil if none.
--- Used to gate EP-shutter behavior: Backup for Brad is the first main scoop
--- in vanilla, so once any *other* main scoop has already completed under
--- ScoopSanity, the world has progressed past Backup for Brad's natural
--- gate -- the shutters are already open via that later mission, and the
--- EP270 cutscene is no longer needed.
-local function find_completed_main_scoop()
-    for name, data in pairs(SCOOP_DATA) do
-        if data.category == "Main" and completed_scoops[name] then
-            return name
-        end
-    end
-    return nil
-end
-
 -- Session-only timestamp of our last flag-270 fire. The cutscene takes a
 -- few seconds to land 765/2280; this grace window prevents a refire while
 -- the cutscene is mid-playback.
@@ -894,13 +946,15 @@ local function try_fire_ep270_in_scoop_sanity()
     local later_main = find_completed_main_scoop()
     if later_main then return end
 
-    -- Don't pre-fire if Backup for Brad is the player's active main scoop.
-    -- They'll get there on their own; our trigger would only short-circuit
-    -- the natural mission flow.
-    local current_chain = M.get_current_chain_scoop and M.get_current_chain_scoop()
-    if current_chain == "Backup for Brad" then return end
-    -- Same guard for the AP-received-but-not-yet-completed case (current
-    -- chain may not match if scoops aren't running in strict order).
+    -- Don't pre-fire if Backup for Brad is the player's active mission --
+    -- the natural mission flow will fire 270 itself, and our trigger
+    -- would short-circuit it. "Active" means received-but-not-completed;
+    -- we deliberately do NOT use M.get_current_chain_scoop() here because
+    -- it returns the next uncompleted main in chain order regardless of
+    -- whether the player has actually received the AP item, so a Backup
+    -- that's randomized to be the *last* AP item to arrive would
+    -- incorrectly read as "active" the entire run, blocking MOTS's
+    -- 765/2280 prereq from ever being satisfied.
     if received_scoops["Backup for Brad"] and not completed_scoops["Backup for Brad"] then
         return
     end
@@ -1795,30 +1849,36 @@ function M.reapply_unlocked_scoops()
     M.log("Reapplying unlocked scoops...")
     local main_count, side_count = 0, 0
 
-    if scoop_order_set and ap_activated then
-        try_advance_chain()
-    else
-        for scoop_name, _ in pairs(received_scoops) do
-            if not completed_scoops[scoop_name] then
-                local data = SCOOP_DATA[scoop_name]
-                if data and data.category == "Main" then
-                    received_scoops[scoop_name] = nil
-                    M.unlock_scoop(scoop_name)
-                    main_count = main_count + 1
-                end
+    -- Snapshot the names before unlocking anything: unlock_scoop() re-inserts
+    -- into received_scoops, and inserting into a table while pairs() iterates
+    -- it is undefined behavior in Lua -- entries can be silently skipped or
+    -- repeated (symptom: some scoops not reapplied after a save load).
+    local mains, sides = {}, {}
+    for scoop_name, _ in pairs(received_scoops) do
+        if not completed_scoops[scoop_name] then
+            local data = SCOOP_DATA[scoop_name]
+            if data and data.category == "Main" then
+                table.insert(mains, scoop_name)
+            elseif data then
+                table.insert(sides, scoop_name)
             end
         end
     end
 
-    for scoop_name, _ in pairs(received_scoops) do
-        if not completed_scoops[scoop_name] then
-            local data = SCOOP_DATA[scoop_name]
-            if data and data.category ~= "Main" then
-                received_scoops[scoop_name] = nil
-                M.unlock_scoop(scoop_name)
-                side_count = side_count + 1
-            end
+    if scoop_order_set and ap_activated then
+        try_advance_chain()
+    else
+        for _, scoop_name in ipairs(mains) do
+            received_scoops[scoop_name] = nil
+            M.unlock_scoop(scoop_name)
+            main_count = main_count + 1
         end
+    end
+
+    for _, scoop_name in ipairs(sides) do
+        received_scoops[scoop_name] = nil
+        M.unlock_scoop(scoop_name)
+        side_count = side_count + 1
     end
 
     M.log(string.format("Reapplied: %d main, %d side scoops", main_count, side_count))
@@ -1952,14 +2012,17 @@ end
 
 local NEW_GAME_FLAGS = { 263, 264 }
 
+-- Returns true/false when every flag read is CONFIRMED, nil when any read
+-- failed. Callers must treat nil as "ask again later" -- answering "new
+-- game" off unreadable flags would wipe side-scoop progress spuriously.
 function M.is_new_game()
     local efm = efm_mgr:get()
-    if not efm then return false end
+    if not efm then return nil end
 
     for _, flag_id in ipairs(NEW_GAME_FLAGS) do
-        if raw_check_flag(flag_id) then
-            return false
-        end
+        local v = raw_check_flag(flag_id)
+        if v == nil then return nil end
+        if v == true then return false end
     end
     return true
 end
@@ -2215,8 +2278,11 @@ function M.force_activate()
 end
 
 function M.set_save_filename(slot, seed)
+    -- Sanitized: reserved characters in slot/seed made json.dump_file fail
+    -- silently, resetting progress every session.
     save_filename = string.format("./AP_DRDR_Scoops/DRAP_scoops_%s_%s.json",
-        tostring(slot or "unknown"), tostring(seed or "unknown"))
+        Shared.sanitize_token(slot or "unknown"),
+        Shared.sanitize_token(seed or "unknown"))
     M.log("Save filename: " .. save_filename)
 end
 
@@ -2575,29 +2641,46 @@ function M.on_frame()
         end
     end
 
-    -- Detect save reload (flag 769 off = pre-Jessie)
-    if ap_activated then
+    -- Detect save reload (flag 769 off = pre-Jessie). Deactivation is
+    -- destructive (wipes side-scoop unlocks + persists), so two guards:
+    --   * gameplay only: at the title screen the EFM holds cleared flags,
+    --     so 769 reads confirmed-false indefinitely there;
+    --   * dwell: 769 must read confirmed-false continuously for
+    --     RELOAD_CONFIRM_SECONDS -- failed reads and brief pre-restore
+    --     falses during load windows reset the timer.
+    local in_game = Shared.is_in_game()
+    if not in_game then
+        jessie_false_since = nil
+    end
+    if in_game and ap_activated then
         local jessie_on = raw_check_flag(JESSIE_FLAG)
         if jessie_on == false then
-            ap_activated = false
-            time_frozen = false
-            M.log("RELOAD DETECTED: Flag 769 off -- deactivating until Meet Jessie replays")
+            jessie_false_since = jessie_false_since or os.clock()
+            if os.clock() - jessie_false_since >= RELOAD_CONFIRM_SECONDS then
+                jessie_false_since = nil
+                ap_activated = false
+                time_frozen = false
+                M.log("RELOAD DETECTED: Flag 769 off -- deactivating until Meet Jessie replays")
 
-            local cleared = 0
-            for scoop_name, _ in pairs(received_scoops) do
-                local data = SCOOP_DATA[scoop_name]
-                if data and data.category ~= "Main" then
-                    received_scoops[scoop_name] = nil
-                    cleared = cleared + 1
+                local cleared = 0
+                for scoop_name, _ in pairs(received_scoops) do
+                    local data = SCOOP_DATA[scoop_name]
+                    if data and data.category ~= "Main" then
+                        received_scoops[scoop_name] = nil
+                        cleared = cleared + 1
+                    end
                 end
-            end
-            if cleared > 0 then
-                M.log(string.format("Cleared %d side scoop unlocks for pre-Jessie state", cleared))
-            end
+                if cleared > 0 then
+                    M.log(string.format("Cleared %d side scoop unlocks for pre-Jessie state", cleared))
+                end
 
-            save_state()
+                save_state()
+            end
+        else
+            jessie_false_since = nil
         end
-    elseif not ap_activated and scoop_sanity_enabled then
+    elseif in_game and not ap_activated and scoop_sanity_enabled then
+        jessie_false_since = nil
         local jessie_on = raw_check_flag(JESSIE_FLAG)
         if jessie_on == true then
             activate_ap("RELOAD DETECTED: Flag 769 on -- activating AP enforcement")
@@ -2605,17 +2688,22 @@ function M.on_frame()
     end
 
     -- ScoopSanity: ensure time freeze matches game state (past stairs or Meet Jessie backup)
-    if scoop_sanity_enabled and efm_mgr:get() then
+    -- Gameplay-gated like the reload detector: at the title screen flags read
+    -- confirmed-false and the unfreeze branch fired spuriously on every exit.
+    if in_game and scoop_sanity_enabled and efm_mgr:get() then
         local past_stairs = raw_check_flag(NEW_GAME_FLAGS[1]) and raw_check_flag(NEW_GAME_FLAGS[2])
         local jessie_on = raw_check_flag(JESSIE_FLAG)
 
-        if (past_stairs or jessie_on) and not time_frozen then
+        -- Freezing on a confirmed-true read is always safe; unfreezing
+        -- requires confirmed-false on both flags -- a failed read during a
+        -- load screen must not unfreeze.
+        if (past_stairs == true or jessie_on == true) and not time_frozen then
             time_frozen = true
             M.log(string.format("ScoopSanity: time freeze applied (past_stairs=%s, jessie=%s)",
                 tostring(past_stairs), tostring(jessie_on)))
             if on_time_freeze_callback then pcall(on_time_freeze_callback) end
             save_state()
-        elseif not past_stairs and not jessie_on and time_frozen then
+        elseif past_stairs == false and jessie_on == false and time_frozen then
             time_frozen = false
             M.log("ScoopSanity: pre-stairs -- clearing time freeze")
             if on_time_unfreeze_callback then pcall(on_time_unfreeze_callback) end
@@ -2727,7 +2815,13 @@ function M.on_frame()
         end
     end
 
-    enforce_flags()
+    -- Session-gated: never reconcile flags against the title screen's
+    -- cleared/menu state. Cutscenes keep their player session, so
+    -- enforcement behavior there is unchanged. (Console force_enforce
+    -- remains ungated for manual use.)
+    if is_player_session() then
+        enforce_flags()
+    end
 end
 
 re.on_frame(function()

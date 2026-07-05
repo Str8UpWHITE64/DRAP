@@ -561,6 +561,20 @@ end
 --- @param path string The file path
 --- @param logger function|nil Optional logger for errors
 --- @return table|nil The parsed data, or nil on error
+--- Loads JSON only if the file exists and is non-empty. json.load_file
+--- logs a loud parse error for missing/empty files, which reads like data
+--- loss to players -- probe with io.open first.
+--- @param path string Data-relative path
+--- @return table|nil
+function Shared.load_json_if_exists(path, logger)
+    local probe = io.open(path, "r")
+    if not probe then return nil end
+    local has_content = probe:read(1) ~= nil
+    probe:close()
+    if not has_content then return nil end
+    return Shared.load_json(path, logger)
+end
+
 function Shared.load_json(path, logger)
     local data = json.load_file(path)
     if not data and logger then

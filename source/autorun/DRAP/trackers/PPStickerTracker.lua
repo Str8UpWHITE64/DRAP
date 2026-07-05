@@ -6,6 +6,7 @@
 
 local Shared = require("DRAP/Shared")
 local SharedData = require("DRAP/SharedData")
+local Ledger = require("DRAP/LocationLedger")
 
 local M = Shared.create_module("PPStickerTracker")
 M:set_throttle(0.5)
@@ -57,7 +58,6 @@ local function get_save_path()
 end
 
 local function save_captured()
-    if not CAPTURED_JSON_FILE then return end  -- No save until filename set
     if not save_dirty then return end
 
     local data = {
@@ -70,7 +70,14 @@ local function save_captured()
         data.captured[tostring(photo_id)] = true
     end
 
-    local ok = Shared.save_json(get_save_path(), data, 2, M.log)
+    -- Run ledger is the primary store; legacy standalone file is only a
+    -- fallback when the ledger isn't initialized yet.
+    local ok
+    if Ledger.is_init() then
+        ok = Ledger.set_section("stickers", data)
+    elseif CAPTURED_JSON_FILE then
+        ok = Shared.save_json(get_save_path(), data, 2, M.log)
+    end
     if ok then
         save_dirty = false
     end
@@ -78,9 +85,19 @@ end
 
 local function load_captured()
     CAPTURED = {}
-    if not CAPTURED_JSON_FILE then return end  -- No load until filename set
-    local data = Shared.load_json(get_save_path())
+    -- Prefer the run ledger; fall back to (and migrate from) the legacy
+    -- standalone file for seeds saved by older versions.
+    local data = Ledger.is_init() and Ledger.get_section("stickers") or nil
+    local from_legacy = false
+    if not data and CAPTURED_JSON_FILE then
+        data = Shared.load_json_if_exists(get_save_path())
+        from_legacy = data ~= nil
+    end
     if not data or type(data.captured) ~= "table" then return end
+    if from_legacy and Ledger.is_init() then
+        Ledger.set_section("stickers", data)
+        M.log("Migrated sticker state into the run ledger")
+    end
 
     local ok, err = pcall(function()
         for photo_id_str, _ in pairs(data.captured) do

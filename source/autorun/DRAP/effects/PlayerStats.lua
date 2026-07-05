@@ -9,6 +9,7 @@
 local M = {}
 
 local Shared = require("DRAP/Shared")
+local Ledger = require("DRAP/LocationLedger")
 local log = Shared.create_logger("PlayerStats")
 
 ------------------------------------------------------------
@@ -278,9 +279,11 @@ function M.get_progression_mode() return progression_mode end
 ------------------------------------------------------------
 
 function M.set_save_filename(slot, seed)
+    -- Sanitized like the Bridge stores: unsanitized slot/seed with reserved
+    -- characters made json.dump_file fail silently every save.
     save_filename = string.format(
         "./AP_DRDR_Scoops/DRAP_player_stats_%s_%s.json",
-        tostring(slot or "0"), tostring(seed or "0"))
+        Shared.sanitize_token(slot or "0"), Shared.sanitize_token(seed or "0"))
     log("Save filename: " .. save_filename)
 end
 
@@ -296,16 +299,31 @@ function M.save_state()
         stat_deltas    = stat_deltas,
         progression    = progression_mode,
     }
+    -- Run ledger is the primary store; legacy standalone file is only a
+    -- pre-connect fallback.
+    if Ledger.is_init() then
+        return Ledger.set_section("player_stats", data)
+    end
     local ok = pcall(json.dump_file, save_filename, data)
     return ok
 end
 
 function M.load_save()
-    if not save_filename then return false end
-    local ok_load, data = pcall(json.load_file, save_filename)
-    if not ok_load or not data then
-        log("No existing PlayerStats save at " .. save_filename)
+    -- Prefer the run ledger; fall back to (and migrate from) the legacy
+    -- standalone file for seeds saved by older versions.
+    local data = Ledger.is_init() and Ledger.get_section("player_stats") or nil
+    local from_legacy = false
+    if not data and save_filename then
+        data = Shared.load_json_if_exists(save_filename)
+        from_legacy = data ~= nil
+    end
+    if not data then
+        log("No existing PlayerStats state (ledger or legacy file)")
         return false
+    end
+    if from_legacy and Ledger.is_init() then
+        Ledger.set_section("player_stats", data)
+        log("Migrated PlayerStats state into the run ledger")
     end
 
     -- Skills load idempotently (set semantics, replays are no-ops).

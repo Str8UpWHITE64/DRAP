@@ -27,6 +27,7 @@ AP.EventTracker     = require("DRAP/trackers/EventTracker")
 AP.NpcTracker       = require("DRAP/trackers/NpcTracker")
 AP.PPStickerTracker = require("DRAP/trackers/PPStickerTracker")
 AP.SaveSlot         = require("DRAP/SaveSlot")
+AP.SaveDiagnostics  = require("DRAP/SaveDiagnostics")
 AP.TimeGate         = require("DRAP/TimeGate")
 AP.Scene            = require("DRAP/Scene")
 AP.DeathLink        = require("DRAP/trackers/DeathLink")
@@ -111,6 +112,8 @@ AP.effects.SurvivorScoopCompletion    = require("DRAP/effects/SurvivorScoopCompl
 AP.effects.SaviorGoalEffects          = require("DRAP/effects/SaviorGoalEffects")
 AP.effects.BookSkills                 = require("DRAP/effects/BookSkills")
 AP.effects.BookGuards                 = require("DRAP/effects/BookGuards")
+AP.effects.NpcInfoSweeper             = require("DRAP/effects/NpcInfoSweeper")
+AP.effects.PartyHudGuard              = require("DRAP/effects/PartyHudGuard")
 AP.effects.PlayerStats                = require("DRAP/effects/PlayerStats")
 AP.effects.PlayerBuffs                = require("DRAP/effects/PlayerBuffs")
 AP.effects.HostileSurvivorTrap        = require("DRAP/effects/HostileSurvivorTrap")
@@ -263,6 +266,31 @@ AP_BRIDGE.AP_REF.on_slot_connected = function(slot_data)
     local seed = extract_seed(slot_data)
 
     log("Slot connected: slot=" .. slot .. " seed=" .. seed)
+
+    -- Bridge persistence FIRST: everything below may consult completed-check
+    -- history. In particular AP_LocationTriggers.setup() bootstraps its
+    -- counted-entry counters (Use N Microwaves/Stoves/Racks) from
+    -- AP_BRIDGE.is_completed(); loading the checks file after setup() ran
+    -- meant those counters reset to 0 every session.
+    --
+    -- Received items: the on_items_received filter (`index > last_item_index`)
+    -- splits the server's full item history into already-applied (skipped) vs
+    -- received-while-offline (applied as fresh). This is what stops traps from
+    -- re-firing on every reconnect -- on_replay="skip" is only consulted by
+    -- the manual reapply path, not the on-connect dispatch.
+    AP_BRIDGE.set_received_items_filename(slot, seed)
+    AP_BRIDGE.load_received_items()
+
+    -- Load completed checks list and resend all to the server.
+    -- This catches any checks that were completed while disconnected.
+    AP_BRIDGE.set_completed_checks_filename(slot, seed)
+    AP_BRIDGE.load_completed_checks()
+    AP_BRIDGE.resend_all_checks()
+
+    -- Set up sticker save file
+    if AP.PPStickerTracker.set_save_filename then
+        AP.PPStickerTracker.set_save_filename(slot, seed)
+    end
 
     -- DeathLink option
     local deathlink_enabled = (type(slot_data) == "table" and slot_data.death_link == true)
@@ -430,25 +458,8 @@ AP_BRIDGE.AP_REF.on_slot_connected = function(slot_data)
         AP.SaveSlot.apply_for_slot(slot, seed)
     end
 
-    -- Restore the persisted received-items list. The on_items_received
-    -- filter (`index > last_item_index`) then splits the server's full item
-    -- history into already-applied (skipped) vs received-while-offline
-    -- (applied as fresh). This is what stops traps from re-firing on every
-    -- reconnect -- on_replay="skip" is only consulted by the manual reapply
-    -- path, not the on-connect dispatch.
-    AP_BRIDGE.set_received_items_filename(slot, seed)
-    AP_BRIDGE.load_received_items()
-
-    -- Load completed checks list and resend all to the server.
-    -- This catches any checks that were completed while disconnected.
-    AP_BRIDGE.set_completed_checks_filename(slot, seed)
-    AP_BRIDGE.load_completed_checks()
-    AP_BRIDGE.resend_all_checks()
-
-    -- Set up sticker save file
-    if AP.PPStickerTracker.set_save_filename then
-        AP.PPStickerTracker.set_save_filename(slot, seed)
-    end
+    -- (Bridge persistence — received items, completed checks, sticker save
+    -- file — is initialized at the TOP of this handler, before any consumer.)
 end
 
 ------------------------------------------------------------
@@ -469,12 +480,19 @@ local function try_reapply_if_ready()
     if not pending_reapply then return end
     if not AP.ItemSpawner.inventory_system_running() then return end
 
-    -- Check for new game before reapplying (only once per game entry)
+    -- Check for new game before reapplying (once per game entry, but only
+    -- latch on a CONFIRMED answer -- is_new_game() returns nil while flag
+    -- reads are still unreliable during the load window).
     if not new_game_checked then
-        new_game_checked = true
-        if AP.ScoopUnlocker.is_new_game() then
-            log("New game detected -- resetting side scoop progress")
-            AP.ScoopUnlocker.reset_for_new_game()
+        local ng = AP.ScoopUnlocker.is_new_game()
+        if ng ~= nil then
+            new_game_checked = true
+            if ng then
+                log("New game detected -- resetting side scoop progress")
+                AP.ScoopUnlocker.reset_for_new_game()
+            end
+        else
+            return  -- retry next frame; don't reapply against unsettled flags
         end
     end
 
@@ -530,7 +548,10 @@ re.on_frame(function()
     safe_on_frame(AP.AP_BRIDGE,        "AP_BRIDGE")
     safe_on_frame(AP.PPStickerTracker, "PPStickerTracker")
     safe_on_frame(AP.SaveSlot,         "SaveSlot")
+    safe_on_frame(AP.SaveDiagnostics,  "SaveDiagnostics")
     safe_on_frame(AP.effects.BookGuards, "BookGuards")
+    safe_on_frame(AP.effects.NpcInfoSweeper, "NpcInfoSweeper")
+    safe_on_frame(AP.effects.PartyHudGuard, "PartyHudGuard")
 
     -- Debug modules
     safe_on_frame(AP.EventFlagExplorer, "EventFlagExplorer")
