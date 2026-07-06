@@ -2592,6 +2592,7 @@
       "region": "Security Room",
       "region_counts": {"Paradise Plaza": 1, "Food Court": 6, "Al Fresca Plaza": 2},
       "required_regions": ["Seon's Food and Stuff"],
+      "alt_items_any": ["Uncooked Pizza", "Raw Meat"],
       "restricted_mode_items_any": ["Uncooked Pizza", "Raw Meat"]
     },
     {

@@ -403,6 +403,14 @@ specialty_items = {
     "Raw Meat",        # gates "Use N Microwaves" (alongside Uncooked Pizza)
 }
 
+# Food items that stand in for Seon's Food and Stuff access in the
+# microwave rules. Progression whenever PP-bonus locations exist, in any
+# item mode -- state.has() only sees progression items.
+microwave_food_items = {
+    "Uncooked Pizza",
+    "Raw Meat",
+}
+
 # Items widely considered overpowered. Removed from the filler pool when
 # Options.exclude_overpowered_items is on. Guaranteed-items overrides still
 # win — listing one here AND in Guaranteed Items will keep it in the pool.

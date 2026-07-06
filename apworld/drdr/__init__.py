@@ -6,7 +6,7 @@ from BaseClasses import MultiWorld, Region, Item, Entrance, Tutorial, ItemClassi
 from worlds.AutoWorld import World, WebWorld
 from worlds.generic.Rules import set_rule, add_rule, add_item_rule, forbid_item
 
-from .Items import DRItem, DRItemCategory, item_dictionary, key_item_names, item_descriptions, BuildItemPool, specialty_items, progression_skills
+from .Items import DRItem, DRItemCategory, item_dictionary, key_item_names, item_descriptions, BuildItemPool, specialty_items, progression_skills, microwave_food_items
 from .Locations import DRLocation, DRLocationCategory, location_tables, location_dictionary
 from .Options import DROption
 
@@ -604,6 +604,10 @@ class DRWorld(World):
             item_classification = ItemClassification.progression
         elif name in specialty_items and self.options.restricted_item_mode:
             item_classification = ItemClassification.progression
+        elif name in microwave_food_items and self.options.pp_bonus_locations:
+            # Food items bypass the Seon's requirement in the microwave
+            # rules, so state.has must be able to see them in every mode.
+            item_classification = ItemClassification.progression
         elif (name in progression_skills
               and self.options.enable_skill_items
               and self.options.vanilla_progression.value == 1):
@@ -829,23 +833,31 @@ class DRWorld(World):
                         _req_loc = None
 
                 # Zone-counted entries (region_counts): "Use n X" is
-                # reachable when the reachable zones' item counts sum to n,
-                # with required_regions (e.g. Seon's as the microwave food
-                # source) always needed. These locations live in Security
-                # Room so the parent region never blocks a zone
-                # alternative -- the rule does all the gating.
+                # reachable when the reachable zones' item counts sum to n.
+                # required_regions (e.g. Seon's as the microwave food
+                # source) are always needed, unless one of alt_items_any
+                # has been received in their place (e.g. Raw Meat /
+                # Uncooked Pizza stand in for the grocery store). These
+                # locations live in Security Room so the parent region
+                # never blocks a zone alternative -- the rule does all the
+                # gating.
                 _region_counts = _entry.get("region_counts")
                 if _t == "counted" and _region_counts:
                     _required = list(_entry.get("required_regions") or [])
+                    _required_alts = _entry.get("alt_items_any") or []
 
                     def _make_count_rule(n, counts=_region_counts,
-                                         required=_required, req_loc=_req_loc,
+                                         required=_required,
+                                         alts=_required_alts,
+                                         req_loc=_req_loc,
                                          items_any=_items_any,
                                          restricted_on=restricted_mode_on,
                                          player=self.player):
                         def rule(state):
-                            for r in required:
-                                if not state.can_reach_region(r, player):
+                            if required and not all(
+                                    state.can_reach_region(r, player)
+                                    for r in required):
+                                if not any(state.has(it, player) for it in alts):
                                     return False
                             if req_loc and not state.can_reach_location(req_loc, player):
                                 return False
