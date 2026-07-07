@@ -6,7 +6,7 @@ from BaseClasses import MultiWorld, Region, Item, Entrance, Tutorial, ItemClassi
 from worlds.AutoWorld import World, WebWorld
 from worlds.generic.Rules import set_rule, add_rule, add_item_rule, forbid_item
 
-from .Items import DRItem, DRItemCategory, item_dictionary, key_item_names, item_descriptions, BuildItemPool, specialty_items, progression_skills, microwave_food_items
+from .Items import DRItem, DRItemCategory, item_dictionary, key_item_names, item_descriptions, BuildItemPool, specialty_items, progression_skills, microwave_food_items, challenge_tool_items
 from .Locations import DRLocation, DRLocationCategory, location_tables, location_dictionary
 from .Options import DROption
 
@@ -611,6 +611,11 @@ class DRWorld(World):
         elif name in microwave_food_items and self.options.pp_bonus_locations:
             # Food items bypass the Seon's requirement in the microwave
             # rules, so state.has must be able to see them in every mode.
+            item_classification = ItemClassification.progression
+        elif name in challenge_tool_items:
+            # A sent tool can satisfy the challenge rules -- replacing its
+            # spawn zones outside restricted mode, whitelisting the pickup
+            # inside it -- so state.has must see it in every mode.
             item_classification = ItemClassification.progression
         elif (name in progression_skills
               and self.options.enable_skill_items
@@ -1425,7 +1430,7 @@ class DRWorld(World):
                  lambda state, psychopaths=photograph_psychos: sum(c for p, c in psychopaths if state.can_reach_location(p, self.player)) >= 8)
         set_rule(self.multiworld.get_location("Kill 8 psychopaths", self.player),
                  lambda state, psychopaths=kill_psychos: sum(c for p, c in psychopaths if state.can_reach_location(p, self.player)) >= 8)
-        set_rule(self.multiworld.get_location("Hit 10 zombies with a parasol", self.player), lambda state: (state.can_reach_region("Entrance Plaza", self.player) or state.can_reach_region("Al Fresca Plaza", self.player)) and (not self.options.restricted_item_mode or state.has("Parasol", self.player)))
+        set_rule(self.multiworld.get_location("Hit 10 zombies with a parasol", self.player), lambda state: ((state.can_reach_region("Entrance Plaza", self.player) or state.can_reach_region("Al Fresca Plaza", self.player)) and (not self.options.restricted_item_mode or state.has("Parasol", self.player))) or (not self.options.restricted_item_mode and state.has("Parasol", self.player) and (state.can_reach_region("Paradise Plaza", self.player) or state.can_reach_region("Entrance Plaza", self.player))))
         set_rule(self.multiworld.get_location("Kill 50 cultists", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player) and state.can_reach_location("Witness Sean in Paradise Plaza", self.player))
         if self.options.goal.value == 0:  # Ending S — overtime locations exist
             set_rule(self.multiworld.get_location("Kill 100 zombies with an RPG", self.player), lambda state: state.can_reach_region("Maintenance Tunnel", self.player) and state.can_reach_location("Get bit!", self.player))
@@ -1433,10 +1438,10 @@ class DRWorld(World):
         set_rule(self.multiworld.get_location("Escort 8 survivors at once", self.player), lambda state, counts=SCOOP_SURVIVOR_COUNTS: state.can_reach_region("Paradise Plaza", self.player) and state.can_reach_region("Al Fresca Plaza", self.player) and state.can_reach_location("Kill Jo", self.player) and state.can_reach_region("Food Court", self.player) and state.can_reach_region("Entrance Plaza", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player)) or (self.options.scoop_sanity and sum(c[0] for s, c in counts.items() if state.has(s, self.player)) >= 8)))
         set_rule(self.multiworld.get_location("Frank the pimp", self.player), lambda state, counts=SCOOP_SURVIVOR_COUNTS: state.can_reach_region("Paradise Plaza", self.player) and state.can_reach_region("Al Fresca Plaza", self.player) and state.can_reach_location("Kill Jo", self.player) and state.can_reach_region("Food Court", self.player) and state.can_reach_region("Entrance Plaza", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player)) or (self.options.scoop_sanity and sum(c[1] for s, c in counts.items() if state.has(s, self.player)) >= 8)))
         set_rule(self.multiworld.get_location("Jump a vehicle 50 feet", self.player), lambda state: state.can_reach_region("Leisure Park", self.player))
-        set_rule(self.multiworld.get_location("Bowl over 5 zombies", self.player), lambda state: (state.can_reach_region("Paradise Plaza", self.player) or state.can_reach_region("Entrance Plaza", self.player)) and (not self.options.restricted_item_mode or state.has("Bowling Ball", self.player)))
-        set_rule(self.multiworld.get_location("Hit a golf ball 100 feet", self.player), lambda state: state.can_reach_region("Rooftop", self.player) and (not self.options.restricted_item_mode or state.has("Golf Club", self.player)))
-        set_rule(self.multiworld.get_location("Fire 30 bullets", self.player), lambda state: state.can_reach_region("North Plaza", self.player) and (not self.options.restricted_item_mode or state.has("Handgun", self.player) or state.has("Heavy Machinegun", self.player) or state.has("Machinegun", self.player) or state.has("Submachine Gun", self.player) or state.has("Shotgun", self.player)))
-        set_rule(self.multiworld.get_location("Fire 300 bullets", self.player), lambda state: state.can_reach_region("North Plaza", self.player) and (not self.options.restricted_item_mode or state.has("Handgun", self.player) or state.has("Heavy Machinegun", self.player) or state.has("Machinegun", self.player) or state.has("Submachine Gun", self.player)))
+        set_rule(self.multiworld.get_location("Bowl over 5 zombies", self.player), lambda state: ((state.can_reach_region("Paradise Plaza", self.player) or state.can_reach_region("Wonderland Plaza", self.player)) and (not self.options.restricted_item_mode or state.has("Bowling Ball", self.player))) or (not self.options.restricted_item_mode and state.has("Bowling Ball", self.player) and (state.can_reach_region("Paradise Plaza", self.player) or state.can_reach_region("Entrance Plaza", self.player))))
+        set_rule(self.multiworld.get_location("Hit a golf ball 100 feet", self.player), lambda state: ((state.can_reach_region("Paradise Plaza", self.player) or state.can_reach_region("Entrance Plaza", self.player)) and (not self.options.restricted_item_mode or state.has("Golf Club", self.player))) or (not self.options.restricted_item_mode and state.has("Golf Club", self.player) and state.can_reach_region("Rooftop", self.player)))
+        set_rule(self.multiworld.get_location("Fire 30 bullets", self.player), lambda state, guns=("Handgun", "Heavy Machinegun", "Machinegun", "Submachine Gun", "Shotgun"): (state.can_reach_region("North Plaza", self.player) and (not self.options.restricted_item_mode or any(state.has(g, self.player) for g in guns))) or (not self.options.restricted_item_mode and any(state.has(g, self.player) for g in guns) and state.can_reach_region("Rooftop", self.player)))
+        set_rule(self.multiworld.get_location("Fire 300 bullets", self.player), lambda state, guns=("Handgun", "Heavy Machinegun", "Machinegun", "Submachine Gun"): (state.can_reach_region("North Plaza", self.player) and (not self.options.restricted_item_mode or any(state.has(g, self.player) for g in guns))) or (not self.options.restricted_item_mode and any(state.has(g, self.player) for g in guns) and state.can_reach_region("Rooftop", self.player)))
         # "Ride zombies for 50 feet" requires Zombie Ride only when that
         # skill is actually in the AP item pool. BuildItemPool adds skills
         # only when enable_skill_items is on AND vanilla_progression is

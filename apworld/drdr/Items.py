@@ -411,6 +411,20 @@ microwave_food_items = {
     "Raw Meat",
 }
 
+# Tools that can replace their spawn zones in the challenge rules when
+# received outside restricted mode (golf, bowling, parasol, gun checks).
+# Progression for the same reason as microwave_food_items.
+challenge_tool_items = {
+    "Golf Club",
+    "Bowling Ball",
+    "Parasol",
+    "Handgun",
+    "Heavy Machinegun",
+    "Machinegun",
+    "Submachine Gun",
+    "Shotgun",
+}
+
 # Items widely considered overpowered. Removed from the filler pool when
 # Options.exclude_overpowered_items is on. Guaranteed-items overrides still
 # win — listing one here AND in Guaranteed Items will keep it in the pool.
