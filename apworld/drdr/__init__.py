@@ -858,7 +858,8 @@ class DRWorld(World):
                             if required and not all(
                                     state.can_reach_region(r, player)
                                     for r in required):
-                                if not any(state.has(it, player) for it in alts):
+                                if restricted_on or not any(
+                                        state.has(it, player) for it in alts):
                                     return False
                             if req_loc and not state.can_reach_location(req_loc, player):
                                 return False
