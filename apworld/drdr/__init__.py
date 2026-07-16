@@ -119,7 +119,7 @@ SCOOP_REGION_REQUIREMENTS = {
     "Girl Hunting": ["North Plaza"],
     "A Promise to Isabela": ["North Plaza"],
     "The Last Resort": ["Maintenance Tunnel", "Leisure Park"],
-    "Hideout": ["Carlito's Hideout"],
+    "Hideout": ["Paradise Plaza", "Leisure Park", "North Plaza", "Carlito's Hideout"],
     "The Butcher": ["Maintenance Tunnel"],
 }
 
