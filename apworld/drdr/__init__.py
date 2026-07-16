@@ -1050,6 +1050,8 @@ class DRWorld(World):
             if self.options.scoop_sanity:
                 self.multiworld.get_location("Beat Drivin Carlito", self.player).progress_type = LocationProgressType.EXCLUDED
 
+                self.multiworld.get_location("Rescue Greg Simpson", self.player).progress_type = LocationProgressType.EXCLUDED
+
             set_rule(self.multiworld.get_location("Complete Jessie's Discovery", self.player), lambda state: state.can_reach_location("Escort Isabela to Carlito's Hideout and have a chat", self.player))
 
             set_rule(self.multiworld.get_location("Meet Larry", self.player), lambda state: state.can_reach_location("Complete Jessie's Discovery", self.player))
@@ -1334,7 +1336,7 @@ class DRWorld(World):
         set_rule(self.multiworld.get_location("Meet Cletus", self.player), lambda state: state.can_reach_region("North Plaza", self.player) and ((not self.options.scoop_sanity) or (self.options.scoop_sanity and state.has("Cletus", self.player))))
         set_rule(self.multiworld.get_location("Kill Cletus", self.player), lambda state: state.can_reach_location("Meet Cletus", self.player))
 
-        set_rule(self.multiworld.get_location("Meet Adam", self.player), lambda state: state.can_reach_region("Wonderland Plaza", self.player) and state.can_reach_region("Paradise Plaza", self.player) and ((not self.options.scoop_sanity) or (self.options.scoop_sanity and state.has("Out of Control", self.player))))
+        set_rule(self.multiworld.get_location("Meet Adam", self.player), lambda state: state.can_reach_region("Wonderland Plaza", self.player) and ((not self.options.scoop_sanity) or (self.options.scoop_sanity and state.has("Out of Control", self.player))))
         set_rule(self.multiworld.get_location("Kill Adam", self.player), lambda state: state.can_reach_location("Meet Adam", self.player))
 
         set_rule(self.multiworld.get_location("Meet Cliff", self.player), lambda state: state.can_reach_region("Crislip's Home Saloon", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player)) or (self.options.scoop_sanity and state.has("The Hatchet Man", self.player))))
