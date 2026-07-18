@@ -348,6 +348,12 @@ AP_BRIDGE.AP_REF.on_slot_connected = function(slot_data)
     AP.ScoopUnlocker.set_scoop_sanity_enabled(scoop_sanity_enabled)
     log("ScoopSanity enabled=" .. tostring(scoop_sanity_enabled))
 
+    -- Cult Limited option
+    local cult_limited_enabled = (type(slot_data) == "table" and slot_data.cult_limited == true)
+    AP.CultLimitedEnabled = cult_limited_enabled
+    AP.ScoopUnlocker.set_cult_limited_enabled(cult_limited_enabled)
+    log("Cult Limited enabled=" .. tostring(cult_limited_enabled))
+
     -- Goal mode for ScoopUnlocker -- used to fire flag 270 (Backup for Brad
     -- cutscene that opens EP shutters) on Meet-Jessie when goal is Savior.
     AP.ScoopUnlocker.set_goal_mode(goal)
