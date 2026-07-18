@@ -637,6 +637,7 @@ local scoop_order_set = false
 local ap_activated = false
 local time_frozen = false
 local scoop_sanity_enabled = false
+local cult_limited_enabled = false
 local door_randomizer_enabled = false
 local goal_mode = 0   -- 0 = Ending S, 1 = Ending A, 2 = Savior
 local on_ap_activated_callback = nil
@@ -1177,36 +1178,50 @@ local function enforce_flags()
     -- Suppress completion/death flags but enforce the three cult-spawn flags.
     -- Flags auto-re-enabled by 326 (1222, 327, 1157, 3722, 1217, 1219, 1221, 1223, 3600)
     -- are left alone -- the game handles those.
+    -- Cult Limited instead keps them in Colby's outside the boss room.
     if completed_scoops["A Strange Group"] then
-        -- Flags to keep ON for cult spawning
-        local cult_on = { 326, 811, 1166, 2063 }
-        for _, fid in ipairs(cult_on) do
-            if not raw_check_flag(fid) then
-                currently_unlocking = true
-                raw_set_flag_on(fid)
-                currently_unlocking = false
-                if verbose_logging then
-                    M.log(string.format("Cult respawn: enabled flag %d", fid))
+        if M.is_cult_limited_enabled() then
+            -- Cultists will be limited to outside the boss room in Colby's Theater
+            if get_current_area_index() == PARADISE_PLAZA_AREA_INDEX then
+                -- Turn OFF flag 2063 when entering Paradise Plaza
+                if raw_check_flag(2063) then
+                    raw_set_flag_off(2063)
+                    if verbose_logging then
+                        M.log("Cult Limited: turned OFF flag 2063 in Paradise Plaza")
+                    end
                 end
             end
-        end
-        -- Completion/death flags to keep OFF so cult keeps spawning
-        local cult_off = {
-            783,                                      -- scoop start flags
-            4131, 738, 847, 875, 1173, 1294,          -- fight/kill flags
-            2447, 2475, 335, 403, 3329, 1182,         -- post-kill flags
-            462,                                      -- cult fight flag
-        }
-        for _, fid in ipairs(cult_off) do
-            if raw_check_flag(fid) then
-                raw_set_flag_off(fid)
-                if verbose_logging then
-                    M.log(string.format("Cult respawn: suppressed flag %d", fid))
+        else
+            -- Flags to keep ON for cult spawning
+            local cult_on = { 326, 811, 1166, 2063 }
+            for _, fid in ipairs(cult_on) do
+                if not raw_check_flag(fid) then
+                    currently_unlocking = true
+                    raw_set_flag_on(fid)
+                    currently_unlocking = false
+                    if verbose_logging then
+                        M.log(string.format("Cult respawn: enabled flag %d", fid))
+                    end
                 end
             end
+            -- Completion/death flags to keep OFF so cult keeps spawning
+            local cult_off = {
+                783,                                      -- scoop start flags
+                4131, 738, 847, 875, 1173, 1294,          -- fight/kill flags
+                2447, 2475, 335, 403, 3329, 1182,         -- post-kill flags
+                462,                                      -- cult fight flag
+            }
+            for _, fid in ipairs(cult_off) do
+                if raw_check_flag(fid) then
+                    raw_set_flag_off(fid)
+                    if verbose_logging then
+                        M.log(string.format("Cult respawn: suppressed flag %d", fid))
+                    end
+                end
+            end    
         end
     end
-
+    
     if door_randomizer_enabled and not raw_check_flag(514) then
         currently_unlocking = true
         raw_set_flag_on(514)
@@ -2238,6 +2253,15 @@ end
 
 function M.is_scoop_sanity_enabled()
     return scoop_sanity_enabled
+end
+
+function M.set_cult_limited_enabled(enabled)
+    cult_limited_enabled = enabled
+    M.log("Cultists " .. (enabled and "ENABLED" or "DISABLED"))
+end
+
+function M.is_cult_limited_enabled()
+    return cult_limited_enabled
 end
 
 function M.set_goal_mode(goal)
