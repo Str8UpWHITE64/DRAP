@@ -193,6 +193,27 @@ SCOOP_SURVIVOR_COUNTS = {
     "The Convicts": (1, 1),                 # Sophie Richard (F)
 }
 
+# Determines the value of the region towards levels
+REGION_LEVEL_VALUES = {
+    "Security Room": 1,
+    "Rooftop": 1,
+    "Paradise Plaza": 2,
+    "Entrance Plaza": 1,
+    "Leisure Park": 1,
+    "Al Fresca Plaza": 2,
+    "Food Court": 2,
+    "Wonderland Plaza": 2,
+    "North Plaza": 2,
+    "Maintenance Tunnel": 3,
+    "Seon's Food and Stuff": 1,
+    "Crislip's Home Saloon": 1,
+    "Colby's Movieland": 1,
+}
+
+def get_reachable_region_points(state, player: int) -> int:
+    return sum(value for region, value in REGION_LEVEL_VALUES.items() 
+               if state.can_reach_region(region, player))
+
 # PP Sticker groups: (count, required_regions, required_locations)
 # Used by milestone rules to dynamically count how many stickers the player can reach
 PP_STICKER_GROUPS = [
@@ -683,44 +704,50 @@ class DRWorld(World):
                     set_rule(location, lambda state, r=region.name:
                              state.can_reach_region(r, self.player))
 
-        # Level-up sphere gates: higher levels require deeper mall access
-        LEVEL_SPHERE_GATES = {
-            7:  "Rooftop",
-            10: "Paradise Plaza",
-            12: "Leisure Park",
-            15: "Food Court",
-            16: "Al Fresca Plaza",
-            17: "Wonderland Plaza",
-            18: "North Plaza",
-            20: "Entrance Plaza",
-            22: "Maintenance Tunnel",
-        }
+        # Region-Based Levels
+        points = lambda state: get_reachable_region_points(state, self.player)
 
-        current_gate = None  # None = Sphere 0, no region requirement
+        for level in range(2, 6):      # Levels 2-5
+            set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
+                    lambda state, p=points: p(state) >= 1)
 
-        for level in range(2, 51):
-            # Check if this level introduces a new region gate
-            if level in LEVEL_SPHERE_GATES:
-                current_gate = LEVEL_SPHERE_GATES[level]
+        for level in range(6, 11):     # Levels 6-10
+            set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
+                    lambda state, p=points: p(state) >= 2)
 
-            loc = self.multiworld.get_location(f"Reach Level {level}", self.player)
+        for level in range(11, 16):    # Levels 11-15
+            set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
+                    lambda state, p=points: p(state) >= 4)
 
-            if level >= 3:
-                prev = f"Reach Level {level - 1}"
-                if current_gate:
-                    set_rule(loc, lambda state, p=prev, g=current_gate:
-                             state.can_reach_location(p, self.player) and
-                             state.can_reach_region(g, self.player))
-                else:
-                    set_rule(loc, lambda state, p=prev:
-                             state.can_reach_location(p, self.player))
-            else:
-                # Level 2: always accessible (Sphere 0)
-                if current_gate:
-                    set_rule(loc, lambda state, g=current_gate:
-                             state.can_reach_region(g, self.player))
-                # else: already set to True above
+        for level in range(16, 21):    # Levels 16-20
+            set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
+                    lambda state, p=points: p(state) >= 6)
 
+        for level in range(21, 26):    # Levels 21-25
+            set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
+                    lambda state, p=points: p(state) >= 8)
+
+        for level in range(26, 31):    # Levels 26-30
+            set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
+                    lambda state, p=points: p(state) >= 11)
+
+        for level in range(31, 36):    # Levels 31-35
+            set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
+                    lambda state, p=points: p(state) >= 13)
+
+        for level in range(36, 41):    # Levels 35-40
+            set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
+                    lambda state, p=points: p(state) >= 15)
+
+        for level in range(41, 46):    # Levels 41-45
+            set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
+                    lambda state, p=points: p(state) >= 17)
+
+        for level in range(46, 51):    # Levels 46-50
+            set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
+                    lambda state, p=points: p(state) >= 20)
+
+        # Exclude Levels Above code
         if self.options.exclude_levels:
             threshold = self.options.exclude_levels_above.value
 
