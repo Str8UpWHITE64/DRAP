@@ -395,6 +395,9 @@ specialty_items = {
     "Fire Extinguisher",
     "Golf Club",
     "Handgun",
+    "Shotgun",
+    "Sniper Rifle",
+    "Submachine Gun",
     "Orange Juice",
     "Parasol",
     # Required for PP-bonus location gating in restricted_item_mode:
@@ -423,6 +426,7 @@ challenge_tool_items = {
     "Machinegun",
     "Submachine Gun",
     "Shotgun",
+    "Sniper Rifle",
 }
 
 # Items widely considered overpowered. Removed from the filler pool when
