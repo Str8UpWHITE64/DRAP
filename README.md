@@ -108,12 +108,16 @@ Steam Cloud disabled for the game.
 
 ## Known Bugs
 
-Spawning items is by far the most buggy part of this mod.  When spawning items using the AP Items Window, try not to spam the spawn button.  Wait a few seconds after spawning an item before spawning another one.  If you do spawn multiple items quickly, you increase your chances of the game crashing.
+Please check out the [Known Bugs]() document to see if it answers your question. If not, please feel free to post a message in the AP After Dark Discord channel! 
+
+~~~
 
 Fixed in recent versions (update the mod if you're still seeing these):
 - Leaving 10+ party members behind in another area crashed the game shortly after a loading screen or cutscene. The mod now guards the HUD widget responsible; when your scattered party exceeds 8, the other-map HP readout pauses until you regroup.
 - "Use N Microwaves/Stoves/Clothing Racks" progress reset between play sessions.
 - Survivors occasionally spawning dead or not at all (the "Burt bug") — broken NPC records are now detected and repaired automatically on area transitions.
+
+~~~
 
 ## Final note
 I spent countless hours playing the original game when I was younger, and spent plenty playing this version when it came out.  I hope you enjoy this implementation, and I look forward to seeing how people play it!
