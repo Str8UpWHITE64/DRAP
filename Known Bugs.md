@@ -47,4 +47,4 @@ Leave the Security Room, enter Paradise Plaza, then return to the Security Room 
 
 # I Can't Spawn Items From The AP Client Item List
 
-Another known bug with no known fix at this time. Sorry about that.
+Spawning items is by far the most buggy part of this mod.  When spawning items using the AP Items Window, try not to spam the spawn button.  Wait a few seconds after spawning an item before spawning another one.  If you do spawn multiple items quickly, you increase your chances of the game crashing.
