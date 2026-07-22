@@ -394,12 +394,17 @@ specialty_items = {
     "Bowling Ball",
     "Fire Extinguisher",
     "Golf Club",
+    "Orange Juice",
+    "Parasol",
+    # Required for the bullet checks in restricted_item_mode:
     "Handgun",
     "Shotgun",
     "Sniper Rifle",
     "Submachine Gun",
-    "Orange Juice",
-    "Parasol",
+    # Required for Kent Day 2 in restricted_item_mode:
+    "Novelty Mask (Bear)",
+    "Novelty Mask (Horse)",
+    "Novelty Mask (Servbot)",
     # Required for PP-bonus location gating in restricted_item_mode:
     "Frying Pan",      # gates "Heat a pan on N stoves" locations
     "Uncooked Pizza",  # gates "Use N Microwaves" (alongside Raw Meat)
