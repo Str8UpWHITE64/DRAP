@@ -49,3 +49,4 @@ luac.out
 /.idea/git_toolbox_prj.xml
 /.idea/inspectionProfiles/Project_Default.xml
 __pycache__/
+tools/logic_tests/
