@@ -346,6 +346,12 @@ class DRWorld(World):
             if self.main_scoops_enabled:
                 scoop_order = list(MAIN_SCOOP_NAMES)
                 self.random.shuffle(scoop_order)
+                # Backup for Brad never leads the chain -- its mission owns
+                # the EP shutter cutscene and holds the trigger spot closed
+                # until the escort completes.
+                if scoop_order[0] == "Backup for Brad":
+                    swap = self.random.randrange(1, len(scoop_order))
+                    scoop_order[0], scoop_order[swap] = scoop_order[swap], scoop_order[0]
                 self.scoop_order = scoop_order
             # else: Savior+ScoopSanity — scoop_order stays empty.
 
@@ -1153,6 +1159,8 @@ class DRWorld(World):
         # met Jessie (Warehouse reach) -- except when Backup for Brad is
         # first in the chain, where the runtime holds the trigger until the
         # Brad escort completes (the mission fires the cutscene itself).
+        # Generation now keeps Backup out of the first slot, so that branch
+        # is a safeguard for hand-edited orders.
         if (not self.options.scoop_sanity
                 or (self.scoop_order and self.scoop_order[0] == "Backup for Brad")):
             _shutter = lambda state: state.can_reach_location("Escort Brad to see Dr Barnaby", self.player)
