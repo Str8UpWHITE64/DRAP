@@ -119,7 +119,7 @@ SCOOP_REGION_REQUIREMENTS = {
     "Girl Hunting": ["North Plaza"],
     "A Promise to Isabela": ["North Plaza"],
     "The Last Resort": ["Maintenance Tunnel", "Leisure Park"],
-    "Hideout": ["Carlito's Hideout"],
+    "Hideout": ["Paradise Plaza", "Leisure Park", "North Plaza", "Carlito's Hideout"],
     "The Butcher": ["Maintenance Tunnel"],
 }
 
@@ -192,6 +192,27 @@ SCOOP_SURVIVOR_COUNTS = {
     "Out of Control": (1, 0),               # Greg Simpson (M)
     "The Convicts": (1, 1),                 # Sophie Richard (F)
 }
+
+# Determines the value of the region towards levels
+REGION_LEVEL_VALUES = {
+    "Security Room": 1,
+    "Rooftop": 1,
+    "Paradise Plaza": 2,
+    "Entrance Plaza": 1,
+    "Leisure Park": 1,
+    "Al Fresca Plaza": 2,
+    "Food Court": 2,
+    "Wonderland Plaza": 2,
+    "North Plaza": 2,
+    "Maintenance Tunnel": 3,
+    "Seon's Food and Stuff": 1,
+    "Crislip's Home Saloon": 1,
+    "Colby's Movieland": 1,
+}
+
+def get_reachable_region_points(state, player: int) -> int:
+    return sum(value for region, value in REGION_LEVEL_VALUES.items() 
+               if state.can_reach_region(region, player))
 
 # PP Sticker groups: (count, required_regions, required_locations)
 # Used by milestone rules to dynamically count how many stickers the player can reach
@@ -689,44 +710,50 @@ class DRWorld(World):
                     set_rule(location, lambda state, r=region.name:
                              state.can_reach_region(r, self.player))
 
-        # Level-up sphere gates: higher levels require deeper mall access
-        LEVEL_SPHERE_GATES = {
-            7:  "Rooftop",
-            10: "Paradise Plaza",
-            12: "Leisure Park",
-            15: "Food Court",
-            16: "Al Fresca Plaza",
-            17: "Wonderland Plaza",
-            18: "North Plaza",
-            20: "Entrance Plaza",
-            22: "Maintenance Tunnel",
-        }
+        # Region-Based Levels
+        points = lambda state: get_reachable_region_points(state, self.player)
 
-        current_gate = None  # None = Sphere 0, no region requirement
+        for level in range(2, 6):      # Levels 2-5
+            set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
+                    lambda state, p=points: p(state) >= 1)
 
-        for level in range(2, 51):
-            # Check if this level introduces a new region gate
-            if level in LEVEL_SPHERE_GATES:
-                current_gate = LEVEL_SPHERE_GATES[level]
+        for level in range(6, 11):     # Levels 6-10
+            set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
+                    lambda state, p=points: p(state) >= 2)
 
-            loc = self.multiworld.get_location(f"Reach Level {level}", self.player)
+        for level in range(11, 16):    # Levels 11-15
+            set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
+                    lambda state, p=points: p(state) >= 4)
 
-            if level >= 3:
-                prev = f"Reach Level {level - 1}"
-                if current_gate:
-                    set_rule(loc, lambda state, p=prev, g=current_gate:
-                             state.can_reach_location(p, self.player) and
-                             state.can_reach_region(g, self.player))
-                else:
-                    set_rule(loc, lambda state, p=prev:
-                             state.can_reach_location(p, self.player))
-            else:
-                # Level 2: always accessible (Sphere 0)
-                if current_gate:
-                    set_rule(loc, lambda state, g=current_gate:
-                             state.can_reach_region(g, self.player))
-                # else: already set to True above
+        for level in range(16, 21):    # Levels 16-20
+            set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
+                    lambda state, p=points: p(state) >= 6)
 
+        for level in range(21, 26):    # Levels 21-25
+            set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
+                    lambda state, p=points: p(state) >= 8)
+
+        for level in range(26, 31):    # Levels 26-30
+            set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
+                    lambda state, p=points: p(state) >= 11)
+
+        for level in range(31, 36):    # Levels 31-35
+            set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
+                    lambda state, p=points: p(state) >= 13)
+
+        for level in range(36, 41):    # Levels 35-40
+            set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
+                    lambda state, p=points: p(state) >= 15)
+
+        for level in range(41, 46):    # Levels 41-45
+            set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
+                    lambda state, p=points: p(state) >= 17)
+
+        for level in range(46, 51):    # Levels 46-50
+            set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
+                    lambda state, p=points: p(state) >= 20)
+
+        # Exclude Levels Above code
         if self.options.exclude_levels:
             threshold = self.options.exclude_levels_above.value
 
@@ -1056,6 +1083,8 @@ class DRWorld(World):
             if self.options.scoop_sanity:
                 self.multiworld.get_location("Beat Drivin Carlito", self.player).progress_type = LocationProgressType.EXCLUDED
 
+                self.multiworld.get_location("Rescue Greg Simpson", self.player).progress_type = LocationProgressType.EXCLUDED
+
             set_rule(self.multiworld.get_location("Complete Jessie's Discovery", self.player), lambda state: state.can_reach_location("Escort Isabela to Carlito's Hideout and have a chat", self.player))
 
             set_rule(self.multiworld.get_location("Meet Larry", self.player), lambda state: state.can_reach_location("Complete Jessie's Discovery", self.player))
@@ -1275,9 +1304,9 @@ class DRWorld(World):
         # Survivors in Paradise Plaza
         set_rule(self.multiworld.get_location("Rescue Heather Tompkins", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.can_reach_location("Rescue Ross Folk", self.player) and state.can_reach_location("Rescue Tonya Waters", self.player)) or (self.options.scoop_sanity and state.has("Twin Sisters", self.player))))
         set_rule(self.multiworld.get_location("Rescue Pamela Tompkins", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.can_reach_location("Rescue Ross Folk", self.player) and state.can_reach_location("Rescue Tonya Waters", self.player)) or (self.options.scoop_sanity and state.has("Twin Sisters", self.player))))
-        set_rule(self.multiworld.get_location("Rescue Ronald Shiner", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and (not self.options.restricted_item_mode or state.has("Orange Juice", self.player))) or (self.options.scoop_sanity and state.has("Restaurant Man", self.player))))
+        set_rule(self.multiworld.get_location("Rescue Ronald Shiner", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player) and (not self.options.restricted_item_mode or state.has("Orange Juice", self.player)) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player)) or (self.options.scoop_sanity and state.has("Restaurant Man", self.player))))
         set_rule(self.multiworld.get_location("Rescue Jennifer Gorman", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player)) or (self.options.scoop_sanity and state.has("The Cult", self.player))))
-        set_rule(self.multiworld.get_location("Rescue Tad Hawthorne", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.has("DAY3_00_AM", self.player) and state.has("DAY3_11_AM", self.player) and state.can_reach_location("Kill Kent on day 3", self.player)) or (self.options.scoop_sanity and state.has("Cut from the Same Cloth", self.player) and state.has("Photo Challenge", self.player) and state.has("Photographer's Pride", self.player))))
+        set_rule(self.multiworld.get_location("Rescue Tad Hawthorne", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player) and state.can_reach_location("Kill Kent on day 3", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.has("DAY3_00_AM", self.player) and state.has("DAY3_11_AM", self.player)) or (self.options.scoop_sanity and state.has("Cut from the Same Cloth", self.player) and state.has("Photo Challenge", self.player) and state.has("Photographer's Pride", self.player))))
         set_rule(self.multiworld.get_location("Rescue Simone Ravendark", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.has("DAY3_00_AM", self.player) and state.has("DAY3_11_AM", self.player)) or (self.options.scoop_sanity and state.has("A Woman in Despair", self.player))))
 
         # Survivors in Leisure Park
@@ -1342,7 +1371,7 @@ class DRWorld(World):
         set_rule(self.multiworld.get_location("Meet Cletus", self.player), lambda state: state.can_reach_region("North Plaza", self.player) and ((not self.options.scoop_sanity) or (self.options.scoop_sanity and state.has("Cletus", self.player))))
         set_rule(self.multiworld.get_location("Kill Cletus", self.player), lambda state: state.can_reach_location("Meet Cletus", self.player))
 
-        set_rule(self.multiworld.get_location("Meet Adam", self.player), lambda state: state.can_reach_region("Wonderland Plaza", self.player) and state.can_reach_region("Paradise Plaza", self.player) and ((not self.options.scoop_sanity) or (self.options.scoop_sanity and state.has("Out of Control", self.player))))
+        set_rule(self.multiworld.get_location("Meet Adam", self.player), lambda state: state.can_reach_region("Wonderland Plaza", self.player) and ((not self.options.scoop_sanity) or (self.options.scoop_sanity and state.has("Out of Control", self.player))))
         set_rule(self.multiworld.get_location("Kill Adam", self.player), lambda state: state.can_reach_location("Meet Adam", self.player))
 
         set_rule(self.multiworld.get_location("Meet Cliff", self.player), lambda state: state.can_reach_region("Crislip's Home Saloon", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player)) or (self.options.scoop_sanity and state.has("The Hatchet Man", self.player))))
@@ -1364,17 +1393,17 @@ class DRWorld(World):
 
         set_rule(self.multiworld.get_location("Meet Kent on day 1", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player) and ((not self.options.scoop_sanity) or (self.options.scoop_sanity and state.has("Cut from the Same Cloth", self.player))))
         set_rule(self.multiworld.get_location("Complete Kent's day 1 photoshoot", self.player), lambda state: state.can_reach_location("Meet Kent on day 1", self.player))
-        set_rule(self.multiworld.get_location("Meet Kent on day 2", self.player), lambda state: state.can_reach_location("Complete Kent's day 1 photoshoot", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player)) or (self.options.scoop_sanity and state.has("Cut from the Same Cloth", self.player) and state.has("Photo Challenge", self.player))))
+        set_rule(self.multiworld.get_location("Meet Kent on day 2", self.player), lambda state, masks=("Novelty Mask (Bear)", "Novelty Mask (Servbot)", "Novelty Mask (Horse)"): (state.can_reach_location("Complete Kent's day 1 photoshoot", self.player)) and (not self.options.restricted_item_mode or any(state.has(m, self.player) for m in masks)) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player)) or (self.options.scoop_sanity and state.has("Cut from the Same Cloth", self.player) and state.has("Photo Challenge", self.player))))
         set_rule(self.multiworld.get_location("Complete Kent's day 2 photoshoot", self.player), lambda state: state.can_reach_location("Meet Kent on day 2", self.player))
         set_rule(self.multiworld.get_location("Meet Kent on day 3", self.player), lambda state: state.can_reach_location("Complete Kent's day 2 photoshoot", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.has("DAY3_00_AM", self.player) and state.has("DAY3_11_AM", self.player)) or (self.options.scoop_sanity and state.has("Cut from the Same Cloth", self.player) and state.has("Photo Challenge", self.player) and state.has("Photographer's Pride", self.player))))
         set_rule(self.multiworld.get_location("Kill Kent on day 3", self.player), lambda state: state.can_reach_location("Meet Kent on day 3", self.player))
 
         # Challenges
         set_rule(self.multiworld.get_location("Reach Level 10!", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player))
-        set_rule(self.multiworld.get_location("Reach Level 20!", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player) and state.can_reach_region("Leisure Park", self.player))
-        set_rule(self.multiworld.get_location("Reach Level 30!", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player) and state.can_reach_region("Leisure Park", self.player) and state.can_reach_region("North Plaza", self.player))
-        set_rule(self.multiworld.get_location("Reach Level 40!", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player) and state.can_reach_region("Leisure Park", self.player) and state.can_reach_region("North Plaza", self.player) and state.can_reach_region("Maintenance Tunnel", self.player) and ending_a_ok(state))
-        set_rule(self.multiworld.get_location("Reach max level", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player) and state.can_reach_region("Leisure Park", self.player) and state.can_reach_region("North Plaza", self.player) and state.can_reach_region("Maintenance Tunnel", self.player) and ending_a_ok(state))
+        set_rule(self.multiworld.get_location("Reach Level 20!", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player) and state.can_reach_region("Leisure Park", self.player) and state.can_reach_region("Food Court", self.player) and state.can_reach_region("Al Fresca Plaza", self.player) and state.can_reach_region("Wonderland Plaza", self.player) and state.can_reach_region("North Plaza", self.player) and state.can_reach_region("Entrance Plaza", self.player))
+        set_rule(self.multiworld.get_location("Reach Level 30!", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player) and state.can_reach_region("Leisure Park", self.player) and state.can_reach_region("Food Court", self.player) and state.can_reach_region("Al Fresca Plaza", self.player) and state.can_reach_region("Wonderland Plaza", self.player) and state.can_reach_region("North Plaza", self.player) and state.can_reach_region("Entrance Plaza", self.player) and state.can_reach_region("Maintenance Tunnel", self.player))
+        set_rule(self.multiworld.get_location("Reach Level 40!", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player) and state.can_reach_region("Leisure Park", self.player) and state.can_reach_region("Food Court", self.player) and state.can_reach_region("Al Fresca Plaza", self.player) and state.can_reach_region("Wonderland Plaza", self.player) and state.can_reach_region("North Plaza", self.player) and state.can_reach_region("Entrance Plaza", self.player) and state.can_reach_region("Maintenance Tunnel", self.player))
+        set_rule(self.multiworld.get_location("Reach max level", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player) and state.can_reach_region("Leisure Park", self.player) and state.can_reach_region("Food Court", self.player) and state.can_reach_region("Al Fresca Plaza", self.player) and state.can_reach_region("Wonderland Plaza", self.player) and state.can_reach_region("North Plaza", self.player) and state.can_reach_region("Entrance Plaza", self.player) and state.can_reach_region("Maintenance Tunnel", self.player))
         set_rule(self.multiworld.get_location("Kill 500 zombies by vehicle", self.player), lambda state: state.can_reach_region("Maintenance Tunnel", self.player))
         set_rule(self.multiworld.get_location("Kill 1000 zombies by vehicle", self.player), lambda state: state.can_reach_region("Maintenance Tunnel", self.player))
         all_side_scoops = SURVIVOR_SCOOP_NAMES + PSYCHOPATH_SCOOP_NAMES
@@ -1448,8 +1477,8 @@ class DRWorld(World):
         set_rule(self.multiworld.get_location("Jump a vehicle 50 feet", self.player), lambda state: state.can_reach_region("Leisure Park", self.player))
         set_rule(self.multiworld.get_location("Bowl over 5 zombies", self.player), lambda state: ((state.can_reach_region("Paradise Plaza", self.player) or state.can_reach_region("Wonderland Plaza", self.player)) and (not self.options.restricted_item_mode or state.has("Bowling Ball", self.player))) or (not self.options.restricted_item_mode and state.has("Bowling Ball", self.player) and (state.can_reach_region("Paradise Plaza", self.player) or state.can_reach_region("Entrance Plaza", self.player))))
         set_rule(self.multiworld.get_location("Hit a golf ball 100 feet", self.player), lambda state: ((state.can_reach_region("Paradise Plaza", self.player) or state.can_reach_region("Entrance Plaza", self.player)) and (not self.options.restricted_item_mode or state.has("Golf Club", self.player))) or (not self.options.restricted_item_mode and state.has("Golf Club", self.player) and state.can_reach_region("Rooftop", self.player)))
-        set_rule(self.multiworld.get_location("Fire 30 bullets", self.player), lambda state, guns=("Handgun", "Heavy Machinegun", "Machinegun", "Submachine Gun", "Shotgun"): (state.can_reach_region("North Plaza", self.player) and (not self.options.restricted_item_mode or any(state.has(g, self.player) for g in guns))) or (not self.options.restricted_item_mode and any(state.has(g, self.player) for g in guns) and state.can_reach_region("Rooftop", self.player)))
-        set_rule(self.multiworld.get_location("Fire 300 bullets", self.player), lambda state, guns=("Handgun", "Heavy Machinegun", "Machinegun", "Submachine Gun"): (state.can_reach_region("North Plaza", self.player) and (not self.options.restricted_item_mode or any(state.has(g, self.player) for g in guns))) or (not self.options.restricted_item_mode and any(state.has(g, self.player) for g in guns) and state.can_reach_region("Rooftop", self.player)))
+        set_rule(self.multiworld.get_location("Fire 30 bullets", self.player), lambda state: state.can_reach_location("Fire 300 bullets", self.player) or ((not self.options.restricted_item_mode or state.has("Handgun", self.player)) and (state.can_reach_region("North Plaza", self.player) or state.can_reach_region("Wonderland Plaza", self.player) or state.can_reach_region("Paradise Plaza", self.player) or state.can_reach_region("Al Fresca Plaza", self.player))))
+        set_rule(self.multiworld.get_location("Fire 300 bullets", self.player), lambda state, smallguns=("Handgun", "Submachine Gun", "Shotgun", "Sniper Rifle"), guns=("Handgun", "Submachine Gun", "Shotgun", "Sniper Rifle", "Heavy Machinegun", "Machinegun"): (state.can_reach_region("North Plaza", self.player) and (not self.options.restricted_item_mode or any(state.has(g, self.player) for g in smallguns))) or (not self.options.restricted_item_mode and any(state.has(g, self.player) for g in guns) and state.can_reach_region("Rooftop", self.player)))
         # "Ride zombies for 50 feet" requires Zombie Ride only when that
         # skill is actually in the AP item pool. BuildItemPool adds skills
         # only when enable_skill_items is on AND vanilla_progression is
@@ -1588,6 +1617,7 @@ class DRWorld(World):
         trap_percentage = int(self.options.trap_percentage.value)
         hostile_min = int(self.options.hostile_survivor_count_min.value)
         hostile_max = int(self.options.hostile_survivor_count_max.value)
+        cult_limited_enabled = bool(self.options.cult_limited.value)
         # Hardcore implies Night — auto-enable Night when Hardcore is on so
         # the Lua side can rely on the single flag without extra logic.
         night_mode_enabled = bool(self.options.night_mode_enabled.value)
@@ -1659,6 +1689,7 @@ class DRWorld(World):
                 "trap_percentage": trap_percentage,
                 "hostile_survivor_count_min": hostile_min,
                 "hostile_survivor_count_max": hostile_max,
+                "cult_limited": cult_limited_enabled,
                 "night_mode_enabled": night_mode_enabled,
                 "hardcore_zombies_enabled": hardcore_zombies_enabled,
                 "random_starting_costume": random_starting_costume,
@@ -1686,6 +1717,7 @@ class DRWorld(World):
             "trap_percentage": trap_percentage,
             "hostile_survivor_count_min": hostile_min,
             "hostile_survivor_count_max": hostile_max,
+            "cult_limited": cult_limited_enabled,
             "night_mode_enabled": night_mode_enabled,
             "hardcore_zombies_enabled": hardcore_zombies_enabled,
             "random_starting_costume": random_starting_costume,
