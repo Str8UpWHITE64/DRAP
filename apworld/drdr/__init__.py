@@ -117,7 +117,7 @@ SCOOP_REGION_REQUIREMENTS = {
     "Rescue the Professor": ["Entrance Plaza", "Paradise Plaza"],
     "Medicine Run": ["Seon's Food and Stuff"],
     "Girl Hunting": ["North Plaza"],
-    "A Promise to Isabela": ["North Plaza"],
+    "A Promise to Isabela": ["North Plaza", "Paradise Plaza"],
     "The Last Resort": ["Maintenance Tunnel", "Leisure Park"],
     "Hideout": ["Paradise Plaza", "Leisure Park", "North Plaza", "Carlito's Hideout"],
     "The Butcher": ["Maintenance Tunnel"],
