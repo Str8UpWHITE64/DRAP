@@ -117,7 +117,7 @@ SCOOP_REGION_REQUIREMENTS = {
     "Rescue the Professor": ["Entrance Plaza", "Paradise Plaza"],
     "Medicine Run": ["Seon's Food and Stuff"],
     "Girl Hunting": ["North Plaza"],
-    "A Promise to Isabela": ["North Plaza"],
+    "A Promise to Isabela": ["North Plaza", "Rooftop"],
     "The Last Resort": ["Maintenance Tunnel", "Leisure Park"],
     "Hideout": ["Paradise Plaza", "Leisure Park", "North Plaza", "Carlito's Hideout"],
     "The Butcher": ["Maintenance Tunnel"],
@@ -197,14 +197,14 @@ SCOOP_SURVIVOR_COUNTS = {
 REGION_LEVEL_VALUES = {
     "Security Room": 1,
     "Rooftop": 1,
-    "Paradise Plaza": 2,
-    "Entrance Plaza": 1,
-    "Leisure Park": 1,
+    "Paradise Plaza": 3,
+    "Entrance Plaza": 2,
+    "Leisure Park": 3,
     "Al Fresca Plaza": 2,
     "Food Court": 2,
-    "Wonderland Plaza": 2,
+    "Wonderland Plaza": 3,
     "North Plaza": 2,
-    "Maintenance Tunnel": 3,
+    "Maintenance Tunnel": 4,
     "Seon's Food and Stuff": 1,
     "Crislip's Home Saloon": 1,
     "Colby's Movieland": 1,
@@ -729,45 +729,49 @@ class DRWorld(World):
         # Region-Based Levels
         points = lambda state: get_reachable_region_points(state, self.player)
 
-        for level in range(2, 6):      # Levels 2-5
+        for level in range(2, 7):      # Levels 2-6
             set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
                     lambda state, p=points: p(state) >= 1)
 
-        for level in range(6, 11):     # Levels 6-10
+        for level in range(7, 10):     # Levels 7-9
             set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
                     lambda state, p=points: p(state) >= 2)
 
-        for level in range(11, 16):    # Levels 11-15
+        for level in range(10, 12):    # Levels 10-11
             set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
                     lambda state, p=points: p(state) >= 4)
 
-        for level in range(16, 21):    # Levels 16-20
+        for level in range(12, 13):    # Levels 12
             set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
-                    lambda state, p=points: p(state) >= 6)
+                    lambda state, p=points: p(state) >= 5)
 
-        for level in range(21, 26):    # Levels 21-25
+        for level in range(13, 16):    # Levels 13-15
             set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
-                    lambda state, p=points: p(state) >= 8)
+                    lambda state, p=points: p(state) >= 7)
 
-        for level in range(26, 31):    # Levels 26-30
+        for level in range(16, 19):    # Levels 16-18
             set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
-                    lambda state, p=points: p(state) >= 11)
+                    lambda state, p=points: p(state) >= 10)
 
-        for level in range(31, 36):    # Levels 31-35
+        for level in range(19, 22):    # Levels 19-21
             set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
                     lambda state, p=points: p(state) >= 13)
 
-        for level in range(36, 41):    # Levels 35-40
-            set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
-                    lambda state, p=points: p(state) >= 15)
-
-        for level in range(41, 46):    # Levels 41-45
+        for level in range(22, 26):    # Levels 22-25
             set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
                     lambda state, p=points: p(state) >= 17)
 
-        for level in range(46, 51):    # Levels 46-50
+        for level in range(26, 31):    # Levels 26-30
             set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
-                    lambda state, p=points: p(state) >= 20)
+                    lambda state, p=points: p(state) >= 22)
+
+        for level in range(31, 41):    # Levels 31-40
+            set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
+                    lambda state, p=points: p(state) >= 23)
+
+        for level in range(41, 51):    # Levels 41-50
+            set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
+                    lambda state, p=points: p(state) >= 25)
 
         # Exclude Levels Above code
         if self.options.exclude_levels:
@@ -1415,11 +1419,11 @@ class DRWorld(World):
         set_rule(self.multiworld.get_location("Kill Kent on day 3", self.player), lambda state: state.can_reach_location("Meet Kent on day 3", self.player))
 
         # Challenges
-        set_rule(self.multiworld.get_location("Reach Level 10!", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player))
-        set_rule(self.multiworld.get_location("Reach Level 20!", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player) and state.can_reach_region("Leisure Park", self.player) and state.can_reach_region("Food Court", self.player) and state.can_reach_region("Al Fresca Plaza", self.player) and state.can_reach_region("Wonderland Plaza", self.player) and state.can_reach_region("North Plaza", self.player) and state.can_reach_region("Entrance Plaza", self.player))
-        set_rule(self.multiworld.get_location("Reach Level 30!", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player) and state.can_reach_region("Leisure Park", self.player) and state.can_reach_region("Food Court", self.player) and state.can_reach_region("Al Fresca Plaza", self.player) and state.can_reach_region("Wonderland Plaza", self.player) and state.can_reach_region("North Plaza", self.player) and state.can_reach_region("Entrance Plaza", self.player) and state.can_reach_region("Maintenance Tunnel", self.player))
-        set_rule(self.multiworld.get_location("Reach Level 40!", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player) and state.can_reach_region("Leisure Park", self.player) and state.can_reach_region("Food Court", self.player) and state.can_reach_region("Al Fresca Plaza", self.player) and state.can_reach_region("Wonderland Plaza", self.player) and state.can_reach_region("North Plaza", self.player) and state.can_reach_region("Entrance Plaza", self.player) and state.can_reach_region("Maintenance Tunnel", self.player))
-        set_rule(self.multiworld.get_location("Reach max level", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player) and state.can_reach_region("Leisure Park", self.player) and state.can_reach_region("Food Court", self.player) and state.can_reach_region("Al Fresca Plaza", self.player) and state.can_reach_region("Wonderland Plaza", self.player) and state.can_reach_region("North Plaza", self.player) and state.can_reach_region("Entrance Plaza", self.player) and state.can_reach_region("Maintenance Tunnel", self.player))
+        set_rule(self.multiworld.get_location("Reach Level 10!", self.player), lambda state: state.can_reach_location("Reach Level 10", self.player))
+        set_rule(self.multiworld.get_location("Reach Level 20!", self.player), lambda state: state.can_reach_location("Reach Level 20", self.player))
+        set_rule(self.multiworld.get_location("Reach Level 30!", self.player), lambda state: state.can_reach_location("Reach Level 30", self.player))
+        set_rule(self.multiworld.get_location("Reach Level 40!", self.player), lambda state: state.can_reach_location("Reach Level 40", self.player))
+        set_rule(self.multiworld.get_location("Reach max level", self.player), lambda state: state.can_reach_location("Reach Level 50", self.player))
         set_rule(self.multiworld.get_location("Kill 500 zombies by vehicle", self.player), lambda state: state.can_reach_region("Maintenance Tunnel", self.player))
         set_rule(self.multiworld.get_location("Kill 1000 zombies by vehicle", self.player), lambda state: state.can_reach_region("Maintenance Tunnel", self.player))
         all_side_scoops = SURVIVOR_SCOOP_NAMES + PSYCHOPATH_SCOOP_NAMES
