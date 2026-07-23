@@ -365,15 +365,25 @@ class DRWorld(World):
             for time_key in TIME_KEY_NAMES:
                 self.multiworld.push_precollected(self.create_item(time_key))
             if self.main_scoops_enabled:
-                scoop_order = list(MAIN_SCOOP_NAMES)
-                self.random.shuffle(scoop_order)
-                # Backup for Brad never leads the chain -- its mission owns
-                # the EP shutter cutscene and holds the trigger spot closed
-                # until the escort completes.
-                if scoop_order[0] == "Backup for Brad":
-                    swap = self.random.randrange(1, len(scoop_order))
-                    scoop_order[0], scoop_order[swap] = scoop_order[swap], scoop_order[0]
-                self.scoop_order = scoop_order
+                # Universal Tracker re-generation: use the connected slot's
+                # actual order (see interpret_slot_data) instead of rolling
+                # a fresh one, so tracker logic matches the real seed.
+                _passthrough = getattr(self.multiworld, "re_gen_passthrough", None)
+                _ut_order = None
+                if _passthrough and self.game in _passthrough:
+                    _ut_order = (_passthrough[self.game] or {}).get("scoop_order")
+                if _ut_order:
+                    self.scoop_order = list(_ut_order)
+                else:
+                    scoop_order = list(MAIN_SCOOP_NAMES)
+                    self.random.shuffle(scoop_order)
+                    # Backup for Brad never leads the chain -- its mission
+                    # owns the EP shutter cutscene and holds the trigger
+                    # spot closed until the escort completes.
+                    if scoop_order[0] == "Backup for Brad":
+                        swap = self.random.randrange(1, len(scoop_order))
+                        scoop_order[0], scoop_order[swap] = scoop_order[swap], scoop_order[0]
+                    self.scoop_order = scoop_order
             # else: Savior+ScoopSanity — scoop_order stays empty.
 
         # Softlock prevention
@@ -666,6 +676,12 @@ class DRWorld(World):
 
     def get_filler_item_name(self) -> str:
         return "Rotten Pizza"
+
+    def interpret_slot_data(self, slot_data):
+        # Universal Tracker support: returning the slot data makes the
+        # tracker re-generate with it attached as re_gen_passthrough, so
+        # generate_early can adopt the seed's real scoop order.
+        return slot_data
 
     def pre_fill(self) -> None:
         """Force early placement of the first gate key + first scoop item.
