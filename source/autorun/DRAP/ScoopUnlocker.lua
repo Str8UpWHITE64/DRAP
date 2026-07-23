@@ -993,6 +993,16 @@ local function get_current_area_index()
     return Shared.to_int(Shared.safe_get_field(am, f))
 end
 
+local function get_current_scene()
+    local am = am_mgr:get()
+    if not am then return nil end
+    local scene
+    pcall(function() scene = am:get_field("CurrentLevelPath") end)
+    scene = tostring(scene or "")
+    if scene == "" then return nil end
+    return scene
+end
+
 local function try_advance_conflict_group(completed_name)
     local info = SCOOP_TO_CONFLICT_GROUP[completed_name]
     if not info then return end
@@ -1178,16 +1188,19 @@ local function enforce_flags()
     -- Suppress completion/death flags but enforce the three cult-spawn flags.
     -- Flags auto-re-enabled by 326 (1222, 327, 1157, 3722, 1217, 1219, 1221, 1223, 3600)
     -- are left alone -- the game handles those.
-    -- Cult Limited instead keps them in Colby's outside the boss room.
+    -- Cult Limited instead keeps them in Colby's outside the boss room.
     if completed_scoops["A Strange Group"] then
         if M.is_cult_limited_enabled() then
-            -- Cultists will be limited to outside the boss room in Colby's Theater
-            if get_current_area_index() == PARADISE_PLAZA_AREA_INDEX then
-                -- Turn OFF flag 2063 when entering Paradise Plaza
+            -- Cultists stay clustered outside the Colby's boss room only:
+            -- clear the spawn flag in every scene except the theater
+            -- (s503). The theater exit can lead anywhere under the door
+            -- randomizer, so keying on Paradise Plaza is not enough.
+            local scene = get_current_scene()
+            if scene and not scene:find("s503") then
                 if raw_check_flag(2063) then
                     raw_set_flag_off(2063)
                     if verbose_logging then
-                        M.log("Cult Limited: turned OFF flag 2063 in Paradise Plaza")
+                        M.log("Cult Limited: cleared flag 2063 outside Colby's (" .. scene .. ")")
                     end
                 end
             end
