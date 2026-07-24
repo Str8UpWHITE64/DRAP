@@ -50,3 +50,8 @@ luac.out
 /.idea/inspectionProfiles/Project_Default.xml
 __pycache__/
 tools/logic_tests/
+tools/release_out/
+
+# Vendored release binaries (see tools/build_release.py)
+!/dinput8.dll
+!/lua-apclientpp.dll

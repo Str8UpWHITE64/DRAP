@@ -23,36 +23,24 @@ It is possible to soft lock yourself, so don't be hesitant to start the game ove
 Currently, there is only one goal, to get Ending S and beat Brock. We may add more goals in the future.
 
 ## Setup
-1. Download the APWorld from the Releases page and place it into your custom worlds folder.
-2. Download the REFramework mod for Dead Rising Deluxe Remaster from [here](https://www.nexusmods.com/deadrisingdeluxeremaster/mods/2).  Extract and place the dinput8.dll file into You Dead Rising Deluxe Remaster installation folder.
-3. Open up your Dead Rising Deluxe Remaster installation folder.  From Steam, that is usually located at: `C:\Program Files (x86)\Steam\steamapps\common\DEAD RISING DELUXE REMASTER`
-4. Create a folder called `reframework` in the Dead Rising Deluxe Remaster installation folder.
-5. Create a folder called `autorun` inside the `reframework` folder.
-6. Download the DRAP mod zip from the Releases page, and place the files in their respective folders.  It should look like this:
+1. Download `DRAP_<version>.zip` from the Releases page and extract everything into your Dead Rising Deluxe Remaster installation folder.  From Steam, that is usually located at: `C:\Program Files (x86)\Steam\steamapps\common\DEAD RISING DELUXE REMASTER`.  The zip contains everything the game side needs, already laid out:
 ```DEAD RISING DELUXE REMASTER
+├── dinput8.dll             (REFramework, DD2 build)
+├── lua-apclientpp.dll      (Archipelago client library)
+├── THIRD-PARTY-LICENSES.md
 └── reframework
-    ├── autorun
-        ├── DRAP
-        │   ├── debug
-        │   ├── effects
-        │   ├── trackers
-        │   ├── Bridge.lua
-        │   └── etc...
-        ├── AP_REF
-        │   ├── core.lua
-        │   ├── GUI.lua
-        │   └── etc...
+    └── autorun
         ├── AP_DRDR_main.lua
-    └── data
-        └── drdr_items
-        └── drdr_shared.json
-        └── etc...
+        ├── AP_REF
+        └── DRAP
 ```
-7. Download and place the lua-apclientpp.dll into the Dead Rising Deluxe Remaster installation folder from [here](https://github.com/TheRealSolidusSnake/RE3R_AP_Client/blob/main/lua-apclientpp.dll).  I don't yet have permission to post this myself, but will do so if and when I do. 
-8. Upon loading into the game, You should see the AP client connect window pop up, along with the REFramework window.  If You do not see the AP client connect window, scroll down in the REFramework window to "Script Generated UI" and make sure "Show Archipelago Client UI" is checked.
-9. Generate a template and a world in Archipelago then enter your connection information at the title screen, and wait for it to connect.
-10. Upon connecting, a new save file path is created, so no need to worry about overwriting your existing saves.  Each AP world You play will create a new save file location here for Steam users: ```C:\Program Files (x86)\Steam\userdata\{STEAMID}\2527390\remote```. The original saves are under ```win64_save```.
-11. Start a new game and enjoy!
+2. Download `drdr.apworld` from the Releases page and place it into your Archipelago `custom_worlds` folder.
+3. Launch the game.  You should see the AP client connect window pop up, along with the REFramework window.  If you do not see the AP client connect window, scroll down in the REFramework window to "Script Generated UI" and make sure "Show Archipelago Client UI" is checked.  If the mod reports that `lua-apclientpp.dll` could not load, re-extract the zip and make sure both dll files sit next to the game exe.
+4. Generate a template and a world in Archipelago, then enter your connection information at the title screen and wait for it to connect.
+5. Upon connecting, a new save file path is created, so no need to worry about overwriting your existing saves.  Each AP world you play will create a new save file location here for Steam users: ```C:\Program Files (x86)\Steam\userdata\{STEAMID}\2527390\remote```. The original saves are under ```win64_save```.
+6. Start a new game and enjoy!
+
+REFramework is by [praydog](https://github.com/praydog/REFramework) and lua-apclientpp is by [black-sliver](https://github.com/black-sliver/lua-apclientpp); both are bundled under the MIT license (see THIRD-PARTY-LICENSES.md).
 
 ## Gameplay Notes
 There are two main modes for this: ScoopSanity and regular.  ScoopSanity is the default and recommended mode as it adds a new way to play the game and more random-ness.
