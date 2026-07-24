@@ -8,7 +8,7 @@ from worlds.generic.Rules import set_rule, add_rule, add_item_rule, forbid_item
 
 from .Items import DRItem, DRItemCategory, item_dictionary, key_item_names, item_descriptions, BuildItemPool, specialty_items, progression_skills, microwave_food_items, challenge_tool_items
 from .Locations import DRLocation, DRLocationCategory, location_tables, location_dictionary
-from .Options import DROption
+from .Options import DROption, dr_option_groups
 
 import re
 
@@ -268,6 +268,8 @@ class DRWeb(WebWorld):
     )
     game_info_languages = ["en"]
     tutorials = [setup_en]
+
+    option_groups = dr_option_groups
 
 
 class DRWorld(World):
