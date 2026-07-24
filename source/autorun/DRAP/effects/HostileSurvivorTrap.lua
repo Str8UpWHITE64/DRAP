@@ -127,6 +127,30 @@ local function in_sanctuary()
     return SANCTUARY_SCENES[scene] == true
 end
 
+local function get_area_index()
+    local am = get_area_mgr()
+    if not am then return nil end
+    return tonumber(safe(function() return am:call("getAreaIndex") end))
+end
+
+-- One trap per area at a time: firing a trap locks the current area and
+-- further traps queue until the player changes areas. Bursts of traps in
+-- one area caused crashes and connection stalls.
+local trap_area_lock = nil
+
+local function lock_trap_area()
+    trap_area_lock = get_area_index() or -1
+end
+
+local function update_trap_area_lock()
+    if trap_area_lock == nil then return end
+    local area = get_area_index()
+    if area ~= nil and area ~= trap_area_lock then
+        trap_area_lock = nil
+        log("Trap area lock released (area changed)")
+    end
+end
+
 local function get_player_pos()
     local pm = get_player_mgr()
     if not pm then return nil end
@@ -187,6 +211,10 @@ local function can_fire_now()
     if not player then return false, "player not in-game" end
 
     if in_sanctuary() then return false, "in sanctuary scene" end
+
+    if trap_area_lock ~= nil then
+        return false, "trap already fired in this area"
+    end
 
     -- AP gate (only ScoopSanity enforces; standard mode just needs AP connection
     -- which is implicit when an item is being received)
@@ -372,6 +400,7 @@ local function process_pending(pool, label, state)
     _notify_trap(label,
         string.format("%d hostile attacker%s spawned!",
             #targets, #targets == 1 and "" or "s"))
+    lock_trap_area()
     for _, stype in ipairs(targets) do fire_spawn(stype) end
     state.count = state.count - 1
     if state.count <= 0 then state.first_at = nil end
@@ -380,6 +409,7 @@ end
 -- Deferred-firing loop registered at module load. Registering re.on_frame
 -- from within another on_frame disrupts REFramework's iteration.
 re.on_frame(function()
+    update_trap_area_lock()
     if pending.hostile.count <= 0 and pending.special_forces.count <= 0 then return end
     local now = os.clock()
     if now - last_check_time < DEFER_INTERVAL_S then return end
@@ -419,6 +449,7 @@ local function fire_trap_impl(pool, label, state)
     _notify_trap(label,
         string.format("%d hostile attacker%s spawned!",
             #targets, #targets == 1 and "" or "s"))
+    lock_trap_area()
     for _, stype in ipairs(targets) do
         fire_spawn(stype)
     end
@@ -460,6 +491,7 @@ function M.clear_pending()
     pending.hostile.first_at         = nil
     pending.special_forces.count    = 0
     pending.special_forces.first_at  = nil
+    trap_area_lock                   = nil
     log("Cleared pending trap queue")
 end
 

@@ -285,6 +285,7 @@ local on_completion_detected_callback = nil
 local _last_cascade_signature = nil
 local _logged_completion_events = {}   -- event_name -> true
 local scoop_sanity_enabled = false
+local cult_limited_enabled = false
 local door_randomizer_enabled = false
 local goal_mode = 0   -- 0 = Ending S, 1 = Ending A, 2 = Savior
 local on_ap_activated_callback = nil
@@ -463,8 +464,8 @@ local pending_flag_clears = {}
 -- ScoopSanity-only: fire flag 270 (EP-shutter cutscene) the first time the
 -- player walks into the configured AABB in Entrance Plaza after AP activates.
 -- Persisted via engine flags 765/2280 so save reload/new game come for free.
--- Skipped while Backup for Brad is active (see below) to avoid racing its
--- natural completion path.
+-- Skipped while a first-in-chain Backup for Brad is pending -- its natural
+-- flow fires 270 itself, so pre-firing would race its completion.
 local function try_fire_ep270_in_scoop_sanity()
     if not scoop_sanity_enabled then return end
     if not State.is_activated() then return end
@@ -475,12 +476,13 @@ local function try_fire_ep270_in_scoop_sanity()
     local later_main = find_completed_main_scoop()
     if later_main then return end
 
-    -- Don't pre-fire while Backup for Brad is active (received, not completed)
-    -- -- its natural flow fires 270 itself. Use the received/completed check,
-    -- NOT get_current_chain_scoop(): that reads the next uncompleted main in
-    -- chain order even before its AP item arrives, so a late-randomized Backup
-    -- would read "active" all run and block MOTS's 765/2280 prereq forever.
-    if received_scoops["Backup for Brad"] and not completed_scoops["Backup for Brad"] then
+    -- Don't pre-fire while a first-in-chain Backup for Brad is pending -- its
+    -- mission flow fires 270 itself. received/completed, NOT
+    -- get_current_chain_scoop() (which reads the next uncompleted main before
+    -- its AP item arrives, so a late-randomized Backup would block forever).
+    if scoop_order[1] == "Backup for Brad"
+        and received_scoops["Backup for Brad"]
+        and not completed_scoops["Backup for Brad"] then
         return
     end
 
@@ -524,6 +526,17 @@ local function each_conflict_scoop()
         end
     end
     return pairs(names)
+end
+
+-- Current scene path (e.g. "s503" = Colby's theater); Cult Limited keys on it.
+local function get_current_scene()
+    local am = am_mgr:get()
+    if not am then return nil end
+    local scene
+    pcall(function() scene = am:get_field("CurrentLevelPath") end)
+    scene = tostring(scene or "")
+    if scene == "" then return nil end
+    return scene
 end
 
 local function get_all_conflict_blocked_flags()
@@ -700,24 +713,36 @@ local function enforce_flags_legacy()
     -- Suppress completion/death flags but enforce the three cult-spawn flags.
     -- Flags auto-re-enabled by 326 (1222, 327, 1157, 3722, 1217, 1219, 1221, 1223, 3600)
     -- are left alone -- the game handles those.
+    -- Cult Limited instead keeps them in Colby's outside the boss room.
     if completed_scoops["A Strange Group"] then
-        -- Flags to keep ON for cult spawning
-        for _, fid in ipairs(CULT_ON) do
-            if not raw_check_flag(fid) then
-                currently_unlocking = true
-                raw_set_flag_on(fid)
-                currently_unlocking = false
+        if M.is_cult_limited_enabled() then
+            -- Cult Limited: keep cultists in Colby's (s503) by clearing the
+            -- spawn flag everywhere else -- keyed on scene, not area, since
+            -- door-rando can reroute the theater exit.
+            local scene = get_current_scene()
+            if scene and not scene:find("s503") and raw_check_flag(2063) then
+                raw_set_flag_off(2063)
                 if verbose_logging then
-                    M.log(string.format("Cult respawn: enabled flag %d", fid))
+                    M.log("Cult Limited: cleared flag 2063 outside Colby's (" .. scene .. ")")
                 end
             end
-        end
-        -- Completion/death flags to keep OFF so cult keeps spawning
-        for _, fid in ipairs(CULT_OFF) do
-            if raw_check_flag(fid) then
-                raw_set_flag_off(fid)
-                if verbose_logging then
-                    M.log(string.format("Cult respawn: suppressed flag %d", fid))
+        else
+            for _, fid in ipairs(CULT_ON) do
+                if not raw_check_flag(fid) then
+                    currently_unlocking = true
+                    raw_set_flag_on(fid)
+                    currently_unlocking = false
+                    if verbose_logging then
+                        M.log(string.format("Cult respawn: enabled flag %d", fid))
+                    end
+                end
+            end
+            for _, fid in ipairs(CULT_OFF) do
+                if raw_check_flag(fid) then
+                    raw_set_flag_off(fid)
+                    if verbose_logging then
+                        M.log(string.format("Cult respawn: suppressed flag %d", fid))
+                    end
                 end
             end
         end
@@ -966,6 +991,8 @@ local function build_reconciler_ctx()
         activated = State.is_activated(),
         endgame = State.is_endgame_reached(),
         scoop_sanity = scoop_sanity_enabled,
+        cult_limited = cult_limited_enabled,
+        scene = get_current_scene(),   -- for the Cult Limited policy
         goal_mode = goal_mode,
         door_randomizer = door_randomizer_enabled,
         area = get_current_area_index(),
@@ -1709,6 +1736,15 @@ end
 
 function M.is_scoop_sanity_enabled()
     return scoop_sanity_enabled
+end
+
+function M.set_cult_limited_enabled(enabled)
+    cult_limited_enabled = enabled
+    M.log("Cultists " .. (enabled and "ENABLED" or "DISABLED"))
+end
+
+function M.is_cult_limited_enabled()
+    return cult_limited_enabled
 end
 
 function M.set_goal_mode(goal)

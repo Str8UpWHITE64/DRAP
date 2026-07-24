@@ -13,7 +13,7 @@ These include:
 - Main story scoops
 - Survivor rescues
 - PP Sticker locations
-- Level ups
+- Level Ups
 - Challenges
 
 I have implemented door locking and time locking.  This means that in order to go to any areas past the Security Room, you will need to get a key for it.  That means, if you are playing solo and cant get to the Rooftop, you likely can do some checks in the Entrance Plaza in the opening sequence. Which leads to:
@@ -23,33 +23,24 @@ It is possible to soft lock yourself, so don't be hesitant to start the game ove
 Currently, there is only one goal, to get Ending S and beat Brock. We may add more goals in the future.
 
 ## Setup
-1. Download the APWorld from the Releases page and place it into your custom worlds folder.
-2. Download the REFramework mod for Dead Rising Deluxe Remaster from [here](https://www.nexusmods.com/deadrisingdeluxeremaster/mods/2).  Extract and place the dinput8.dll file into you Dead Rising Deluxe Remaster installation folder.
-3. Open up your Dead Rising Deluxe Remaster installation folder.  From Steam, that is usually located at: `C:\Program Files (x86)\Steam\steamapps\common\DEAD RISING DELUXE REMASTER`
-4. Create a folder called `reframework` in the Dead Rising Deluxe Remaster installation folder.
-5. Create a folder called `autorun` inside the `reframework` folder.
-6. Download the DRAP mod zip from the Releases page, and place the files in their respective folders.  It should look like this:
+1. Download `DRAP_<version>.zip` from the Releases page and extract everything into your Dead Rising Deluxe Remaster installation folder.  From Steam, that is usually located at: `C:\Program Files (x86)\Steam\steamapps\common\DEAD RISING DELUXE REMASTER`.  The zip contains everything the game side needs, already laid out:
 ```DEAD RISING DELUXE REMASTER
+├── dinput8.dll             (REFramework, DD2 build)
+├── lua-apclientpp.dll      (Archipelago client library)
+├── THIRD-PARTY-LICENSES.md
 └── reframework
-    ├── autorun
-        ├── DRAP
-        │   ├── ChallangeTracker.lua
-        │   ├── DoorSceneLock.lua
-        │   └── etc...
-        ├── AP_REF
-        │   ├── core.lua
-        │   ├── GUI.lua
-        │   └── etc...
-        ├── ap_drdr_bridge.lua
+    └── autorun
         ├── AP_DRDR_main.lua
-    └── data
-        └── drdr_shared.json
+        ├── AP_REF
+        └── DRAP
 ```
-7. Download and place the lua-apclientpp.dll into the Dead Rising Deluxe Remaster installation folder from [here](https://github.com/TheRealSolidusSnake/RE3R_AP_Client/blob/main/lua-apclientpp.dll).  I don't yet have permission to post this myself, but will do so if and when I do. 
-8. Upon loading into the game, you should see the AP client connect window pop up, along with the REFramework window.  If you do not see the AP client connect window, scroll down in the REFramework window to "Script Generated UI" and make sure "Show Archipelago Client UI" is checked.
-9. Generate a template and a world in Archipelago then enter your connection information at the title screen, and wait for it to connect.
-10. Upon connecting, a new save file path is created, so no need to worry about overwriting your existing saves.  Each AP world you play will create a new save file location here for Steam users: ```C:\Program Files (x86)\Steam\userdata\{STEAMID}\2527390\remote```. The original saves are under ```win64_save```.
-11. Start a new game and enjoy!
+2. Download `drdr.apworld` from the Releases page and place it into your Archipelago `custom_worlds` folder.
+3. Launch the game.  You should see the AP client connect window pop up, along with the REFramework window.  If you do not see the AP client connect window, scroll down in the REFramework window to "Script Generated UI" and make sure "Show Archipelago Client UI" is checked.  If the mod reports that `lua-apclientpp.dll` could not load, re-extract the zip and make sure both dll files sit next to the game exe.
+4. Generate a template and a world in Archipelago, then enter your connection information at the title screen and wait for it to connect.
+5. Upon connecting, a new save file path is created, so no need to worry about overwriting your existing saves.  Each AP world you play will create a new save file location here for Steam users: ```C:\Program Files (x86)\Steam\userdata\{STEAMID}\2527390\remote```. The original saves are under ```win64_save```.
+6. Start a new game and enjoy!
+
+REFramework is by [praydog](https://github.com/praydog/REFramework) and lua-apclientpp is by [black-sliver](https://github.com/black-sliver/lua-apclientpp); both are bundled under the MIT license (see THIRD-PARTY-LICENSES.md).
 
 ## Gameplay Notes
 There are two main modes for this: ScoopSanity and regular.  ScoopSanity is the default and recommended mode as it adds a new way to play the game and more random-ness.
@@ -68,10 +59,10 @@ The main story scoops are in their normal order, but time-lock items are added t
 
 ### General
 - There are two main ways items are handled in this mod: Granted items and Restricted items.  This is determined by the options selected in your APWorld YAML file.
-  - Granted items show up in the AP Items window (see below) and can be spawned at any time.  These items are added to the list of items you have received from the APWorld, and can be spawned at any time.
-  - Restricted items are items that you are allowed to pick up in the world after you have received them from the APWorld.  These items will show up in the AP Items window, but you cannot spawn them.  Instead, you must find them in the world like normal.  If you haven't gotten the item from the APWorld yet, you will not be able to pick it up in the world.
-- Door locks and time locks gate your progress.  If you can't get to an area, you likely need to find the key for it. If you notice time isn't progressing towards a main scoop, you likely need an item.  Time-locks are sent on connection for ScoopSanity, and missions are sent to you as items.  DoorSanity also grants all door-locks on first connection.
-- With DoorSanity enabled, you can generate a map HTML file with each of the door redirections.  You can find this in the "Doors" section of the Archipelago window.
+  - Granted items show up in the AP Items window (see below) and can be spawned at any time.  These items are added to the list of items You have received from the APWorld, and can be spawned at any time.
+  - Restricted items are items that You are allowed to pick up in the world after You have received them from the APWorld.  These items will show up in the AP Items window, but You cannot spawn them.  Instead, You must find them in the world like normal.  If You haven't gotten the item from the APWorld yet, You will not be able to pick it up in the world.
+- Door locks and time locks gate your progress.  If You can't get to an area, You likely need to find the key for it. If You notice time isn't progressing towards a main scoop, You likely need an item.  Time-locks are sent on connection for ScoopSanity, and missions are sent to You as items.  DoorSanity also grants all door-locks on first connection.
+- With DoorSanity enabled, You can generate a map HTML file with each of the door redirections.  You can find this in the "Doors" section of the Archipelago window.
 - If you disconnect while playing, you will send challenge and level locations on reconnect.
 - To open the ItemSpawner window, go into the REFramework window, scroll down to "Script Generated UI" and check "Show AP Items Window".  This will open a new window where you can spawn items you have received from the APWorld, view your scoop statuses, your keys to areas, and generate your DoorSanity HTML file.
 
@@ -105,12 +96,16 @@ Steam Cloud disabled for the game.
 
 ## Known Bugs
 
-Spawning items is by far the most buggy part of this mod.  When spawning items using the AP Items Window, try not to spam the spawn button.  Wait a few seconds after spawning an item before spawning another one.  If you do spawn multiple items quickly, you increase your chances of the game crashing.
+Please check out the [Known Bugs]() document to see if it answers your question. If not, please feel free to post a message in the AP After Dark Discord channel! 
+
+~~~
 
 Fixed in recent versions (update the mod if you're still seeing these):
 - Leaving 10+ party members behind in another area crashed the game shortly after a loading screen or cutscene. The mod now guards the HUD widget responsible; when your scattered party exceeds 8, the other-map HP readout pauses until you regroup.
 - "Use N Microwaves/Stoves/Clothing Racks" progress reset between play sessions.
 - Survivors occasionally spawning dead or not at all (the "Burt bug") — broken NPC records are now detected and repaired automatically on area transitions.
+
+~~~
 
 ## Final note
 I spent countless hours playing the original game when I was younger, and spent plenty playing this version when it came out.  I hope you enjoy this implementation, and I look forward to seeing how people play it!

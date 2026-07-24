@@ -1,7 +1,6 @@
 import typing
 from dataclasses import dataclass
-from Options import Toggle, DefaultOnToggle, Option, Range, Choice, ItemDict, DeathLink, PerGameCommonOptions, StartInventoryPool, \
-    OptionGroup
+from Options import Toggle, DefaultOnToggle, Option, Range, Choice, ItemDict, DeathLink, PerGameCommonOptions, StartInventoryPool, OptionGroup
 
 
 class GuaranteedItemsOption(ItemDict):
@@ -252,6 +251,22 @@ class HostileSurvivorCountMax(Range):
     default = 3
 
 
+class CultLimited(Toggle):
+    """
+    In ScoopSanity, cultists will appear after beginning either 'The Cult' or
+    'A Strange Group', and they will remain in the mall indefinitely.
+
+    If this option is enabled, the cult will instead disappear from the mall
+    after Sean is killed like they do in the regular game. However, they will
+    still be clustered outside the boss room in Colby's movie theater so you
+    can complete any cult-related checks.
+
+    This option has no effect if ScoopSanity is off.
+    """
+    display_name = "Cult Limited"
+    default = False
+
+
 class NightModeEnabled(Toggle):
     """
     When enabled, zombies behave as if it is always night, regardless of
@@ -425,9 +440,71 @@ class DROption(PerGameCommonOptions):
     trap_percentage: TrapPercentage
     hostile_survivor_count_min: HostileSurvivorCountMin
     hostile_survivor_count_max: HostileSurvivorCountMax
+    cult_limited: CultLimited
     night_mode_enabled: NightModeEnabled
     hardcore_zombies_enabled: HardcoreZombiesEnabled
     random_starting_costume: RandomStartingCostume
     costume_chaos_mode: CostumeChaosMode
     dlc_outfits_enabled: DLCOutfitsEnabled
     pp_bonus_locations: PpBonusLocations
+
+dr_option_groups = [
+    OptionGroup("Goal and Location Settings",
+        [
+            Goal,
+            NumberOfSurvivors,
+            ScoopSanity,
+            PpBonusLocations,
+            ExcludeLevels,
+            ExcludeLevelsAbove,
+        ],
+    ),
+    OptionGroup(
+        "Door Randomizer Settings",
+        [
+            DoorRandomizer,
+            DoorRandomizerMode,
+            RandomizeRooftopServiceHallwayDoors
+        ],
+    ),
+    OptionGroup(
+        "Item Settings",
+        [
+            RestrictedItemMode,
+            ExcludeOverpoweredItems,
+        ],
+    ),
+    OptionGroup(
+        "Skill and Stat Settings",
+        [
+            EnableSkillItems,
+            EnableStatItems,
+            EnableExtraStatBuffs,
+            VanillaProgression,
+        ],
+    ),
+    OptionGroup(
+        "Trap Settings",
+        [
+            TrapPercentage,
+            HostileSurvivorCountMin,
+            HostileSurvivorCountMax,
+        ],
+    ),
+    OptionGroup(
+        "Difficulty Settings",
+        [
+            CultLimited,
+            NightModeEnabled,
+            HardcoreZombiesEnabled,
+        ],
+    ),
+    OptionGroup(
+        "Costume Settings",
+        [
+            RandomStartingCostume,
+            CostumeChaosMode,
+            DLCOutfitsEnabled,
+        ],
+    ),
+]

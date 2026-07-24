@@ -394,13 +394,44 @@ specialty_items = {
     "Bowling Ball",
     "Fire Extinguisher",
     "Golf Club",
-    "Handgun",
     "Orange Juice",
     "Parasol",
+    # Required for the bullet checks in restricted_item_mode:
+    "Handgun",
+    "Shotgun",
+    "Sniper Rifle",
+    "Submachine Gun",
+    # Required for Kent Day 2 in restricted_item_mode:
+    "Novelty Mask (Bear)",
+    "Novelty Mask (Horse)",
+    "Novelty Mask (Servbot)",
     # Required for PP-bonus location gating in restricted_item_mode:
     "Frying Pan",      # gates "Heat a pan on N stoves" locations
     "Uncooked Pizza",  # gates "Use N Microwaves" (alongside Raw Meat)
     "Raw Meat",        # gates "Use N Microwaves" (alongside Uncooked Pizza)
+}
+
+# Food items that stand in for Seon's Food and Stuff access in the
+# microwave rules. Progression whenever PP-bonus locations exist, in any
+# item mode -- state.has() only sees progression items.
+microwave_food_items = {
+    "Uncooked Pizza",
+    "Raw Meat",
+}
+
+# Tools that can replace their spawn zones in the challenge rules when
+# received outside restricted mode (golf, bowling, parasol, gun checks).
+# Progression for the same reason as microwave_food_items.
+challenge_tool_items = {
+    "Golf Club",
+    "Bowling Ball",
+    "Parasol",
+    "Handgun",
+    "Heavy Machinegun",
+    "Machinegun",
+    "Submachine Gun",
+    "Shotgun",
+    "Sniper Rifle",
 }
 
 # Items widely considered overpowered. Removed from the filler pool when
