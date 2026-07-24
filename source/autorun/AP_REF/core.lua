@@ -1,7 +1,14 @@
 -- TODO: since we had to shove this into its own folder, maybe split this into multiple files?
 local AP = nil
-while AP == nil do
-	AP = package.loadlib("lua-apclientpp.dll", "luaopen_apclientpp")
+local load_err = nil
+for attempt = 1, 3 do
+    AP, load_err = package.loadlib("lua-apclientpp.dll", "luaopen_apclientpp")
+    if AP then break end
+end
+if not AP then
+    re.msg("[DRAP] Could not load lua-apclientpp.dll: " .. tostring(load_err) ..
+           "\nMake sure the DLL from the release zip is in the game folder next to the game exe.")
+    error("lua-apclientpp.dll load failed: " .. tostring(load_err))
 end
 AP = AP()
 local AP_REF = {}
