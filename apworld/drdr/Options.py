@@ -1,7 +1,6 @@
 import typing
 from dataclasses import dataclass
-from Options import Toggle, DefaultOnToggle, Option, Range, Choice, ItemDict, DeathLink, PerGameCommonOptions, StartInventoryPool, \
-    OptionGroup
+from Options import Toggle, DefaultOnToggle, Option, Range, Choice, ItemDict, DeathLink, PerGameCommonOptions, StartInventoryPool, OptionGroup
 
 
 class GuaranteedItemsOption(ItemDict):
@@ -448,3 +447,64 @@ class DROption(PerGameCommonOptions):
     costume_chaos_mode: CostumeChaosMode
     dlc_outfits_enabled: DLCOutfitsEnabled
     pp_bonus_locations: PpBonusLocations
+
+dr_option_groups = [
+    OptionGroup("Goal and Location Settings",
+        [
+            Goal,
+            NumberOfSurvivors,
+            ScoopSanity,
+            PpBonusLocations,
+            ExcludeLevels,
+            ExcludeLevelsAbove,
+        ],
+    ),
+    OptionGroup(
+        "Door Randomizer Settings",
+        [
+            DoorRandomizer,
+            DoorRandomizerMode,
+            RandomizeRooftopServiceHallwayDoors
+        ],
+    ),
+    OptionGroup(
+        "Item Settings",
+        [
+            RestrictedItemMode,
+            ExcludeOverpoweredItems,
+        ],
+    ),
+    OptionGroup(
+        "Skill and Stat Settings",
+        [
+            EnableSkillItems,
+            EnableStatItems,
+            EnableExtraStatBuffs,
+            VanillaProgression,
+        ],
+    ),
+    OptionGroup(
+        "Trap Settings",
+        [
+            TrapPercentage,
+            HostileSurvivorCountMin,
+            HostileSurvivorCountMax,
+        ],
+    ),
+    OptionGroup(
+        "Difficulty Settings",
+        [
+            CultLimited,
+            NightModeEnabled,
+            HardcoreZombiesEnabled,
+        ],
+    ),
+    OptionGroup(
+        "Costume Settings",
+        [
+            RandomStartingCostume,
+            CostumeChaosMode,
+            DLCOutfitsEnabled,
+        ],
+    ),
+]
