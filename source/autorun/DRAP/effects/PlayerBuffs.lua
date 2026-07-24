@@ -39,10 +39,9 @@ local DEFAULT_TIMED_DURATION = 30.0
 local HEAL_AMOUNT = 2000
 local DAMAGE_AMOUNT = 2000
 -- Damage Player Trap floor: clamp damage so the player never drops below this.
--- Going to 0 via addDamage triggers a stuck-undead state (HP <= 0 but the engine
--- never transitions to the death/respawn path), forcing the player to close
--- the game. Leaving them at 1000 keeps a clear "danger zone" feel without
--- tripping the bug.
+-- Reaching 0 via addDamage triggers a stuck-undead state (HP<=0 but no
+-- death/respawn transition), forcing a game restart. 1000 keeps a danger-zone
+-- feel without tripping the bug.
 local DAMAGE_HP_FLOOR = 1000
 -- Berserker Mode attack% target (and paired Buttobi computed from it)
 local BERSERKER_ATTACK_PCT = 1000
@@ -138,7 +137,86 @@ local _frame_cb_installed = false
 
 -- Timer-expiry loop registered at module load. Registering re.on_frame
 -- from within another on_frame disrupts REFramework's iteration.
+------------------------------------------------------------
+-- God mode (debug): invincible + un-grabbable + super speed, re-asserted
+-- every tick (area loads / level-ups reset the underlying values).
+-- Toggled from the Scoops tab debug GUI.
+------------------------------------------------------------
+
+local god_mode = false
+local god_saved_speed = nil
+local god_last_tick = 0
+local GOD_TICK_SECONDS = 2.0
+local GOD_SPEED = { 5.0, 5.0, 5.0 }
+local GOD_RUN_LEVEL = 10   -- acceleration: reach top speed instantly
+
+local function _set_god_run(level_or_nil)
+    local ps = _G.AP and _G.AP.effects and _G.AP.effects.PlayerStats
+    if ps and ps.set_god_run_level then pcall(ps.set_god_run_level, level_or_nil) end
+end
+
+local function _read_speed_table()
+    local ms = _move_setting()
+    if not ms then return nil end
+    local list
+    pcall(function() list = ms:get_field("LevelSpeedMax") end)
+    if not list then return nil end
+    local out = {}
+    for i = 0, 2 do
+        local ok, v = pcall(function() return list:call("get_Item", i) end)
+        out[i + 1] = ok and tonumber(v) or nil
+    end
+    if out[1] and out[2] and out[3] then return out end
+    return nil
+end
+
+-- True no-damage: PlayerVitalController IS an app.solid.HitPointController,
+-- which exposes the engine's own set_Invincible / set_NoDamage switches.
+-- Re-asserted each tick in case area loads reset them.
+local function _set_invincible(on)
+    local hpc = _hpc()
+    if not hpc then return false end
+    pcall(function() hpc:call("set_Invincible", on == true) end)
+    pcall(function() hpc:call("set_NoDamage", on == true) end)
+    return true
+end
+
+function M.set_god_mode(enabled)
+    enabled = enabled == true
+    if enabled == god_mode then return end
+    god_mode = enabled
+    if enabled then
+        god_saved_speed = _read_speed_table()
+        _set_speed_table(GOD_SPEED)
+        _refresh_psm_ui()
+        _set_invincible(true)
+        _set_god_run(GOD_RUN_LEVEL)
+        god_last_tick = 0   -- fire the buff tick immediately
+        log("GOD MODE ON (Invincible + NoDamage[grab immunity] + speed "
+            .. tostring(GOD_SPEED[1]) .. ")")
+    else
+        _set_invincible(false)
+        _set_god_run(nil)
+        _set_speed_table(god_saved_speed or VANILLA_SPEED_TABLE)
+        _refresh_psm_ui()
+        -- Let the juice timers lapse on their own (short refresh window).
+        log("GOD MODE OFF (invincibility, grab immunity, and speed restored)")
+    end
+end
+
+function M.is_god_mode() return god_mode end
+
 re.on_frame(function()
+    if god_mode then
+        local now = os.clock()
+        if now - god_last_tick >= GOD_TICK_SECONDS then
+            god_last_tick = now
+            -- NoDamage covers grab immunity (Alex) -- no juice needed.
+            _set_invincible(true)                        -- area loads may reset
+            _set_speed_table(GOD_SPEED)                  -- level-ups rewrite it
+            _set_god_run(GOD_RUN_LEVEL)                  -- ditto run level
+        end
+    end
     if next(_timed_effects) == nil then return end
     local now = os.clock()
     for name, entry in pairs(_timed_effects) do
@@ -424,6 +502,10 @@ function M.register()
     log(string.format("PlayerBuffs registered (%d items)", #items))
 end
 
+_G.drap_god = function(on)
+    if on == nil then on = not M.is_god_mode() end
+    M.set_god_mode(on ~= false)
+end
 _G.drap_buff_fleetfoot   = function(s) M.fleetfoot_effect(s)   end
 _G.drap_buff_untouchable = function(s) M.untouchable_effect(s) end
 _G.drap_buff_spitfire    = function(s) M.spitfire_effect(s)    end

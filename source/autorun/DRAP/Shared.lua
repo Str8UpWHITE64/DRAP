@@ -47,14 +47,19 @@ end
 --- Creates a logger function with a prefix tag
 --- @param tag string The module name to prefix log messages with
 --- @return function A log function that prefixes messages with [tag]
+---
+--- Output goes to the live REFramework console (print) AND to
+--- re2_framework_log.txt (log.info) so session evidence survives the
+--- console window closing.
 function Shared.create_logger(tag)
     local prefix = "[" .. tag .. "] "
     return function(msg)
         local clean_msg = Shared.safe_log_string(msg)
         -- Skip empty messages
         if clean_msg == "" or clean_msg == "nil" then return end
-        local str = prefix .. clean_msg
-        print(build_clean_string(str))
+        local str = build_clean_string(prefix .. clean_msg)
+        print(str)
+        if log and log.info then pcall(log.info, str) end
     end
 end
 
@@ -146,13 +151,10 @@ end
 -- Scene Metadata
 ------------------------------------------------------------
 
---- Engine scene-code → {name, index} lookup. The index is the AreaManager
---- mAreaIndex value the engine uses for area-jump-name resolution; the name
---- is the human-readable area name. Used by door modules to translate between
---- the scene path string ("SCN_s100") and the engine's numeric index (256).
----
---- This is a Lua-only constant because the index field is engine-side and
---- isn't carried in drdr_shared.json (which only has scene_code + name).
+--- Engine scene-code → {name, index} lookup, where index is the AreaManager
+--- mAreaIndex value. Lets door modules translate between the scene path string
+--- ("SCN_s100") and the engine's numeric index (256). Lua-only because the
+--- index field isn't carried in drdr_shared.json (only scene_code + name).
 Shared.SCENE_INFO = {
     s140 = { name = "Title Screen",          index = 292  },
     s135 = { name = "Heliport",              index = 287  },
@@ -557,15 +559,12 @@ end
 -- JSON Helpers
 ------------------------------------------------------------
 
---- Safely loads a JSON file
+--- Loads JSON only if the file exists and is non-empty. json.load_file logs a
+--- loud parse error for missing/empty files (reads like data loss to players),
+--- so probe with io.open first.
 --- @param path string The file path
 --- @param logger function|nil Optional logger for errors
---- @return table|nil The parsed data, or nil on error
---- Loads JSON only if the file exists and is non-empty. json.load_file
---- logs a loud parse error for missing/empty files, which reads like data
---- loss to players -- probe with io.open first.
---- @param path string Data-relative path
---- @return table|nil
+--- @return table|nil The parsed data, or nil if absent/empty/error
 function Shared.load_json_if_exists(path, logger)
     local probe = io.open(path, "r")
     if not probe then return nil end

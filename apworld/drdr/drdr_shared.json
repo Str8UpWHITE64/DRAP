@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "areas": [
     {
       "name": "Heliport",
@@ -2590,11 +2590,32 @@
       "location_template_plural": "Use {n} Microwaves",
       "all_location_name": "Use All Microwaves",
       "count_tiers": [
-        {"max_count": 1, "regions": ["Paradise Plaza"]},
-        {"max_count": 7, "regions": ["Paradise Plaza", "Food Court"]},
-        {"max_count": 9, "regions": ["Paradise Plaza", "Food Court", "Al Fresca Plaza"]}
+        {
+          "max_count": 1,
+          "regions": [
+            "Paradise Plaza"
+          ]
+        },
+        {
+          "max_count": 7,
+          "regions": [
+            "Paradise Plaza",
+            "Food Court"
+          ]
+        },
+        {
+          "max_count": 9,
+          "regions": [
+            "Paradise Plaza",
+            "Food Court",
+            "Al Fresca Plaza"
+          ]
+        }
       ],
-      "restricted_mode_items_any": ["Uncooked Pizza", "Raw Meat"]
+      "restricted_mode_items_any": [
+        "Uncooked Pizza",
+        "Raw Meat"
+      ]
     },
     {
       "id": "pp_stove",
@@ -2607,11 +2628,1720 @@
       "location_template_plural": "Heat a pan on {n} stoves",
       "all_location_name": "Heat a pan on all stoves",
       "count_tiers": [
-        {"max_count": 2, "regions": ["Paradise Plaza"]},
-        {"max_count": 4, "regions": ["Paradise Plaza", "Food Court"]},
-        {"max_count": 5, "regions": ["Paradise Plaza", "Food Court", "Al Fresca Plaza"]}
+        {
+          "max_count": 2,
+          "regions": [
+            "Paradise Plaza"
+          ]
+        },
+        {
+          "max_count": 4,
+          "regions": [
+            "Paradise Plaza",
+            "Food Court"
+          ]
+        },
+        {
+          "max_count": 5,
+          "regions": [
+            "Paradise Plaza",
+            "Food Court",
+            "Al Fresca Plaza"
+          ]
+        }
       ],
-      "restricted_mode_items_any": ["Frying Pan"]
+      "restricted_mode_items_any": [
+        "Frying Pan"
+      ]
+    }
+  ],
+  "scoops": [
+    {
+      "name": "Backup for Brad",
+      "category": "Main",
+      "order": 2,
+      "primary_flag": 268,
+      "completion_event": "Escort Brad to see Dr Barnaby",
+      "chain_eligible": true,
+      "events": [
+        "Complete Backup for Brad",
+        "Escort Brad to see Dr Barnaby"
+      ],
+      "description": {
+        "location": "Food Court",
+        "trigger": "Enter the Food Court",
+        "description": "Help Brad fight Carlito."
+      },
+      "disp_flag": 2497,
+      "disp_end_flag": 2543,
+      "guide": {
+        "area": 2560,
+        "x": -94.48,
+        "y": 0.0,
+        "z": 124.2,
+        "pos_tbl": 23
+      }
+    },
+    {
+      "name": "A Temporary Agreement",
+      "category": "Main",
+      "order": 4,
+      "primary_flag": 272,
+      "completion_event": "Complete Temporary Agreement",
+      "chain_eligible": true,
+      "events": [
+        "Complete Temporary Agreement"
+      ],
+      "description": {
+        "location": "Security Room",
+        "trigger": "Enter the Security Room front door",
+        "description": "Speak to Brad and Jessie in the Security Room."
+      },
+      "disp_flag": 2497,
+      "disp_end_flag": 2543,
+      "guide": {
+        "area": 288,
+        "x": 170.99,
+        "y": 9.5,
+        "z": 111.42,
+        "pos_tbl": 23
+      }
+    },
+    {
+      "name": "Image in the Monitor",
+      "category": "Main",
+      "order": 5,
+      "primary_flag": 273,
+      "secondary_flags": [
+        770
+      ],
+      "completion_event": "Complete Image in the Monitor",
+      "chain_eligible": true,
+      "events": [
+        "Complete Image in the Monitor"
+      ],
+      "description": {
+        "location": "Security Room",
+        "trigger": "Walk through the Security Room rear door",
+        "description": "Watch the monitor cutscene with Jessie."
+      },
+      "disp_flag": 2498,
+      "disp_end_flag": 2544,
+      "guide": {
+        "scq_no": 2,
+        "pos_tbl": 24,
+        "x": 149.65,
+        "y": 9.25,
+        "z": 228.65,
+        "area": 288
+      }
+    },
+    {
+      "name": "Rescue the Professor",
+      "category": "Main",
+      "order": 6,
+      "primary_flag": 275,
+      "secondary_flags": [
+        536,
+        2310
+      ],
+      "completion_event": "Complete Rescue the Professor",
+      "chain_eligible": true,
+      "events": [
+        "Complete Rescue the Professor"
+      ],
+      "description": {
+        "location": "Entrance Plaza",
+        "trigger": "Enter the Entrance Plaza",
+        "description": "Rescue Dr. Barnaby from Carlito."
+      },
+      "disp_flag": 2498,
+      "disp_end_flag": 2544,
+      "guide": {
+        "scq_no": 2,
+        "pos_tbl": 24,
+        "x": 134.49,
+        "y": 0.0,
+        "z": 95.2,
+        "area": 256
+      }
+    },
+    {
+      "name": "Medicine Run",
+      "category": "Main",
+      "order": 7,
+      "primary_flag": 2311,
+      "secondary_flags": [
+        277
+      ],
+      "completion_event": "Complete Medicine Run",
+      "chain_eligible": true,
+      "events": [
+        "Meet Steven",
+        "Clean up... Register 6!",
+        "Complete Medicine Run"
+      ],
+      "description": {
+        "location": "Seon's Food and Stuff",
+        "trigger": "Open the back office hallway door in the Seon's Food and Stuff",
+        "description": "Find medicine for Brad and return to the Security Room."
+      },
+      "disp_flag": 2499,
+      "disp_end_flag": 2545,
+      "guide": {
+        "scq_no": 3,
+        "pos_tbl": 25,
+        "x": -182.51,
+        "y": 5.0,
+        "z": -211.01,
+        "area": 1280
+      }
+    },
+    {
+      "name": "Professor's Past",
+      "category": "Main",
+      "order": 8,
+      "primary_flag": 772,
+      "completion_event": "Complete Professor's Past",
+      "chain_eligible": true,
+      "events": [
+        "Complete Professor's Past"
+      ],
+      "description": {
+        "location": "Security Room",
+        "trigger": "Enter the Security Room",
+        "description": "Speak with Dr. Barnaby."
+      },
+      "disp_flag": 2500,
+      "disp_end_flag": 2546,
+      "guide": {
+        "scq_no": 4,
+        "pos_tbl": 26,
+        "x": 149.65,
+        "y": 9.25,
+        "z": 228.65,
+        "area": 288
+      }
+    },
+    {
+      "name": "Girl Hunting",
+      "category": "Main",
+      "order": 9,
+      "primary_flag": 284,
+      "completion_event": "Beat up Isabela",
+      "chain_eligible": true,
+      "events": [
+        "Complete Girl Hunting",
+        "Beat up Isabela"
+      ],
+      "description": {
+        "location": "North Plaza",
+        "trigger": "Approach the Seon's Food and Stuff entrance",
+        "description": "Fight Isabela on her motorcycle."
+      },
+      "disp_flag": 2500,
+      "disp_end_flag": 2546,
+      "guide": {
+        "scq_no": 4,
+        "pos_tbl": 26,
+        "x": 20.08,
+        "y": 5.0,
+        "z": -146.35,
+        "area": 1024
+      }
+    },
+    {
+      "name": "A Promise to Isabela",
+      "category": "Main",
+      "order": 10,
+      "primary_flag": 773,
+      "secondary_flags": [
+        286
+      ],
+      "disable_flags": [
+        292
+      ],
+      "completion_event": "Carry Isabela back to the Security Room",
+      "chain_eligible": true,
+      "events": [
+        "Complete Promise to Isabela",
+        "Save Isabela from the zombie",
+        "Complete Transporting Isabela",
+        "Carry Isabela back to the Security Room"
+      ],
+      "description": {
+        "location": "North Plaza",
+        "trigger": "Walk into the small room near the Leisure Park entrance",
+        "description": "Escort Isabela to the Security Room."
+      },
+      "disp_flag": 2501,
+      "disp_end_flag": 2547,
+      "guide": {
+        "scq_no": 5,
+        "pos_tbl": 27,
+        "x": -29.5,
+        "y": 5.0,
+        "z": -152.0,
+        "area": 1024
+      }
+    },
+    {
+      "name": "Santa Cabeza",
+      "category": "Main",
+      "order": 11,
+      "primary_flag": 292,
+      "secondary_flags": [
+        774
+      ],
+      "completion_event": "Complete Santa Cabeza",
+      "chain_eligible": true,
+      "events": [
+        "Complete Santa Cabeza"
+      ],
+      "description": {
+        "location": "Security Room",
+        "trigger": "Enter the Security Room",
+        "description": "Speak with Isabela about Santa Cabeza."
+      },
+      "disp_flag": 2502,
+      "disp_end_flag": 2548,
+      "guide": {
+        "scq_no": 6,
+        "pos_tbl": 28,
+        "x": 149.65,
+        "y": 9.25,
+        "z": 228.65,
+        "area": 288
+      }
+    },
+    {
+      "name": "The Last Resort",
+      "category": "Main",
+      "order": 12,
+      "primary_flag": 294,
+      "secondary_flags": [
+        775,
+        313
+      ],
+      "completion_event": "Complete Bomb Collector",
+      "chain_eligible": true,
+      "events": [
+        "Complete Bomb Collector"
+      ],
+      "description": {
+        "location": "Security Room",
+        "trigger": "Walk through the Security Room rear door",
+        "description": "Collect all bombs in the Maintenance Tunnels and return them."
+      },
+      "disp_flag": 2503,
+      "disp_end_flag": 2549,
+      "guide": {
+        "scq_no": 7,
+        "pos_tbl": 29,
+        "x": 149.65,
+        "y": 9.25,
+        "z": 228.65,
+        "area": 288
+      }
+    },
+    {
+      "name": "Hideout",
+      "category": "Main",
+      "order": 13,
+      "primary_flag": 776,
+      "secondary_flags": [
+        265
+      ],
+      "disable_flags": [
+        304
+      ],
+      "disable_on_unlock": [
+        355
+      ],
+      "completion_event": "Escort Isabela to Carlito's Hideout and have a chat",
+      "lua_event_tracking": false,
+      "chain_eligible": true,
+      "events": [
+        "Escort Isabela to Carlito's Hideout and have a chat"
+      ],
+      "description": {
+        "location": "Security Room",
+        "trigger": "Walk through the Security Room rear door",
+        "description": "Escort Isabela from the Security Room to Carlito's Hideout."
+      },
+      "disp_flag": 2504,
+      "disp_end_flag": 2550,
+      "guide": {
+        "scq_no": 8,
+        "pos_tbl": 30,
+        "x": 20.08,
+        "y": 5.0,
+        "z": -146.35,
+        "area": 1024
+      }
+    },
+    {
+      "name": "Jessie's Discovery",
+      "category": "Main",
+      "order": 14,
+      "primary_flag": 301,
+      "completion_event": "Complete Jessie's Discovery",
+      "chain_eligible": true,
+      "events": [
+        "Complete Jessie's Discovery"
+      ],
+      "description": {
+        "location": "Security Room",
+        "trigger": "Enter the Security Room",
+        "description": "Speak with Jessie."
+      },
+      "disp_flag": 2504,
+      "disp_end_flag": 2550,
+      "guide": {
+        "scq_no": 8,
+        "pos_tbl": 30,
+        "x": 170.99,
+        "y": 9.5,
+        "z": 111.42,
+        "area": 288
+      }
+    },
+    {
+      "name": "The Butcher",
+      "category": "Main",
+      "order": 15,
+      "primary_flag": 302,
+      "completion_event": "Complete The Butcher",
+      "chain_eligible": true,
+      "events": [
+        "Meet Larry",
+        "Complete The Butcher"
+      ],
+      "description": {
+        "location": "Meat Processing Area",
+        "trigger": "Enter the Meat Processing Area in the Maintenance Tunnels",
+        "description": "Fight the butcher."
+      },
+      "disp_flag": 2504,
+      "disp_end_flag": 2550,
+      "guide": {
+        "scq_no": 8,
+        "pos_tbl": 30,
+        "x": -242.84,
+        "y": -3.0,
+        "z": -259.46,
+        "area": 1537
+      }
+    },
+    {
+      "name": "The Facts",
+      "category": "Main",
+      "order": 16,
+      "primary_flag": 305,
+      "secondary_flags": [
+        348
+      ],
+      "completion_event": "Get bit!",
+      "chain_eligible": false,
+      "description": {
+        "location": "Security Room",
+        "trigger": "Walk into Paradise Plaza",
+        "description": "Head back to the Security Room to talk to Jessie. If time doesn't speed up after killing Zombie Jessie, go to the bench in the Security Room and fast-forward to the ending."
+      },
+      "disp_flag": 2505,
+      "guide": {
+        "scq_no": 9,
+        "pos_tbl": 31,
+        "x": -15.75,
+        "y": 7.0,
+        "z": -182.26,
+        "area": 1025
+      }
+    },
+    {
+      "name": "A Mother's Lament",
+      "category": "Survivor",
+      "flags": [
+        796
+      ],
+      "npcs": [
+        "Leah Stein"
+      ],
+      "completion_event": "Rescue Leah Stein",
+      "disp_flag": 2524,
+      "disp_end_flag": 860,
+      "guide": {
+        "scq_no": 72,
+        "pos_tbl": 15,
+        "x": 90.34,
+        "y": 0.0,
+        "z": 171.37
+      }
+    },
+    {
+      "name": "A Sick Man",
+      "category": "Survivor",
+      "flags": [
+        799
+      ],
+      "npcs": [
+        "Leroy McKenna"
+      ],
+      "completion_event": "Rescue Leroy McKenna",
+      "disp_flag": 2527,
+      "disp_end_flag": 863,
+      "guide": {
+        "scq_no": 75,
+        "pos_tbl": 18,
+        "x": -159.0,
+        "y": 6.0,
+        "z": -41.66
+      }
+    },
+    {
+      "name": "A Woman in Despair",
+      "category": "Survivor",
+      "flags": [
+        801,
+        295
+      ],
+      "npcs": [
+        "Simone Ravendark"
+      ],
+      "completion_event": "Rescue Simone Ravendark",
+      "disp_flag": 2529,
+      "disp_end_flag": 865,
+      "guide": {
+        "scq_no": 77,
+        "pos_tbl": 20,
+        "x": -102.44,
+        "y": 0.0,
+        "z": 84.11
+      }
+    },
+    {
+      "name": "Antique Lover",
+      "category": "Survivor",
+      "flags": [
+        792
+      ],
+      "npcs": [
+        "Floyd Sanders"
+      ],
+      "completion_event": "Rescue Floyd Sanders",
+      "disp_flag": 2520,
+      "disp_end_flag": 856,
+      "guide": {
+        "scq_no": 68,
+        "pos_tbl": 12,
+        "x": 97.5,
+        "y": 0.0,
+        "z": -37.35
+      }
+    },
+    {
+      "name": "Barricade Pair",
+      "category": "Survivor",
+      "flags": [
+        793,
+        802
+      ],
+      "npcs": [
+        "Burt Thompson",
+        "Aaron Swoop"
+      ],
+      "completion_event": "Rescue Burt Thompson",
+      "disp_flag": 2521,
+      "disp_end_flag": 857,
+      "guide": {
+        "scq_no": 69,
+        "pos_tbl": 13,
+        "x": 88.0,
+        "y": 8.2,
+        "z": 186.6
+      },
+      "extra_disp_flags": [
+        2530
+      ]
+    },
+    {
+      "name": "Dressed for Action",
+      "category": "Survivor",
+      "flags": [
+        814
+      ],
+      "npcs": [
+        "Kindell Johnson"
+      ],
+      "completion_event": "Rescue Kindell Johnson",
+      "disp_flag": 2537,
+      "disp_end_flag": 2489,
+      "repurposed": true,
+      "repurpose": {
+        "placeholder": "Floyd the Sommelier",
+        "title": "Dressed for Action",
+        "goal": "North Plaza",
+        "desc": "Rescue Kindell Johnson.",
+        "pos_tbl": 34,
+        "x": -37.59,
+        "y": 5.0,
+        "z": -164.68,
+        "area": 1024,
+        "pin_slot": 46
+      }
+    },
+    {
+      "name": "Gun Shop Standoff",
+      "category": "Survivor",
+      "flags": [
+        819,
+        823,
+        822
+      ],
+      "npcs": [
+        "Brett Styles",
+        "Alyssa Laurent",
+        "Jonathan Picardson"
+      ],
+      "completion_event": "Rescue Brett Styles",
+      "disp_flag": 2540,
+      "disp_end_flag": 2492,
+      "repurposed": true,
+      "repurpose": {
+        "placeholder": "Cheryl's Request",
+        "title": "Gun Shop Standoff",
+        "goal": "North Plaza",
+        "desc": "Rescue Brett Styles, Alyssa Laurent, and Jonathan Picardson.",
+        "pos_tbl": 37,
+        "x": 24.7,
+        "y": 5.0,
+        "z": -199.97,
+        "area": 1024,
+        "pin_slot": 49
+      }
+    },
+    {
+      "name": "Hanging by a Thread",
+      "category": "Survivor",
+      "flags": [
+        821,
+        817
+      ],
+      "npcs": [
+        "Nick Evans",
+        "Sally Mills"
+      ],
+      "completion_event": "Rescue Nick Evans",
+      "disp_flag": 2538,
+      "disp_end_flag": 2490,
+      "repurposed": true,
+      "repurpose": {
+        "placeholder": "Simone the Gunslinger",
+        "title": "Hanging by a Thread",
+        "goal": "Wonderland Plaza",
+        "desc": "Rescue Nick Evans and Sally Mills.",
+        "pos_tbl": 35,
+        "x": -100.46,
+        "y": 2.69,
+        "z": 46.06,
+        "area": 768,
+        "pin_slot": 47
+      }
+    },
+    {
+      "name": "Japanese Tourists",
+      "category": "Survivor",
+      "flags": [
+        797,
+        803
+      ],
+      "npcs": [
+        "Yuu Tanaka",
+        "Shinji Kitano"
+      ],
+      "completion_event": "Rescue Yuu Tanaka",
+      "disp_flag": 2525,
+      "disp_end_flag": 861,
+      "guide": {
+        "scq_no": 73,
+        "pos_tbl": 16,
+        "x": 138.0,
+        "y": 8.0,
+        "z": 195.5
+      },
+      "extra_disp_flags": [
+        2531
+      ]
+    },
+    {
+      "name": "Lovers",
+      "category": "Survivor",
+      "flags": [
+        800,
+        804
+      ],
+      "npcs": [
+        "Tonya Waters",
+        "Ross Folk"
+      ],
+      "completion_event": "Rescue Ross Folk",
+      "disp_flag": 2528,
+      "disp_end_flag": 864,
+      "guide": {
+        "scq_no": 76,
+        "pos_tbl": 19,
+        "x": 114.69,
+        "y": 8.0,
+        "z": 88.9
+      },
+      "extra_disp_flags": [
+        2532
+      ]
+    },
+    {
+      "name": "Restaurant Man",
+      "category": "Survivor",
+      "flags": [
+        791
+      ],
+      "npcs": [
+        "Ronald Shiner"
+      ],
+      "completion_event": "Rescue Ronald Shiner",
+      "disp_flag": 2519,
+      "disp_end_flag": 855,
+      "guide": {
+        "scq_no": 67,
+        "pos_tbl": 11,
+        "x": -40.6,
+        "y": 0.05,
+        "z": 129.66
+      }
+    },
+    {
+      "name": "Shadow of the North Plaza",
+      "category": "Survivor",
+      "flags": [
+        789
+      ],
+      "npcs": [
+        "David Bailey"
+      ],
+      "completion_event": "Rescue David Bailey",
+      "disp_flag": 2517,
+      "disp_end_flag": 853,
+      "guide": {
+        "scq_no": 65,
+        "pos_tbl": 9,
+        "x": 110.0,
+        "y": 0.0,
+        "z": 140.0
+      }
+    },
+    {
+      "name": "The Coward",
+      "category": "Survivor",
+      "flags": [
+        790
+      ],
+      "npcs": [
+        "Gordon Stalworth"
+      ],
+      "completion_event": "Rescue Gordon Stalworth",
+      "disp_flag": 2518,
+      "disp_end_flag": 854,
+      "guide": {
+        "scq_no": 66,
+        "pos_tbl": 10,
+        "x": -115.81,
+        "y": 5.0,
+        "z": -168.3
+      }
+    },
+    {
+      "name": "The Drunkard",
+      "category": "Survivor",
+      "flags": [
+        818
+      ],
+      "npcs": [
+        "Gil Jiminez"
+      ],
+      "completion_event": "Rescue Gil Jiminez",
+      "disp_flag": 2534,
+      "disp_end_flag": 2470,
+      "repurposed": true,
+      "repurpose": {
+        "placeholder": "Ronald's Appetite",
+        "title": "The Drunkard",
+        "goal": "Food Court",
+        "desc": "Rescue Gil Jiminez.",
+        "pos_tbl": 33,
+        "x": -88.66,
+        "y": 1.0,
+        "z": 140.27,
+        "area": 2560,
+        "pin_slot": 45
+      }
+    },
+    {
+      "name": "The Woman Left Behind",
+      "category": "Survivor",
+      "flags": [
+        815
+      ],
+      "npcs": [
+        "Susan Walsh"
+      ],
+      "completion_event": "Rescue Susan Walsh",
+      "disp_flag": 2539,
+      "disp_end_flag": 2491,
+      "repurposed": true,
+      "repurpose": {
+        "placeholder": "Paul's Present",
+        "title": "The Woman Left Behind",
+        "goal": "Wonderland Plaza",
+        "desc": "Rescue Susan Walsh.",
+        "pos_tbl": 36,
+        "x": -128.49,
+        "y": 1.63,
+        "z": 57.97,
+        "area": 768,
+        "pin_slot": 48
+      }
+    },
+    {
+      "name": "The Woman Who Didn't Make it",
+      "category": "Survivor",
+      "flags": [
+        794,
+        795
+      ],
+      "npcs": [
+        "Jolie Wu",
+        "Rachel Decker"
+      ],
+      "completion_event": "Rescue Jolie Wu",
+      "disp_flag": 2522,
+      "disp_end_flag": 858,
+      "guide": {
+        "scq_no": 70,
+        "pos_tbl": 14,
+        "x": -31.6,
+        "y": 0.05,
+        "z": 139.6
+      }
+    },
+    {
+      "name": "Twin Sisters",
+      "category": "Survivor",
+      "flags": [
+        812,
+        820
+      ],
+      "npcs": [
+        "Heather Tompkins",
+        "Pamela Tompkins"
+      ],
+      "completion_event": "Rescue Pamela Tompkins",
+      "disp_flag": 2533,
+      "disp_end_flag": 2469,
+      "repurposed": true,
+      "repurpose": {
+        "placeholder": "Kindell's Betrayal",
+        "title": "Twin Sisters",
+        "goal": "Paradise Plaza",
+        "desc": "Rescue Heather Tompkins and Pamela Tompkins.",
+        "pos_tbl": 32,
+        "x": 142.16,
+        "y": 0.0,
+        "z": 40.92,
+        "area": 512,
+        "pin_slot": 44
+      }
+    },
+    {
+      "name": "A Strange Group",
+      "category": "Psychopath",
+      "flags": [
+        783,
+        811,
+        2700,
+        2701,
+        2702,
+        2703,
+        2704
+      ],
+      "npcs": [
+        "Sean",
+        "Ray Mathison",
+        "Nathan Crabbe",
+        "Michelle Feltz",
+        "Cheryl Jones",
+        "Beth Shrake"
+      ],
+      "completion_event": "Kill Sean",
+      "disp_flag": 2511,
+      "disp_end_flag": 1157,
+      "guide": {
+        "scq_no": 36,
+        "pos_tbl": 4,
+        "x": 127.55,
+        "y": 0.0,
+        "z": -155.7
+      }
+    },
+    {
+      "name": "Above the Law",
+      "category": "Psychopath",
+      "flags": [
+        785,
+        2712,
+        2713,
+        2714,
+        2715
+      ],
+      "npcs": [
+        "Jo",
+        "Kay Nelson",
+        "Lilly Deacon",
+        "Kelly Carpenter",
+        "Janet Star"
+      ],
+      "completion_event": "Kill Jo",
+      "disp_flag": 2513,
+      "disp_end_flag": 1159,
+      "guide": {
+        "scq_no": 38,
+        "pos_tbl": 6,
+        "x": -104.0,
+        "y": 6.0,
+        "z": 12.5
+      }
+    },
+    {
+      "name": "Cletus",
+      "category": "Psychopath",
+      "flags": [
+        810
+      ],
+      "npcs": [
+        "Cletus"
+      ],
+      "completion_event": "Kill Cletus",
+      "clear_on_complete": true
+    },
+    {
+      "name": "Cut from the Same Cloth",
+      "category": "Psychopath",
+      "flags": [
+        779
+      ],
+      "npcs": [
+        "Kent Day 1"
+      ],
+      "completion_event": "Complete Kent's day 1 photoshoot",
+      "disp_flag": 2507,
+      "disp_end_flag": 2541,
+      "guide": {
+        "scq_no": 32,
+        "pos_tbl": 0,
+        "x": 161.98,
+        "y": 8.0,
+        "z": -7.54
+      }
+    },
+    {
+      "name": "Long Haired Punk",
+      "category": "Psychopath",
+      "flags": [
+        786,
+        2708,
+        2709
+      ],
+      "npcs": [
+        "Paul Carson",
+        "Mindy Baker",
+        "Debbie Willet"
+      ],
+      "completion_event": "Defeat Paul",
+      "disp_flag": 2514,
+      "disp_end_flag": 1160,
+      "guide": {
+        "scq_no": 39,
+        "pos_tbl": 7,
+        "x": -148.95,
+        "y": 0.0,
+        "z": 20.0
+      }
+    },
+    {
+      "name": "Mark of the Sniper",
+      "category": "Psychopath",
+      "flags": [
+        798,
+        808
+      ],
+      "npcs": [
+        "Wayne Blackwell",
+        "Roger Hall",
+        "Jack Hall",
+        "Thomas Hall"
+      ],
+      "completion_event": "Kill Roger and Jack (and Thomas if you want) and chat with Wayne",
+      "disp_flag": 2526,
+      "disp_end_flag": 862,
+      "guide": {
+        "scq_no": 74,
+        "pos_tbl": 17,
+        "x": -2.6,
+        "y": 0.05,
+        "z": 171.1
+      }
+    },
+    {
+      "name": "Out of Control",
+      "category": "Psychopath",
+      "flags": [
+        784,
+        2711
+      ],
+      "npcs": [
+        "Adam",
+        "Greg Simpson"
+      ],
+      "completion_event": "Kill Adam",
+      "disp_flag": 2512,
+      "disp_end_flag": 1158,
+      "guide": {
+        "scq_no": 37,
+        "pos_tbl": 5,
+        "x": -131.81,
+        "y": 8.94,
+        "z": 9.05
+      }
+    },
+    {
+      "name": "Photo Challenge",
+      "category": "Psychopath",
+      "disable_flags": [
+        342,
+        344,
+        385,
+        843,
+        1224,
+        1277
+      ],
+      "flags": [
+        779,
+        780,
+        1225
+      ],
+      "npcs": [
+        "Kent Day 2"
+      ],
+      "completion_event": "Complete Kent's day 2 photoshoot",
+      "disp_flag": 2508,
+      "disp_end_flag": 2542,
+      "guide": {
+        "scq_no": 33,
+        "pos_tbl": 1,
+        "x": 161.98,
+        "y": 8.0,
+        "z": -7.54
+      }
+    },
+    {
+      "name": "Photographer's Pride",
+      "category": "Psychopath",
+      "disable_flags": [
+        352,
+        386,
+        387,
+        389,
+        844,
+        2183,
+        2444,
+        2509
+      ],
+      "flags": [
+        781,
+        2710
+      ],
+      "npcs": [
+        "Kent Day 3",
+        "Tad Hawthorne"
+      ],
+      "completion_event": "Kill Kent on day 3",
+      "disp_flag": 2509,
+      "disp_end_flag": 1155,
+      "guide": {
+        "scq_no": 34,
+        "pos_tbl": 2,
+        "x": 161.98,
+        "y": 8.0,
+        "z": -7.54
+      }
+    },
+    {
+      "name": "The Convicts",
+      "category": "Psychopath",
+      "flags": [
+        807,
+        2698
+      ],
+      "npcs": [
+        "Convicts",
+        "Sophie Richard"
+      ],
+      "completion_event": "Watch the convicts kill that poor guy"
+    },
+    {
+      "name": "The Cult",
+      "category": "Psychopath",
+      "flags": [
+        787,
+        811,
+        2699
+      ],
+      "npcs": [
+        "Raincoats",
+        "Jennifer Gorman"
+      ],
+      "completion_event": "Witness Sean in Paradise Plaza"
+    },
+    {
+      "name": "The Hatchet Man",
+      "category": "Psychopath",
+      "flags": [
+        782,
+        2705,
+        2706,
+        2707
+      ],
+      "npcs": [
+        "Cliff",
+        "Josh Manning",
+        "Barbara Patterson",
+        "Rich Atkins"
+      ],
+      "completion_event": "Kill Cliff",
+      "disp_flag": 2510,
+      "disp_end_flag": 1156,
+      "guide": {
+        "scq_no": 35,
+        "pos_tbl": 3,
+        "x": 138.83,
+        "y": 14.0,
+        "z": 238.42
+      }
+    },
+    {
+      "name": "Maintenance Tunnel Access Key",
+      "category": "Special",
+      "flags": [
+        2082
+      ]
+    }
+  ],
+  "completion_flags": [
+    {
+      "flag": 129,
+      "event": "See the crashed helicopter"
+    },
+    {
+      "flag": 131,
+      "event": "Reach the end of the tunnel with Isabela"
+    },
+    {
+      "flag": 270,
+      "event": "Complete Backup for Brad"
+    },
+    {
+      "flag": 273,
+      "event": "Complete Temporary Agreement",
+      "scoop": "A Temporary Agreement"
+    },
+    {
+      "flag": 275,
+      "event": "Complete Image in the Monitor",
+      "scoop": "Image in the Monitor"
+    },
+    {
+      "flag": 277,
+      "event": "Complete Rescue the Professor",
+      "scoop": "Rescue the Professor"
+    },
+    {
+      "flag": 284,
+      "event": "Complete Professor's Past",
+      "scoop": "Professor's Past"
+    },
+    {
+      "flag": 292,
+      "event": "Carry Isabela back to the Security Room",
+      "scoop": "A Promise to Isabela"
+    },
+    {
+      "flag": 294,
+      "event": "Complete Santa Cabeza",
+      "scoop": "Santa Cabeza"
+    },
+    {
+      "flag": 302,
+      "event": "Complete Jessie's Discovery",
+      "scoop": "Jessie's Discovery"
+    },
+    {
+      "flag": 304,
+      "event": "Complete The Butcher",
+      "scoop": "The Butcher"
+    },
+    {
+      "flag": 312,
+      "event": "Ending A: Solve all of the cases and be on the helipad at 12pm"
+    },
+    {
+      "flag": 316,
+      "event": "Frank sees a sick-ass RC Drone"
+    },
+    {
+      "flag": 769,
+      "event": "Meet Jessie in the Warehouse",
+      "scoop": "Meet Jessie in the Warehouse"
+    },
+    {
+      "flag": 839,
+      "event": "Complete Bomb Collector",
+      "scoop": "The Last Resort"
+    },
+    {
+      "flag": 1288,
+      "event": "Beat up Isabela",
+      "scoop": "Girl Hunting"
+    },
+    {
+      "flag": 1292,
+      "event": "Kill Kent on day 3",
+      "scoop": "Photographer's Pride"
+    },
+    {
+      "flag": 1352,
+      "event": "Find Greg's secret passage"
+    },
+    {
+      "flag": 2192,
+      "event": "Complete Medicine Run",
+      "scoop": "Medicine Run"
+    },
+    {
+      "flag": 2308,
+      "event": "Escort Brad to see Dr Barnaby",
+      "scoop": "Backup for Brad"
+    },
+    {
+      "flag": 2322,
+      "event": "Escort Isabela to Carlito's Hideout and have a chat",
+      "scoop": "Hideout"
+    },
+    {
+      "flag": 2356,
+      "event": "Complete Memories"
+    }
+  ],
+  "survivor_positions": {
+    "0": {
+      "name": "Burt Thompson",
+      "x": -31.61,
+      "y": 0.05,
+      "z": 139.61,
+      "area": 2304,
+      "state": 0,
+      "hp": 5000
+    },
+    "1": {
+      "name": "Heather Tompkins",
+      "x": 142.16,
+      "y": 0.0,
+      "z": 40.92,
+      "area": 512,
+      "state": 0,
+      "hp": 3500
+    },
+    "2": {
+      "name": "Natalie Meyer",
+      "x": 200.12,
+      "y": 8.0,
+      "z": 62.15,
+      "area": 535,
+      "state": 0,
+      "hp": 3500
+    },
+    "3": {
+      "name": "Gordon Stalworth",
+      "x": -38.85,
+      "y": 0.05,
+      "z": 130.47,
+      "area": 2304,
+      "state": 0,
+      "hp": 5000
+    },
+    "4": {
+      "name": "Aaron Swoop",
+      "x": -31.41,
+      "y": 0.07,
+      "z": 130.23,
+      "area": 2304,
+      "state": 0,
+      "hp": 5000
+    },
+    "5": {
+      "name": "Jeff Meyer",
+      "x": 199.99,
+      "y": 8.0,
+      "z": 98.79,
+      "area": 535,
+      "state": 0,
+      "hp": 5000
+    },
+    "6": {
+      "name": "Pamela Tompkins",
+      "x": 151.82,
+      "y": -0.62,
+      "z": 40.28,
+      "area": 512,
+      "state": 0,
+      "hp": 3500
+    },
+    "7": {
+      "name": "Kindell Johnson",
+      "x": -37.59,
+      "y": 5.0,
+      "z": -164.68,
+      "area": 1024,
+      "state": 0,
+      "hp": 5000
+    },
+    "8": {
+      "name": "Jolie Wu",
+      "x": 90.34,
+      "y": 0.0,
+      "z": 171.37,
+      "area": 256,
+      "state": 0,
+      "hp": 3500
+    },
+    "9": {
+      "name": "Rachel Decker",
+      "x": 138.01,
+      "y": 8.0,
+      "z": 195.51,
+      "area": 256,
+      "state": 0,
+      "hp": 3500
+    },
+    "10": {
+      "name": "Susan Walsh",
+      "x": -128.49,
+      "y": 1.63,
+      "z": 57.97,
+      "area": 768,
+      "state": 0,
+      "hp": 3500
+    },
+    "11": {
+      "name": "Ronald Shiner",
+      "x": 97.77,
+      "y": 0.0,
+      "z": -37.35,
+      "area": 512,
+      "state": 0,
+      "hp": 5000
+    },
+    "12": {
+      "name": "Leah Stein",
+      "x": -9.79,
+      "y": 0.05,
+      "z": 170.89,
+      "area": 2304,
+      "state": 0,
+      "hp": 3500
+    },
+    "13": {
+      "name": "David Bailey",
+      "x": -115.81,
+      "y": 5.04,
+      "z": -168.3,
+      "area": 1024,
+      "state": 0,
+      "hp": 5000
+    },
+    "14": {
+      "name": "Floyd Sanders",
+      "x": 85.57,
+      "y": 8.2,
+      "z": 181.56,
+      "area": 256,
+      "state": 0,
+      "hp": 3500
+    },
+    "15": {
+      "name": "Yuu Tanaka",
+      "x": -159.01,
+      "y": 6.0,
+      "z": -41.66,
+      "area": 768,
+      "state": 0,
+      "hp": 5000
+    },
+    "16": {
+      "name": "Shinji Kitano",
+      "x": -158.87,
+      "y": 6.0,
+      "z": -40.07,
+      "area": 768,
+      "state": 0,
+      "hp": 5000
+    },
+    "17": {
+      "name": "Tonya Waters",
+      "x": -157.92,
+      "y": 6.05,
+      "z": 54.26,
+      "area": 768,
+      "state": 0,
+      "hp": 3500
+    },
+    "18": {
+      "name": "Ross Folk",
+      "x": -158.22,
+      "y": 6.1,
+      "z": 55.05,
+      "area": 768,
+      "state": 0,
+      "hp": 3500
+    },
+    "19": {
+      "name": "Wayne Blackwell",
+      "x": 114.69,
+      "y": 8.12,
+      "z": 88.91,
+      "area": 256,
+      "state": 0,
+      "hp": 5000
+    },
+    "20": {
+      "name": "Bill Brenton",
+      "x": 130.06,
+      "y": 8.67,
+      "z": 153.65,
+      "area": 256,
+      "state": 0,
+      "hp": 5000
+    },
+    "21": {
+      "name": "Sally Mills",
+      "x": -100.51,
+      "y": 2.7,
+      "z": 54.87,
+      "area": 768,
+      "state": 0,
+      "hp": 3500
+    },
+    "22": {
+      "name": "Nick Evans",
+      "x": -100.46,
+      "y": 2.69,
+      "z": 46.06,
+      "area": 768,
+      "state": 0,
+      "hp": 5000
+    },
+    "23": {
+      "name": "Leroy McKenna",
+      "x": -102.57,
+      "y": 0.0,
+      "z": 84.0,
+      "area": 768,
+      "state": 0,
+      "hp": 5000
+    },
+    "24": {
+      "name": "Simone Ravendark",
+      "x": 138.66,
+      "y": 0.0,
+      "z": 19.67,
+      "area": 512,
+      "state": 0,
+      "hp": 3500
+    },
+    "25": {
+      "name": "Gil Jiminez",
+      "x": -88.66,
+      "y": 1.0,
+      "z": 140.27,
+      "area": 2560,
+      "state": 0,
+      "hp": 5000
+    },
+    "26": {
+      "name": "Brett Styles",
+      "x": 24.7,
+      "y": 5.0,
+      "z": -199.97,
+      "area": 1024,
+      "state": 0,
+      "hp": 5000
+    },
+    "27": {
+      "name": "Jonathan Picardson",
+      "x": 24.7,
+      "y": 5.0,
+      "z": -197.12,
+      "area": 1024,
+      "state": 0,
+      "hp": 5000
+    },
+    "28": {
+      "name": "Alyssa Laurent",
+      "x": 24.7,
+      "y": 5.0,
+      "z": -193.28,
+      "area": 1024,
+      "state": 0,
+      "hp": 3500
+    },
+    "29": {
+      "name": "Paul Carson",
+      "x": -156.05,
+      "y": 0.0,
+      "z": 25.46,
+      "area": 768,
+      "state": 0,
+      "hp": 5000
+    },
+    "30": {
+      "name": "Sophie Richard",
+      "x": 13.49,
+      "y": 0.13,
+      "z": -30.34,
+      "area": 1792,
+      "state": 1,
+      "hp": 3500
+    },
+    "31": {
+      "name": "Jennifer Gorman",
+      "x": 115.19,
+      "y": 0.0,
+      "z": -53.54,
+      "area": 512,
+      "state": 5,
+      "hp": 3500
+    },
+    "32": {
+      "name": "Kent Swanson",
+      "x": 159.43,
+      "y": 7.0,
+      "z": 1.87,
+      "area": 512,
+      "state": 0,
+      "hp": 5000
+    },
+    "41": {
+      "name": "Ray Mathison",
+      "x": 131.6,
+      "y": -3.0,
+      "z": -141.48,
+      "area": 1283,
+      "state": 5,
+      "hp": 5000
+    },
+    "42": {
+      "name": "Nathan Crabbe",
+      "x": 123.87,
+      "y": -0.75,
+      "z": -151.52,
+      "area": 1283,
+      "state": 5,
+      "hp": 5000
+    },
+    "43": {
+      "name": "Michelle Feltz",
+      "x": 123.49,
+      "y": -3.0,
+      "z": -141.43,
+      "area": 1283,
+      "state": 5,
+      "hp": 3500
+    },
+    "44": {
+      "name": "Cheryl Jones",
+      "x": 144.22,
+      "y": -3.0,
+      "z": -135.75,
+      "area": 1283,
+      "state": 0,
+      "hp": 3500
+    },
+    "45": {
+      "name": "Beth Shrake",
+      "x": 137.86,
+      "y": -3.0,
+      "z": -136.95,
+      "area": 1283,
+      "state": 5,
+      "hp": 3500
+    },
+    "48": {
+      "name": "Josh Manning",
+      "x": 39.98,
+      "y": 5.0,
+      "z": -187.98,
+      "area": 1024,
+      "state": 0,
+      "hp": 5000
+    },
+    "49": {
+      "name": "Barbara Patterson",
+      "x": 42.49,
+      "y": 5.0,
+      "z": -187.71,
+      "area": 1024,
+      "state": 0,
+      "hp": 3500
+    },
+    "50": {
+      "name": "Rich Atkins",
+      "x": 43.55,
+      "y": 5.0,
+      "z": -184.78,
+      "area": 1024,
+      "state": 0,
+      "hp": 5000
+    },
+    "51": {
+      "name": "Mindy Baker",
+      "x": -160.99,
+      "y": 0.0,
+      "z": 28.15,
+      "area": 768,
+      "state": 1,
+      "hp": 3500
+    },
+    "52": {
+      "name": "Debbie Willet",
+      "x": -163.48,
+      "y": 0.0,
+      "z": 28.18,
+      "area": 768,
+      "state": 1,
+      "hp": 3500
+    },
+    "53": {
+      "name": "Tad Hawthorne",
+      "x": 174.08,
+      "y": 7.0,
+      "z": -7.62,
+      "area": 512,
+      "state": 0,
+      "hp": 5000
+    },
+    "54": {
+      "name": "Greg Simpson",
+      "x": -133.09,
+      "y": 8.98,
+      "z": 12.12,
+      "area": 768,
+      "state": 0,
+      "hp": 5000
+    },
+    "55": {
+      "name": "Kay Nelson",
+      "x": -90.7,
+      "y": 6.11,
+      "z": 12.5,
+      "area": 768,
+      "state": 5,
+      "hp": 3500
+    },
+    "56": {
+      "name": "Lilly Deacon",
+      "x": -96.6,
+      "y": 5.99,
+      "z": 13.98,
+      "area": 768,
+      "state": 5,
+      "hp": 3500
+    },
+    "57": {
+      "name": "Kelly Carpenter",
+      "x": -97.3,
+      "y": 5.99,
+      "z": 10.39,
+      "area": 768,
+      "state": 5,
+      "hp": 3500
+    },
+    "58": {
+      "name": "Janet Star",
+      "x": -94.8,
+      "y": 5.99,
+      "z": 17.11,
+      "area": 768,
+      "state": 5,
+      "hp": 3500
+    }
+  },
+  "main_case_guides": [
+    {
+      "case": 0,
+      "scq_no": 124,
+      "pos_tbl": 52
+    },
+    {
+      "case": 1,
+      "scq_no": 1,
+      "pos_tbl": 23
+    },
+    {
+      "case": 2,
+      "scq_no": 2,
+      "pos_tbl": 24
+    },
+    {
+      "case": 3,
+      "scq_no": 3,
+      "pos_tbl": 25
+    },
+    {
+      "case": 4,
+      "scq_no": 4,
+      "pos_tbl": 26
+    },
+    {
+      "case": 5,
+      "scq_no": 5,
+      "pos_tbl": 27
+    },
+    {
+      "case": 6,
+      "scq_no": 6,
+      "pos_tbl": 28
+    },
+    {
+      "case": 7,
+      "scq_no": 7,
+      "pos_tbl": 29
+    },
+    {
+      "case": 8,
+      "scq_no": 8,
+      "pos_tbl": 30
+    },
+    {
+      "case": 9,
+      "scq_no": 9,
+      "pos_tbl": 31
     }
   ]
 }

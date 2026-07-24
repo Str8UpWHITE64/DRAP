@@ -49,6 +49,14 @@ local npc_mgr = M:add_singleton("npc", "app.solid.gamemastering.NpcManager")
 
 local enabled = true
 local mode = "corrupt"          -- "corrupt" | "all_dead"
+
+-- Newborn grace: a freshly created NpcBaseInfo is indistinguishable from a
+-- corpse (all fields zeroed, isDead=true) until the engine's spawn init
+-- completes, which spans several area-load frames. Removing one too early
+-- amputates the engine's own repair, so a corrupt-looking record must persist
+-- across this window before removal is allowed.
+local NEWBORN_GRACE_SECONDS = 30.0
+local corrupt_first_seen = {}   -- stype -> os.clock() when first seen corrupt
 local last_area_index = nil
 local removed_this_session = 0
 local last_sweep_report = "never swept"
@@ -177,12 +185,14 @@ function M.sweep(reason)
     local stype_counts = {}
     local to_remove = {}
     local anomalies = 0
+    local seen_stypes = {}
 
     for _, info in Shared.iter_collection(list) do
         if info then
             local e = read_entry(info)
             if e and e.stype then
                 stype_counts[e.stype] = (stype_counts[e.stype] or 0) + 1
+                seen_stypes[e.stype] = true
 
                 local corrupt = e.is_dead and e.state == LIVE_STATE_UNKNOWN
                 local owning = eligible[e.stype]
@@ -200,6 +210,19 @@ function M.sweep(reason)
                     and ((mode == "corrupt" and corrupt)
                          or (mode == "all_dead" and e.is_dead))
                 if should_remove then
+                    local first = corrupt_first_seen[e.stype]
+                    if not first then
+                        corrupt_first_seen[e.stype] = os.clock()
+                        should_remove = false
+                        M.log(string.format(
+                            "newborn grace: %s -- removal deferred %ds",
+                            describe(e, owning), NEWBORN_GRACE_SECONDS))
+                    elseif os.clock() - first < NEWBORN_GRACE_SECONDS then
+                        should_remove = false
+                    end
+                end
+                if not corrupt then corrupt_first_seen[e.stype] = nil end
+                if should_remove then
                     e.owning = owning
                     table.insert(to_remove, e)
                 end
@@ -215,6 +238,22 @@ function M.sweep(reason)
             anomalies = anomalies + 1
             M.log(string.format("duplicate records: stype=%d (%s) x%d",
                 stype, stype_to_name[stype] or "?", n))
+        end
+    end
+
+    -- No-record-yet visibility: informational ONLY. Record creation is LAZY --
+    -- the engine creates a survivor's NpcBaseInfo at flag-flip or, failing
+    -- that, on first entry to their home area. A missing record is a normal
+    -- resting state, NOT damage, so it's not counted as an anomaly. Genuine
+    -- damage is: record still absent/zeroed AFTER entering the home area with
+    -- the scoop active.
+    for stype, scoop_name in pairs(eligible) do
+        if not seen_stypes[stype] then
+            M.log(string.format(
+                "no record yet: stype=%d (%s) scoop='%s' -- normal until "
+                .. "their area is visited; investigate only if it persists "
+                .. "after visiting",
+                stype, stype_to_name[stype] or "?", scoop_name))
         end
     end
 

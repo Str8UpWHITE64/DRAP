@@ -32,6 +32,8 @@ AP.TimeGate         = require("DRAP/TimeGate")
 AP.Scene            = require("DRAP/Scene")
 AP.DeathLink        = require("DRAP/trackers/DeathLink")
 AP.ScoopUnlocker     = require("DRAP/ScoopUnlocker")
+AP.MissionTruth      = require("DRAP/effects/MissionTruth")
+AP.MissionTruth.init({ scoop_unlocker = AP.ScoopUnlocker })
 AP.SceneFixups       = require("DRAP/SceneFixups")
 AP.GUI               = require("DRAP/GUI")
 AP.Notify            = require("DRAP/Notify")
@@ -40,6 +42,9 @@ AP.MsgEvents         = require("DRAP/MsgEvents")
 -- Debug modules. Noisy output (per-flag prints) and JSON persistence inside
 -- EventFlagExplorer gate themselves on GUI's "Debug Mode" checkbox.
 AP.EventFlagExplorer = require("DRAP/debug/EventFlagExplorer")
+-- FlagTraceRecorder self-registers its own re.on_frame (it must keep
+-- recording during cutscenes, where the isInGame-gated loop below stops).
+AP.FlagTraceRecorder = require("DRAP/debug/FlagTraceRecorder")
 
 local Shared = require("DRAP/Shared")
 local SharedData = require("DRAP/SharedData")
@@ -113,6 +118,7 @@ AP.effects.SaviorGoalEffects          = require("DRAP/effects/SaviorGoalEffects"
 AP.effects.BookSkills                 = require("DRAP/effects/BookSkills")
 AP.effects.BookGuards                 = require("DRAP/effects/BookGuards")
 AP.effects.NpcInfoSweeper             = require("DRAP/effects/NpcInfoSweeper")
+AP.effects.SurvivorRecovery           = require("DRAP/effects/SurvivorRecovery")
 AP.effects.PartyHudGuard              = require("DRAP/effects/PartyHudGuard")
 AP.effects.PlayerStats                = require("DRAP/effects/PlayerStats")
 AP.effects.PlayerBuffs                = require("DRAP/effects/PlayerBuffs")
@@ -268,16 +274,10 @@ AP_BRIDGE.AP_REF.on_slot_connected = function(slot_data)
     log("Slot connected: slot=" .. slot .. " seed=" .. seed)
 
     -- Bridge persistence FIRST: everything below may consult completed-check
-    -- history. In particular AP_LocationTriggers.setup() bootstraps its
-    -- counted-entry counters (Use N Microwaves/Stoves/Racks) from
-    -- AP_BRIDGE.is_completed(); loading the checks file after setup() ran
-    -- meant those counters reset to 0 every session.
-    --
-    -- Received items: the on_items_received filter (`index > last_item_index`)
-    -- splits the server's full item history into already-applied (skipped) vs
-    -- received-while-offline (applied as fresh). This is what stops traps from
-    -- re-firing on every reconnect -- on_replay="skip" is only consulted by
-    -- the manual reapply path, not the on-connect dispatch.
+    -- history (e.g. AP_LocationTriggers.setup() bootstraps its counted-entry
+    -- counters from AP_BRIDGE.is_completed(); loading checks after setup() ran
+    -- reset them to 0 every session). load_received_items likewise restores
+    -- last_item_index so offline items apply fresh without re-firing traps.
     AP_BRIDGE.set_received_items_filename(slot, seed)
     AP_BRIDGE.load_received_items()
 
@@ -551,6 +551,7 @@ re.on_frame(function()
     safe_on_frame(AP.SaveDiagnostics,  "SaveDiagnostics")
     safe_on_frame(AP.effects.BookGuards, "BookGuards")
     safe_on_frame(AP.effects.NpcInfoSweeper, "NpcInfoSweeper")
+    safe_on_frame(AP.effects.SurvivorRecovery, "SurvivorRecovery")
     safe_on_frame(AP.effects.PartyHudGuard, "PartyHudGuard")
 
     -- Debug modules

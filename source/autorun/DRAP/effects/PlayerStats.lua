@@ -126,13 +126,33 @@ end
 -- Canonical-state application
 ------------------------------------------------------------
 
+-- God-mode run-level override (debug): acceleration (how fast top speed is
+-- reached), distinct from the speed cap PlayerBuffs pins. nil = off. Routed
+-- through _target_values so normal enforcement keeps it asserted in connected
+-- sessions; PlayerBuffs' god tick re-calls this for vanilla_only sessions
+-- where stat enforcement doesn't run.
+local god_run_level = nil
+
+function M.set_god_run_level(level)
+    god_run_level = tonumber(level)
+    local psm = _psm()
+    if not psm then return end
+    if god_run_level then
+        pcall(function() psm:call("setPlayerRunLevel", god_run_level) end)
+    else
+        local t = _target_values()
+        pcall(function() psm:call("setPlayerRunLevel", t.run_level) end)
+    end
+end
+
 -- Compute target value for each stat (baseline + delta).
 local function _target_values()
     return {
         hp_max      = BASELINE.hp_max      + stat_deltas.hp_max,
         attack_pct  = BASELINE.attack_pct  + stat_deltas.attack_pct,
         throw_power = BASELINE.throw_power + stat_deltas.throw_power,
-        run_level   = BASELINE.run_level   + stat_deltas.run_level,
+        run_level   = god_run_level
+                      or (BASELINE.run_level + stat_deltas.run_level),
         item_buff   = BASELINE.item_buff   + stat_deltas.item_buff,
         speed_mul   = BASELINE.speed_mul   + stat_deltas.speed_mul,
     }

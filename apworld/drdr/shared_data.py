@@ -2,15 +2,10 @@
 # Single source of truth for static data shared between Python (AP generation)
 # and Lua (in-game enforcement): areas, time keys, items, survivors, stickers.
 #
-# The canonical JSON lives at source/data/drdr_shared.json (shipped alongside
-# the Lua mod). A copy is committed here at apworld/drdr/drdr_shared.json so
-# Python can find it when the apworld is packaged as a zip and the repo tree
-# is not available.
-#
-# IMPORTANT: source/data/drdr_shared.json and apworld/drdr/drdr_shared.json
-# MUST stay identical. Only edit the source/data/ copy, then run:
-#     cp source/data/drdr_shared.json apworld/drdr/drdr_shared.json
-# See source/data/README.md for the full sync rule.
+# Canonical JSON is source/data/drdr_shared.json; a copy committed at
+# apworld/drdr/drdr_shared.json lets Python read it from a packaged .apworld zip.
+# The two MUST stay identical -- edit only source/data/, then copy it here
+# (see source/data/README.md).
 
 import json
 from pathlib import Path
@@ -18,29 +13,21 @@ from typing import Any, Dict, List, Optional
 
 
 def _load() -> Dict[str, Any]:
-    """Load drdr_shared.json from the package. Works whether the apworld is
-    a packaged zip (.apworld) or an unpacked directory in the repo.
-
-    Order of attempts:
-      1. Filesystem path next to __file__ — works in the unpacked repo tree
-         and when Archipelago has extracted the .apworld to disk.
-      2. Loader-based read — works when __file__ points inside a zip
-         (.apworld packed) and the package's loader can serve resources
-         (zipimporter supports get_data(path)).
-      3. Repo dev fallback — for generators run outside the apworld package.
+    """Load drdr_shared.json, whether the apworld is a packaged .apworld zip
+    or an unpacked directory. Tries in order: (1) filesystem path next to
+    __file__, (2) loader.get_data for a zip-packed .apworld, (3) repo dev
+    fallback for generators run outside the package.
     """
-    # (1) Try the filesystem path first. Inside a packaged .apworld zip this
-    # path won't resolve, so Path.is_file() returns False and we fall through.
+    # (1) Filesystem path -- resolves in the unpacked tree; inside a zip
+    # is_file() is False and we fall through.
     here = Path(__file__).resolve().parent
     fs_path = here / "drdr_shared.json"
     if fs_path.is_file():
         with fs_path.open("r", encoding="utf-8") as f:
             return json.load(f)
 
-    # (2) Inside a zip: ask the module's loader for the file bytes. zipimporter
-    # exposes get_data(fullpath) where fullpath is the absolute path that
-    # __file__ claims to be. We derive the sibling drdr_shared.json path from
-    # __file__ and hand it to the loader.
+    # (2) Inside a zip: ask the loader for the bytes. zipimporter.get_data
+    # takes the absolute path __file__ claims, so we pass the sibling json path.
     loader = globals().get("__loader__")
     if loader is not None and hasattr(loader, "get_data"):
         resource_path = str(fs_path)
@@ -86,6 +73,28 @@ SCOOP_SURVIVORS: Dict[str, List[str]] = _DATA.get("scoop_survivors", {})
 # detects via MsgEvents and converts into AP location checks. See the
 # "ap_trigger_locations" section of drdr_shared.json for the schema.
 AP_TRIGGER_LOCATIONS: List[Dict[str, Any]] = _DATA.get("ap_trigger_locations", [])
+
+# Scoop definitions (schema v2): the single source both ScoopUnlocker.lua
+# (SCOOP_DATA / SCOOP_DESCRIPTIONS) and __init__.py's generation tables
+# (MAIN_SCOOP_NAMES / SCOOP_COMPLETION_MAP / SCOOP_EVENTS) are built from.
+SCOOPS: List[Dict[str, Any]] = _DATA.get("scoops", [])
+
+# Flag-id -> AP event mapping used by Lua's evFlagOn completion detection.
+# Kept here so the event strings can be validated against Locations.py.
+COMPLETION_FLAGS: List[Dict[str, Any]] = _DATA.get("completion_flags", [])
+
+if SCHEMA_VERSION >= 2 and not SCOOPS:
+    raise ValueError(
+        "drdr_shared.json declares schema_version >= 2 but has no 'scoops' "
+        "section -- the file is corrupt or mis-merged."
+    )
+
+
+def scoop_by_name(name: str) -> Optional[Dict[str, Any]]:
+    for s in SCOOPS:
+        if s.get("name") == name:
+            return s
+    return None
 
 
 def expand_trigger_location_names(entry: Dict[str, Any]) -> List[str]:

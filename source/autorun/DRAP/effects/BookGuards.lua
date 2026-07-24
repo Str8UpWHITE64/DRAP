@@ -7,17 +7,12 @@
 -- Currently registered:
 --   * book 68 (Brainwashing Tips / Cult Initiation Guide) -> Burt Thompson
 --     in the Barricade Pair scoop. The book overrides the persuade dialog
---     used to defuse Burt and can lock in his NpcBaseInfo in a hostile /
---     dead state when it's active during any engine evaluation of Burt's
---     spawn. Empirically: a tight "in-area + scoop-active" window doesn't
---     close the bug -- saves from a fresh playthrough where the symptom
---     was never visible still showed Burt corrupted on reload. So the
---     guard is now just: "in Al Fresca Plaza? suppress." That covers any
---     spawn evaluation the engine does while the player is in s900,
---     regardless of scoop state or Burt's current condition. Once the
---     player leaves the area the book reactivates for normal use.
---     Run `_G.drap_burt_reset()` for recovery when an existing save
---     already has Burt in a bad state.
+--     that defuses Burt and can lock his NpcBaseInfo into a hostile/dead
+--     state during any engine evaluation of his spawn. A tight
+--     "in-area + scoop-active" window didn't close the bug, so the guard is
+--     simply "in Al Fresca Plaza (s900)? suppress", regardless of scoop state
+--     or Burt's condition; the book reactivates on leaving the area.
+--     Run `_G.drap_burt_reset()` to recover a save already in a bad state.
 
 local BookSkills = require("DRAP/effects/BookSkills")
 local Shared = require("DRAP/Shared")
@@ -60,15 +55,12 @@ end
 -- Guard predicates
 ------------------------------------------------------------
 
--- Simple area-gated suppression. The earlier predicate also gated on scoop
--- completion + Burt's mLiveState (using searchInformation as a probe), but
--- field reports showed Burt's NpcBaseInfo getting corrupted on saves where
--- the player never visibly hit the bug -- the tight window wasn't closing
--- the engine's evaluation surface. The simpler "any time we're in s900
--- with the book granted, suppress it" closes that window for the whole
--- area regardless of scoop state. Side benefit: no per-frame
--- searchInformation(0) call, which was a possible source of zombie
--- BaseInfo creation if the engine creates entries on miss.
+-- Area-gated suppression. An earlier predicate also gated on scoop completion
+-- + Burt's mLiveState (via a searchInformation probe), but that tight window
+-- didn't close the bug. Suppressing whenever we're in s900 with the book
+-- granted covers the whole area regardless of scoop state, and drops the
+-- per-frame searchInformation(0) call (a possible source of zombie BaseInfo
+-- creation on miss).
 local function should_suppress_brainwashing()
     if not BookSkills.is_granted(BOOK_BRAINWASHING) then return false end
     return get_current_area_index() == AL_FRESCA_AREA_INDEX
@@ -202,6 +194,32 @@ _G.drap_burt_reset = function()
             .. "Run drap_npc_dump_list() to verify.",
             removed, total, BURT_NPC_ID))
     end
+end
+
+-- Generalized per-survivor record reset: drap_burt_reset for any stype.
+-- Usage: drap_npc_reset(1) or drap_npc_reset("Heather Tompkins").
+-- Removes every NpcBaseInfo entry for that survivor so the engine recreates
+-- a clean one on next area entry. Recovery tool for the Burt-class
+-- "won't spawn / spawns dead" persisted-record damage.
+_G.drap_npc_reset = function(stype_or_name)
+    local stype = tonumber(stype_or_name)
+    if not stype and type(stype_or_name) == "string" then
+        local SharedData = require("DRAP/SharedData")
+        for _, row in ipairs(SharedData.survivors()) do
+            if row.name == stype_or_name then
+                stype = tonumber(row.item_number)
+                break
+            end
+        end
+    end
+    if not stype then
+        log("drap_npc_reset: pass a survivor stype number or exact display name")
+        return
+    end
+    local removed, total = clear_all_entries_for_stype(stype)
+    log(string.format("drap_npc_reset: removed %d/%d entries for stype %d. "
+        .. "Leave the area and return so the engine recreates the record.",
+        removed, total, stype))
 end
 
 -- Generalized cleanup: for every stype that appears more than once in

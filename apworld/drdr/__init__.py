@@ -17,97 +17,96 @@ from .shared_data import (
     AREA_KEY_NAMES, TIME_KEY_NAMES,
     AP_TRIGGER_LOCATIONS, expand_trigger_location_names,
     trigger_location_required_regions,
+    SCOOPS, COMPLETION_FLAGS,
 )
 
-# Main scoop names eligible for randomized ordering (ScoopSanity)
-# These must match the scoop names in ScoopUnlocker.lua's SCOOP_DATA
-# and the item names in Items.py (category SCOOP, dr_code 3000-3012)
+# Scoop tables below are derived from drdr_shared.json (schema v2), the same
+# file ScoopUnlocker.lua builds SCOOP_DATA from. _validate_shared_scoops()
+# turns any name mismatch into a loud generation failure.
+
+# Main scoop names eligible for randomized ordering (ScoopSanity), in
+# vanilla order. "The Facts" is main but chain-ineligible (auto-triggered
+# after the chain completes).
 MAIN_SCOOP_NAMES = [
-    "Backup for Brad",
-    "A Temporary Agreement",
-    "Image in the Monitor",
-    "Rescue the Professor",
-    "Medicine Run",
-    "Professor's Past",
-    "Girl Hunting",
-    "A Promise to Isabela",
-    "Santa Cabeza",
-    "The Last Resort",
-    "Hideout",
-    "Jessie's Discovery",
-    "The Butcher",
+    s["name"]
+    for s in sorted(
+        (s for s in SCOOPS if s.get("category") == "Main" and s.get("chain_eligible")),
+        key=lambda s: s.get("order", 0),
+    )
 ]
 
-# Maps each main scoop name to its completion event location name
-# (from ScoopUnlocker.lua SCOOP_DATA completion_event fields)
+# Each main scoop name -> its completion event location name.
 SCOOP_COMPLETION_MAP = {
-    "Backup for Brad": "Escort Brad to see Dr Barnaby",
-    "A Temporary Agreement": "Complete Temporary Agreement",
-    "Image in the Monitor": "Complete Image in the Monitor",
-    "Rescue the Professor": "Complete Rescue the Professor",
-    "Medicine Run": "Complete Medicine Run",
-    "Professor's Past": "Complete Professor's Past",
-    "Girl Hunting": "Beat up Isabela",
-    "A Promise to Isabela": "Carry Isabela back to the Security Room",
-    "Santa Cabeza": "Complete Santa Cabeza",
-    "The Last Resort": "Complete Bomb Collector",
-    "Hideout": "Escort Isabela to Carlito's Hideout and have a chat",
-    "Jessie's Discovery": "Complete Jessie's Discovery",
-    "The Butcher": "Complete The Butcher",
+    s["name"]: s["completion_event"]
+    for s in SCOOPS
+    if s.get("category") == "Main" and s.get("chain_eligible")
+    and s.get("completion_event")
 }
 
 # Ordered event chain per scoop (first event -> completion). Drives the
 # ScoopSanity per-event override loop in set_rules; the last entry of each
 # list must equal SCOOP_COMPLETION_MAP[scoop].
 SCOOP_EVENTS = {
-    "Backup for Brad": [
-        "Complete Backup for Brad",
-        "Escort Brad to see Dr Barnaby",
-    ],
-    "A Temporary Agreement": [
-        "Complete Temporary Agreement",
-    ],
-    "Image in the Monitor": [
-        "Complete Image in the Monitor",
-    ],
-    "Rescue the Professor": [
-        "Complete Rescue the Professor",
-    ],
-    "Medicine Run": [
-        "Meet Steven",
-        "Clean up... Register 6!",
-        "Complete Medicine Run",
-    ],
-    "Professor's Past": [
-        "Complete Professor's Past",
-    ],
-    "Girl Hunting": [
-        "Complete Girl Hunting",
-        "Beat up Isabela",
-    ],
-    "A Promise to Isabela": [
-        "Complete Promise to Isabela",
-        "Save Isabela from the zombie",
-        "Complete Transporting Isabela",
-        "Carry Isabela back to the Security Room",
-    ],
-    "Santa Cabeza": [
-        "Complete Santa Cabeza",
-    ],
-    "The Last Resort": [
-        "Complete Bomb Collector",
-    ],
-    "Hideout": [
-        "Escort Isabela to Carlito's Hideout and have a chat",
-    ],
-    "Jessie's Discovery": [
-        "Complete Jessie's Discovery",
-    ],
-    "The Butcher": [
-        "Meet Larry",
-        "Complete The Butcher",
-    ],
+    s["name"]: s["events"] for s in SCOOPS if s.get("events")
 }
+
+
+def _validate_shared_scoops() -> None:
+    """Fail generation loudly if the shared scoop data disagrees with the
+    item/location tables. Every failure here used to be a silent bug: a
+    check that never sends, or an item that unlocks nothing."""
+    problems: List[str] = []
+
+    all_locations = set(location_dictionary.keys())
+    all_items = set(item_dictionary.keys())
+
+    for s in SCOOPS:
+        name = s.get("name", "?")
+        # Items exist for chain-eligible mains and all side scoops.
+        # "Special" entries and chain-ineligible mains ("The Facts",
+        # auto-triggered after the chain) are never AP items.
+        needs_item = (
+            s.get("category") in ("Survivor", "Psychopath")
+            or (s.get("category") == "Main" and s.get("chain_eligible"))
+        )
+        if needs_item and name not in all_items:
+            problems.append(f"scoop '{name}' is not an item in Items.py")
+        event = s.get("completion_event")
+        if event and event not in all_locations:
+            problems.append(
+                f"scoop '{name}' completion_event '{event}' is not a "
+                "location in Locations.py")
+        for ev in s.get("events", []):
+            if ev not in all_locations:
+                problems.append(
+                    f"scoop '{name}' event '{ev}' is not a location in "
+                    "Locations.py")
+
+    for name, events in SCOOP_EVENTS.items():
+        if events and name in SCOOP_COMPLETION_MAP \
+                and events[-1] != SCOOP_COMPLETION_MAP[name]:
+            problems.append(
+                f"scoop '{name}': last event '{events[-1]}' != "
+                f"completion_event '{SCOOP_COMPLETION_MAP[name]}'")
+
+    for row in COMPLETION_FLAGS:
+        event = row.get("event")
+        if event and event not in all_locations:
+            problems.append(
+                f"completion_flags[{row.get('flag')}] event '{event}' is "
+                "not a location in Locations.py")
+
+    if len(MAIN_SCOOP_NAMES) != 13:
+        problems.append(
+            f"expected 13 chain-eligible main scoops, got {len(MAIN_SCOOP_NAMES)}")
+
+    if problems:
+        raise ValueError(
+            "drdr_shared.json scoop data does not match Items/Locations:\n  "
+            + "\n  ".join(problems))
+
+
+_validate_shared_scoops()
 
 # Region(s) the player must physically reach to complete each scoop.
 # Scoops in the Security Room (always reachable) are omitted.
@@ -803,13 +802,9 @@ class DRWorld(World):
                 _t = _entry.get("type")
                 _max = int(_entry.get("max_count", 0))
 
-                # If the entry references a required location (e.g. First Aid
-                # Kit needs Steven defeated at "Clean up... Register 6!"),
-                # check that location was actually created in this seed --
-                # it might not exist when the corresponding category is
-                # disabled (Savior + ScoopSanity disables MAIN_SCOOP).
-                # Drop the gate gracefully when the location is missing;
-                # region gating still applies.
+                # A required-predecessor location may not exist this seed
+                # (e.g. Savior+ScoopSanity disables MAIN_SCOOP). Drop the gate
+                # gracefully when missing; region gating still applies.
                 if _req_loc:
                     try:
                         self.multiworld.get_location(_req_loc, self.player)
@@ -990,12 +985,11 @@ class DRWorld(World):
 
             set_rule(self.multiworld.get_location("Ending S: Beat up Brock with your bare fists!", self.player), lambda state: state.can_reach_location("Fight a tank and win", self.player))
 
-        # ScoopSanity: gate every event of every scoop uniformly on
-        # (item received, previous scoop's completion, scoop regions,
-        # position-level gate). Replaces the vanilla event-to-event chain
-        # so randomized order can't strand intermediate events behind the
-        # vanilla predecessor. Day items aren't checked here -- the engine
-        # sets time flags directly on chain advance in ScoopSanity.
+        # ScoopSanity: gate every event of every scoop uniformly on item
+        # received, previous scoop's completion, scoop regions, and the
+        # position-level gate. Replaces the vanilla event-to-event chain so
+        # randomized order can't strand events behind the vanilla predecessor.
+        # Day items aren't checked -- the engine sets time flags on chain advance.
         if self.options.scoop_sanity and self.scoop_order:
             for i, scoop_name in enumerate(self.scoop_order):
                 prereq = ("Meet Jessie in the Warehouse" if i == 0

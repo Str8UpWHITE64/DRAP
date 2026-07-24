@@ -34,13 +34,14 @@ local function ensure_loaded()
     end
     data = loaded
     log(string.format(
-        "Loaded schema_version=%s (areas=%d, time_keys=%d, items=%d, survivors=%d, stickers=%d)",
+        "Loaded schema_version=%s (areas=%d, time_keys=%d, items=%d, survivors=%d, stickers=%d, scoops=%d)",
         tostring(data.schema_version),
         data.areas and #data.areas or 0,
         data.time_keys and #data.time_keys or 0,
         data.items and #data.items or 0,
         data.survivors and #data.survivors or 0,
-        data.stickers and #data.stickers or 0
+        data.stickers and #data.stickers or 0,
+        data.scoops and #data.scoops or 0
     ))
     return true
 end
@@ -85,6 +86,37 @@ end
 function M.scoop_survivors()
     ensure_loaded()
     return (data and data.scoop_survivors) or {}
+end
+
+-- Scoop definitions (schema v2): ScoopUnlocker builds SCOOP_DATA /
+-- SCOOP_DESCRIPTIONS from these; the Python generation side derives its
+-- MAIN_SCOOP_NAMES / SCOOP_COMPLETION_MAP / SCOOP_EVENTS from the same
+-- entries and validates every name against Items.py / Locations.py.
+function M.scoops()
+    ensure_loaded()
+    return (data and data.scoops) or {}
+end
+
+-- Flag-id -> AP event mapping for ScoopUnlocker's evFlagOn completion
+-- detection. Event strings are validated as real AP locations at
+-- generation time.
+function M.completion_flags()
+    ensure_loaded()
+    return (data and data.completion_flags) or {}
+end
+
+-- Main-case objective-pin indices (case -> scq_no/pos_tbl), the
+-- redirect-FROM set MissionTruth rewrites at getSCQPosData.
+function M.main_case_guides()
+    ensure_loaded()
+    return (data and data.main_case_guides) or {}
+end
+
+-- Bundled survivor spawn positions (stype-string -> {name, x, y, z, area,
+-- state, hp}). SurvivorRecovery overlays locally-harvested positions on top.
+function M.survivor_positions()
+    ensure_loaded()
+    return (data and data.survivor_positions) or {}
 end
 
 function M.schema_version()

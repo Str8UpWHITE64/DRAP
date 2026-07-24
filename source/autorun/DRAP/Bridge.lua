@@ -9,18 +9,14 @@ local Ledger = require("DRAP/LocationLedger")
 local M = Shared.create_module("Bridge")
 
 ------------------------------------------------------------
--- Module-level state. Declared up front so every function in the file
--- can reference them, regardless of source position. Lua module-level
--- locals are only visible to code that follows their declaration --
--- declaring late means earlier functions silently fall through to the
--- (nil) global lookup, which is what caused checks/items to never
--- record locally.
+-- Module-level state. Declared up front: Lua module-level locals are only
+-- visible to code that follows them, so late declaration would make earlier
+-- functions fall through to (nil) globals and silently fail to record.
 ------------------------------------------------------------
 
 -- Location checks live in DRAP/LocationLedger (one persisted document per
--- slot/seed; Bug 5 Phases 1-2). These cache the identifiers between
--- set_completed_checks_filename() and load_completed_checks(), and drive
--- the sync-on-connect state machine in M.on_frame.
+-- slot/seed). These cache the identifiers between set_completed_checks_filename()
+-- and load_completed_checks(), and drive the sync-on-connect state machine.
 local ledger_slot = nil
 local ledger_seed = nil
 local sync_needed = false
@@ -33,9 +29,7 @@ local RECEIVED_ITEMS_BY_NAME = {}
 local last_item_index = -1
 local RECEIVED_ITEMS_FILE = nil
 
--- Forward-declared local functions. M.check (early in the file) references
--- functions defined later; without these declarations the calls resolve to
--- nil globals.
+-- Forward declaration: M.check references save_received_items, defined later.
 local save_received_items
 
 ------------------------------------------------------------
@@ -264,43 +258,26 @@ end
 
 local _warned_no_checks_file = false
 
--- Pre-connect journal: checks detected before the first slot-connect of a
--- session have no per-slot/seed file yet. Without a journal they were lost
--- permanently -- the trackers are edge-triggered and never refire. The
--- journal is global (slot/seed unknown at write time) and is merged into
--- whichever slot connects next, which is the save the player was playing.
-local PENDING_CHECKS_FILE = "./AP_DRDR_Items/AP_DRDR_checks_pending.json"
+-- Pre-connect journal: checks detected before the first slot-connect are held
+-- IN MEMORY and merged into the slot that connects later in the SAME session.
+-- Deliberately not persisted -- the old on-disk journal had no slot/seed
+-- identity, so disconnected-play checks got attributed to whatever seed
+-- connected next. Losing pre-connect detections on a crash is the lesser evil;
+-- the trackers re-derive nearly everything from save state next session.
 local PENDING_CHECKS = {}
 
-local function save_pending_checks()
-    local list = {}
-    for name, _ in pairs(PENDING_CHECKS) do
-        table.insert(list, name)
-    end
-    table.sort(list)
-    Shared.save_json(PENDING_CHECKS_FILE, { checks = list }, 4, M.log)
-end
-
-local function load_pending_checks()
-    PENDING_CHECKS = {}
-    -- Existence check first: json.load_file logs a loud parse error for a
-    -- missing/empty file, which reads like data loss to players. io.open
-    -- resolves relative to reframework/data, same root as json.load_file
-    -- (verified: probe scripts' io.open logs land there).
-    local probe = io.open(PENDING_CHECKS_FILE, "r")
-    if not probe then return end
-    local has_content = probe:read(1) ~= nil
-    probe:close()
-    if not has_content then return end
-
-    local data = Shared.load_json(PENDING_CHECKS_FILE)
-    if data and data.checks then
-        for _, name in ipairs(data.checks) do
-            PENDING_CHECKS[name] = true
-        end
+-- One-time purge of the legacy on-disk journal so existing installs can't
+-- replay stale entries through an older mod version's merge path.
+do
+    local stale = "./AP_DRDR_Items/AP_DRDR_checks_pending.json"
+    local probe = io.open(stale, "r")
+    if probe then
+        probe:close()
+        local ok = os.remove(stale)
+        M.log("Removed legacy pre-connect journal ("
+            .. (ok and "ok" or "failed") .. "): " .. stale)
     end
 end
-load_pending_checks()
 
 function M.check(loc_name)
     M.log("Sending location check: " .. tostring(loc_name))
@@ -309,16 +286,13 @@ function M.check(loc_name)
     if loc_name and Ledger.is_init() then
         Ledger.record(loc_name, "check")
     elseif loc_name then
-        -- Not slot-connected yet: journal the check so the next slot-connect
-        -- merges and sends it.
-        if not PENDING_CHECKS[loc_name] then
-            PENDING_CHECKS[loc_name] = true
-            save_pending_checks()
-        end
+        -- Not slot-connected yet: journal the check (in memory, this
+        -- session only) so a later connect in this session merges it.
+        PENDING_CHECKS[loc_name] = true
         if not _warned_no_checks_file then
             _warned_no_checks_file = true
-            M.log("Note: not slot-connected yet; checks are journaled to "
-                .. PENDING_CHECKS_FILE .. " and will merge+send on connect.")
+            M.log("Note: not slot-connected yet; checks are journaled in-session "
+                .. "and will merge+send on connect.")
         end
     end
 
@@ -359,19 +333,16 @@ local function safe_filename(s)
 end
 
 ------------------------------------------------------------
--- Location Ledger integration (Bug 5 Phases 1-2)
+-- Location Ledger integration
 --
--- The ledger (DRAP/LocationLedger) is the single store for every location
--- this slot/seed has detected. Bridge owns id resolution and traffic:
---   * server acks arrive via AP_REF.on_location_checked (full checked set
---     at connect + deltas), marking entries acked and reverse-importing
---     server-known checks we lost locally;
---   * a sync state machine (M.on_frame) batch-resends every unacked name
---     once the data package can resolve ids, retrying every ~2s -- this
---     replaces the old one-shot resend that silently dropped names when
---     the data package raced the connect.
--- The legacy per-name COMPLETED_CHECKS file is imported once and kept on
--- disk for rollback; it is no longer written.
+-- The ledger (DRAP/LocationLedger) is the single store for every location this
+-- slot/seed has detected. Bridge owns id resolution and traffic:
+--   * server acks arrive via AP_REF.on_location_checked (full set at connect +
+--     deltas), marking entries acked and reverse-importing checks we lost;
+--   * a sync state machine batch-resends every unacked name once ids resolve,
+--     retrying every ~2s (replaces a one-shot resend that dropped names when
+--     the data package raced the connect).
+-- The legacy per-name file is imported once and kept for rollback; not written.
 ------------------------------------------------------------
 
 -- Sync diagnostics persist to a file (console prints don't reach the
@@ -399,8 +370,8 @@ local function coerce_id(id)
 end
 
 -- Resolve a location id to its name. The mirror table only fills when
--- data_package_changed fires, which it doesn't when apclientpp's package
--- cache is current -- so fall through to the client's own resolver.
+-- data_package_changed fires (which it skips when apclientpp's cache is
+-- current), so fall through to the client's own resolver.
 local function location_name_from_id(key)
     local name = AP_LOCATIONS_BY_ID[key]
     if name then return name end
@@ -498,10 +469,7 @@ function M.load_completed_checks()
             merged = merged + 1
         end
     end
-    if next(PENDING_CHECKS) then
-        PENDING_CHECKS = {}
-        save_pending_checks()
-    end
+    PENDING_CHECKS = {}
     if merged > 0 then
         M.log(string.format("merged %d pre-connect check(s) into the ledger", merged))
     end
@@ -509,10 +477,9 @@ function M.load_completed_checks()
     drain_pending_acks()
 end
 
--- Public getter: has this location already been recorded as checked? Used by
--- AP_LocationTriggers to bootstrap per-counted-entry counters on startup --
--- e.g. if "Walk on 4 Treadmills" was sent in a previous session, the
--- treadmill counter starts at 4 so the 5th walk correctly sends count 5.
+-- Has this location already been recorded as checked? AP_LocationTriggers uses
+-- it to bootstrap per-counted-entry counters on startup (e.g. resume a
+-- treadmill counter at 4 so the 5th walk sends count 5).
 function M.is_completed(loc_name)
     return Ledger.is_checked(loc_name)
 end
@@ -530,10 +497,9 @@ function M.resend_all_checks()
     M.arm_sync()
 end
 
--- Diagnostic ack pull via the DataStorage API: the server keeps a
--- read-only key "_read_location_checks_{team}_{slot}" with the slot's
--- checked location ids. Normal ack flow is the location_checked push
--- (fires on RoomUpdate); this pull remains for manual diagnostics.
+-- Diagnostic ack pull via DataStorage: the server keeps a read-only key
+-- "_read_location_checks_{team}_{slot}" with the slot's checked ids. Normal
+-- ack flow is the location_checked push; this pull is for manual diagnostics.
 local pull_diagnosed = false
 local ack_storage_key = nil
 
@@ -673,8 +639,7 @@ local function try_sync()
                 and string.format(" (%d name(s) not in this seed's data package)", unresolved)
                 or ""))
         sync_needed = false
-        -- The server answers this batch with a RoomUpdate carrying the full
-        -- checked set; the location_checked push applies it as acks.
+        -- Server answers with a RoomUpdate; the location_checked push acks it.
     end
 end
 
@@ -686,20 +651,14 @@ local function sync_tick()
         last_sync_try = os.clock()
         pcall(try_sync)
     end
-    -- NOTE: no periodic datastorage pull. Acks arrive via the
-    -- location_checked push, which fires on every RoomUpdate -- and the
-    -- connect-time batch resend itself triggers one, so every session
-    -- reconciles without polling. (The datastorage Get response map also
-    -- marshals empty on this binding; drap_bridge_pull_acks remains for
-    -- diagnostics.)
+    -- No periodic datastorage pull: the location_checked push (fired by every
+    -- RoomUpdate, including the connect-time resend) reconciles without polling.
 end
 
--- Console: dump the APClient binding's available methods (sol2 usertype
--- metatable walk). Used to discover whether this lua-apclientpp build
--- exposes checked-location state under any name -- get_checked_locations
--- is absent (verified 2026-07-05) and the location_checked push never
--- fires, so if nothing shows up here, acks are permanently unavailable on
--- this DLL and resend-on-connect is the accepted sync mechanism.
+-- Console: dump the APClient binding's methods (sol2 metatable walk). Used to
+-- check whether this lua-apclientpp build exposes checked-location state under
+-- any name; if nothing shows, acks are unavailable and resend-on-connect is
+-- the accepted sync mechanism.
 _G.drap_bridge_client_methods = function()
     if not AP_REF.APClient then
         print("[Bridge] no APClient (connect first)")
@@ -756,8 +715,7 @@ local bound_once = false
 
 re.on_frame(function()
     -- Handler rebinding must not wait for gameplay: connects happen at the
-    -- title screen, where main's module loop (which used to trigger this
-    -- via M.on_frame) never runs.
+    -- title screen, where main's in-game module loop never runs.
     if not bound_once and AP_REF.APClient then
         bound_once = true
         pcall(M.bind_client)
@@ -897,14 +855,11 @@ function M.reset_received_items()
 end
 
 -- Restore RECEIVED_ITEMS / last_item_index from disk on slot connect. The
--- on_items_received filter (`index > last_item_index`) then naturally splits
--- the server's item-history replay into:
---   * already-applied items  -> skipped (index <= last_item_index)
---   * received-while-offline  -> applied as fresh (index > last_item_index)
--- Without this, reset_received_items() wipes last_item_index back to -1 and
--- every history item gets re-applied as fresh -- which causes traps with
--- on_replay="skip" to fire again on every reconnect, since on_replay is
--- only consulted by the manual reapply path, not the on-connect dispatch.
+-- on_items_received filter (`index > last_item_index`) then splits the server's
+-- history replay into already-applied (skipped) vs received-while-offline
+-- (applied fresh). Without it, last_item_index resets to -1 and every history
+-- item re-applies as fresh -- which re-fires on_replay="skip" traps on every
+-- reconnect, since on_replay is only consulted by the manual reapply path.
 function M.load_received_items()
     if not RECEIVED_ITEMS_FILE then
         M.log("load_received_items: filename not set yet")
@@ -952,16 +907,14 @@ end
 -- Item Handlers Registry
 ------------------------------------------------------------
 --
--- The actual registry lives in DRAP/ItemEffects.lua. The two functions below
--- are legacy shims: they forward (name, fn) / (id, fn) registrations into the
--- new declarative registry with on_replay="apply" (the pre-ItemEffects default
--- behavior). New code should call ItemEffects.register(...) directly so it can
--- opt into category dispatch and on_replay="skip" semantics (traps).
+-- The registry lives in DRAP/ItemEffects.lua. The two functions below are
+-- legacy shims forwarding (name/id, fn) into it with on_replay="apply". New
+-- code should call ItemEffects.register(...) directly for category dispatch and
+-- on_replay="skip" (traps).
 
--- Silent: the legacy path feeds in per-item auto-registrations where duplicate
--- display names are expected (e.g. multiple "Chair" variants in drdr_items.json).
--- A collision between two NEW effect modules -- which is a real bug signal --
--- still warns because those callers use ItemEffects.register() directly.
+-- Silent: the legacy path auto-registers per-item, where duplicate display
+-- names are expected (e.g. multiple "Chair" variants). Collisions between two
+-- NEW effect modules still warn, since those use ItemEffects.register() directly.
 local SHIM_OPTS = { silent = true }
 
 function M.register_item_handler_by_name(name, fn)
@@ -1064,11 +1017,8 @@ AP_REF.on_items_received = function(items)
     end
 end
 
--- Sent-item toast: when an "ItemSend" PrintJSON arrives where WE are the
--- source and the receiver is someone else, show a native notification with
--- the same color scheme as item_received (item-flag colored, names bold).
--- The imgui Archipelago client window already shows these in its chat log;
--- this just mirrors them on the in-game UI.
+-- Sent-item toast: on an "ItemSend" where WE sent to someone else, mirror the
+-- AP client's chat-log line as an in-game notification (item_received styling).
 AP_REF.on_print_json = function(msg, extra)
     if not extra or not AP_REF.APClient then return end
     -- Only ItemSend (other types: Hint, ItemCheat, Tutorial, etc. -- skip)
