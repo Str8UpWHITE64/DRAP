@@ -916,7 +916,6 @@ function M.load_received_items()
         RECEIVED_ITEMS = {}
         RECEIVED_ITEMS_BY_NAME = {}
         last_item_index = -1
-        pending_items = {}
         return
     end
     RECEIVED_ITEMS = data.items or {}
@@ -928,7 +927,6 @@ function M.load_received_items()
         end
     end
     last_item_index = tonumber(data.last_item_index) or -1
-    pending_items = {}
     M.log(string.format("Loaded %d received items, last_item_index=%d",
         #RECEIVED_ITEMS, last_item_index))
 end
@@ -1040,27 +1038,25 @@ local function handle_net_item(net_item, is_replay)
     end
 end
 
+-- Queue and return. This runs inside lua-apclientpp's C dispatch, so it does
+-- no engine work at all: handle_net_item spawns items, fires effects and
+-- touches managed objects, none of which belongs beneath native code. The
+-- drain in M.on_frame already sorts by index and advances last_item_index, so
+-- ordering is unchanged -- items simply apply on the next frame instead of
+-- mid-callback. The queue path was previously only taken when the data package
+-- wasn't ready; now it is the only path.
 AP_REF.on_items_received = function(items)
     if not items then return end
 
+    local queued = 0
     for _, net_item in ipairs(items) do
         if net_item.index and net_item.index > last_item_index then
-            -- Check if data package is actually ready by testing name resolution
-            local test_name = AP_REF.APClient:get_item_name(net_item.item, nil)
-            local resolvable = test_name ~= nil and test_name ~= "Unknown"
-            -- Queue when unresolvable, OR when older items are already queued:
-            -- processing this one now would advance last_item_index past the
-            -- queued indices, and the on_frame drain (index > last_item_index)
-            -- would then discard them forever.
-            if not resolvable or #pending_items > 0 then
-                M.log("Queuing item index=" .. tostring(net_item.index) .. " id=" .. tostring(net_item.item)
-                    .. (resolvable and " (preserving queue order)" or " (data package not ready)"))
-                table.insert(pending_items, net_item)
-            else
-                last_item_index = net_item.index
-                handle_net_item(net_item, false)
-            end
+            table.insert(pending_items, net_item)
+            queued = queued + 1
         end
+    end
+    if queued > 0 then
+        M.log(string.format("Queued %d item(s) for next-frame delivery", queued))
     end
 end
 

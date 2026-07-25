@@ -265,9 +265,19 @@ local function extract_seed(slot_data)
 end
 
 local prev_on_slot_connected = AP_BRIDGE.AP_REF.on_slot_connected
-AP_BRIDGE.AP_REF.on_slot_connected = function(slot_data)
-    if prev_on_slot_connected then pcall(prev_on_slot_connected, slot_data) end
 
+-- Slot-connect restore is deferred out of the AP client's callback frame.
+--
+-- lua-apclientpp dispatches these handlers from inside its own C function
+-- (AP_REF/core.lua drives APClient:poll() from on_pre_application_entry), so
+-- anything done here runs on the Lua stack beneath native code. This handler
+-- is the heaviest thing DRAP does -- JSON file loads, a dozen module restores,
+-- and several sdk.hook installs -- and doing it there is the one structural
+-- difference between DRAP and the RE Engine AP clients that never showed
+-- corruption: they queue and return. So do we now.
+local pending_slot_connect = nil
+
+local function run_slot_connect(slot_data)
     local slot = Shared.clean_string(AP_BRIDGE.AP_REF.APSlot or "unknown")
     local seed = extract_seed(slot_data)
 
@@ -474,6 +484,13 @@ AP_BRIDGE.AP_REF.on_slot_connected = function(slot_data)
     -- file — is initialized at the TOP of this handler, before any consumer.)
 end
 
+--- The AP callback proper: capture the slot data and get off the client's
+--- stack immediately. The restore runs from re.on_frame below.
+AP_BRIDGE.AP_REF.on_slot_connected = function(slot_data)
+    if prev_on_slot_connected then pcall(prev_on_slot_connected, slot_data) end
+    pending_slot_connect = slot_data or {}
+end
+
 ------------------------------------------------------------
 -- Game Enter Detection
 ------------------------------------------------------------
@@ -542,6 +559,18 @@ local function safe_on_frame(mod, name)
 end
 
 re.on_frame(function()
+    -- Drain the deferred slot-connect FIRST, and deliberately above the
+    -- isInGame gate: connecting normally happens at the title screen, so
+    -- gating this would postpone the whole restore until the player loads in.
+    if pending_slot_connect ~= nil then
+        local slot_data = pending_slot_connect
+        pending_slot_connect = nil
+        local ok, err = pcall(run_slot_connect, slot_data)
+        if not ok then
+            log.error("slot-connect restore failed: " .. tostring(err))
+        end
+    end
+
     local ok_ig, now_in_game = pcall(AP.Scene.isInGame)
     if not ok_ig or not now_in_game then
         was_in_game = false
