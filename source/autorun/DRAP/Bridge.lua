@@ -219,37 +219,17 @@ end
 ------------------------------------------------------------
 -- Client Binding
 ------------------------------------------------------------
-
-function M.bind_client()
-    if not AP_REF.APClient then return false end
-
-    AP_REF.APClient:set_items_received_handler(function(items)
-        if AP_REF.on_items_received then AP_REF.on_items_received(items) end
-    end)
-
-    AP_REF.APClient:set_data_package_changed_handler(function(dp)
-        if AP_REF.on_data_package_changed then AP_REF.on_data_package_changed(dp) end
-    end)
-
-    AP_REF.APClient:set_slot_connected_handler(function(slot_data)
-        if AP_REF.on_slot_connected then AP_REF.on_slot_connected(slot_data) end
-    end)
-
-    AP_REF.APClient:set_location_checked_handler(function(locations)
-        if AP_REF.on_location_checked then AP_REF.on_location_checked(locations) end
-    end)
-
-    AP_REF.APClient:set_retrieved_handler(function(map, keys, extra)
-        if AP_REF.on_retrieved then AP_REF.on_retrieved(map, keys, extra) end
-    end)
-
-    AP_REF.APClient:set_room_info_handler(function()
-        if AP_REF.on_room_info then AP_REF.on_room_info() end
-    end)
-
-    M.log("Rebound APClient handlers.")
-    return true
-end
+-- There is deliberately none. APConnect() in AP_REF/core.lua registers every
+-- handler on the client it just built, and each of those wrappers forwards to
+-- the AP_REF.on_<event> field that this module assigns below -- so our handlers
+-- are already live without touching the client.
+--
+-- Re-registering them here (the old M.bind_client) replaced core's wrappers
+-- with bare pass-throughs, and core's wrappers are where the protocol lives:
+-- room_info sends ConnectSlot, slot_connected sends ConnectUpdate. Losing
+-- ConnectSlot meant the first Connect never authenticated and simply hung; the
+-- second press built a fresh client whose wrappers survived, which is why
+-- "press Connect twice" was the workaround.
 
 ------------------------------------------------------------
 -- Location Checks
@@ -752,16 +732,9 @@ _G.drap_bridge_pull_acks = function()
     print(string.format("[Bridge] ledger: %d known, %d acked", s.total, s.acked))
 end
 
-local bound_once = false
-
+-- Ungated by gameplay on purpose: connects happen at the title screen, where
+-- main's module loop never runs.
 re.on_frame(function()
-    -- Handler rebinding must not wait for gameplay: connects happen at the
-    -- title screen, where main's module loop (which used to trigger this
-    -- via M.on_frame) never runs.
-    if not bound_once and AP_REF.APClient then
-        bound_once = true
-        pcall(M.bind_client)
-    end
     pcall(sync_tick)
 end)
 
@@ -1120,8 +1093,8 @@ end
 ------------------------------------------------------------
 
 function M.on_frame()
-    -- (Handler binding happens in the ungated re.on_frame hook above --
-    -- this in-game loop only drains the pending-items queue.)
+    -- This in-game loop only drains the pending-items queue; the sync tick
+    -- runs from its own ungated re.on_frame above.
 
     -- Process queued items once data package is actually available
     if #pending_items > 0 then
