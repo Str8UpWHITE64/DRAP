@@ -6,23 +6,53 @@ Outputs into tools/release_out/:
 
 The bundled binaries are vendored at the repo root and pinned to the
 builds this mod is tested against:
-  dinput8.dll         REFramework (DD2 build)
+  dinput8.dll         REFramework v1.5.9.1 (DD2 build)
   lua-apclientpp.dll  Archipelago client library
 Replace them deliberately and retest; do not swap in untested builds.
+
+dinput8.dll must stay at v1.5.8 or newer. That release added Dead Rising
+support; older builds cannot resolve the engine's Context::LocalFrameGC, so
+object-lifetime tracking breaks and the Lua heap gets corrupted (garbled log
+output, and worse). Diagnosed 2026-07-25 -- see
+docs/reframework/features/logging.md.
 """
 import json
 import os
+import re
 import zipfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
 OUT = os.path.join(HERE, "release_out")
 
+LOGGER_LUA = os.path.join(REPO, "source", "autorun", "DRAP", "Logger.lua")
+
 
 def world_version():
     path = os.path.join(REPO, "apworld", "drdr", "archipelago.json")
     with open(path, encoding="utf-8") as f:
         return json.load(f)["world_version"]
+
+
+def logger_version():
+    """Version the client stamps into every session log header."""
+    with open(LOGGER_LUA, encoding="utf-8") as f:
+        m = re.search(r'^Logger\.VERSION\s*=\s*"([^"]+)"', f.read(), re.M)
+    if not m:
+        raise SystemExit(f"could not find Logger.VERSION in {LOGGER_LUA}")
+    return m.group(1)
+
+
+def check_versions(world):
+    """Every log a player sends us names its own build, so that name has to be
+    right. A silent drift here means months of misattributed bug reports."""
+    lua = logger_version()
+    if lua != world:
+        raise SystemExit(
+            f"version mismatch: Logger.VERSION is {lua!r} but world_version is "
+            f"{world!r}.\nBump Logger.VERSION in source/autorun/DRAP/Logger.lua "
+            f"to match apworld/drdr/archipelago.json."
+        )
 
 
 def build_apworld():
@@ -41,6 +71,7 @@ def build_apworld():
 def main():
     os.makedirs(OUT, exist_ok=True)
     version = world_version()
+    check_versions(version)
     apworld = build_apworld()
 
     zpath = os.path.join(OUT, f"DRAP_{version}.zip")

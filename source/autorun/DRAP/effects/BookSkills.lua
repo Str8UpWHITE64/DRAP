@@ -95,7 +95,7 @@ local function install_hook()
     if not td then return false end
     local m = td:get_method("checkItemSkill")
     if not m then
-        log("ERROR: Inventory.checkItemSkill method not found")
+        log.error("Inventory.checkItemSkill method not found")
         return false
     end
 
@@ -110,7 +110,7 @@ local function install_hook()
             return retval
         end)
     if not ok then
-        log("ERROR: hook install failed: " .. tostring(err))
+        log.error("hook install failed: " .. tostring(err))
         return false
     end
     hook_installed = true

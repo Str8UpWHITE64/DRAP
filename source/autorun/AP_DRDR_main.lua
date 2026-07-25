@@ -11,6 +11,12 @@ end
 -- Load Modules
 ------------------------------------------------------------
 
+-- First, so the session log is open before any module can log into it and the
+-- banner below is genuinely the first DRAP line in the file.
+local Logger = require("DRAP/Logger")
+Logger.info("DRAP", string.format("DRAP %s starting -- session log: %s",
+    Logger.VERSION, Logger.get_path() or "console only (file open failed)"))
+
 local AP_BRIDGE = require("DRAP/Bridge")
 
 AP = AP or {}
@@ -57,7 +63,7 @@ local log = Shared.create_logger("DRAP")
 local function register_spawn_handlers_from_json()
     local items = SharedData.items()
     if not items or #items == 0 then
-        log("Failed to load item list from SharedData")
+        log.error("Failed to load item list from SharedData -- no item handlers will be registered")
         return
     end
 
@@ -265,9 +271,19 @@ local function extract_seed(slot_data)
 end
 
 local prev_on_slot_connected = AP_BRIDGE.AP_REF.on_slot_connected
-AP_BRIDGE.AP_REF.on_slot_connected = function(slot_data)
-    if prev_on_slot_connected then pcall(prev_on_slot_connected, slot_data) end
 
+-- Slot-connect restore is deferred out of the AP client's callback frame.
+--
+-- lua-apclientpp dispatches these handlers from inside its own C function
+-- (AP_REF/core.lua drives APClient:poll() from on_pre_application_entry), so
+-- anything done here runs on the Lua stack beneath native code. This handler
+-- is the heaviest thing DRAP does -- JSON file loads, a dozen module restores,
+-- and several sdk.hook installs -- and doing it there is the one structural
+-- difference between DRAP and the RE Engine AP clients that never showed
+-- corruption: they queue and return. So do we now.
+local pending_slot_connect = nil
+
+local function run_slot_connect(slot_data)
     local slot = Shared.clean_string(AP_BRIDGE.AP_REF.APSlot or "unknown")
     local seed = extract_seed(slot_data)
 
@@ -468,6 +484,13 @@ AP_BRIDGE.AP_REF.on_slot_connected = function(slot_data)
     -- file — is initialized at the TOP of this handler, before any consumer.)
 end
 
+--- The AP callback proper: capture the slot data and get off the client's
+--- stack immediately. The restore runs from re.on_frame below.
+AP_BRIDGE.AP_REF.on_slot_connected = function(slot_data)
+    if prev_on_slot_connected then pcall(prev_on_slot_connected, slot_data) end
+    pending_slot_connect = slot_data or {}
+end
+
 ------------------------------------------------------------
 -- Game Enter Detection
 ------------------------------------------------------------
@@ -525,14 +548,29 @@ end
 -- Main Frame Loop
 ------------------------------------------------------------
 
+-- A module that throws here throws every frame, so this logs at ERROR and
+-- leans on the Logger's consecutive-duplicate collapse to keep the identical
+-- line from repeating 60x/second in the session file.
 local function safe_on_frame(mod, name)
     if mod and type(mod.on_frame) == "function" then
         local ok, err = pcall(mod.on_frame)
-        if not ok then log(name .. ".on_frame ERROR: " .. tostring(err)) end
+        if not ok then log.error(name .. ".on_frame failed: " .. tostring(err)) end
     end
 end
 
 re.on_frame(function()
+    -- Drain the deferred slot-connect FIRST, and deliberately above the
+    -- isInGame gate: connecting normally happens at the title screen, so
+    -- gating this would postpone the whole restore until the player loads in.
+    if pending_slot_connect ~= nil then
+        local slot_data = pending_slot_connect
+        pending_slot_connect = nil
+        local ok, err = pcall(run_slot_connect, slot_data)
+        if not ok then
+            log.error("slot-connect restore failed: " .. tostring(err))
+        end
+    end
+
     local ok_ig, now_in_game = pcall(AP.Scene.isInGame)
     if not ok_ig or not now_in_game then
         was_in_game = false
@@ -591,3 +629,7 @@ _G.show_items = function() AP.GUI.show_window() end
 _G.hide_items = function() AP.GUI.hide_window() end
 
 log("Main script loaded.")
+
+-- Get the whole startup block on disk now. If the game dies on the first
+-- frames, this is the part of the log that explains why.
+Logger.flush()

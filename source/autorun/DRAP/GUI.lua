@@ -3,6 +3,7 @@
 -- Combines ItemSpawner and ScoopUnlocker into a single tabbed window
 
 local Shared = require("DRAP/Shared")
+local Logger = require("DRAP/Logger")
 
 local M = Shared.create_module("GUI")
 
@@ -144,6 +145,9 @@ re.on_draw_ui(function()
     local dbg_changed, dbg_val = imgui.checkbox("Debug Mode", debug_mode)
     if dbg_changed then
         debug_mode = dbg_val
+        -- DEBUG records always reach the file; this decides whether they also
+        -- appear in the script console while debugging live.
+        Logger.set_console_level(debug_mode and "DEBUG" or "INFO")
     end
 end)
 

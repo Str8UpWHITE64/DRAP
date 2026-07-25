@@ -2,65 +2,64 @@
 -- Shared utilities for Dead Rising Archipelago mod
 -- Consolidates common patterns used across all modules
 
+local Logger = require("DRAP/Logger")
+
 local Shared = {}
+
+Shared.Logger = Logger
 
 ------------------------------------------------------------
 -- Logging Factory
 ------------------------------------------------------------
 
---- Sanitizes a string for safe logging (removes binary garbage)
+--- Sanitizes a string for safe logging (removes binary garbage). Delegates to
+--- the sink's scrubber so console and file agree on what a message looks like;
+--- callers get one behaviour to reason about instead of two near-copies.
 --- @param s any The value to sanitize for logging
 --- @return string The sanitized string
 function Shared.safe_log_string(s)
-    if s == nil then return "nil" end
-    local str = tostring(s)
-    -- Remove null characters and everything after them
-    local null_pos = str:find("%z")
-    if null_pos then
-        str = str:sub(1, null_pos - 1)
-    end
-    -- Remove non-printable characters (keep newlines and tabs)
-    str = str:gsub("[%c%z]", function(c)
-        if c == "\n" or c == "\t" then return c end
-        return ""
-    end)
-    -- Remove high-byte characters (non-ASCII garbage)
-    str = str:gsub("[\128-\255]", "")
-    return str
+    return Logger.scrub(s)
 end
 
---- Builds a completely fresh, clean string character by character
---- @param str string The input string
---- @return string A fresh string with only printable ASCII
-local function build_clean_string(str)
-    local clean = {}
-    for i = 1, #str do
-        local b = string.byte(str, i)
-        -- Only include printable ASCII (32-126), newline, tab
-        if (b >= 32 and b <= 126) or b == 10 or b == 9 then
-            clean[#clean + 1] = string.char(b)
-        end
-    end
-    return table.concat(clean)
-end
-
---- Creates a logger function with a prefix tag
---- @param tag string The module name to prefix log messages with
---- @return function A log function that prefixes messages with [tag]
+--- Creates a logger for a module. The result is callable -- log("message")
+--- keeps working exactly as it always has, at INFO level -- and also carries
+--- one method per severity:
 ---
---- Output goes to the live REFramework console (print) AND to
---- re2_framework_log.txt (log.info) so session evidence survives the
---- console window closing.
+---     local log = Shared.create_logger("MyModule")
+---     log("routine progress")            -- INFO, console + file
+---     log.debug("only in the log file")  -- DEBUG, file only by default
+---     log.warn("something looks off")    -- WARN, flushed immediately
+---     log.error("that call failed: " .. tostring(err))
+---
+--- Everything reaches the session log file (see DRAP/Logger.lua); the console
+--- shows INFO and above, which is what it showed before file logging existed.
+--- @param tag string The module name to prefix log messages with
+--- @return table A callable logger with .debug/.info/.warn/.error
 function Shared.create_logger(tag)
-    local prefix = "[" .. tag .. "] "
-    return function(msg)
-        local clean_msg = Shared.safe_log_string(msg)
-        -- Skip empty messages
-        if clean_msg == "" or clean_msg == "nil" then return end
-        local str = build_clean_string(prefix .. clean_msg)
-        print(str)
-        if log and log.info then pcall(log.info, str) end
-    end
+    local L = Logger.LEVELS
+    local logger = {
+        tag   = tag,
+        debug = function(msg) Logger.write(tag, L.DEBUG, msg) end,
+        info  = function(msg) Logger.write(tag, L.INFO,  msg) end,
+        warn  = function(msg) Logger.write(tag, L.WARN,  msg) end,
+        error = function(msg) Logger.write(tag, L.ERROR, msg) end,
+    }
+    return setmetatable(logger, {
+        __call = function(_, msg) Logger.write(tag, L.INFO, msg) end,
+    })
+end
+
+--- Emits at a chosen severity through a logger that may be either a full
+--- create_logger table or a bare function (helpers here accept an optional
+--- `logger` argument, and callers outside this repo may still pass a plain
+--- function). Falls back to a plain call when the level method is absent.
+--- @param logger table|function|nil
+--- @param level string "debug" | "info" | "warn" | "error"
+--- @param msg any
+function Shared.log_at(logger, level, msg)
+    if not logger then return end
+    local fn = (type(logger) == "table") and logger[level] or nil
+    if fn then fn(msg) else logger(msg) end
 end
 
 ------------------------------------------------------------
@@ -474,7 +473,7 @@ function Shared.create_singleton_manager(type_name, logger)
         end
 
         if warn_once ~= false and not self.missing_warned[field_name] then
-            log("Field '" .. field_name .. "' not found on " .. short_name)
+            Shared.log_at(log, "warn", "Field '" .. field_name .. "' not found on " .. short_name)
             self.missing_warned[field_name] = true
         end
 
@@ -500,7 +499,7 @@ function Shared.create_singleton_manager(type_name, logger)
         end
 
         if warn_once ~= false and not self.missing_warned[method_name] then
-            log("Method '" .. method_name .. "' not found on " .. short_name)
+            Shared.log_at(log, "warn", "Method '" .. method_name .. "' not found on " .. short_name)
             self.missing_warned[method_name] = true
         end
 
@@ -576,8 +575,8 @@ end
 
 function Shared.load_json(path, logger)
     local data = json.load_file(path)
-    if not data and logger then
-        logger("Failed to load JSON: " .. path)
+    if not data then
+        Shared.log_at(logger, "warn", "Failed to load JSON: " .. path)
     end
     return data
 end
@@ -590,8 +589,8 @@ end
 --- @return boolean True if successful
 function Shared.save_json(path, data, indent, logger)
     local ok = json.dump_file(path, data, indent or 4)
-    if not ok and logger then
-        logger("Failed to save JSON: " .. path)
+    if not ok then
+        Shared.log_at(logger, "error", "Failed to save JSON: " .. path)
     end
     return ok
 end
