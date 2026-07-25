@@ -52,6 +52,10 @@ __pycache__/
 tools/logic_tests/
 tools/release_out/
 
+# Build artifact: tools/build_release.py generates it from apworld/drdr/ into
+# tools/release_out/. The committed copy had no regeneration step and drifted.
+apworld/drdr.apworld
+
 # Vendored release binaries (see tools/build_release.py)
 !/dinput8.dll
 !/lua-apclientpp.dll
