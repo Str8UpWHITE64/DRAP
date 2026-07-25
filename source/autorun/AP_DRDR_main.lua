@@ -303,6 +303,11 @@ local function run_slot_connect(slot_data)
     AP_BRIDGE.load_completed_checks()
     AP_BRIDGE.resend_all_checks()
 
+    -- Survivor observation history. Must follow load_completed_checks, which
+    -- is what initializes the ledger this reads its section from. Without it a
+    -- survivor killed in an earlier session looks like a broken spawn.
+    AP.effects.SurvivorRecovery.load_census()
+
     -- Set up sticker save file
     if AP.PPStickerTracker.set_save_filename then
         AP.PPStickerTracker.set_save_filename(slot, seed)

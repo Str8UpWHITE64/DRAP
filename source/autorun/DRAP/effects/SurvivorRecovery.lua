@@ -16,19 +16,26 @@
 --
 --   REPAIR (area ENTRY only): for each DRAP-active Survivor-category scoop
 --   whose survivor's DB home area was just entered, wait REPAIR_SETTLE_SECONDS
---   for the engine's lazy creation, then -- only if the record is STILL
---   missing or a zeroed corpse -- clear debris and respawn at the DB position.
+--   for the engine's lazy creation, then -- only if SurvivorCensus still judges
+--   the record broken -- clear debris and respawn at the DB position.
 --
 -- Guards:
+--   * ScoopSanity only -- the flag-driven spawning that breaks is exclusive to
+--     it, so in vanilla this module does nothing at all;
 --   * area-ENTRY edge only -- avoids pre-empting NPCs the engine would spawn
 --     itself on a later re-entry;
---   * settle delay + strict signature -- never races lazy creation;
+--   * settle delay -- never races lazy creation;
+--   * the census verdict, not the current frame alone -- a survivor the player
+--     killed reads identically to a broken one in a single frame, and used to
+--     be resurrected on that basis;
 --   * spawns only when no healthy record exists -- no duplicates;
 --   * Survivor-category scoops only -- psycho-scoop NPCs (hostages, boss-gated
 --     spawns) are never auto-spawned; use drap_recover_force for those.
 
 local Shared = require("DRAP/Shared")
 local SharedData = require("DRAP/SharedData")
+local Census = require("DRAP/npc/SurvivorCensus")
+local Ledger = require("DRAP/LocationLedger")
 
 local M = Shared.create_module("SurvivorRecovery")
 M:set_throttle(1.0)
@@ -142,10 +149,6 @@ local function scan_records()
     return by_stype
 end
 
-local function is_zeroed_corpse(e)
-    return e.is_dead and (e.state or 0) == 0 and (e.hp or 0) == 0
-end
-
 ------------------------------------------------------------
 -- Passive harvester
 ------------------------------------------------------------
@@ -229,7 +232,7 @@ end
 
 local spawn_pending = {}   -- stype -> { started, entry, scoop }
 
-local function spawn_at(stype, entry, scoop_name, forced)
+local function spawn_at(stype, entry, scoop_name, forced, verdict)
     local mgr = npc_mgr:get()
     if not mgr then return false end
     local pos, rot
@@ -246,11 +249,11 @@ local function spawn_at(stype, entry, scoop_name, forced)
             stype, pos, rot, nil, nil)
     end)
     M.log(string.format(
-        "REPAIR%s: respawning %s (stype=%d, scoop='%s') at (%.2f, %.2f, %.2f)"
+        "REPAIR%s: respawning %s (stype=%d, scoop='%s', %s) at (%.2f, %.2f, %.2f)"
             .. " -- cleared %d broken record(s), spawnNPC=%s",
         forced and " (forced)" or "", entry.name or "?", stype,
-        scoop_name or "?", entry.x, entry.y, entry.z, removed,
-        ok and "ok" or "FAILED"))
+        scoop_name or "?", verdict or "manual", entry.x, entry.y, entry.z,
+        removed, ok and "ok" or "FAILED"))
     if ok then
         spawn_pending[stype] = {
             started = os.clock(), entry = entry, scoop = scoop_name,
@@ -292,6 +295,44 @@ local function finish_pending_spawns()
 end
 
 ------------------------------------------------------------
+-- Census persistence
+--
+-- The census has to outlive the session: a survivor killed yesterday leaves
+-- only a zeroed corpse record, which without history reads as a broken spawn
+-- and gets them resurrected on the next launch. Stored per slot/seed in the
+-- run ledger, same as PlayerStats.
+------------------------------------------------------------
+
+local CENSUS_SECTION = "survivor_census"
+
+-- Configured at load, not on connect: NpcInfoSweeper also feeds the census, so
+-- the trap-pool filter has to be in place before any observation happens.
+Census.init({
+    log = M.log,
+    should_track = function(stype) return stype < TRAP_POOL_MIN_STYPE end,
+})
+
+function M.load_census()
+    if not Ledger.is_init() then
+        M.log.debug("census load skipped: ledger not initialized yet")
+        return false
+    end
+    local doc = Ledger.get_section(CENSUS_SECTION)
+    if not doc then
+        Census.reset()
+        return false
+    end
+    return Census.restore(doc) == true
+end
+
+local function flush_census()
+    if not Census.is_dirty() or not Ledger.is_init() then return end
+    if Ledger.set_section(CENSUS_SECTION, Census.serialize()) then
+        Census.clear_dirty()
+    end
+end
+
+------------------------------------------------------------
 -- Area-entry detection + settle timer
 ------------------------------------------------------------
 
@@ -306,26 +347,28 @@ local function get_area()
     return Shared.to_int(Shared.safe_get_field(am, f))
 end
 
-local function run_repair_check(area)
+-- Verdicts that mean "the engine owes us this survivor". KILLED is deliberately
+-- absent: a dead survivor is the player's doing, not a broken spawn.
+local REPAIRABLE = {
+    [Census.VERDICT.CORRUPT] = true,
+    [Census.VERDICT.NEVER_SPAWNED] = true,
+    -- Seen alive, now no record at all. Respawning at their spawn point is
+    -- right when they never left it, and merely recoverable if they vanished
+    -- mid-escort -- the player can re-recruit them there.
+    [Census.VERDICT.VANISHED] = true,
+}
+
+local function run_repair_check(area, by_stype)
     local eligible = eligible_survivors()
     if not next(eligible) then return end
-    local by_stype = scan_records()
     if not by_stype then return end
 
     for stype, scoop_name in pairs(eligible) do
         local entry = db_get(stype)
         if entry and entry.area == area then
-            local entries = by_stype[stype]
-            local healthy = false
-            local corpse_only = true
-            for _, e in ipairs(entries or {}) do
-                if not is_zeroed_corpse(e) then corpse_only = false end
-                if not e.is_dead and (e.hp or 0) > 0 then healthy = true end
-            end
-            local broken = (entries == nil)                  -- still missing
-                or (#(entries or {}) > 0 and corpse_only)    -- only corpses
-            if broken and not healthy and not spawn_pending[stype] then
-                spawn_at(stype, entry, scoop_name, false)
+            local verdict = Census.verdict_for(stype, by_stype[stype])
+            if REPAIRABLE[verdict] and not spawn_pending[stype] then
+                spawn_at(stype, entry, scoop_name, false, verdict)
             end
         end
     end
@@ -335,8 +378,19 @@ end
 -- Frame driver
 ------------------------------------------------------------
 
+-- ScoopSanity drives survivor spawning through flags, and that is the only
+-- mode where the spawns break. Vanilla is left completely alone -- including
+-- the harvester, since drdr_shared.json already ships every survivor position.
+local function scoop_sanity_on()
+    local su = _G.AP and _G.AP.ScoopUnlocker
+    if not su or not su.is_scoop_sanity_enabled then return false end
+    local ok, on = pcall(su.is_scoop_sanity_enabled)
+    return ok and on == true
+end
+
 function M.on_frame()
     if not M:should_run() then return end
+    if not scoop_sanity_on() then return end
     if not Shared.is_in_game() then
         last_area = nil
         entry_check = nil
@@ -344,6 +398,15 @@ function M.on_frame()
     end
 
     finish_pending_spawns()
+
+    -- One scan per tick feeds the census, the repair check and the harvester.
+    -- The census must see every tick, not just area entries: its whole job is
+    -- to have witnessed a survivor alive before they turn up as a corpse.
+    local by_stype = scan_records()
+    if by_stype then
+        Census.observe(by_stype)
+        flush_census()
+    end
 
     local area = get_area()
     if area and area ~= last_area then
@@ -359,12 +422,10 @@ function M.on_frame()
         local check = entry_check
         entry_check = nil
         if get_area() == check.area then
-            run_repair_check(check.area)
+            run_repair_check(check.area, by_stype)
         end
     end
 
-    -- Passive harvest piggybacks the same throttle; cheap scan.
-    local by_stype = scan_records()
     if by_stype then harvest(by_stype) end
 end
 
@@ -385,6 +446,63 @@ _G.drap_recover_status = function()
     end
     table.sort(names)
     M.log("  " .. table.concat(names, ", "))
+end
+
+-- Every NPC of every DRAP-active scoop, whatever the category. Auto-repair
+-- only covers Survivor-category scoops, but a psycho-scoop NPC who fails to
+-- appear is exactly what gets reported, so the diagnostic has to show them.
+local function active_scoop_npcs()
+    ensure_maps()
+    local su = _G.AP and _G.AP.ScoopUnlocker
+    if not su or not su.get_all_status then return {} end
+    local out = {}
+    local ok, status = pcall(su.get_all_status)
+    if not ok or type(status) ~= "table" then return out end
+    for _, s in ipairs(status) do
+        if s.received and not s.completed and type(s.npcs) == "table" then
+            for _, npc_name in ipairs(s.npcs) do
+                local stype = name_to_stype[npc_name]
+                if stype then
+                    out[stype] = { scoop = s.name, category = s.category }
+                end
+            end
+        end
+    end
+    return out
+end
+
+-- Why each active scoop NPC is (or is not) being repaired. The verdict is the
+-- whole decision, so this is the first thing to read on a "they never spawned"
+-- or "they came back from the dead" report.
+_G.drap_census_status = function()
+    local s = Census.stats()
+    M.log(string.format(
+        "census: %d survivor(s) observed, %d seen alive, %d died, %d joined",
+        s.total, s.ever_alive, s.deaths, s.ever_joined))
+
+    local by_stype = scan_records() or {}
+    local lines = {}
+    for stype, info in pairs(active_scoop_npcs()) do
+        local h = Census.get(stype) or {}
+        -- Auto-repair is Survivor-category only; anything else needs
+        -- drap_recover_force, so say which one this is.
+        local auto = info.category == "Survivor"
+        table.insert(lines, string.format(
+            "  %s (stype=%d, scoop='%s' [%s], %s): %s [records=%d "
+                .. "ever_alive=%s death_seen=%s joined=%s max_state=%s]",
+            stype_to_name[stype] or "?", stype, info.scoop,
+            tostring(info.category), auto and "auto-repair" or "manual only",
+            Census.verdict_for(stype, by_stype[stype]),
+            #(by_stype[stype] or {}), tostring(h.ever_alive or false),
+            tostring(h.death_seen or false), tostring(h.ever_joined or false),
+            tostring(h.max_state or 0)))
+    end
+    table.sort(lines)
+    if #lines == 0 then
+        M.log("  (no active scoops with NPCs)")
+    else
+        for _, l in ipairs(lines) do M.log(l) end
+    end
 end
 
 -- Manual repair for anything auto-repair deliberately skips (psycho-scoop

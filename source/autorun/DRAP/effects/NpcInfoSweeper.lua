@@ -9,9 +9,14 @@
 -- the engine recreates a clean record on next area entry.
 --
 -- Safety filters:
---   * mLiveState == UNKNOWN only: legitimately-dead survivors progressed
---     past UNKNOWN, and their record drives scoop-failure/notebook logic.
---     "all_dead" mode (drap_npc_sweep_mode) also respawns those.
+--   * ScoopSanity only: flag-driven spawning is what breaks, so the sweep does
+--     not run in vanilla. The spawn blocker below is exempt -- it serves
+--     HostileSurvivorTrap and must keep arming from its JSON.
+--   * SurvivorCensus verdict == CORRUPT only. A record stuck at isDead +
+--     mLiveState=UNKNOWN is ambiguous on its own: a survivor killed before the
+--     player ever met them looks identical, and removing that record made
+--     SurvivorRecovery resurrect them. The census settles it with history.
+--     "all_dead" mode (drap_npc_sweep_mode) still sweeps every dead record.
 --   * Owning scoop must be received and not completed, so vanilla scoop
 --     expiry deaths in time-flowing modes are never touched.
 --   * Trap-pool stypes (>= 59) skipped -- HostileSurvivorTrap self-cleans.
@@ -22,6 +27,7 @@
 local Shared = require("DRAP/Shared")
 local SharedData = require("DRAP/SharedData")
 local ScoopUnlocker = require("DRAP/ScoopUnlocker")
+local Census = require("DRAP/npc/SurvivorCensus")
 
 local M = Shared.create_module("NpcInfoSweeper")
 M:set_throttle(1.0)
@@ -33,8 +39,6 @@ M:set_throttle(1.0)
 -- stypes >= this belong to the HostileSurvivorTrap pool, which manages its
 -- own dead-record cleanup. Never sweep them.
 local TRAP_POOL_MIN_STYPE = 59
-
-local LIVE_STATE_UNKNOWN = 0
 
 ------------------------------------------------------------
 -- Singleton Managers
@@ -180,9 +184,11 @@ function M.sweep(reason)
 
     local eligible = build_eligible_stypes()
 
-    -- Pass 1: read everything, tally per-stype counts, pick removal targets.
+    -- Pass 1: read everything, tally per-stype counts, group for the census.
     -- Never remove while iterating the live list.
     local stype_counts = {}
+    local by_stype = {}
+    local entries = {}
     local to_remove = {}
     local anomalies = 0
     local seen_stypes = {}
@@ -193,40 +199,50 @@ function M.sweep(reason)
             if e and e.stype then
                 stype_counts[e.stype] = (stype_counts[e.stype] or 0) + 1
                 seen_stypes[e.stype] = true
-
-                local corrupt = e.is_dead and e.state == LIVE_STATE_UNKNOWN
-                local owning = eligible[e.stype]
-
-                -- Log every dead survivor record we see, whether or not we
-                -- act on it -- this is the visibility the bug reports lacked.
-                if e.is_dead and e.stype < TRAP_POOL_MIN_STYPE then
-                    anomalies = anomalies + 1
-                    M.log(string.format("dead record: %s%s",
-                        describe(e, owning),
-                        corrupt and " [corrupt: never encountered]" or ""))
-                end
-
-                local should_remove = owning ~= nil
-                    and ((mode == "corrupt" and corrupt)
-                         or (mode == "all_dead" and e.is_dead))
-                if should_remove then
-                    local first = corrupt_first_seen[e.stype]
-                    if not first then
-                        corrupt_first_seen[e.stype] = os.clock()
-                        should_remove = false
-                        M.log(string.format(
-                            "newborn grace: %s -- removal deferred %ds",
-                            describe(e, owning), NEWBORN_GRACE_SECONDS))
-                    elseif os.clock() - first < NEWBORN_GRACE_SECONDS then
-                        should_remove = false
-                    end
-                end
-                if not corrupt then corrupt_first_seen[e.stype] = nil end
-                if should_remove then
-                    e.owning = owning
-                    table.insert(to_remove, e)
-                end
+                by_stype[e.stype] = by_stype[e.stype] or {}
+                table.insert(by_stype[e.stype], e)
+                table.insert(entries, e)
             end
+        end
+    end
+
+    Census.observe(by_stype)
+
+    -- Pass 2: judge each record. The verdict, not the record's current shape,
+    -- decides -- a survivor the player killed looks exactly like a record the
+    -- flag-spawn never filled in, and used to be removed and then resurrected.
+    for _, e in ipairs(entries) do
+        local verdict = Census.verdict_for(e.stype, by_stype[e.stype])
+        local corrupt = verdict == Census.VERDICT.CORRUPT
+        local owning = eligible[e.stype]
+
+        -- Dead records are routine now that the census tells them apart, so
+        -- they go to the session log only and stay off the console.
+        if e.is_dead and e.stype < TRAP_POOL_MIN_STYPE then
+            M.log.debug(string.format("dead record: %s [%s]",
+                describe(e, owning), verdict))
+            if corrupt then anomalies = anomalies + 1 end
+        end
+
+        local should_remove = owning ~= nil
+            and ((mode == "corrupt" and corrupt)
+                 or (mode == "all_dead" and e.is_dead))
+        if should_remove then
+            local first = corrupt_first_seen[e.stype]
+            if not first then
+                corrupt_first_seen[e.stype] = os.clock()
+                should_remove = false
+                M.log(string.format(
+                    "newborn grace: %s -- removal deferred %ds",
+                    describe(e, owning), NEWBORN_GRACE_SECONDS))
+            elseif os.clock() - first < NEWBORN_GRACE_SECONDS then
+                should_remove = false
+            end
+        end
+        if not corrupt then corrupt_first_seen[e.stype] = nil end
+        if should_remove then
+            e.owning = owning
+            table.insert(to_remove, e)
         end
     end
 
@@ -423,6 +439,12 @@ function M.on_frame()
     if not spawn_hooks_installed and next(BLOCKED_SPAWNS) ~= nil then
         install_spawn_hooks()
     end
+
+    -- Everything below is ScoopSanity-only: the flag-driven spawning that
+    -- corrupts records does not happen in vanilla. drap_npc_sweep() still
+    -- forces a sweep by hand for debugging.
+    local ss_ok, ss_on = pcall(ScoopUnlocker.is_scoop_sanity_enabled)
+    if not ss_ok or ss_on ~= true then return end
 
     if not enabled then return end
     if not M:should_run() then return end
