@@ -5,7 +5,7 @@ Dead Rising Deluxe Remaster Archipelago Implementation
 
 There aren't a ton of crashes, but you should expect some.  Please report any you find on the issue tracker or in the DRDR AP Discord thread.  Please try to be as detailed as possible.
 
-I have only tested this using the 1.5.7 build of REFramework.  Other versions may or may not work.  More testing will be needed.
+This is tested against the 1.5.9.1 build of REFramework, which ships in the release zip.  Anything older than 1.5.8 will misbehave in ways that are hard to trace — see the note in Setup.
 ## About
 There are about 300 locations at the present time. More may be added in the future, it will just take time and testing.
 
@@ -25,7 +25,7 @@ Currently, there is only one goal, to get Ending S and beat Brock. We may add mo
 ## Setup
 1. Download `DRAP_<version>.zip` from the Releases page and extract everything into your Dead Rising Deluxe Remaster installation folder.  From Steam, that is usually located at: `C:\Program Files (x86)\Steam\steamapps\common\DEAD RISING DELUXE REMASTER`.  The zip contains everything the game side needs, already laid out:
 ```DEAD RISING DELUXE REMASTER
-├── dinput8.dll             (REFramework, DD2 build)
+├── dinput8.dll             (REFramework v1.5.9.1, DD2 build)
 ├── lua-apclientpp.dll      (Archipelago client library)
 ├── THIRD-PARTY-LICENSES.md
 └── reframework
@@ -34,6 +34,8 @@ Currently, there is only one goal, to get Ending S and beat Brock. We may add mo
         ├── AP_REF
         └── DRAP
 ```
+> **If you already have your own REFramework installed, let the zip overwrite it.** REFramework only learned about Dead Rising in **v1.5.8** (25 Oct 2024) — the `DD2.zip` build. Anything older loads and looks fine, but it cannot find one of the engine functions it needs to track object lifetimes, and the result is memory corruption: garbled text in the console, and occasional wrong behaviour or crashes that are impossible to trace. If you want to supply your own, use v1.5.8 or newer.
+
 2. Download `drdr.apworld` from the Releases page and place it into your Archipelago `custom_worlds` folder.
 3. Launch the game.  You should see the AP client connect window pop up, along with the REFramework window.  If you do not see the AP client connect window, scroll down in the REFramework window to "Script Generated UI" and make sure "Show Archipelago Client UI" is checked.  If the mod reports that `lua-apclientpp.dll` could not load, re-extract the zip and make sure both dll files sit next to the game exe.
 4. Generate a template and a world in Archipelago, then enter your connection information at the title screen and wait for it to connect.

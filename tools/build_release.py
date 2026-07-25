@@ -6,9 +6,15 @@ Outputs into tools/release_out/:
 
 The bundled binaries are vendored at the repo root and pinned to the
 builds this mod is tested against:
-  dinput8.dll         REFramework (DD2 build)
+  dinput8.dll         REFramework v1.5.9.1 (DD2 build)
   lua-apclientpp.dll  Archipelago client library
 Replace them deliberately and retest; do not swap in untested builds.
+
+dinput8.dll must stay at v1.5.8 or newer. That release added Dead Rising
+support; older builds cannot resolve the engine's Context::LocalFrameGC, so
+object-lifetime tracking breaks and the Lua heap gets corrupted (garbled log
+output, and worse). Diagnosed 2026-07-25 -- see
+docs/reframework/features/logging.md.
 """
 import json
 import os
