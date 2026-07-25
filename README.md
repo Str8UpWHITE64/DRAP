@@ -94,6 +94,22 @@ Steam Cloud disabled for the game.
    ~190 MB depending on how many slots you used. You can also delete individual old save slots
    from inside the game's load menu to free ~9 MB each.
 
+## Reporting a Bug
+
+The mod keeps a log of every play session. When you report something, **attach the log file** — it saves a lot of back-and-forth guessing.
+
+Logs live in your game folder under:
+
+```
+reframework/data/DRAP_Logs/
+```
+
+Each session gets its own file, named for when you started the game — `drap_20260725_143012.log` — so opening the game again never erases the log from the run where the bug happened. If you're not sure which file you want, `latest.json` in that folder names the most recent one. Grab the log from the session where the problem occurred, not just the newest one.
+
+You can also find the exact path in-game: open the Archipelago window and click the **Log** tab. It shows the file path along with a running count of any warnings and errors. Copying the file while the game is running is fine.
+
+If you're reporting a crash, send the log from the session that crashed — the last lines before it died are usually the useful part.
+
 ## Known Bugs
 
 Please check out the [Known Bugs]() document to see if it answers your question. If not, please feel free to post a message in the AP After Dark Discord channel! 

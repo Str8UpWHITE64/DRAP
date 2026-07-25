@@ -100,7 +100,7 @@ end
 
 function M.send_goal_complete()
     if not AP_REF.APClient then
-        M.log("Cannot send goal: APClient is nil")
+        M.log.error("Cannot send goal: APClient is nil")
         return false
     end
 
@@ -114,7 +114,7 @@ function M.send_goal_complete()
             M.log("Goal completion sent successfully!")
             return true
         else
-            M.log("StatusUpdate failed: " .. tostring(err))
+            M.log.error("StatusUpdate failed: " .. tostring(err))
             re.msg("Goal completion failed to send: " .. tostring(err))
         end
     else
@@ -195,7 +195,7 @@ function M.send_deathlink(data)
             M.log("Sent DeathLink: " .. tostring(deathLinkData.cause))
             return true
         end
-        M.log("DeathLink send failed: " .. tostring(err))
+        M.log.error("DeathLink send failed: " .. tostring(err))
     end
 
     return false
@@ -329,14 +329,14 @@ function M.check(loc_name)
     end
 
     if not is_connected() then
-        M.log("Disconnected; cannot send (sync will retry)")
+        M.log.warn("Disconnected; cannot send (sync will retry)")
         sync_needed = true
         return false
     end
 
     local loc_id = resolve_location_id(loc_name)
     if not loc_id then
-        M.log("Could not resolve location: " .. tostring(loc_name) .. " (sync will retry)")
+        M.log.warn("Could not resolve location: " .. tostring(loc_name) .. " (sync will retry)")
         sync_needed = true
         return false
     end

@@ -11,6 +11,12 @@ end
 -- Load Modules
 ------------------------------------------------------------
 
+-- First, so the session log is open before any module can log into it and the
+-- banner below is genuinely the first DRAP line in the file.
+local Logger = require("DRAP/Logger")
+Logger.info("DRAP", string.format("DRAP %s starting -- session log: %s",
+    Logger.VERSION, Logger.get_path() or "console only (file open failed)"))
+
 local AP_BRIDGE = require("DRAP/Bridge")
 
 AP = AP or {}
@@ -52,7 +58,7 @@ local log = Shared.create_logger("DRAP")
 local function register_spawn_handlers_from_json()
     local items = SharedData.items()
     if not items or #items == 0 then
-        log("Failed to load item list from SharedData")
+        log.error("Failed to load item list from SharedData -- no item handlers will be registered")
         return
     end
 
@@ -525,10 +531,13 @@ end
 -- Main Frame Loop
 ------------------------------------------------------------
 
+-- A module that throws here throws every frame, so this logs at ERROR and
+-- leans on the Logger's consecutive-duplicate collapse to keep the identical
+-- line from repeating 60x/second in the session file.
 local function safe_on_frame(mod, name)
     if mod and type(mod.on_frame) == "function" then
         local ok, err = pcall(mod.on_frame)
-        if not ok then log(name .. ".on_frame ERROR: " .. tostring(err)) end
+        if not ok then log.error(name .. ".on_frame failed: " .. tostring(err)) end
     end
 end
 
@@ -590,3 +599,7 @@ _G.show_items = function() AP.GUI.show_window() end
 _G.hide_items = function() AP.GUI.hide_window() end
 
 log("Main script loaded.")
+
+-- Get the whole startup block on disk now. If the game dies on the first
+-- frames, this is the part of the log that explains why.
+Logger.flush()

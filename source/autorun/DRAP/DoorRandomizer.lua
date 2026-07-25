@@ -414,7 +414,7 @@ local function install_hook()
     end)
 
     if not hook_ok then
-        M.log("ERROR: Failed to install areaJump hook")
+        M.log.error("Failed to install areaJump hook")
         return false
     end
 
