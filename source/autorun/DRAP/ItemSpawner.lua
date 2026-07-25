@@ -26,7 +26,8 @@ local SPAWN_PATH = "world"
 -- World-spawn tunables.
 local WORLD_SPAWN_OFFSET_Y = 1.0      -- spawn slightly above the floor so it
                                        -- doesn't sink through level geometry
-local WORLD_PRELOAD_TIMEOUT_S = 5.0   -- max wait for prefab preload
+local WORLD_PRELOAD_TIMEOUT_S = 10.0  -- max wait for prefab preload
+local WORLD_PRELOAD_RETRY_S = 2.0     -- re-register cadence while waiting
 
 ------------------------------------------------------------
 -- Restricted item mode: Spawning Control
@@ -253,16 +254,6 @@ local function build_identity_rot()
     return nil
 end
 
--- Track which prefabs we've preloaded so we don't double-register.
-local world_preloaded = {}
-
-local function preload_prefab(im, item_no)
-    if world_preloaded[item_no] then return true end
-    local ok = pcall(function() im:call("setPreloadedItemPrefab", item_no) end)
-    if ok then world_preloaded[item_no] = true; return true end
-    return false
-end
-
 local function is_prefab_ready(im, item_no)
     local standby = nil
     pcall(function() standby = im:get_field("ItemStandbyPrefab") end)
@@ -272,10 +263,57 @@ local function is_prefab_ready(im, item_no)
     return has == true
 end
 
--- Async spawn: preload, wait for prefab, then instantiate. Returns immediately;
--- the actual item appears in the world after the prefab finishes streaming.
--- on_done(success, err_string) fires once when the operation completes (success
--- or timeout).
+-- Register the prefab unless the standby registry already holds it. The
+-- registry is the sole authority: reloads rebuild it and entries can
+-- vanish mid-run, so any Lua-side "already registered" cache goes stale
+-- and strands every later spawn of that item.
+local function preload_prefab(im, item_no)
+    if is_prefab_ready(im, item_no) then return true end
+    local ok = pcall(function() im:call("setPreloadedItemPrefab", item_no) end)
+    return ok
+end
+
+-- Async spawn: preload, queue, instantiate when the prefab is ready.
+-- Jobs drain through one frame worker registered at module load --
+-- registering re.on_frame per spawn leaked a permanent callback each and
+-- ran from a UI callback context, which disrupts REFramework's callback
+-- iteration. on_done(success, err_string) fires once per job.
+local pending_world_spawns = {}
+
+local function process_world_spawns()
+    if #pending_world_spawns == 0 then return end
+    local keep = {}
+    for _, job in ipairs(pending_world_spawns) do
+        local done = false
+        local im = get_item_manager()
+        if im and is_prefab_ready(im, job.item_no) then
+            local ok, err = pcall(function()
+                im:call(
+                    "instantiateItem(app.MTData.ITEM_NO, via.vec3, via.Quaternion, System.Action`1<via.GameObject>, via.Folder)",
+                    job.item_no, job.pos, job.rot, nil, nil)
+            end)
+            if job.on_done then pcall(job.on_done, ok, ok and nil or tostring(err)) end
+            done = true
+        end
+        if not done then
+            if os.clock() - job.started > WORLD_PRELOAD_TIMEOUT_S then
+                if job.on_done then pcall(job.on_done, false, "Prefab preload timeout") end
+            else
+                -- Registrations can be dropped by the game; re-assert
+                -- until the prefab shows up or the job times out.
+                if im and os.clock() - (job.last_register or job.started) >= WORLD_PRELOAD_RETRY_S then
+                    preload_prefab(im, job.item_no)
+                    job.last_register = os.clock()
+                end
+                table.insert(keep, job)
+            end
+        end
+    end
+    pending_world_spawns = keep
+end
+
+re.on_frame(process_world_spawns)
+
 local function world_spawn_async(item_no, on_done)
     local im = get_item_manager()
     if not im then
@@ -296,27 +334,10 @@ local function world_spawn_async(item_no, on_done)
     end
 
     preload_prefab(im, item_no)
-
-    -- Poll for prefab readiness, then call the 5-arg instantiateItem.
-    local started = os.clock()
-    local fired = false
-    re.on_frame(function()
-        if fired then return end
-        if is_prefab_ready(im, item_no) then
-            fired = true
-            local ok, err = pcall(function()
-                im:call(
-                    "instantiateItem(app.MTData.ITEM_NO, via.vec3, via.Quaternion, System.Action`1<via.GameObject>, via.Folder)",
-                    item_no, pos, rot, nil, nil)
-            end)
-            if on_done then on_done(ok, ok and nil or tostring(err)) end
-            return
-        end
-        if os.clock() - started > WORLD_PRELOAD_TIMEOUT_S then
-            fired = true
-            if on_done then on_done(false, "Prefab preload timeout") end
-        end
-    end)
+    table.insert(pending_world_spawns, {
+        item_no = item_no, pos = pos, rot = rot,
+        started = os.clock(), on_done = on_done,
+    })
 end
 
 ------------------------------------------------------------
@@ -387,7 +408,7 @@ local function try_spawn_item_inventory(item_entry)
         return true, nil
     else
         local err_s = tostring(err)
-        M.log("setEventItem FAILED for: " .. tostring(item_name) .. " error: " .. err_s)
+        M.log.error("setEventItem FAILED for: " .. tostring(item_name) .. " error: " .. err_s)
         return false, err_s
     end
 end
@@ -599,7 +620,7 @@ function M.draw_tab_content(debug)
         if imgui.button("Spawn Selected") then
             local success, err = try_spawn_item(selected_entry)
             if success then
-                M.log("Successfully spawned: " .. tostring(selected_entry.item_name))
+                M.log("Spawn requested: " .. tostring(selected_entry.item_name))
             else
                 M.log("Spawn failed: " .. tostring(selected_entry.item_name) .. " - " .. tostring(err))
             end
