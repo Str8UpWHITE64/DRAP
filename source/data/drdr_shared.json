@@ -3456,7 +3456,6 @@
       ],
       "completion_event": "Kill Sean",
       "disp_flag": 2511,
-      "disp_end_flag": 1157,
       "guide": {
         "scq_no": 36,
         "pos_tbl": 4,
@@ -3484,7 +3483,6 @@
       ],
       "completion_event": "Kill Jo",
       "disp_flag": 2513,
-      "disp_end_flag": 1159,
       "guide": {
         "scq_no": 38,
         "pos_tbl": 6,
@@ -3540,7 +3538,6 @@
       ],
       "completion_event": "Defeat Paul",
       "disp_flag": 2514,
-      "disp_end_flag": 1160,
       "guide": {
         "scq_no": 39,
         "pos_tbl": 7,
@@ -3586,7 +3583,6 @@
       ],
       "completion_event": "Kill Adam",
       "disp_flag": 2512,
-      "disp_end_flag": 1158,
       "guide": {
         "scq_no": 37,
         "pos_tbl": 5,
@@ -3648,7 +3644,6 @@
       ],
       "completion_event": "Kill Kent on day 3",
       "disp_flag": 2509,
-      "disp_end_flag": 1155,
       "guide": {
         "scq_no": 34,
         "pos_tbl": 2,
@@ -3701,7 +3696,6 @@
       ],
       "completion_event": "Kill Cliff",
       "disp_flag": 2510,
-      "disp_end_flag": 1156,
       "guide": {
         "scq_no": 35,
         "pos_tbl": 3,
