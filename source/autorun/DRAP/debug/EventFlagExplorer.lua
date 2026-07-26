@@ -1166,7 +1166,7 @@ function M.save_mission_records()
         for _ in pairs(mission_records) do count = count + 1 end
         M.log(string.format("Saved mission records (%d missions) to %s", count, MISSION_RECORD_FILE))
     else
-        M.log("ERROR: Failed to save mission records")
+        M.log.error("Failed to save mission records to " .. MISSION_RECORD_FILE)
     end
 end
 

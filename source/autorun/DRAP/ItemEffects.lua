@@ -205,7 +205,7 @@ function M.dispatch(net_item, item_name, sender_name, is_replay)
 
     local ok, err = pcall(apply_fn, ctx)
     if not ok then
-        log(string.format("Error in handler for id=%s name='%s': %s",
+        log.error(string.format("Error in handler for id=%s name='%s': %s",
             tostring(id), tostring(item_name), tostring(err)))
     end
     return true

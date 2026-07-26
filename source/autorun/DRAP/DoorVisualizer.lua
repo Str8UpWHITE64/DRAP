@@ -1307,13 +1307,13 @@ end
 local function write_html()
     local html = generate_html()
     if not html or #html == 0 then
-        M.log("ERROR: Failed to generate HTML")
+        M.log.error("Failed to generate HTML")
         return false, "Failed to generate HTML"
     end
 
     local file, err = io.open(HTML_OUTPUT_PATH, "w")
     if not file then
-        M.log("ERROR: Could not write file: " .. tostring(err))
+        M.log.error("Could not write file: " .. tostring(err))
         return false, "Could not write file: " .. tostring(err)
     end
 

@@ -1,4 +1,10 @@
 -- TODO: since we had to shove this into its own folder, maybe split this into multiple files?
+
+-- DRAP addition: the session logger, required before anything can fail so the
+-- DLL-load path below leaves a trace in the log file rather than only in a
+-- message box the player has already dismissed by the time they file a report.
+local Logger = require("DRAP/Logger")
+
 local AP = nil
 local load_err = nil
 for attempt = 1, 3 do
@@ -6,10 +12,13 @@ for attempt = 1, 3 do
     if AP then break end
 end
 if not AP then
+    Logger.error("AP_REF", "lua-apclientpp.dll load failed after 3 attempts: " .. tostring(load_err))
+    Logger.flush()
     re.msg("[DRAP] Could not load lua-apclientpp.dll: " .. tostring(load_err) ..
            "\nMake sure the DLL from the release zip is in the game folder next to the game exe.")
     error("lua-apclientpp.dll load failed: " .. tostring(load_err))
 end
+Logger.info("AP_REF", "lua-apclientpp.dll loaded")
 AP = AP()
 local AP_REF = {}
 AP_REF.AP = AP
@@ -104,12 +113,12 @@ local current_text = ""
 
 local disconnect_client = false
 
-local DEBUG = false
-
+-- DRAP change: this used to call REFramework's log.debug behind a DEBUG flag
+-- that is never on, so client chatter went nowhere a player could reach it.
+-- It now lands in the session log file at DEBUG, and stays off the console
+-- unless Debug Mode is ticked.
 local function debug_print(str)
-	if DEBUG then
-		log.debug(str)
-	end
+	Logger.debug("AP_REF", str)
 end
 
 local function callback_passthrough()
@@ -211,24 +220,26 @@ AP_REF.on_retrieved = callback_passthrough_three_arg
 AP_REF.on_set_reply = callback_passthrough_one_arg
 
 
+-- DRAP change: connection lifecycle is logged above DEBUG. "Could not connect"
+-- is the most common report we get, and the answer is almost always in these
+-- four lines.
 local function set_socket_connected_handler(callback)
 	function socket_connected()
-		debug_print("Socket connected")
+		Logger.info("AP_REF", "socket connected")
 		callback()
 	end
 	AP_REF.APClient:set_socket_connected_handler(socket_connected)
 end
 local function set_socket_error_handler(callback)
 	function socket_error_handler(msg)
-		debug_print("Socket error")
-		debug_print(msg)
+		Logger.error("AP_REF", "socket error: " .. tostring(msg))
 		callback(msg)
 	end
 	AP_REF.APClient:set_socket_error_handler(socket_error_handler)
 end
 local function set_socket_disconnected_handler(callback)
 	function socket_disconnected_handler()
-		debug_print("Socket disconnected")
+		Logger.warn("AP_REF", "socket disconnected")
 		callback()
 	end
 	AP_REF.APClient:set_socket_disconnected_handler(socket_disconnected_handler)
@@ -244,7 +255,7 @@ local function set_room_info_handler(callback)
 end
 local function set_slot_connected_handler(callback)
 	function slot_connected_handler(slot_data)
-		debug_print("Slot connected")
+		Logger.info("AP_REF", "slot connected: " .. tostring(AP_REF.APSlot))
 
         local tags = {"Lua-APClientPP"}
 
@@ -268,7 +279,7 @@ end
 local function set_slot_refused_handler(callback)
 	function slot_refused_handler(reasons)
         table.insert(textLog, {{text = table.concat(reasons, ", ")}})
-		debug_print("Slot refused: " .. table.concat(reasons, ", "))
+		Logger.error("AP_REF", "slot refused: " .. table.concat(reasons, ", "))
 		callback(reasons)
 		disconnect_client = true
 	end
@@ -302,24 +313,32 @@ local function set_data_package_changed_handler(callback)
 	end
 	AP_REF.APClient:set_data_package_changed_handler(data_package_changed_handler)
 end
+-- DRAP change: server text is recorded in the session log, not just in the
+-- in-game text box that scrolls away. This is the transcript that answers
+-- "did the item actually get sent?".
 local function set_print_handler(callback)
 	function print_handler(msg)
-		debug_print("Print")
+		Logger.info("AP_SERVER", tostring(msg))
 		callback(msg)
 		table.insert(textLog, {{text = msg}})
-		--debug_print(msg)
 	end
 	AP_REF.APClient:set_print_handler(print_handler)
 end
 local function set_print_json_handler(callback)
 	function print_json_handler(msg, extra)
-		debug_print("Print json")
 		callback(msg, extra)
 		message = {}
+		local flat = {}
 		for i, val in ipairs(msg) do
-			table.insert(message, parse_json_msg(val))
+			local part = parse_json_msg(val)
+			table.insert(message, part)
+			-- parse_json_msg returns {text=, color=}; text can be nil when the
+			-- data package can't resolve an id yet.
+			local piece = (type(part) == "table") and part.text or part
+			flat[#flat + 1] = (piece ~= nil) and tostring(piece) or ""
 		end
 		table.insert(textLog, message)
+		Logger.info("AP_SERVER", table.concat(flat))
 	end
 	AP_REF.APClient:set_print_json_handler(print_json_handler)
 end
@@ -349,7 +368,7 @@ function APConnect(host)
     local uuid = ""
     AP_REF.APClient = AP(uuid, AP_REF.APGameName, host)
     table.insert(textLog, {{ text = "Connecting..." }})
-    debug_print("Connecting")
+    Logger.info("AP_REF", "connecting to " .. tostring(host))
     set_socket_connected_handler(AP_REF.on_socket_connected)
     set_socket_error_handler(AP_REF.on_socket_error)
     set_socket_disconnected_handler(AP_REF.on_socket_disconnected)
@@ -545,7 +564,7 @@ local function SaveConfig()
     config["APSaveRedirect"] = AP_REF.APSaveRedirect
 
     if not json.dump_file("AP_REF.json", config, 4) then
-        print("Config cannot be saved!")
+        Logger.error("AP_REF", "AP_REF.json config could not be saved")
     end
 end
 

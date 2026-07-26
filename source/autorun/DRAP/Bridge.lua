@@ -100,7 +100,7 @@ end
 
 function M.send_goal_complete()
     if not AP_REF.APClient then
-        M.log("Cannot send goal: APClient is nil")
+        M.log.error("Cannot send goal: APClient is nil")
         return false
     end
 
@@ -114,7 +114,7 @@ function M.send_goal_complete()
             M.log("Goal completion sent successfully!")
             return true
         else
-            M.log("StatusUpdate failed: " .. tostring(err))
+            M.log.error("StatusUpdate failed: " .. tostring(err))
             re.msg("Goal completion failed to send: " .. tostring(err))
         end
     else
@@ -195,7 +195,7 @@ function M.send_deathlink(data)
             M.log("Sent DeathLink: " .. tostring(deathLinkData.cause))
             return true
         end
-        M.log("DeathLink send failed: " .. tostring(err))
+        M.log.error("DeathLink send failed: " .. tostring(err))
     end
 
     return false
@@ -219,37 +219,17 @@ end
 ------------------------------------------------------------
 -- Client Binding
 ------------------------------------------------------------
-
-function M.bind_client()
-    if not AP_REF.APClient then return false end
-
-    AP_REF.APClient:set_items_received_handler(function(items)
-        if AP_REF.on_items_received then AP_REF.on_items_received(items) end
-    end)
-
-    AP_REF.APClient:set_data_package_changed_handler(function(dp)
-        if AP_REF.on_data_package_changed then AP_REF.on_data_package_changed(dp) end
-    end)
-
-    AP_REF.APClient:set_slot_connected_handler(function(slot_data)
-        if AP_REF.on_slot_connected then AP_REF.on_slot_connected(slot_data) end
-    end)
-
-    AP_REF.APClient:set_location_checked_handler(function(locations)
-        if AP_REF.on_location_checked then AP_REF.on_location_checked(locations) end
-    end)
-
-    AP_REF.APClient:set_retrieved_handler(function(map, keys, extra)
-        if AP_REF.on_retrieved then AP_REF.on_retrieved(map, keys, extra) end
-    end)
-
-    AP_REF.APClient:set_room_info_handler(function()
-        if AP_REF.on_room_info then AP_REF.on_room_info() end
-    end)
-
-    M.log("Rebound APClient handlers.")
-    return true
-end
+-- There is deliberately none. APConnect() in AP_REF/core.lua registers every
+-- handler on the client it just built, and each of those wrappers forwards to
+-- the AP_REF.on_<event> field that this module assigns below -- so our handlers
+-- are already live without touching the client.
+--
+-- Re-registering them here (the old M.bind_client) replaced core's wrappers
+-- with bare pass-throughs, and core's wrappers are where the protocol lives:
+-- room_info sends ConnectSlot, slot_connected sends ConnectUpdate. Losing
+-- ConnectSlot meant the first Connect never authenticated and simply hung; the
+-- second press built a fresh client whose wrappers survived, which is why
+-- "press Connect twice" was the workaround.
 
 ------------------------------------------------------------
 -- Location Checks
@@ -329,14 +309,14 @@ function M.check(loc_name)
     end
 
     if not is_connected() then
-        M.log("Disconnected; cannot send (sync will retry)")
+        M.log.warn("Disconnected; cannot send (sync will retry)")
         sync_needed = true
         return false
     end
 
     local loc_id = resolve_location_id(loc_name)
     if not loc_id then
-        M.log("Could not resolve location: " .. tostring(loc_name) .. " (sync will retry)")
+        M.log.warn("Could not resolve location: " .. tostring(loc_name) .. " (sync will retry)")
         sync_needed = true
         return false
     end
@@ -752,16 +732,9 @@ _G.drap_bridge_pull_acks = function()
     print(string.format("[Bridge] ledger: %d known, %d acked", s.total, s.acked))
 end
 
-local bound_once = false
-
+-- Ungated by gameplay on purpose: connects happen at the title screen, where
+-- main's module loop never runs.
 re.on_frame(function()
-    -- Handler rebinding must not wait for gameplay: connects happen at the
-    -- title screen, where main's module loop (which used to trigger this
-    -- via M.on_frame) never runs.
-    if not bound_once and AP_REF.APClient then
-        bound_once = true
-        pcall(M.bind_client)
-    end
     pcall(sync_tick)
 end)
 
@@ -916,7 +889,6 @@ function M.load_received_items()
         RECEIVED_ITEMS = {}
         RECEIVED_ITEMS_BY_NAME = {}
         last_item_index = -1
-        pending_items = {}
         return
     end
     RECEIVED_ITEMS = data.items or {}
@@ -928,7 +900,6 @@ function M.load_received_items()
         end
     end
     last_item_index = tonumber(data.last_item_index) or -1
-    pending_items = {}
     M.log(string.format("Loaded %d received items, last_item_index=%d",
         #RECEIVED_ITEMS, last_item_index))
 end
@@ -1040,27 +1011,25 @@ local function handle_net_item(net_item, is_replay)
     end
 end
 
+-- Queue and return. This runs inside lua-apclientpp's C dispatch, so it does
+-- no engine work at all: handle_net_item spawns items, fires effects and
+-- touches managed objects, none of which belongs beneath native code. The
+-- drain in M.on_frame already sorts by index and advances last_item_index, so
+-- ordering is unchanged -- items simply apply on the next frame instead of
+-- mid-callback. The queue path was previously only taken when the data package
+-- wasn't ready; now it is the only path.
 AP_REF.on_items_received = function(items)
     if not items then return end
 
+    local queued = 0
     for _, net_item in ipairs(items) do
         if net_item.index and net_item.index > last_item_index then
-            -- Check if data package is actually ready by testing name resolution
-            local test_name = AP_REF.APClient:get_item_name(net_item.item, nil)
-            local resolvable = test_name ~= nil and test_name ~= "Unknown"
-            -- Queue when unresolvable, OR when older items are already queued:
-            -- processing this one now would advance last_item_index past the
-            -- queued indices, and the on_frame drain (index > last_item_index)
-            -- would then discard them forever.
-            if not resolvable or #pending_items > 0 then
-                M.log("Queuing item index=" .. tostring(net_item.index) .. " id=" .. tostring(net_item.item)
-                    .. (resolvable and " (preserving queue order)" or " (data package not ready)"))
-                table.insert(pending_items, net_item)
-            else
-                last_item_index = net_item.index
-                handle_net_item(net_item, false)
-            end
+            table.insert(pending_items, net_item)
+            queued = queued + 1
         end
+    end
+    if queued > 0 then
+        M.log(string.format("Queued %d item(s) for next-frame delivery", queued))
     end
 end
 
@@ -1124,8 +1093,8 @@ end
 ------------------------------------------------------------
 
 function M.on_frame()
-    -- (Handler binding happens in the ungated re.on_frame hook above --
-    -- this in-game loop only drains the pending-items queue.)
+    -- This in-game loop only drains the pending-items queue; the sync tick
+    -- runs from its own ungated re.on_frame above.
 
     -- Process queued items once data package is actually available
     if #pending_items > 0 then

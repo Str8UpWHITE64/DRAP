@@ -231,7 +231,7 @@ function M.sweep(reason)
             M.log(string.format("REMOVED broken record (%s): %s -- engine will respawn on next area entry",
                 reason or "?", describe(e, e.owning)))
         else
-            M.log("removeInformation FAILED for " .. describe(e, e.owning))
+            M.log.warn("removeInformation FAILED for " .. describe(e, e.owning))
         end
     end
 

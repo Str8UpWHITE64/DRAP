@@ -174,7 +174,7 @@ local function dump_failure(reason)
     C.last_failure = { reason = reason, when = os.date() }
     local f, err = io.open(FAILURES_FILE, "a")
     if not f then
-        M.log("failure log open failed: " .. tostring(err))
+        M.log.error("failure log open failed: " .. tostring(err))
         return
     end
     f:write(string.format(
@@ -187,7 +187,7 @@ local function dump_failure(reason)
     f:write("==========================================\n")
     f:flush()
     f:close()
-    M.log(string.format("SAVE FAILURE captured (#%d, %s) -> %s",
+    M.log.error(string.format("SAVE FAILURE captured (#%d, %s) -> %s",
         C.failures, reason, FAILURES_FILE))
 end
 
