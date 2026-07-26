@@ -375,6 +375,15 @@ local function run_slot_connect(slot_data)
     AP.ScoopUnlocker.set_cult_limited_enabled(cult_limited_enabled)
     log("Cult Limited enabled=" .. tostring(cult_limited_enabled))
 
+    -- Survivor Respawn option. Defaults ON in the apworld, so treat a missing
+    -- key (older seed) as enabled rather than silently reverting to the
+    -- vanilla rule where a dead survivor loses their check for good.
+    local survivor_respawn_enabled = not (type(slot_data) == "table"
+        and slot_data.survivor_respawn == false)
+    AP.SurvivorRespawnEnabled = survivor_respawn_enabled
+    AP.effects.SurvivorRecovery.set_survivor_respawn_enabled(survivor_respawn_enabled)
+    log("Survivor Respawn enabled=" .. tostring(survivor_respawn_enabled))
+
     -- Goal mode for ScoopUnlocker -- used to fire flag 270 (Backup for Brad
     -- cutscene that opens EP shutters) on Meet-Jessie when goal is Savior.
     AP.ScoopUnlocker.set_goal_mode(goal)
