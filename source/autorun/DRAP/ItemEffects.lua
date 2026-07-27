@@ -160,6 +160,25 @@ function M.has_category_handler(category)
     return CATEGORY_HANDLERS[category] ~= nil
 end
 
+--- Does this item resolve to a one-shot effect rather than an object?
+---
+--- on_replay = "skip" already marks the items whose effect must not re-fire on
+--- a reload -- traps, temporary buffs, stat grants. None of them has a world
+--- prefab, so the spawner UI uses this to keep them out of its list. Ordinary
+--- items arrive through the bridge's legacy shim as "apply" and are unaffected.
+--- Resolution mirrors dispatch(): entry wins, then its category, then "apply".
+--- @param name string
+--- @return boolean
+function M.is_one_shot(name)
+    local entry = name and NAME_HANDLERS[name] or nil
+    if not entry then return false end
+    local cat_entry = entry.category and CATEGORY_HANDLERS[entry.category] or nil
+    local on_replay = entry.on_replay
+                   or (cat_entry and cat_entry.on_replay)
+                   or "apply"
+    return on_replay == "skip"
+end
+
 function M.stats()
     local name_count, id_count, cat_count = 0, 0, 0
     for _ in pairs(NAME_HANDLERS) do name_count = name_count + 1 end

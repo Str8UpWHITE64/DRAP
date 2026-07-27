@@ -493,6 +493,16 @@ local function get_scoop_unlocker()
     return nil
 end
 
+-- Lazy-loaded ItemEffects: the registry knows which items are one-shot
+-- effects (traps, buffs) rather than objects with a world prefab.
+local ItemEffects_mod = nil
+local function get_item_effects()
+    if ItemEffects_mod then return ItemEffects_mod end
+    local ok, mod = pcall(require, "DRAP/ItemEffects")
+    if ok and mod then ItemEffects_mod = mod end
+    return ItemEffects_mod
+end
+
 -- Lazy-loaded PlayerStats (covers Progressive *Upgrade* and the 21 SKILL items)
 local PlayerStats_mod = nil
 local function get_player_stats()
@@ -516,12 +526,17 @@ local function is_effect_item(item_name)
         return false
     end
 
-    if item_name == "Maintenance Tunnel Access Key" then
+    -- Filter out key items. Matched case-insensitively so the Access Key --
+    -- the one key that capitalises the word -- is caught here too.
+    if string.find(string.lower(item_name), "key", 1, true) then
         return true
     end
 
-    -- Filter out key items
-    if string.find(item_name, "key", 1, true) then
+    -- Filter out traps, temporary buffs and stat grants. These register with
+    -- ItemEffects as one-shot effects (on_replay = "skip"); they have no world
+    -- prefab, so there is nothing for the spawner to place.
+    local ie = get_item_effects()
+    if ie and ie.is_one_shot and ie.is_one_shot(item_name) then
         return true
     end
 
@@ -548,10 +563,14 @@ local function is_effect_item(item_name)
     return false
 end
 
+-- Case-insensitive on purpose. The 14 area keys are "<Zone> key", but
+-- "Maintenance Tunnel Access Key" capitalises it, so a lowercase-only match
+-- dropped it out of the Keys tab entirely. "Hockey Stick" contains "key" and
+-- is a real weapon, hence the exclusion.
 local function is_key_item(item_name)
     if not item_name then return false end
     if item_name == "Hockey Stick" then return false end
-    return string.find(item_name, "key", 1, true) ~= nil
+    return string.find(string.lower(item_name), "key", 1, true) ~= nil
 end
 
 local function matches_filter(entry)
