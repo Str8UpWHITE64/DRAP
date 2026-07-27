@@ -8,7 +8,11 @@ Before playing, please consider installing [Universal Tracker](https://github.co
 
 ## Ignore the in-game Mission HUD
 
-The AP has 13 Main Scoop missions that you are expected to complete in order to obtain Ending A. The in-game HUD is, as of 1.1.X, does not necessarily reflect what your current Scoop/Objective is. Only rely on the AP Client **Scoops** tab to know what comes next.
+The AP has 13 Main Scoop missions that you are expected to complete in order to obtain Ending A. The in-game HUD is, as of 1.1.X, does not necessarily reflect what your current Scoop/Objective is. Only rely on the AP Client **Scoops** tab to know what comes next, which is pulled up by pressing a key on your keyboard (Default: Insert Key).
+
+## AP Client Tabs meaning
+
+The in-game AP Client has 5 tabs: **Items**, **Keys**, **Scoops**, **Doors**, ** and **Saves**. I'll explain the Items and Scoops tabs in the next two sections, as they require some more detail. The others are simpler; **Keys** shows you the keys you have, **Doors** shows you the ways doors work if you have Door Randomizer enabled, and **Saves** shows you if there are any errors related to saves in your game.
 
 ## Understanding the AP Client **Scoops** tab
 
@@ -26,3 +30,6 @@ Beneath the Main Scoops, you can see all other side scoops you have currently av
 
 You are able to click "Done" on your Side Scoops. DO NOT DO THIS unless the Scoop is bugged or otherwise not able to be completed. This does not send the corresponding checks; you will either need to have the Server Admin send you the check locations OR start a new save file and run to the mission to complete it. For more information, check out the [Known Bugs]() document.
 
+## Understanding the AP Client **Items** tab
+
+The **Items** tab represents two things: your ability to spawn items in
