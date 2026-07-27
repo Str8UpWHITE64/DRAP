@@ -1647,6 +1647,7 @@ class DRWorld(World):
         door_randomizer_mode = self.options.door_randomizer_mode.value
         scoop_sanity_enabled = bool(self.options.scoop_sanity.value)
         exclude_levels_enabled = bool(self.options.exclude_levels.value)
+        pp_stickers_filler_enabled = bool(self.options.pp_stickers_filler.value)
 
         # Player-stats / progression options (PlayerStats + PlayerBuffs +
         # HostileSurvivorTrap on the Lua side read these from slot_data).
