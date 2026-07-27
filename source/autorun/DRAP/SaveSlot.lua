@@ -126,10 +126,6 @@ end
 -- Public API
 ------------------------------------------------------------
 
--- Set on mid-session connect (saves will fail until restart). Read by
--- SaveDiagnostics' GUI tab for a persistent banner.
-M.mid_session_warning = false
-
 --- Reads the engine's current SaveMountPath (or nil).
 function M.get_current_mount()
     local td = sdk.find_type_definition(SaveService_TYPE_NAME)
@@ -152,7 +148,6 @@ function M.apply_for_slot(slot_name, seed)
     if _is_player_in_session() then
         -- The engine's storage state is sticky to the previous mount;
         -- every save this session will fail. Make it unmissable.
-        M.mid_session_warning = true
         M.log("WARNING: connecting to AP mid-session; saves will fail until restart.")
         pcall(re.msg,
             "DRAP: Connected to Archipelago mid-game.\n"
