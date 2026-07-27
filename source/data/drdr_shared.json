@@ -2567,7 +2567,8 @@
       "location_template_singular": "Spin 1 Display Rack",
       "location_template_plural": "Spin {n} Display Racks",
       "all_location_name": "Spin All Display Racks",
-      "region": "Entrance Plaza"
+      "region": "Entrance Plaza",
+      "ep_shutter": true
     },
     {
       "id": "pp_food_court_dish",
