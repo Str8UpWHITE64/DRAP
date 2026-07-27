@@ -2590,11 +2590,10 @@
       "location_template_singular": "Use 1 Microwave",
       "location_template_plural": "Use {n} Microwaves",
       "all_location_name": "Use All Microwaves",
-      "count_tiers": [
-        {"max_count": 1, "regions": ["Paradise Plaza"]},
-        {"max_count": 7, "regions": ["Paradise Plaza", "Food Court"]},
-        {"max_count": 9, "regions": ["Paradise Plaza", "Food Court", "Al Fresca Plaza"]}
-      ],
+      "region": "Security Room",
+      "region_counts": {"Paradise Plaza": 1, "Food Court": 6, "Al Fresca Plaza": 2},
+      "required_regions": ["Seon's Food and Stuff"],
+      "alt_items_any": ["Uncooked Pizza", "Raw Meat"],
       "restricted_mode_items_any": ["Uncooked Pizza", "Raw Meat"]
     },
     {
@@ -2607,11 +2606,8 @@
       "location_template_singular": "Heat a pan on 1 stove",
       "location_template_plural": "Heat a pan on {n} stoves",
       "all_location_name": "Heat a pan on all stoves",
-      "count_tiers": [
-        {"max_count": 2, "regions": ["Paradise Plaza"]},
-        {"max_count": 4, "regions": ["Paradise Plaza", "Food Court"]},
-        {"max_count": 5, "regions": ["Paradise Plaza", "Food Court", "Al Fresca Plaza"]}
-      ],
+      "region": "Security Room",
+      "region_counts": {"Al Fresca Plaza": 1, "Paradise Plaza": 2, "Food Court": 2},
       "restricted_mode_items_any": ["Frying Pan"]
     }
   ]
