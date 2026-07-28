@@ -44,6 +44,8 @@ If you do not play with Scoopsanity, the Main Scoops will have to be completed i
 
 *Door Randomizer* how doors are linked together. The door from Wonderland Plaza to Food Court could instead take you to the door from Paradise Plaza to Warehouse, while the door from Food Court to Wonderland Plaza could take you to the door from North Plaza to Crislip's Home Saloon. You can generate a map of the linked doors in the **Doors** tab of the AP client, explained further down.
 
+*Note: DRDR AP 1.1 does not support the /get_logical_path function in UT.*
+
 ## Ignore the in-game Mission HUD
 
 The in-game HUD is, as of 1.1, does not necessarily reflect what your current Scoop/Objective is. Only rely on the AP Client **Scoops** tab to know what comes next, which is pulled up by pressing a key on your keyboard (Default: Insert Key).
