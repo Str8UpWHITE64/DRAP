@@ -436,6 +436,15 @@ class ExcludeOverpoweredItems(Toggle):
     default = False
 
 
+class PPStickersFiller(Toggle):
+    """
+    When enabled, PP stickers and their milestone checks (such as
+    "Photograph 10 PP Stickers") will still exist but will only have filler.
+    """
+    display_name = "PP Stickers Filler"
+    default = False
+
+
 @dataclass
 class DROption(PerGameCommonOptions):
     start_inventory_from_pool: StartInventoryPool
@@ -466,6 +475,7 @@ class DROption(PerGameCommonOptions):
     costume_chaos_mode: CostumeChaosMode
     dlc_outfits_enabled: DLCOutfitsEnabled
     pp_bonus_locations: PpBonusLocations
+    pp_stickers_filler: PPStickersFiller
 
 dr_option_groups = [
     OptionGroup("Goal and Location Settings",
@@ -476,6 +486,7 @@ dr_option_groups = [
             PpBonusLocations,
             ExcludeLevels,
             ExcludeLevelsAbove,
+            PPStickersFiller,
         ],
     ),
     OptionGroup(

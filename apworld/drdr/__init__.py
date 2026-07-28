@@ -801,6 +801,33 @@ class DRWorld(World):
                         if 50 > threshold:
                             location.progress_type = LocationProgressType.EXCLUDED
 
+
+        # PP Stickers Filler code (make all PP sticker checks excluded)
+        if self.options.pp_stickers_filler:
+            for location in self.multiworld.get_locations(self.player):
+                name = location.name
+
+                # "Photograph PP Sticker 1" to "Photograph PP Sticker 100"
+                if re.match(r"Photograph PP Sticker \d+", name):
+                    location.progress_type = LocationProgressType.EXCLUDED
+                    continue
+
+                # Milestone checks
+                if name in {
+                    "Photograph 10 PP Stickers",
+                    "Photograph 20 PP Stickers",
+                    "Photograph 30 PP Stickers",
+                    "Photograph 40 PP Stickers",
+                    "Photograph 50 PP Stickers",
+                    "Photograph 60 PP Stickers",
+                    "Photograph 70 PP Stickers",
+                    "Photograph 80 PP Stickers",
+                    "Photograph 90 PP Stickers",
+                    "Photograph all PP Stickers",
+                }:
+                    location.progress_type = LocationProgressType.EXCLUDED
+
+        
         # Victory condition based on goal
         goal_location_name = self.GOAL_LOCATIONS[self.options.goal.value]
         set_rule(self.multiworld.get_location("Victory", self.player), lambda state: state.can_reach_location(goal_location_name, self.player))
@@ -1620,6 +1647,7 @@ class DRWorld(World):
         door_randomizer_mode = self.options.door_randomizer_mode.value
         scoop_sanity_enabled = bool(self.options.scoop_sanity.value)
         exclude_levels_enabled = bool(self.options.exclude_levels.value)
+        pp_stickers_filler_enabled = bool(self.options.pp_stickers_filler.value)
 
         # Player-stats / progression options (PlayerStats + PlayerBuffs +
         # HostileSurvivorTrap on the Lua side read these from slot_data).
@@ -1714,6 +1742,7 @@ class DRWorld(World):
                 "costume_chaos_mode": costume_chaos_mode,
                 "dlc_outfits_enabled": dlc_outfits_enabled,
                 "pp_bonus_locations": pp_bonus_locations_enabled,
+                "pp_stickers_filler": pp_stickers_filler_enabled,
             },
             "goal": goal,
             "number_of_survivors": number_of_survivors,
@@ -1742,6 +1771,7 @@ class DRWorld(World):
             "random_starting_costume": random_starting_costume,
             "costume_chaos_mode": costume_chaos_mode,
             "dlc_outfits_enabled": dlc_outfits_enabled,
+            "pp_stickers_filler": pp_stickers_filler_enabled,
             "pp_bonus_locations": pp_bonus_locations_enabled,
             "pp_bonus_trigger_data": pp_bonus_trigger_data,
             "hints": hints,
