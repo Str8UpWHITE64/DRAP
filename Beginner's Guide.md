@@ -4,7 +4,7 @@ If this is your first time playing the DRDR AP, please read this guide from begi
 
 ## Additional Tools
 
-Before playing, please consider installing [Universal Tracker](https://github.com/FarisTheAncient/Archipelago/releases?q=Tracker) and/or the [PopTracker](https://github.com/RazgrizEast/dead-rising-poptracker-razgriz/releases) made by Razgris. These tools, alongside the in-game AP Client, are helpful in knowing what you are able to do while playing.
+Before playing, please consider installing [Universal Tracker](https://github.com/FarisTheAncient/Archipelago/releases?q=Tracker) and/or the [PopTracker](https://github.com/RazgrizEast/dead-rising-poptracker-razgriz/releases) made by Razgriz. Certain locations have logic for spawning items or are available in the opening earlier than one may expect. These tools, alongside the in-game AP Client, are helpful in knowing what you are able to do while playing. 
 
 ## What is *Restricted Items*?
 
@@ -18,7 +18,7 @@ The AP has 13 Main Scoop missions that you are expected to complete in order to 
 
 ## AP Client Tabs meaning
 
-The in-game AP Client has 4 tabs: **Items**, **Keys**, **Scoops**, **Doors**, and **Saves**. **Saves** does not function as intended and will be removed in a future update. **Keys** shows you the keys you have. **Doors** shows you the ways doors work if you have Door Randomizer enabled. The other tabs need a bit more thorough explanation.
+The in-game AP Client has 4 tabs: **Items**, **Keys**, **Scoops**, and **Doors**. **Keys** shows you the keys you have. **Doors** creates an interactable .html file of the door links, which can be found in `steamapps\common\DEAD RISING DELUXE REMASTER\reframework\data`. The other tabs need a bit more thorough explanation.
 
 ## Understanding the AP Client **Scoops** tab
 
