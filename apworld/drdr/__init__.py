@@ -867,11 +867,31 @@ class DRWorld(World):
                     self.player
                 ).progress_type = LocationProgressType.EXCLUDED
 
+        # EP shutter gate. Entrance Plaza's storefronts stay closed until the
+        # shutter cutscene plays, so anything inside them is unreachable even
+        # once EP itself is. Defined here because both the PP-bonus rules below
+        # and the sticker/survivor rules further down need it.
+        # Vanilla: the shutters open during the Brad escort.
+        # ScoopSanity: the EP trigger spot opens them once the player has
+        # met Jessie (Warehouse reach) -- except when Backup for Brad is
+        # first in the chain, where the runtime holds the trigger until the
+        # Brad escort completes (the mission fires the cutscene itself).
+        # Generation now keeps Backup out of the first slot, so that branch
+        # is a safeguard for hand-edited orders.
+        if (not self.options.scoop_sanity
+                or (self.scoop_order and self.scoop_order[0] == "Backup for Brad")):
+            _shutter = lambda state: state.can_reach_location("Escort Brad to see Dr Barnaby", self.player)
+        else:
+            _shutter = lambda state: state.can_reach_region("Warehouse", self.player)
+        ep_shutter = lambda state: (state.can_reach_region("Entrance Plaza", self.player)
+                                    and _shutter(state))
+
         # PP-bonus rules (per-count for "counted" entries). Per-location rule
         # combines: required_regions (ALL reachable; first may be bypassed by
         # alt_item), requires_location (extra location gate, e.g. First Aid
-        # Kit needs Steven), and restricted_mode_items_any (in restricted
-        # mode, requires ANY one of the listed items).
+        # Kit needs Steven), restricted_mode_items_any (in restricted
+        # mode, requires ANY one of the listed items), and ep_shutter (the
+        # entry sits behind Entrance Plaza's storefront shutters).
         if self.options.pp_bonus_locations:
             restricted_mode_on = bool(self.options.restricted_item_mode.value)
 
@@ -899,10 +919,17 @@ class DRWorld(World):
                     return True
                 return rule
 
+            # Entries flagged ep_shutter sit inside Entrance Plaza's
+            # storefronts, so reaching EP is not enough -- the shutter
+            # cutscene has to have played.
+            def _gate_on_shutter(inner, shutter=ep_shutter):
+                return lambda state: shutter(state) and inner(state)
+
             for _entry in AP_TRIGGER_LOCATIONS:
                 _names = expand_trigger_location_names(_entry)
                 if not _names:
                     continue
+                _shuttered = bool(_entry.get("ep_shutter"))
                 _alt_item = _entry.get("alt_item")
                 _req_loc = _entry.get("requires_location")
                 _items_any = _entry.get("restricted_mode_items_any") or []
@@ -969,7 +996,10 @@ class DRWorld(World):
                             _loc = self.multiworld.get_location(_name, self.player)
                         except KeyError:
                             continue
-                        set_rule(_loc, _make_count_rule(_n))
+                        _rule = _make_count_rule(_n)
+                        if _shuttered:
+                            _rule = _gate_on_shutter(_rule)
+                        set_rule(_loc, _rule)
                     continue
 
                 # Build a list of (location_name, required_regions) tuples
@@ -997,8 +1027,10 @@ class DRWorld(World):
                         _loc = self.multiworld.get_location(_name, self.player)
                     except KeyError:
                         continue
-                    set_rule(_loc, _make_rule(
-                        _regions, _alt_item, _req_loc, _items_any))
+                    _rule = _make_rule(_regions, _alt_item, _req_loc, _items_any)
+                    if _shuttered:
+                        _rule = _gate_on_shutter(_rule)
+                    set_rule(_loc, _rule)
 
         if not self.options.door_randomizer:
             # Normal key-based entrance rules
@@ -1224,22 +1256,9 @@ class DRWorld(World):
         set_rule(self.multiworld.get_location("Photograph PP Sticker 23", self.player), lambda state: state.can_reach_region("Colby's Movieland", self.player))
         set_rule(self.multiworld.get_location("Photograph PP Sticker 24", self.player), lambda state: state.can_reach_region("Colby's Movieland", self.player))
 
-        # PP Stickers in Entrance Plaza
-        # EP shutter gate (EP stickers 25-34, EP survivors, Wayne's check).
-        # Vanilla: the shutters open during the Brad escort.
-        # ScoopSanity: the EP trigger spot opens them once the player has
-        # met Jessie (Warehouse reach) -- except when Backup for Brad is
-        # first in the chain, where the runtime holds the trigger until the
-        # Brad escort completes (the mission fires the cutscene itself).
-        # Generation now keeps Backup out of the first slot, so that branch
-        # is a safeguard for hand-edited orders.
-        if (not self.options.scoop_sanity
-                or (self.scoop_order and self.scoop_order[0] == "Backup for Brad")):
-            _shutter = lambda state: state.can_reach_location("Escort Brad to see Dr Barnaby", self.player)
-        else:
-            _shutter = lambda state: state.can_reach_region("Warehouse", self.player)
-        ep_shutter = lambda state: (state.can_reach_region("Entrance Plaza", self.player)
-                                    and _shutter(state))
+        # PP Stickers in Entrance Plaza -- behind the shutters (25-34), as are
+        # the EP survivors and Wayne's check further down. ep_shutter is
+        # defined above, alongside the PP-bonus rules that also need it.
         set_rule(self.multiworld.get_location("Photograph PP Sticker 25", self.player), ep_shutter)
         set_rule(self.multiworld.get_location("Photograph PP Sticker 26", self.player), ep_shutter)
         set_rule(self.multiworld.get_location("Photograph PP Sticker 27", self.player), ep_shutter)
