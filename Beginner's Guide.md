@@ -1,10 +1,32 @@
 # Beginner's Guide
 
-If this is your first time playing the DRDR AP, please read this guide from beginning to end! I've even included helpful pictures for visual reference.
+If this is your first time playing the Dead Rising Deluxe Remaster AP, please read this guide from beginning to end! I've even included helpful pictures for visual reference. If you're truly pressed for time, just look at the pictures.
 
 ## Additional Tools
 
 Before playing, please consider installing [Universal Tracker](https://github.com/FarisTheAncient/Archipelago/releases?q=Tracker) and/or the [PopTracker](https://github.com/RazgrizEast/dead-rising-poptracker-razgriz/releases) made by Razgriz. Certain locations have logic for spawning items or are available in the opening earlier than one may expect. These tools, alongside the in-game AP Client, are helpful in knowing what you are able to do while playing. 
+
+## Win Conditions
+
+In Ending A and Ending S, your objective is to complete 13 story missions, return to the Security Room via the Warehouse, complete Memories, and head to the Heliport. Ending S also requires you to complete the Overtime missions. The 13 missions you must complete are always the same:
+
+1. Santa Cabeza
+2. Image in the Monitor
+3. A Temporary Agreement
+4. Girl Hunting
+5. The Butcher
+6. Professor's Past
+7. Jessie's Discovery
+8. Hideout
+9. A Promise to Isabela
+10. Rescue the Professor
+11. Medicine Run
+12. The Last Resort
+13. Backup for Brad
+
+Savior, on the other hand, only requires you to bring a certain number of survivors back to the Security Room. You can ignore the Main Scoops, as they only have filler items.
+
+Please read the [Known Bugs]() document should you encounter a bug with survivors unloading.
 
 ## What is *Restricted Items*?
 
@@ -12,9 +34,19 @@ Before playing, please consider installing [Universal Tracker](https://github.co
 
 To see what items have been sent to you, check the in-game AP Client **Items** tab (explained further down).
 
+## What is *Scoopsanity*?
+
+*Scoopsanity* is a setting that freezes the in-game timer after meeting Jessie in the Warehouse. Main Scoops will be assigned in a random order and must be completed in that order. Side Scoops that would normally require a specific time to activate or a specific Scoop to be completed first have these restrictions removed.
+
+If you do not play with Scoopsanity, the Main Scoops will have to be completed in order. You may have to start a new save file in order to reload certain Scoops that were previously locked. This is intentional behavior, and your AP progress and Main Scoop completion carries over between saves.
+
+## What is *Door Randomizer*?
+
+*Door Randomizer* how doors are linked together. The door from Wonderland Plaza to Food Court could instead take you to the door from Paradise Plaza to Warehouse, while the door from Food Court to Wonderland Plaza could take you to the door from North Plaza to Crislip's Home Saloon. You can generate a map of the linked doors in the **Doors** tab of the AP client, explained further down.
+
 ## Ignore the in-game Mission HUD
 
-The AP has 13 Main Scoop missions that you are expected to complete in order to obtain Ending A. The in-game HUD is, as of 1.1.X, does not necessarily reflect what your current Scoop/Objective is. Only rely on the AP Client **Scoops** tab to know what comes next, which is pulled up by pressing a key on your keyboard (Default: Insert Key).
+The in-game HUD is, as of 1.1, does not necessarily reflect what your current Scoop/Objective is. Only rely on the AP Client **Scoops** tab to know what comes next, which is pulled up by pressing a key on your keyboard (Default: Insert Key).
 
 ## AP Client Tabs meaning
 
@@ -24,15 +56,12 @@ The in-game AP Client has 4 tabs: **Items**, **Keys**, **Scoops**, and **Doors**
 
 The in-game AP Client is powerful and informative, if not a little confusing at times. **Scoops** is the most important tab while playing, as it tells you what Scoops are available. For Main Scoops:
 
+- GREY means the Scoop is completed
 - RED means you do not have the Scoop unlocked
 - BLUE means you have the Scoop unlocked but it is not your current Scoop
 - GREEN means you have the Scoop unlocked and it is your current Scoop
 
-Beneath the Main Scoops, you can see all other side scoops you have currently available.
-
-- GREY means the Scoop is completed
-- AAA means the Scoop is unlocked and able to be completed
-- BBB means the Scoop is unlocked but being blocked by the completion of a different Scoop
+Beneath the Main Scoops, you can see all other Side Scoops you have currently available. BLUE, in this case, means you have the Scoop unlocked but the conditions to complete it have yet to be met. Additionally, YELLOW means the Scoop is unlocked but being blocked by the completion of a different Scoop
 
 You are able to click "Done" on your Side Scoops. DO NOT DO THIS unless the Scoop is bugged or otherwise not able to be completed. This does not send the corresponding checks; you will either need to have the Server Admin send you the check locations OR start a new save file and run to the mission to complete it. For more information, check out the [Known Bugs]() document.
 
@@ -45,7 +74,7 @@ The **Items** tab represents two things: your ability to spawn items if you don'
 
 ## Despawning Survivors
 
-There is a knownm bug that Survivors in your party will not respawn should you load a save. This is being investigated and a fix will hopefully be implemented in a future update. If you encounter this bug, please read the [Known Bugs]() document to implement a workaround.
+There is a known bug that Survivors in your party will not respawn should you load a save. This is being investigated and a fix will hopefully be implemented in a future update. If you encounter this bug, please read the [Known Bugs]() document to implement a workaround.
 
 ## Recommended Settings
 
