@@ -5,9 +5,9 @@ DRDR AP, much like all APs, has some jank on the backend to make it work. This m
 
 Ignore the HUD missions. Open up the in-game AP Client to see what scoop you need to do.
 
-## I'm Playing Scoopsanity And I Got Entrance Plaza Key Before Paradise Plaza
+## I'm Playing ScoopSanity And I Got Entrance Plaza Key Before Paradise Plaza
 
-In Scoopsanity, you can exit and enter the Security Room through the normally closed Entrance Plaza door. If the door is locked when you start a mission in the Security Room, go to Rooftops and then go back to Security Room.
+In ScoopSanity, you can exit and enter the Security Room through the normally closed Entrance Plaza door. If the door is locked when you start a mission in the Security Room, go to Rooftops and then go back to Security Room.
 
 ## I Have The Maintenance Tunnel Access Key But Can't Enter Through The Doors
 
@@ -35,9 +35,9 @@ This is a known bug in 1.1 and is being investigated. If the AP client shows you
 
 ## Why Is "Kill Driving Carlito"/"Rescue Greg Simpson"/"Rescue Simone Ravendark" Listed As A Blacklisted Check In UT?
 
-"Kill Driving Carlito" is only available during The Last Resort. It is missable. If you are playing Scoopsanity, it is automatically blacklisted, contains a filler item, and can be ignored.
+"Kill Driving Carlito" is only available during The Last Resort. It is missable. If you are playing ScoopSanity, it is automatically blacklisted, contains a filler item, and can be ignored.
 
-Due to technical issues in 1.1, "Rescue Greg Simpson" is blacklisted in Scoopsanity and "Rescue Simone Ravendark" is blacklisted in all game modes. Both these checks contain filler items instead.
+Due to technical issues in 1.1, "Rescue Greg Simpson" is blacklisted in ScoopSanity and "Rescue Simone Ravendark" is blacklisted in all game modes. Both these checks contain filler items instead.
 
 ## I Grabbed The Maintenance Tunnel Access Key In The Maintenance Tunnel But I Still Logically Can't Access Another Area
 
