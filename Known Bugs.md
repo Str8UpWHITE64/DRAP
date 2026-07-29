@@ -1,5 +1,5 @@
 # Known Bugs And Their Workarounds
-DRDR AP, much like all APs, has some jank on the backend to make it work. This means there are bugs and glitches that you will likely encounter during your playthrough. Please read this whole document before playing and reporting a bug. As always in an AP, your mileage may vary.
+DRDR AP, much like all APs, has some jank on the backend to make it work. This means there are bugs and glitches that you will likely encounter during your playthrough. Please read this whole document before reporting a bug. You are also *strongly* advised to read the [Beginner's Guide](https://github.com/Str8UpWHITE64/DRAP/blob/main/Beginner's%20Guide.md) before playing. As always in an AP, your mileage may vary.
 
 ## My HUD Says I'm Supposed To Do A Scoop But It's Not Letting Me
 
