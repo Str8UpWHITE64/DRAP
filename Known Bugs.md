@@ -37,7 +37,7 @@ This is a known bug in 1.1 and is being investigated. If the AP client shows you
 
 "Kill Driving Carlito" is only available during The Last Resort. It is missable. If you are playing Scoopsanity, it is automatically blacklisted, contains a filler item, and can be ignored.
 
-Due to technical issues in 1.1.0, "Rescue Greg Simpson" is blacklisted in Scoopsanity and "Rescue Simone Ravendark" is blacklisted in all game modes. Both these checks contain filler items instead.
+Due to technical issues in 1.1, "Rescue Greg Simpson" is blacklisted in Scoopsanity and "Rescue Simone Ravendark" is blacklisted in all game modes. Both these checks contain filler items instead.
 
 ## I Grabbed The Maintenance Tunnel Access Key In The Maintenance Tunnel But I Still Logically Can't Access Another Area
 
