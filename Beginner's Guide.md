@@ -36,11 +36,11 @@ Please read the [Known Bugs](https://github.com/Str8UpWHITE64/DRAP/blob/main/Kno
 
 To see what items have been sent to you, check the in-game AP Client **Items** tab (explained further down).
 
-## What is *Scoopsanity*?
+## What is *ScoopSanity*?
 
-*Scoopsanity* is a setting that freezes the in-game timer after meeting Jessie in the Warehouse. Main Scoops will be assigned in a random order and must be completed in that order. Side Scoops that would normally require a specific time to activate or a specific Scoop to be completed first have these restrictions removed.
+*ScoopSanity* is a setting that freezes the in-game timer after meeting Jessie in the Warehouse. Main Missions will be assigned in a random order and must be completed in that order. Side Quests that would normally require a specific time to activate or a specific Scoop to be completed first have these restrictions removed.
 
-If you do not play with Scoopsanity, the Main Scoops will have to be completed in order. You may have to start a new save file in order to reload certain Scoops that were previously locked. This is intentional behavior, and your AP progress and Main Scoop completion carries over between saves.
+If you do not play with ScoopSanity, the Main Scoops will have to be completed in order. You may have to start a new save file in order to reload certain Scoops that were previously locked. This is intentional behavior, and your AP progress and Main Scoop completion carries over between saves.
 
 ## What is *Door Randomizer*?
 
@@ -72,10 +72,10 @@ Beneath the Main Story, you can see all other Side Quests you have currently ava
 
 - GREY means completed
 - BLUE means it's an active Psychopath quest
-- GREEN means it's an active Side Quest/scoop, where you have to rescue a survivor
+- GREEN means it's an active Side Quest where you have to rescue a survivor
 - YELLOW means you have this Side Quest, however it is deferred until the completion of the indicated Scoop
 
-You are able to click "Done" on your Side Scoops. DO NOT DO THIS unless the Scoop is bugged or otherwise not able to be completed. This does not send the corresponding checks; you will either need to have the Server Admin send you the check locations OR start a new save file and run to the mission to complete it. For more information, check out the [Known Bugs](https://github.com/Str8UpWHITE64/DRAP/blob/main/Known%20Bugs.md) document.
+You are able to click "Done" on your Side Quests. DO NOT DO THIS unless the Scoop is bugged or otherwise not able to be completed. This does not send the corresponding checks; you will either need to have the Server Admin send you the check locations OR start a new save file and run to the mission to complete it. For more information, check out the [Known Bugs](https://github.com/Str8UpWHITE64/DRAP/blob/main/Known%20Bugs.md) document.
 
 <img width="1292" height="948" alt="Scoops Tab" src="https://github.com/user-attachments/assets/b2206885-195a-45b5-8cc3-709d61f96ab7" />
 
