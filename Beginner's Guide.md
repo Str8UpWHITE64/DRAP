@@ -6,27 +6,29 @@ If this is your first time playing the Dead Rising Deluxe Remaster AP, please re
 
 Before playing, please consider installing [Universal Tracker](https://github.com/FarisTheAncient/Archipelago/releases?q=Tracker) and/or the [PopTracker](https://github.com/RazgrizEast/dead-rising-poptracker-razgriz/releases) made by Razgriz. Certain locations have logic for spawning items or are available in the opening earlier than one may expect. These tools, alongside the in-game AP Client, are helpful in knowing what you are able to do while playing. 
 
+A minor note before beginning: the launcher for the AP is found in the game, not in the Archipelago Launcher program. This, alongside the AP Client, can be pulled up and hidden by pressing a key on your keyboard (Default: Insert Key)
+
 ## Win Conditions
 
 In Ending A and Ending S, your objective is to complete 13 story missions, return to the Security Room via the Warehouse, complete Memories, and head to the Heliport. Ending S also requires you to complete the Overtime missions. The 13 missions you must complete are always the same:
 
-1. Santa Cabeza
-2. Image in the Monitor
-3. A Temporary Agreement
-4. Girl Hunting
-5. The Butcher
+1. Backup for Brad
+2. A Temporary Agreement
+3. Image in the Monitor
+4. Rescue the Professor
+5. Medicine Run
 6. Professor's Past
-7. Jessie's Discovery
-8. Hideout
-9. A Promise to Isabela
-10. Rescue the Professor
-11. Medicine Run
-12. The Last Resort
-13. Backup for Brad
+7. Girl Hunting
+8. A Promise to Isabela
+9. Santa Cabeza
+10. The Last Resort
+11. Hideout
+12. Jessie's Discovery
+13. The Butcher
 
 Savior, on the other hand, only requires you to bring a certain number of survivors back to the Security Room. You can ignore the Main Scoops, as they only have filler items.
 
-Please read the [Known Bugs]() document should you encounter a bug with survivors unloading.
+Please read the [Known Bugs](https://github.com/Str8UpWHITE64/DRAP/blob/main/Known%20Bugs.md) document should you encounter a bug with survivors unloading.
 
 ## What is *Restricted Items*?
 
@@ -48,7 +50,9 @@ If you do not play with Scoopsanity, the Main Scoops will have to be completed i
 
 ## Ignore the in-game Mission HUD
 
-The in-game HUD is, as of 1.1, does not necessarily reflect what your current Scoop/Objective is. Only rely on the AP Client **Scoops** tab to know what comes next, which is pulled up by pressing a key on your keyboard (Default: Insert Key).
+The in-game HUD is, as of 1.1, does not necessarily reflect what your current Scoop/Objective is. Only rely on the AP Client **Scoops** tab to know what comes next.
+
+<img width="1404" height="579" alt="Ignore vs Listen" src="https://github.com/user-attachments/assets/342be872-e4fe-40d5-bc24-bfaba170431e" />
 
 ## AP Client Tabs meaning
 
@@ -56,27 +60,51 @@ The in-game AP Client has 4 tabs: **Items**, **Keys**, **Scoops**, and **Doors**
 
 ## Understanding the AP Client **Scoops** tab
 
-The in-game AP Client is powerful and informative, if not a little confusing at times. **Scoops** is the most important tab while playing, as it tells you what Scoops are available. For Main Scoops:
+The in-game AP Client is powerful and informative, if not a little confusing at times. **Scoops** is the most important tab while playing, as it tells you what Scoops are available and the triggers for them. For Main Story:
 
+- LIGHT BLUE is the trigger for the current Main Story mission
 - GREY means the Scoop is completed
 - RED means you do not have the Scoop unlocked
 - BLUE means you have the Scoop unlocked but it is not your current Scoop
 - GREEN means you have the Scoop unlocked and it is your current Scoop
 
-Beneath the Main Scoops, you can see all other Side Scoops you have currently available. BLUE, in this case, means you have the Scoop unlocked but the conditions to complete it have yet to be met. Additionally, YELLOW means the Scoop is unlocked but being blocked by the completion of a different Scoop
+Beneath the Main Story, you can see all other Side Quests you have currently available. These have different color meanings, as well as an additional color:
+
+- GREY means completed
+- BLUE means it's an active Psychopath quest
+- GREEN means it's an active side quest/scoop, where you have to rescue a survivor
+- YELLOW means you have this Side Quest, however it is deferred until the completion of the indicated Scoop
 
 You are able to click "Done" on your Side Scoops. DO NOT DO THIS unless the Scoop is bugged or otherwise not able to be completed. This does not send the corresponding checks; you will either need to have the Server Admin send you the check locations OR start a new save file and run to the mission to complete it. For more information, check out the [Known Bugs]() document.
+
+<img width="1292" height="948" alt="Scoops Tab" src="https://github.com/user-attachments/assets/b2206885-195a-45b5-8cc3-709d61f96ab7" />
 
 ## Understanding the AP Client **Items** tab
 
 The **Items** tab represents two things: your ability to spawn items if you don't have *Restricted Items* enabled, and your ability to interact with items if you do have *Restricted Items* enabled. Let's say, for example, you are sent a Baseball Bat.
 
-- If you do not have *Restricted Items* enabled, you can the item in the **Items** tab and then click "Spawn Item" to spawn one item near you in your world (Note: please see the [Known Bugs]() document before spawning items in your world)
+- If you do not have *Restricted Items* enabled, you can the item in the **Items** tab and then click "Spawn Item" to spawn one item near you in your world (Note: please see the [Known Bugs](https://github.com/Str8UpWHITE64/DRAP/blob/main/Known%20Bugs.md) document before spawning items in your world)
 - If you have *Restricted Items* enabled, you can now pick up the item if it already exists in the world. However, you can not spawn the item via the **Items** tab.
+
+<img width="1292" height="972" alt="Items Tab" src="https://github.com/user-attachments/assets/85be7bd8-d8e0-43c0-a546-a1ffd46d7abd" />
+
+## Early Keys
+
+The first keys you obtain, besides Rooftop and Warehouse, are likely to be Paradise Plaza Key or Entrance Plaza Key. In DRDR AP, the normally welded door between Security Room and Entrance Plaza is unlocked. This means your early game progression may be through Entrance Plaza. It is possible you might not get to Paradise Plaza until much later in the game. This is intended behavior.
+
+If you head to the Security Room to complete a Main Story scoop and the door to Entrance Plaza becomes welded again, go to the Rooftop via the air vents, then return to the Security Room. The door should be unlocked now.
+
+## Photographing PP stickers 86, 87, and 88 on the Leisure Park clocktower faces
+
+You have to stand way further back than you'd think to be able to take those photo. It's fickle, in a similar way that photographing PP stickers 64, 65, 66, and 67 on the Space Rider are fickle.
 
 ## Despawning Survivors
 
-There is a known bug that Survivors in your party will not respawn should you load a save. This is being investigated and a fix will hopefully be implemented in a future update. If you encounter this bug, please read the [Known Bugs]() document to implement a workaround.
+There is a known bug that Survivors in your party will not respawn should you load a save. This is being investigated and a fix will hopefully be implemented in a future update. If you encounter this bug, please read the [Known Bugs](https://github.com/Str8UpWHITE64/DRAP/blob/main/Known%20Bugs.md)  document to implement a workaround.
+
+## I encountered a glitch
+
+Please head to the 
 
 ## Recommended Settings
 
@@ -90,3 +118,4 @@ DRDR can be an intimidating AP to play at first. The HUD isn't entirely clear on
 - cult_limited: Enabled
 - start_inventory_from_pool: Rooftop key: 1, Warehouse key: 1
 - start_hints: Paradise Plaza key, Entrance Plaza key, Al Fresca Plaza key, Leisure Park key, Maintenance Tunnel key, Maintenance Tunnel Access Key
+- exclude_locations: Escort 8 survivors at once, Frank the pimp, Photograph 30 survivors, Encounter 50 survivors, Get 50 survivors to join, Save 50 survivors, Kill 8 psychopaths, Photograph 8 psychopaths, Photograph 70 PP Stickers, Photograph 80 PP Stickers, Photograph 90 PP Stickers, Photograph all PP Stickers, Change into 46 new outfits
