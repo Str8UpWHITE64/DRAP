@@ -5,9 +5,9 @@ DRDR AP, much like all APs, has some jank on the backend to make it work. This m
 
 Ignore the HUD missions. Open up the in-game AP Client to see what scoop you need to do.
 
-## I'm Playing Scoop Sanity And I Got Entrance Plaza Key Before Paradise Plaza
+## I'm Playing Scoopsanity And I Got Entrance Plaza Key Before Paradise Plaza
 
-In Scoop Sanity, you can exit and enter the Security Room through the normally closed Entrance Plaza door. If the door is locked when you start a mission in the Security Room, go to Rooftops and then go back to Security Room.
+In Scoopsanity, you can exit and enter the Security Room through the normally closed Entrance Plaza door. If the door is locked when you start a mission in the Security Room, go to Rooftops and then go back to Security Room.
 
 ## I Have The Maintenance Tunnel Access Key But Can't Enter Through The Doors
 
@@ -15,7 +15,7 @@ Do you also have Maintenance Tunnel Key? You need both to enter via the Maintena
 
 ## Why Can't I Do Last Resort If I Have Both Maintenance Tunnel Key And Maintenance Tunnel Access Key
 
-You need Leisure Park Key as well. The end of the mission ejects you to Leisure Park.
+You need Leisure Park Key as well. The End of the mission ejects you to Leisure Park.
 
 ## I Can't Do My Next Scoop On The List
 
@@ -27,7 +27,7 @@ This is a known major bug and unfortunately we don't have a fix for it at this t
 
 ## I finished a mission but the cutscene didn't trigger
 
-This is a known bug in 1.1 and is being investigated. If the AP client shows you having completed the check and the **Scoops** tab shows you are on the next task, then don't worry about it. However if the Scoop doesn't show as completed, there are 3 workarounds for this. Please try them in order.
+This is a known bug in 1.1 and is being investigated. If the AP client shows you having completed the check and the **Scoops** tab shows you are on the next task, then Don't Worry About It. However if the Scoop doesn't show as completed, there are 3 workarounds for this. Please try them in order.
 
 1) Reload your latest save
 2) Stop the program, restart it, and connect to the AP
@@ -43,7 +43,7 @@ Due to technical issues in 1.1, "Rescue Greg Simpson" is blacklisted in Scoopsan
 
 "Obtain Maintenance Tunnel Access Key" is an in-game check that sets a flag to unlock these doors. This flag being set is also why when you receive the Maintenance Tunnel Access Key, it automatically sends the "Obtain Maintenance Tunnel Access Key" check. The AP does not currently consider these doors unlocking early as in Logic, but expects you to receive the Maintenance Tunnel Access Key as an item before going through the Maintenance Tunnel Access doors.
 
-tl;dr Logic wants you to obtain the Key item before it puts stuff in logic.
+TL;DR Logic wants you to obtain the Key item before it puts stuff in logic.
 
 ## A Cutscene Keeps Replaying In The Security Room Whenever I Enter The Door
 
