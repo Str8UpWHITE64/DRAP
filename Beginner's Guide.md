@@ -75,7 +75,7 @@ Beneath the Main Story, you can see all other Side Quests you have currently ava
 - GREEN means it's an active side quest/scoop, where you have to rescue a survivor
 - YELLOW means you have this Side Quest, however it is deferred until the completion of the indicated Scoop
 
-You are able to click "Done" on your Side Scoops. DO NOT DO THIS unless the Scoop is bugged or otherwise not able to be completed. This does not send the corresponding checks; you will either need to have the Server Admin send you the check locations OR start a new save file and run to the mission to complete it. For more information, check out the [Known Bugs]() document.
+You are able to click "Done" on your Side Scoops. DO NOT DO THIS unless the Scoop is bugged or otherwise not able to be completed. This does not send the corresponding checks; you will either need to have the Server Admin send you the check locations OR start a new save file and run to the mission to complete it. For more information, check out the [Known Bugs](https://github.com/Str8UpWHITE64/DRAP/blob/main/Known%20Bugs.md) document.
 
 <img width="1292" height="948" alt="Scoops Tab" src="https://github.com/user-attachments/assets/b2206885-195a-45b5-8cc3-709d61f96ab7" />
 
