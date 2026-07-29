@@ -60,3 +60,19 @@ Leave the Security Room, enter Paradise Plaza, then return to the Security Room 
 # I Can't Spawn Items From The AP Client Item List
 
 Spawning items is by far the most buggy part of this mod.  When spawning items using the AP Items Window, try not to spam the spawn button.  Wait a few seconds after spawning an item before spawning another one.  If you do spawn multiple items quickly, you increase your chances of the game crashing.
+
+## Reporting a Bug
+
+The mod keeps a log of every play session. When you report something, **attach the log file** — it saves a lot of back-and-forth guessing.
+
+Logs live in your game folder under:
+
+```
+reframework/data/DRAP_Logs/
+```
+
+Each session gets its own file, named for when you started the game — `drap_20260725_143012.log` — so opening the game again never erases the log from the run where the bug happened. If you're not sure which file you want, `latest.json` in that folder names the most recent one. Grab the log from the session where the problem occurred, not just the newest one.
+
+You can also find the exact path in-game: open the Archipelago window and click the **Log** tab. It shows the file path along with a running count of any warnings and errors. Copying the file while the game is running is fine.
+
+If you're reporting a crash, send the log from the session that crashed — the last lines before it died are usually the useful part.
