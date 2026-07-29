@@ -60,7 +60,7 @@ The in-game AP Client has 4 tabs: **Items**, **Keys**, **Scoops**, and **Doors**
 
 ## Understanding the AP Client **Scoops** tab
 
-The in-game AP Client is powerful and informative, if not a little confusing at times. **Scoops** is the most important tab while playing, as it tells you what Scoops are available and the triggers for them. For Main Story:
+The in-game AP Client is powerful and informative, if not a little confusing at Times. **Scoops** is the most important tab while playing, as it tells you what Scoops are available and the triggers for them. For Main Story:
 
 - LIGHT BLUE is the trigger for the current Main Story mission
 - GREY means the Scoop is completed
@@ -72,7 +72,7 @@ Beneath the Main Story, you can see all other Side Quests you have currently ava
 
 - GREY means completed
 - BLUE means it's an active Psychopath quest
-- GREEN means it's an active side quest/scoop, where you have to rescue a survivor
+- GREEN means it's an active Side Quest/scoop, where you have to rescue a survivor
 - YELLOW means you have this Side Quest, however it is deferred until the completion of the indicated Scoop
 
 You are able to click "Done" on your Side Scoops. DO NOT DO THIS unless the Scoop is bugged or otherwise not able to be completed. This does not send the corresponding checks; you will either need to have the Server Admin send you the check locations OR start a new save file and run to the mission to complete it. For more information, check out the [Known Bugs](https://github.com/Str8UpWHITE64/DRAP/blob/main/Known%20Bugs.md) document.
@@ -104,7 +104,7 @@ There is a known bug that Survivors in your party will not respawn should you lo
 
 ## I encountered a glitch
 
-Please head to the 
+Please head to the [Known Bugs](https://github.com/Str8UpWHITE64/DRAP/blob/main/Known%20Bugs.md) document to see if it's answered there before reporting the bug to the Discord.
 
 ## Recommended Settings
 
