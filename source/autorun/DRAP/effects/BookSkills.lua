@@ -8,6 +8,7 @@
 
 local SharedData = require("DRAP/SharedData")
 local ItemEffects = require("DRAP/ItemEffects")
+local Ledger = require("DRAP/LocationLedger")
 
 local M = {}
 
@@ -37,6 +38,15 @@ local books_disabled = false
 -- restores the book without needing to re-grant it.
 -- Values are the suppression source string (for diagnostics).
 local suppressed = {}
+
+-- Player-facing per-book off switch, owned solely by the Books tab. Kept
+-- separate from `granted` and `suppressed` because both of those are driven
+-- by other systems that would clobber a player's choice: reapply() re-grants
+-- every owned book on save-load, and BookGuards calls unsuppress on its
+-- falling edge. A book is off here until the player turns it back on.
+local user_disabled = {}
+
+local LEDGER_SECTION = "book_toggles"
 
 ------------------------------------------------------------
 -- Helpers
@@ -85,6 +95,23 @@ function M.is_granted(item_no)
     return granted[item_no] == true
 end
 
+--- Is this book's effect actually live right now?
+---
+--- The single source of truth for the three independent layers: AP ownership
+--- (`granted`), the guard system (`suppressed`), and the player's own switch
+--- (`user_disabled`), plus the global diagnostic kill switch. The hook and the
+--- Books tab both call this, so what the UI shows cannot drift from what the
+--- engine is told.
+--- @param item_no number
+--- @return boolean
+function M.is_effective(item_no)
+    if books_disabled then return false end
+    if not granted[item_no] then return false end
+    if suppressed[item_no] then return false end
+    if user_disabled[item_no] then return false end
+    return true
+end
+
 ------------------------------------------------------------
 -- Hook on Inventory.checkItemSkill
 ------------------------------------------------------------
@@ -103,8 +130,11 @@ local function install_hook()
     local ok, err = pcall(sdk.hook, m,
         function(args) last_id = argint(args[3]) end,
         function(retval)
-            if not books_disabled and last_id
-                and granted[last_id] and not suppressed[last_id] then
+            -- Only ever forces the answer to true: a book the player is
+            -- physically carrying is the engine's business, so a disabled
+            -- book falls through to the engine's own retval rather than
+            -- being forced false.
+            if last_id and M.is_effective(last_id) then
                 return sdk.to_ptr(1)   -- true
             end
             return retval
@@ -219,6 +249,138 @@ function M.list_suppressed()
 end
 
 ------------------------------------------------------------
+-- Player toggles (Books tab)
+------------------------------------------------------------
+
+--- Books the player currently owns, sorted by display name.
+--- Same ownership test reapply() uses. Returns
+--- { { name=, item_number=, enabled=, effective=, guard= }, ... }
+function M.acquired_books()
+    local out = {}
+    if not AP or not AP.AP_BRIDGE then return out end
+    for _, book in ipairs(gather_book_entries()) do
+        local item_no = book.item_number
+        if book.name and item_no and AP.AP_BRIDGE.has_item_name(book.name) then
+            table.insert(out, {
+                name        = book.name,
+                item_number = item_no,
+                enabled     = not user_disabled[item_no],
+                effective   = M.is_effective(item_no),
+                guard       = suppressed[item_no],
+            })
+        end
+    end
+    table.sort(out, function(a, b) return a.name:lower() < b.name:lower() end)
+    return out
+end
+
+function M.is_user_enabled(item_no)
+    return not user_disabled[item_no]
+end
+
+--- Turn one book's effect on or off for the player. Persists immediately so
+--- a crash or hard exit cannot lose the choice.
+function M.set_user_enabled(item_no, enabled)
+    if type(item_no) ~= "number" then return end
+    local now_disabled = (enabled == false) or nil
+    if user_disabled[item_no] == now_disabled then return end
+    user_disabled[item_no] = now_disabled
+    log(string.format("Book ITEM_NO=%d turned %s by the player",
+        item_no, enabled and "on" or "off"))
+    M.save_user_toggles()
+end
+
+--- Persisted as the DISABLED list, so a missing or unreadable section means
+--- "every book on" -- the vanilla-equivalent default -- and newly received
+--- books switch on by themselves.
+function M.save_user_toggles()
+    if not Ledger.is_init() then return false end
+    local ids = {}
+    for id in pairs(user_disabled) do table.insert(ids, id) end
+    table.sort(ids)   -- deterministic order on disk
+    return Ledger.set_section(LEDGER_SECTION, { disabled = ids })
+end
+
+function M.reset_user_toggles()
+    user_disabled = {}
+end
+
+--- Called on the save-load boundary. Resets first: without that, one slot's
+--- choices would leak into the next run loaded in the same session.
+function M.load_user_toggles()
+    M.reset_user_toggles()
+    local doc = Ledger.is_init() and Ledger.get_section(LEDGER_SECTION) or nil
+    if type(doc) ~= "table" or type(doc.disabled) ~= "table" then return false end
+    local n = 0
+    for _, id in ipairs(doc.disabled) do
+        local num = tonumber(id)
+        if num then
+            user_disabled[num] = true
+            n = n + 1
+        end
+    end
+    if n > 0 then
+        log(string.format("Loaded %d player-disabled book(s)", n))
+    end
+    return true
+end
+
+------------------------------------------------------------
+-- UI: Books Tab Drawing
+------------------------------------------------------------
+
+function M.draw_tab_content(debug)
+    local books = M.acquired_books()
+
+    local changed, new_val = imgui.checkbox("Disable all book effects", books_disabled)
+    if changed then
+        M.set_disabled(new_val)
+    end
+    imgui.text_colored(
+        "Turning a book off keeps the item -- only its always-on effect stops.",
+        0xFF888888)
+
+    if debug then
+        imgui.text(string.format("Books received: %d", #books))
+    end
+
+    imgui.separator()
+
+    imgui.begin_child_window("BookList", Vector2f.new(0, 0), true, 0)
+
+    for _, book in ipairs(books) do
+        local label = string.format("%s##book_%d", book.name, book.item_number)
+        local row_changed, row_val = imgui.checkbox(label, book.enabled)
+        if row_changed then
+            M.set_user_enabled(book.item_number, row_val)
+        end
+
+        -- A guard holding a book off would otherwise look like a broken
+        -- toggle: the box is ticked but nothing happens in that area.
+        if book.enabled and book.guard then
+            imgui.same_line()
+            imgui.text_colored("(paused here: " .. tostring(book.guard) .. ")", 0xFFFF8800)
+        end
+
+        if debug then
+            imgui.same_line()
+            imgui.text_colored(string.format("id=%d effective=%s",
+                book.item_number, tostring(book.effective)), 0xFF888888)
+        end
+    end
+
+    if #books == 0 then
+        imgui.text_colored("No books received yet.", 0xFF888888)
+    elseif books_disabled then
+        imgui.separator()
+        imgui.text_colored("All book effects are off via the master switch above.",
+            0xFFFF8800)
+    end
+
+    imgui.end_child_window()
+end
+
+------------------------------------------------------------
 -- Console helpers for live testing
 ------------------------------------------------------------
 
@@ -241,6 +403,20 @@ _G.drap_books_status  = function()
         end
         log("suppressed ids: " .. table.concat(parts, ", "))
     end
+    local off = {}
+    for id in pairs(user_disabled) do table.insert(off, id) end
+    table.sort(off)
+    if #off > 0 then
+        log("player-disabled ids: " .. table.concat(off, ","))
+    end
+end
+
+-- Console equivalent of the Books tab checkbox.
+-- Example: drap_book_effect(172, false) to turn Hypnosis off.
+_G.drap_book_effect = function(item_no, on)
+    item_no = tonumber(item_no)
+    if not item_no then log("usage: drap_book_effect(item_no, true|false)"); return end
+    M.set_user_enabled(item_no, on ~= false)
 end
 
 -- Surgical narrowing: revoke a single granted id (suspects: 68 Brainwashing/Cult
