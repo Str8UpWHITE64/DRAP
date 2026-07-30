@@ -114,7 +114,7 @@ If you're reporting a crash, send the log from the session that crashed — the 
 
 ## Known Bugs
 
-Please check out the [Known Bugs]() document to see if it answers your question. If not, please feel free to post a message in the AP After Dark Discord channel! 
+Please check out the [Known Bugs](https://github.com/Str8UpWHITE64/DRAP/blob/main/Known%20Bugs.md) document to see if it answers your question. If not, please feel free to post a message in the AP After Dark Discord channel! 
 
 ~~~
 

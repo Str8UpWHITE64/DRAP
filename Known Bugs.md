@@ -1,17 +1,13 @@
 # Known Bugs And Their Workarounds
-DRDR AP, much like all APs, has some jank on the backend to make it work. This means there are bugs and glitches that you will likely encounter during your playthrough. Please read this whole document before playing and reporting a bug. As always in an AP, your mileage may vary.
+DRDR AP, much like all APs, has some jank on the backend to make it work. This means there are bugs and glitches that you will likely encounter during your playthrough. Please read this whole document before reporting a bug. You are also *strongly* advised to read the [Beginner's Guide](https://github.com/Str8UpWHITE64/DRAP/blob/main/Beginner's%20Guide.md) before playing. As always in an AP, your mileage may vary.
 
 ## My HUD Says I'm Supposed To Do A Scoop But It's Not Letting Me
 
 Ignore the HUD missions. Open up the in-game AP Client to see what scoop you need to do.
 
-## I Reloaded A Save And My Survivors Didn't Spawn
+## I'm Playing ScoopSanity And I Got Entrance Plaza Key Before Paradise Plaza
 
-This is a known major bug and unfortunately we don't have a fix for it at this time. However there is a workaround; start a new save file, and all the unlocked non-Main Scoops will respawn in their original locations. All your progression in Main Scoops as well as unlocks are carried over in this file.
-
-## I'm Playing Scoop Sanity And I Got Entrance Plaza Key Before Paradise Plaza
-
-In Scoop Sanity, you can exit and enter the Security Room through the normally closed Entrance Plaza door. If the door is locked when you start a mission in the Security Room, go to Rooftops and then go back to Security Room.
+In ScoopSanity, you can exit and enter the Security Room through the normally closed Entrance Plaza door. If the door is locked when you start a mission in the Security Room, go to Rooftops and then go back to Security Room.
 
 ## I Have The Maintenance Tunnel Access Key But Can't Enter Through The Doors
 
@@ -19,19 +15,35 @@ Do you also have Maintenance Tunnel Key? You need both to enter via the Maintena
 
 ## Why Can't I Do Last Resort If I Have Both Maintenance Tunnel Key And Maintenance Tunnel Access Key
 
-You need Leisure Park Key as well. The end of the mission ejects you to Leisure Park.
+You need Leisure Park Key as well. The End of the mission ejects you to Leisure Park.
 
 ## I Can't Do My Next Scoop On The List
 
 You need to unlock the scoops to be able to complete them. A green scoop means it's your current scoop, a blue scoop means it's unlocked but not your current scoop, and a red scoop means it's not unlocked.
 
-## Why Is "Kill Driving Carlito" Listed As A Check In UT?
+## I Reloaded A Save And My Survivors Didn't Spawn
 
-"Kill Driving Carlito" is only available during The Last Resort. It is missable. If you are playing Scoop Sanity, it and "Rescue Greg Simpson" (due to backend limitations) are automatically blacklisted and can be ignored.
+This is a known major bug and unfortunately we don't have a fix for it at this time. However there is a workaround; start a new save file and have it continue over the existing file. All the unlocked non-Main Scoops will respawn in their original locations. All your progression in Main Scoops as well as unlocks are carried over in this file. Blitz through the opening sequence through "Meet Jessie In The Warehouse" and you should be able to resume gameplay with all Survivors respawned in their original locations.
+
+## I finished a mission but the cutscene didn't trigger
+
+This is a known bug in 1.1 and is being investigated. If the AP client shows you having completed the check and the **Scoops** tab shows you are on the next task, then Don't Worry About It. However if the Scoop doesn't show as completed, there are 3 workarounds for this. Please try them in order.
+
+1) Reload your latest save
+2) Stop the program, restart it, and connect to the AP
+3) Start a new save file and have it continue over the existing file, similar to the despawning bug issue.
+
+## Why Is "Kill Driving Carlito"/"Rescue Greg Simpson"/"Rescue Simone Ravendark" Listed As A Blacklisted Check In UT?
+
+"Kill Driving Carlito" is only available during The Last Resort. It is missable. If you are playing ScoopSanity, it is automatically blacklisted, contains a filler item, and can be ignored.
+
+Due to technical issues in 1.1, "Rescue Greg Simpson" is blacklisted in ScoopSanity and "Rescue Simone Ravendark" is blacklisted in all game modes. Both these checks contain filler items instead.
 
 ## I Grabbed The Maintenance Tunnel Access Key In The Maintenance Tunnel But I Still Logically Can't Access Another Area
 
 "Obtain Maintenance Tunnel Access Key" is an in-game check that sets a flag to unlock these doors. This flag being set is also why when you receive the Maintenance Tunnel Access Key, it automatically sends the "Obtain Maintenance Tunnel Access Key" check. The AP does not currently consider these doors unlocking early as in Logic, but expects you to receive the Maintenance Tunnel Access Key as an item before going through the Maintenance Tunnel Access doors.
+
+TL;DR Logic wants you to obtain the Key item before it puts stuff in logic.
 
 ## A Cutscene Keeps Replaying In The Security Room Whenever I Enter The Door
 
@@ -48,3 +60,19 @@ Leave the Security Room, enter Paradise Plaza, then return to the Security Room 
 # I Can't Spawn Items From The AP Client Item List
 
 Spawning items is by far the most buggy part of this mod.  When spawning items using the AP Items Window, try not to spam the spawn button.  Wait a few seconds after spawning an item before spawning another one.  If you do spawn multiple items quickly, you increase your chances of the game crashing.
+
+## Reporting a Bug
+
+The mod keeps a log of every play session. When you report something, **attach the log file** — it saves a lot of back-and-forth guessing.
+
+Logs live in your game folder under:
+
+```
+reframework/data/DRAP_Logs/
+```
+
+Each session gets its own file, named for when you started the game — `drap_20260725_143012.log` — so opening the game again never erases the log from the run where the bug happened. If you're not sure which file you want, `latest.json` in that folder names the most recent one. Grab the log from the session where the problem occurred, not just the newest one.
+
+You can also find the exact path in-game: open the Archipelago window and click the **Log** tab. It shows the file path along with a running count of any warnings and errors. Copying the file while the game is running is fine.
+
+If you're reporting a crash, send the log from the session that crashed — the last lines before it died are usually the useful part.
