@@ -29,11 +29,13 @@ Currently, there is only one goal, to get Ending S and beat Brock. We may add mo
 ├── lua-apclientpp.dll      (Archipelago client library)
 ├── THIRD-PARTY-LICENSES.md
 └── reframework
-    └── autorun
-        ├── AP_DRDR_main.lua
-        ├── AP_REF
-        └── DRAP
+    ├── autorun
+    │   ├── AP_DRDR_main.lua
+    │   ├── AP_REF
+    │   └── DRAP
+    └── data                    (item/survivor/sticker data the mod reads at runtime)
 ```
+> **Extract both folders.** `reframework/data` is not optional — without it the mod loads but registers no items at all.
 > **If you already have your own REFramework installed, let the zip overwrite it.** REFramework only learned about Dead Rising in **v1.5.8** (25 Oct 2024) — the `DD2.zip` build. Anything older loads and looks fine, but it cannot find one of the engine functions it needs to track object lifetimes, and the result is memory corruption: garbled text in the console, and occasional wrong behaviour or crashes that are impossible to trace. If you want to supply your own, use v1.5.8 or newer.
 
 2. Download `drdr.apworld` from the Releases page and place it into your Archipelago `custom_worlds` folder.

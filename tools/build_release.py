@@ -4,6 +4,12 @@ Outputs into tools/release_out/:
   DRAP_<version>.zip  -- extract straight into the game install folder
   drdr.apworld        -- goes into Archipelago's custom_worlds
 
+The zip carries source/autorun as reframework/autorun AND source/data as
+reframework/data. Both halves are required: SharedData reads drdr_shared.json
+from the data folder at runtime, Bridge reads drdr_items.json and
+DoorVisualizer reads Mall.png. A zip without them installs a mod that loads
+and then registers no item handlers at all.
+
 The bundled binaries are vendored at the repo root and pinned to the
 builds this mod is tested against:
   dinput8.dll         REFramework v1.5.9.1 (DD2 build)
@@ -26,6 +32,12 @@ REPO = os.path.dirname(HERE)
 OUT = os.path.join(HERE, "release_out")
 
 LOGGER_LUA = os.path.join(REPO, "source", "autorun", "DRAP", "Logger.lua")
+SHARED_LUA = os.path.join(REPO, "source", "data", "drdr_shared.json")
+SHARED_PY = os.path.join(REPO, "apworld", "drdr", "drdr_shared.json")
+
+# Contributor notes, not a runtime asset -- everything else under source/data
+# ships, including the legacy JSONs, so an install never ends up short.
+DATA_SKIP = {"README.md"}
 
 
 def world_version():
@@ -55,6 +67,22 @@ def check_versions(world):
         )
 
 
+def check_shared_data():
+    """The mod and the generator must agree on the same data. They are two
+    files, so they can drift, and a drifted pair fails as wrong logic at play
+    time rather than as an error at build time."""
+    with open(SHARED_LUA, "rb") as f:
+        lua = f.read()
+    with open(SHARED_PY, "rb") as f:
+        py = f.read()
+    if lua != py:
+        raise SystemExit(
+            "drdr_shared.json copies differ:\n"
+            f"  {SHARED_LUA}\n  {SHARED_PY}\n"
+            "Copy one over the other before building."
+        )
+
+
 def build_apworld():
     dst = os.path.join(OUT, "drdr.apworld")
     src = os.path.join(REPO, "apworld", "drdr")
@@ -72,10 +100,12 @@ def main():
     os.makedirs(OUT, exist_ok=True)
     version = world_version()
     check_versions(version)
+    check_shared_data()
     apworld = build_apworld()
 
     zpath = os.path.join(OUT, f"DRAP_{version}.zip")
     autorun = os.path.join(REPO, "source", "autorun")
+    data = os.path.join(REPO, "source", "data")
     with zipfile.ZipFile(zpath, "w", zipfile.ZIP_DEFLATED) as z:
         z.write(os.path.join(REPO, "dinput8.dll"), "dinput8.dll")
         z.write(os.path.join(REPO, "lua-apclientpp.dll"), "lua-apclientpp.dll")
@@ -85,6 +115,16 @@ def main():
             for f in files:
                 full = os.path.join(root, f)
                 arc = "reframework/autorun/" + os.path.relpath(full, autorun).replace(os.sep, "/")
+                z.write(full, arc)
+        # SharedData reads drdr_shared.json from reframework/data at runtime,
+        # Bridge reads drdr_items.json and DoorVisualizer reads Mall.png.
+        # Omitting them shipped a mod that loaded and then had no item data.
+        for root, dirs, files in os.walk(data):
+            for f in files:
+                if f in DATA_SKIP:
+                    continue
+                full = os.path.join(root, f)
+                arc = "reframework/data/" + os.path.relpath(full, data).replace(os.sep, "/")
                 z.write(full, arc)
 
     entries = len(zipfile.ZipFile(zpath).namelist())
