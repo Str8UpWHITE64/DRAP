@@ -60,7 +60,7 @@ The in-game AP Client has 4 tabs: **Items**, **Keys**, **Scoops**, and **Doors**
 
 ## Understanding the AP Client **Scoops** tab
 
-The in-game AP Client is powerful and informative, if not a little confusing at Times. **Scoops** is the most important tab while playing, as it tells you what Scoops are available and the triggers for them. For Main Story:
+The in-game AP Client is powerful and informative, if not a little confusing at tomes. **Scoops** is the most important tab while playing, as it tells you what Scoops are available and the triggers for them. For Main Story:
 
 - LIGHT BLUE is the trigger for the current Main Story mission
 - GREY means the Scoop is completed
@@ -102,7 +102,7 @@ You have to stand way further back than you'd think to be able to take those pho
 
 There is a known bug that Survivors in your party will not respawn should you load a save. This is being investigated and a fix will hopefully be implemented in a future update. If you encounter this bug, please read the [Known Bugs](https://github.com/Str8UpWHITE64/DRAP/blob/main/Known%20Bugs.md)  document to implement a workaround.
 
-## I encountered a glitch
+## If you encounter a glitch
 
 Please head to the [Known Bugs](https://github.com/Str8UpWHITE64/DRAP/blob/main/Known%20Bugs.md) document to see if it's answered there before reporting the bug to the Discord.
 
