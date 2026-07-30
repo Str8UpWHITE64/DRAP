@@ -33,11 +33,9 @@ Currently, there is only one goal, to get Ending S and beat Brock. We may add mo
     │   ├── AP_DRDR_main.lua
     │   ├── AP_REF
     │   └── DRAP
-    └── data
-        ├── drdr_shared.json    (scoop/area/item data the mod reads at runtime)
-        └── Mall.png
+    └── data                    (scoop/item/survivor data the mod reads at runtime)
 ```
-> Both `autorun` and `data` matter — the mod reads `drdr_shared.json` on startup, and without it the mod loads but finds no scoop data.
+> **Extract both folders.** `reframework/data` is not optional — without it the mod loads but registers no items and finds no scoop data.
 > **If you already have your own REFramework installed, let the zip overwrite it.** REFramework only learned about Dead Rising in **v1.5.8** (25 Oct 2024) — the `DD2.zip` build. Anything older loads and looks fine, but it cannot find one of the engine functions it needs to track object lifetimes, and the result is memory corruption: garbled text in the console, and occasional wrong behaviour or crashes that are impossible to trace. If you want to supply your own, use v1.5.8 or newer.
 
 2. Download `drdr.apworld` from the Releases page and place it into your Archipelago `custom_worlds` folder.
@@ -118,7 +116,7 @@ If you're reporting a crash, send the log from the session that crashed — the 
 
 ## Known Bugs
 
-Please check out the [Known Bugs]() document to see if it answers your question. If not, please feel free to post a message in the AP After Dark Discord channel! 
+Please check out the [Known Bugs](https://github.com/Str8UpWHITE64/DRAP/blob/main/Known%20Bugs.md) document to see if it answers your question. If not, please feel free to post a message in the AP After Dark Discord channel! 
 
 ~~~
 
