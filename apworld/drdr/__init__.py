@@ -1190,7 +1190,7 @@ class DRWorld(World):
 
                 set_rule(self.multiworld.get_location("Meet back at the Security Room at 5pm day 3", self.player), lambda state: state.can_reach_location("Complete Bomb Collector", self.player) or state.can_reach_location("Beat Drivin Carlito", self.player))
 
-                set_rule(self.multiworld.get_location("Escort Isabela to Carlito's Hideout and have a chat", self.player), lambda state: state.can_reach_location("Meet back at the Security Room at 5pm day 3", self.player) and state.can_reach_region("Carlito's Hideout", self.player) and (not self.options.split_keys or (state.has("Paradise - Warehouse Key", self.player) and state.has("Leisure - Paradise Key", self.player) and state.has("Leisure - North Key", self.player) state.has("Hideout - North Key", self.player)))
+                set_rule(self.multiworld.get_location("Escort Isabela to Carlito's Hideout and have a chat", self.player), lambda state: state.can_reach_location("Meet back at the Security Room at 5pm day 3", self.player) and state.can_reach_region("Carlito's Hideout", self.player) and (not self.options.split_keys or (state.has("Paradise - Warehouse Key", self.player) and state.has("Leisure - Paradise Key", self.player) and state.has("Leisure - North Key", self.player) and state.has("Hideout - North Key", self.player))))
 
             if self.options.scoop_sanity:
                 self.multiworld.get_location("Beat Drivin Carlito", self.player).progress_type = LocationProgressType.EXCLUDED
