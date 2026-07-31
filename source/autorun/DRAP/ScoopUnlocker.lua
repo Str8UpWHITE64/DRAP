@@ -2044,6 +2044,10 @@ function M.draw_tab_content(debug)
         if show_only_received and not s.received and not is_deferred then show = false end
         if hide_completed and s.completed then show = false end
         if not debug and s.category == "Main" then show = false end
+        -- "Special" is not a scoop the player works on -- it is the
+        -- Maintenance Tunnel Access Key, which lives here only so receiving
+        -- the item sets its flag. It belongs in the Keys tab, not this list.
+        if not debug and s.category == "Special" then show = false end
         -- Show side scoops that are received OR deferred (AP item received but blocked)
         if not debug and s.category ~= "Main" and not s.received and not is_deferred then show = false end
 

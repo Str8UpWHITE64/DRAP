@@ -1,5 +1,5 @@
 -- DRAP/SaveDiagnostics.lua
--- Passive "Failed to Save" capture + the GUI Saves tab.
+-- Passive "Failed to Save" capture.
 --
 -- Hooks the SaveDataManager save flow, keeps a ring buffer of recent save
 -- events, and dumps state + history to drap_save_failures.log whenever an
@@ -282,60 +282,6 @@ local function install_hooks()
     C.installed = true
     M.log("Save-failure hooks installed (passive capture active).")
     return true
-end
-
-------------------------------------------------------------
--- GUI Tab ("Saves")
-------------------------------------------------------------
-
-local SaveSlot = nil
-local function ensure_saveslot()
-    if not SaveSlot then
-        local ok, mod = pcall(require, "DRAP/SaveSlot")
-        if ok then SaveSlot = mod end
-    end
-    return SaveSlot
-end
-
-function M.draw_tab_content(debug_mode)
-    local ss = ensure_saveslot()
-
-    if ss and ss.mid_session_warning then
-        imgui.text_colored(
-            "Connected to AP mid-game: SAVING WILL FAIL until you restart the game!",
-            0xFF3333FF)
-        imgui.separator()
-    end
-
-    imgui.text("Save folder")
-    imgui.text_colored(
-        "  <Steam>\\userdata\\<your id>\\2527390\\remote", 0xFFAAAAAA)
-    imgui.text_colored(
-        "  (usually C:\\Program Files (x86)\\Steam\\userdata\\...)", 0xFFAAAAAA)
-    imgui.text_colored(
-        "  Saves failing? Steam limits this game's save data to ~200 MB total\n"
-        .. "  across ALL folders in remote/. Close the game and delete old\n"
-        .. "  win64_save_AP_* seed folders there to free space. Also consider\n"
-        .. "  disabling Steam Cloud for this game (Properties > General).\n"
-        .. "  See the README's \"Failed to Save\" section for full steps.", 0xFFAAAAAA)
-    imgui.separator()
-
-    imgui.text("Failure capture")
-    imgui.text(string.format("  hooks=%s  events=%d  failures captured=%d",
-        C.installed and "installed" or "pending", C.events, C.failures))
-    if C.last_failure then
-        imgui.text_colored(string.format("  last failure: %s at %s",
-            C.last_failure.reason, C.last_failure.when), 0xFF3333FF)
-        imgui.text("  Details logged to " .. FAILURES_FILE .. " -- please share it when reporting!")
-    else
-        imgui.text_colored("  no save failures captured this session", 0xFF88FF88)
-    end
-
-    if debug_mode then
-        if imgui.button("Dump State Snapshot Now") then
-            dump_failure("manual_dump")
-        end
-    end
 end
 
 ------------------------------------------------------------

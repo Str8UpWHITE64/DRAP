@@ -547,6 +547,10 @@ local function try_reapply_if_ready()
     AP.effects.SurvivorScoopCompletion.reapply()
     AP.effects.SaviorGoalEffects.reapply()
     AP.effects.BookSkills.reapply()
+    -- After the grants, so the player's per-book off switches apply to the
+    -- books this run just restored. Resets first, so a previous slot's
+    -- choices cannot leak into this one.
+    AP.effects.BookSkills.load_user_toggles()
     AP.effects.PlayerStats.reapply()
 
     -- ScoopSanity: restore indefinite time freeze if milestone was reached
