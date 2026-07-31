@@ -14,7 +14,7 @@ import re
 
 from .DoorRandomization import generate_door_randomization_for_ap, DOOR_MODE_CHAOS, DOOR_MODE_PAIRED, AREA_NAMES
 from .shared_data import (
-    AREA_KEY_NAMES, TIME_KEY_NAMES,
+    AREA_KEY_NAMES, SPLIT_AREA_NAMES, TIME_KEY_NAMES,
     AP_TRIGGER_LOCATIONS, expand_trigger_location_names,
     trigger_location_required_regions,
     SCOOPS, COMPLETION_FLAGS,
@@ -391,7 +391,11 @@ class DRWorld(World):
         if self.options.door_randomizer and self.options.scoop_sanity:
             self.multiworld.push_precollected(self.create_item("Out of Control"))
 
+        # Split Keys mode starts with Maintenance Tunnel Access Key, other keys determine access through those doors
+        if self.options.split_keys:
+            self.multiworld.push_precollected(self.create_item("Maintenance Tunnel Access Key"))
 
+    
     def create_regions(self):
         regions: Dict[str, Region] = {}
         regions["Menu"] = self.create_region("Menu", [])
@@ -455,7 +459,9 @@ class DRWorld(World):
 
         create_connection("Al Fresca Plaza", "Entrance Plaza")
         create_connection("Al Fresca Plaza", "Food Court")
+        
         create_connection("Entrance Plaza", "Al Fresca Plaza")
+        create_connection("Entrance Plaza", "Paradise Plaza")
 
         create_connection("Food Court", "Al Fresca Plaza")
         create_connection("Food Court", "Wonderland Plaza")
@@ -467,11 +473,14 @@ class DRWorld(World):
         create_connection("Leisure Park", "Food Court")
         create_connection("Leisure Park", "North Plaza")
         create_connection("Leisure Park", "Maintenance Tunnel")
+        create_connection("Leisure Park", "Paradise Plaza")
 
+        create_connection("North Plaza", "Leisure Park")
         create_connection("North Plaza", "Wonderland Plaza")
         create_connection("North Plaza", "Seon's Food and Stuff")
         create_connection("North Plaza", "Crislip's Home Saloon")
         create_connection("North Plaza", "Carlito's Hideout")
+        
         create_connection("Seon's Food and Stuff", "North Plaza")
 
         create_connection("Carlito's Hideout", "Tunnels")
@@ -1033,28 +1042,33 @@ class DRWorld(World):
                     set_rule(_loc, _rule)
 
         if not self.options.door_randomizer:
-            # Normal key-based entrance rules
-            set_rule(self.multiworld.get_entrance("Security Room -> Rooftop", self.player), lambda state: state.has("Rooftop key", self.player))
-            set_rule(self.multiworld.get_entrance("Rooftop -> Warehouse", self.player), lambda state: state.has("Warehouse key", self.player))
-            set_rule(self.multiworld.get_entrance("Warehouse -> Paradise Plaza", self.player), lambda state: state.has("Paradise Plaza key", self.player))
-            set_rule(self.multiworld.get_entrance("Paradise Plaza -> Colby's Movieland", self.player), lambda state: state.has("Colby's Movieland key", self.player))
-            set_rule(self.multiworld.get_entrance("Paradise Plaza -> Leisure Park", self.player), lambda state: state.has("Leisure Park key", self.player))
-            set_rule(self.multiworld.get_entrance("Leisure Park -> Food Court", self.player), lambda state: state.has("Food Court key", self.player))
-            set_rule(self.multiworld.get_entrance("Leisure Park -> North Plaza", self.player), lambda state: state.has("North Plaza key", self.player))
-            set_rule(self.multiworld.get_entrance("Leisure Park -> Maintenance Tunnel", self.player), lambda state: state.has("Maintenance Tunnel key", self.player))
-            set_rule(self.multiworld.get_entrance("Food Court -> Al Fresca Plaza", self.player), lambda state: state.has("Al Fresca Plaza key", self.player))
-            set_rule(self.multiworld.get_entrance("Food Court -> Wonderland Plaza", self.player), lambda state: state.has("Wonderland Plaza key", self.player))
-            set_rule(self.multiworld.get_entrance("Food Court -> Leisure Park", self.player), lambda state: state.has("Leisure Park key", self.player))
-            set_rule(self.multiworld.get_entrance("Al Fresca Plaza -> Entrance Plaza", self.player), lambda state: state.has("Entrance Plaza key", self.player))
-            set_rule(self.multiworld.get_entrance("Al Fresca Plaza -> Food Court", self.player), lambda state: state.has("Food Court key", self.player))
-            set_rule(self.multiworld.get_entrance("Entrance Plaza -> Al Fresca Plaza", self.player), lambda state: state.has("Al Fresca Plaza key", self.player))
-            set_rule(self.multiworld.get_entrance("Wonderland Plaza -> North Plaza", self.player), lambda state: state.has("North Plaza key", self.player))
-            set_rule(self.multiworld.get_entrance("Wonderland Plaza -> Food Court", self.player), lambda state: state.has("Food Court key", self.player))
-            set_rule(self.multiworld.get_entrance("Seon's Food and Stuff -> North Plaza", self.player), lambda state: state.has("North Plaza key", self.player))
-            set_rule(self.multiworld.get_entrance("North Plaza -> Wonderland Plaza", self.player), lambda state: state.has("Wonderland Plaza key", self.player))
-            set_rule(self.multiworld.get_entrance("North Plaza -> Seon's Food and Stuff", self.player), lambda state: state.has("Seon's Food and Stuff key", self.player))
-            set_rule(self.multiworld.get_entrance("North Plaza -> Carlito's Hideout", self.player), lambda state: state.has("Carlito's Hideout key", self.player))
-            set_rule(self.multiworld.get_entrance("North Plaza -> Crislip's Home Saloon", self.player), lambda state: state.has("Crislip's Home Saloon key", self.player))
+            # Normal key-based entrance rules and Split Keys
+            # (which use different items and do not conflict with each other)
+            set_rule(self.multiworld.get_entrance("Security Room -> Rooftop", self.player), lambda state: state.has("Rooftop key", self.player) or state.has("Rooftop - Security Key", self.player))
+            set_rule(self.multiworld.get_entrance("Rooftop -> Warehouse", self.player), lambda state: state.has("Warehouse key", self.player) or state.has("Rooftop - Warehouse Key", self.player))
+            set_rule(self.multiworld.get_entrance("Warehouse -> Paradise Plaza", self.player), lambda state: state.has("Paradise Plaza key", self.player) or state.has("Paradise - Warehouse Key", self.player))
+            set_rule(self.multiworld.get_entrance("Paradise Plaza -> Colby's Movieland", self.player), lambda state: state.has("Colby's Movieland key", self.player) or state.has("Colby's - Paradise Key", self.player))
+            set_rule(self.multiworld.get_entrance("Paradise Plaza -> Leisure Park", self.player), lambda state: state.has("Leisure Park key", self.player) or state.has("Leisure - Paradise Key", self.player))
+            set_rule(self.multiworld.get_entrance("Leisure Park -> Food Court", self.player), lambda state: state.has("Food Court key", self.player) or state.has("Food - Leisure Key", self.player))
+            set_rule(self.multiworld.get_entrance("Leisure Park -> North Plaza", self.player), lambda state: state.has("North Plaza key", self.player) or state.has("Leisure - North Key", self.player))
+            set_rule(self.multiworld.get_entrance("Leisure Park -> Maintenance Tunnel", self.player), lambda state: state.has("Maintenance Tunnel key", self.player) or state.has("Leisure - Maintenance Key", self.player))
+            set_rule(self.multiworld.get_entrance("Leisure Park -> Paradise Plaza", self.player), lambda state: state.has("Paradise Plaza key", self.player) or state.has("Leisure - Paradise Key", self.player))
+            set_rule(self.multiworld.get_entrance("Food Court -> Al Fresca Plaza", self.player), lambda state: state.has("Al Fresca Plaza key", self.player) or state.has("Food - Fresca Key", self.player))
+            set_rule(self.multiworld.get_entrance("Food Court -> Wonderland Plaza", self.player), lambda state: state.has("Wonderland Plaza key", self.player) or state.has("Food - Wonderland Key", self.player))
+            set_rule(self.multiworld.get_entrance("Food Court -> Leisure Park", self.player), lambda state: state.has("Leisure Park key", self.player) or state.has("Food - Leisure Key", self.player))
+            set_rule(self.multiworld.get_entrance("Al Fresca Plaza -> Entrance Plaza", self.player), lambda state: state.has("Entrance Plaza key", self.player) or state.has("Entrance - Fresca Key", self.player))
+            set_rule(self.multiworld.get_entrance("Al Fresca Plaza -> Food Court", self.player), lambda state: state.has("Food Court key", self.player) or state.has("Food - Fresca Key", self.player))
+            set_rule(self.multiworld.get_entrance("Entrance Plaza -> Al Fresca Plaza", self.player), lambda state: state.has("Al Fresca Plaza key", self.player) or state.has("Entrance - Fresca Key", self.player))
+            set_rule(self.multiworld.get_entrance("Entrance Plaza -> Paradise Plaza", self.player), lambda state: state.has("Paradise Plaza key", self.player) or state.has("Entrance - Paradise Key", self.player))
+            set_rule(self.multiworld.get_entrance("Wonderland Plaza -> North Plaza", self.player), lambda state: state.has("North Plaza key", self.player) or state.has("North - Wonderland Key", self.player))
+            set_rule(self.multiworld.get_entrance("Wonderland Plaza -> Food Court", self.player), lambda state: state.has("Food Court key", self.player) or state.has("Food - Wonderland Key", self.player))
+            set_rule(self.multiworld.get_entrance("Seon's Food and Stuff -> North Plaza", self.player), lambda state: state.has("North Plaza key", self.player) or state.has("North - Seon's Key", self.player))
+            set_rule(self.multiworld.get_entrance("North Plaza -> Leisure Park", self.player), lambda state: state.has("Leisure Park key", self.player) or state.has("Leisure - North Key", self.player))
+            set_rule(self.multiworld.get_entrance("North Plaza -> Wonderland Plaza", self.player), lambda state: state.has("Wonderland Plaza key", self.player) or state.has("North - Wonderland Key", self.player))
+            set_rule(self.multiworld.get_entrance("North Plaza -> Seon's Food and Stuff", self.player), lambda state: state.has("Seon's Food and Stuff key", self.player) or state.has("North - Seon's Key", self.player))
+            set_rule(self.multiworld.get_entrance("North Plaza -> Carlito's Hideout", self.player), lambda state: state.has("Carlito's Hideout key", self.player) or state.has("Hideout - North Key", self.player))
+            set_rule(self.multiworld.get_entrance("North Plaza -> Crislip's Home Saloon", self.player), lambda state: state.has("Crislip's Home Saloon key", self.player) or state.has("Crislip's - North Key", self.player))
+            set_rule(self.multiworld.get_entrance("Maintenance Tunnel -> Leisure Park", self.player), lambda state: state.has("Leisure Park key", self.player) or state.has("Leisure - Maintenance Key", self.player))
 
             # Maintenance Tunnel doors: every mall<->tunnel door needs the
             # Maintenance Tunnel key plus the Access Key -- either the AP
@@ -1078,6 +1092,19 @@ class DRWorld(World):
                      lambda state: state.has("Maintenance Tunnel key", self.player)
                                    and state.has("Leisure Park key", self.player))
 
+            if self.options.split_keys:
+                set_rule(self.multiworld.get_entrance("Maintenance Tunnel -> Paradise Plaza", self.player), lambda state: state.has("Maintenance - Paradise Key", self.player))
+                set_rule(self.multiworld.get_entrance("Maintenance Tunnel -> Al Fresca Plaza", self.player), lambda state: state.has("Fresca - Maintenance Key", self.player))
+                set_rule(self.multiworld.get_entrance("Maintenance Tunnel -> Food Court", self.player), lambda state: state.has("Food - Maintenance Key", self.player))
+                set_rule(self.multiworld.get_entrance("Maintenance Tunnel -> Wonderland Plaza", self.player), lambda state: state.has("Maintenance - Wonderland Key", self.player))
+                set_rule(self.multiworld.get_entrance("Maintenance Tunnel -> Seon's Food and Stuff", self.player), lambda state: state.has("Maintenance - Seon's Key", self.player))
+                set_rule(self.multiworld.get_entrance("Paradise Plaza -> Maintenance Tunnel", self.player), lambda state: state.has("Maintenance - Paradise Key", self.player))
+                set_rule(self.multiworld.get_entrance("Entrance Plaza -> Maintenance Tunnel", self.player), lambda state: state.has("Entrance - Maintenance Key", self.player))
+                set_rule(self.multiworld.get_entrance("Al Fresca Plaza -> Maintenance Tunnel", self.player), lambda state: state.has("Fresca - Maintenance Key", self.player))
+                set_rule(self.multiworld.get_entrance("Food Court -> Maintenance Tunnel", self.player), lambda state: state.has("Food - Maintenance Key", self.player))
+                set_rule(self.multiworld.get_entrance("Wonderland Plaza -> Maintenance Tunnel", self.player), lambda state: state.has("Maintenance - Wonderland Key", self.player))
+                set_rule(self.multiworld.get_entrance("Seon's Food and Stuff -> Maintenance Tunnel", self.player), lambda state: state.has("Maintenance - Seon's Key", self.player))
+            
             # ScoopSanity-only entrance rules:
             #   * Security Room -> Entrance Plaza requires Rooftop key +
             #     Warehouse key (the player must have been able to reach
@@ -1088,12 +1115,21 @@ class DRWorld(World):
             #     through Al Fresca first, and the shutter opens during the
             #     Rescue the Professor escort, which chains behind EP reach.
             if self.options.scoop_sanity:
-                set_rule(self.multiworld.get_entrance("Security Room -> Entrance Plaza", self.player),
-                         lambda state: state.has("Rooftop key", self.player)
-                                       and state.has("Warehouse key", self.player)
-                                       and state.has("Entrance Plaza key", self.player))
-                set_rule(self.multiworld.get_entrance("Paradise Plaza -> Entrance Plaza", self.player),
-                         lambda state: state.has("Entrance Plaza key", self.player))
+                if self.options.split_keys:
+                    set_rule(self.multiworld.get_entrance("Security Room -> Entrance Plaza", self.player),
+                            lambda state: state.has("Rooftop - Security Key", self.player)
+                                        and state.has("Rooftop - Warehouse Key", self.player)
+                                        and state.has("Entrance - Security Key", self.player))
+                    set_rule(self.multiworld.get_entrance("Paradise Plaza -> Entrance Plaza", self.player), lambda state: state.has("Entrance - Paradise Key", self.player))
+                    set_rule(self.multiworld.get_entrance("Maintenance Tunnel -> Entrance Plaza", self.player), lambda state: state.has("Entrance - Maintenance Key", self.player))
+                
+                else:
+                    set_rule(self.multiworld.get_entrance("Security Room -> Entrance Plaza", self.player),
+                            lambda state: state.has("Rooftop key", self.player)
+                                        and state.has("Warehouse key", self.player)
+                                        and state.has("Entrance Plaza key", self.player))
+                    set_rule(self.multiworld.get_entrance("Paradise Plaza -> Entrance Plaza", self.player),
+                            lambda state: state.has("Entrance Plaza key", self.player))
 
         # "Meet Jessie in the Warehouse" is a prologue main scoop that
         # always exists (see PROLOGUE_MAIN_SCOOPS). Its rule is set outside
@@ -1110,9 +1146,9 @@ class DRWorld(World):
             # ScoopSanity overrides this rule per-event in the SCOOP_EVENTS
             # loop below; here is the vanilla path only (story chains from
             # Meet Jessie -> walk Brad through the mall to the safe room).
-            set_rule(self.multiworld.get_location("Complete Backup for Brad", self.player), lambda state: state.can_reach_location("Meet Jessie in the Warehouse", self.player) and state.can_reach_region("Leisure Park", self.player) and state.can_reach_region("Paradise Plaza", self.player) and state.can_reach_region("Food Court", self.player) and state.has("Food Court key", self.player))
+            set_rule(self.multiworld.get_location("Complete Backup for Brad", self.player), lambda state: state.can_reach_location("Meet Jessie in the Warehouse", self.player) and state.can_reach_region("Leisure Park", self.player) and state.can_reach_region("Paradise Plaza", self.player) and state.can_reach_region("Food Court", self.player))
 
-            set_rule(self.multiworld.get_location("Escort Brad to see Dr Barnaby", self.player), lambda state: state.can_reach_location("Complete Backup for Brad", self.player) and state.can_reach_region("Entrance Plaza", self.player) and state.can_reach_region("Al Fresca Plaza", self.player) and state.has("Entrance Plaza key", self.player))
+            set_rule(self.multiworld.get_location("Escort Brad to see Dr Barnaby", self.player), lambda state: state.can_reach_location("Complete Backup for Brad", self.player) and state.can_reach_region("Entrance Plaza", self.player) and state.can_reach_region("Al Fresca Plaza", self.player))
 
             set_rule(self.multiworld.get_location("Complete Temporary Agreement", self.player), lambda state: state.can_reach_location("Escort Brad to see Dr Barnaby", self.player))
 
@@ -1121,7 +1157,7 @@ class DRWorld(World):
 
                 set_rule(self.multiworld.get_location("Complete Image in the Monitor", self.player), lambda state: state.can_reach_location("Meet back at the Security Room at 6am day 2", self.player))
 
-            set_rule(self.multiworld.get_location("Complete Rescue the Professor", self.player), lambda state: state.can_reach_location("Complete Image in the Monitor", self.player))
+            set_rule(self.multiworld.get_location("Complete Rescue the Professor", self.player), lambda state: state.can_reach_location("Complete Image in the Monitor", self.player) and (not self.options.split_keys or state.has("Entrance - Paradise Key", self.player)))
 
             set_rule(self.multiworld.get_location("Meet Steven", self.player), lambda state: state.can_reach_location("Complete Rescue the Professor", self.player) and state.can_reach_region("North Plaza", self.player) and state.can_reach_region("Seon's Food and Stuff", self.player))
 
@@ -1154,7 +1190,7 @@ class DRWorld(World):
 
                 set_rule(self.multiworld.get_location("Meet back at the Security Room at 5pm day 3", self.player), lambda state: state.can_reach_location("Complete Bomb Collector", self.player) or state.can_reach_location("Beat Drivin Carlito", self.player))
 
-                set_rule(self.multiworld.get_location("Escort Isabela to Carlito's Hideout and have a chat", self.player), lambda state: state.can_reach_location("Meet back at the Security Room at 5pm day 3", self.player) and state.can_reach_region("Carlito's Hideout", self.player))
+                set_rule(self.multiworld.get_location("Escort Isabela to Carlito's Hideout and have a chat", self.player), lambda state: state.can_reach_location("Meet back at the Security Room at 5pm day 3", self.player) and state.can_reach_region("Carlito's Hideout", self.player) and (not self.options.split_keys or (state.has("Paradise - Warehouse Key", self.player) and state.has("Leisure - Paradise Key", self.player) and state.has("Leisure - North Key", self.player) state.has("Hideout - North Key", self.player)))
 
             if self.options.scoop_sanity:
                 self.multiworld.get_location("Beat Drivin Carlito", self.player).progress_type = LocationProgressType.EXCLUDED
@@ -1681,6 +1717,7 @@ class DRWorld(World):
         hostile_min = int(self.options.hostile_survivor_count_min.value)
         hostile_max = int(self.options.hostile_survivor_count_max.value)
         cult_limited_enabled = bool(self.options.cult_limited.value)
+        split_keys_enabled = bool(self.options.split_keys.value)
         survivor_respawn_enabled = bool(self.options.survivor_respawn.value)
         # Hardcore implies Night — auto-enable Night when Hardcore is on so
         # the Lua side can rely on the single flag without extra logic.
@@ -1754,6 +1791,7 @@ class DRWorld(World):
                 "hostile_survivor_count_min": hostile_min,
                 "hostile_survivor_count_max": hostile_max,
                 "cult_limited": cult_limited_enabled,
+                "split_keys": split_keys_enabled,
                 "survivor_respawn": survivor_respawn_enabled,
                 "night_mode_enabled": night_mode_enabled,
                 "hardcore_zombies_enabled": hardcore_zombies_enabled,
@@ -1784,6 +1822,7 @@ class DRWorld(World):
             "hostile_survivor_count_min": hostile_min,
             "hostile_survivor_count_max": hostile_max,
             "cult_limited": cult_limited_enabled,
+            "split_keys": split_keys_enabled,
             "survivor_respawn": survivor_respawn_enabled,
             "night_mode_enabled": night_mode_enabled,
             "hardcore_zombies_enabled": hardcore_zombies_enabled,
