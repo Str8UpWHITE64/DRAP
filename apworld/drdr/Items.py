@@ -267,6 +267,32 @@ _all_items = [DRItemData(row[0], row[1], row[2]) for row in [
     ("Warehouse key", 1012, DRItemCategory.LOCK),
     ("Wonderland Plaza key", 1013, DRItemCategory.LOCK),
 
+    # Split keys
+    ("Rooftop - Security Key", 1014, DRItemCategory.LOCK),
+    ("Rooftop - Warehouse Key", 1015, DRItemCategory.LOCK),
+    ("Paradise - Warehouse Key", 1016, DRItemCategory.LOCK),
+    ("Leisure - Paradise Key", 1017, DRItemCategory.LOCK),
+    ("Colby's - Paradise Key", 1018, DRItemCategory.LOCK),
+    ("Entrance - Paradise Key", 1019, DRItemCategory.LOCK),
+    ("Entrance - Security Key", 1020, DRItemCategory.LOCK),
+    ("Entrance - Fresca Key", 1021, DRItemCategory.LOCK),
+    ("Food - Fresca Key", 1022, DRItemCategory.LOCK),
+    ("Food - Leisure Key", 1023, DRItemCategory.LOCK),
+    ("Food - Wonderland Key", 1024, DRItemCategory.LOCK),
+    ("North - Wonderland Key", 1025, DRItemCategory.LOCK),
+    ("Leisure - North Key", 1026, DRItemCategory.LOCK),
+    ("Crislip's - North Key", 1027, DRItemCategory.LOCK),
+    ("Hideout - North Key", 1028, DRItemCategory.LOCK),
+    ("North - Seon's Key", 1029, DRItemCategory.LOCK),
+    ("Leisure - Maintenance Key", 1030, DRItemCategory.LOCK),
+    ("Maintenance - Paradise Key", 1031, DRItemCategory.LOCK),
+    ("Entrance - Maintenance Key", 1032, DRItemCategory.LOCK),
+    ("Fresca - Maintenance Key", 1033, DRItemCategory.LOCK),
+    ("Food - Maintenance Key", 1034, DRItemCategory.LOCK),
+    ("Maintenance - Wonderland Key", 1035, DRItemCategory.LOCK),
+    ("Maintenance - Seon's Key", 1036, DRItemCategory.LOCK),
+
+    
     # Special Items
     ("Maintenance Tunnel Access Key", 1100, DRItemCategory.LOCK),
 
@@ -475,6 +501,18 @@ def BuildItemPool(multiworld, count, options, excluded_scoop_names=()):
         "Maintenance Tunnel key", "Carlito's Hideout key", "Maintenance Tunnel Access Key"
     }
 
+    # Keys in Split Keys mode, skipped otherwise
+    split_key_names = {
+        "Rooftop - Warehouse Key", "Rooftop - Security Key", "Paradise - Warehouse Key",
+        "Leisure - Paradise Key", "Colby's - Paradise Key", "Entrance - Paradise Key",
+        "Entrance - Security Key", "Entrance - Fresca Key", "Food - Fresca Key",
+        "Food - Leisure Key", "Food - Wonderland Key",
+        "North - Wonderland Key", "Leisure - North Key", "Crislip's - North Key",
+        "Hideout - North Key", "North - Seon's Key", "Leisure - Maintenance Key",
+        "Maintenance - Paradise Key", "Entrance - Maintenance Key", "Food - Maintenance Key",
+        "Fresca - Maintenance Key", "Maintenance - Wonderland Key", "Maintenance - Seon's Key"
+    }
+    
     # Time keys to skip when scoop sanity is enabled
     time_key_names = {
         "DAY2_06_AM", "DAY2_11_AM", "DAY3_00_AM", "DAY3_11_AM", "DAY4_12_PM"
@@ -522,10 +560,13 @@ def BuildItemPool(multiworld, count, options, excluded_scoop_names=()):
 
     for lock in lockList:
         # Skip area keys if door randomizer is enabled (they're precollected)
-        if options.door_randomizer and lock.name in area_key_names:
+        if options.door_randomizer or options.split_keys and lock.name in area_key_names:
             continue
         # Skip time keys if scoop sanity is enabled
         if options.scoop_sanity and lock.name in time_key_names:
+            continue
+        # Skip split keys unless split keys is enabled
+        if not options.split_keys and lock.name in split_key_names:
             continue
 
         item = item_dictionary[lock.name]
