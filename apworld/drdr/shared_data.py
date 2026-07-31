@@ -59,6 +59,7 @@ _DATA: Dict[str, Any] = _load()
 SCHEMA_VERSION: int = _DATA.get("schema_version", 0)
 
 AREAS: List[Dict[str, Any]] = _DATA.get("areas", [])
+SPLIT_AREAS: List[Dict[str, Any]] = _DATA.get("split_areas", [])
 TIME_KEYS: List[Dict[str, Any]] = _DATA.get("time_keys", [])
 ITEMS: List[Dict[str, Any]] = _DATA.get("items", [])
 SURVIVORS: List[Dict[str, Any]] = _DATA.get("survivors", [])
@@ -189,6 +190,8 @@ AREA_KEY_NAMES: List[str] = [
     for a in AREAS
     if a.get("in_item_pool") and a.get("key_item")
 ]
+
+SPLIT_AREA_NAMES: List[str] = [s["name"] for s in SPLIT_AREAS if s.get("name")]
 
 TIME_KEY_NAMES: List[str] = [t["name"] for t in TIME_KEYS if t.get("name")]
 
