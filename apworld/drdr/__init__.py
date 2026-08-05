@@ -131,6 +131,15 @@ SCOOP_REGION_REQUIREMENTS = {
     "The Butcher": ["Maintenance Tunnel"],
 }
 
+# Split Keys only. These escorts walk a fixed route, so those doors must be
+# open -- reaching the regions another way is not enough. The ScoopSanity
+# loop rebuilds scoop rules from scratch and would otherwise drop them.
+SPLIT_KEY_SCOOP_DOORS = {
+    "Rescue the Professor": ["Entrance - Paradise Key"],
+    "Hideout": ["Paradise - Warehouse Key", "Leisure - Paradise Key",
+                "Leisure - North Key", "Hideout - North Key"],
+}
+
 # Level requirements for each main scoop position (0-indexed) in the shuffled order.
 # Scoops at higher positions require higher levels, spreading them across spheres.
 # Uses the same level thresholds as LEVEL_SPHERE_GATES.
@@ -509,6 +518,10 @@ class DRWorld(World):
 
         create_connection("Wonderland Plaza", "North Plaza")
         create_connection("Wonderland Plaza", "Food Court")
+
+        # Greg's secret passage: no area key, opens once Out of Control is done.
+        create_connection("Paradise Plaza", "Wonderland Plaza")
+        create_connection("Wonderland Plaza", "Paradise Plaza")
 
         create_connection("Leisure Park", "Food Court")
         create_connection("Leisure Park", "North Plaza")
@@ -1115,6 +1128,13 @@ class DRWorld(World):
                           _door("Carlito's Hideout key", "Hideout - North Key"))
             self.set_rule(self.multiworld.get_entrance("North Plaza -> Crislip's Home Saloon", self.player),
                           _door("Crislip's Home Saloon key", "Crislip's - North Key"))
+
+            # Split Keys gives the passage a key of its own on top of the scoop.
+            _greg = CanReachLocation("Kill Adam")
+            if self.options.split_keys:
+                _greg = And(_greg, Has("Paradise - Wonderland Key"))
+            self.set_rule(self.multiworld.get_entrance("Paradise Plaza -> Wonderland Plaza", self.player), _greg)
+            self.set_rule(self.multiworld.get_entrance("Wonderland Plaza -> Paradise Plaza", self.player), _greg)
             self.set_rule(self.multiworld.get_entrance("Maintenance Tunnel -> Leisure Park", self.player),
                           _door("Leisure Park key", "Leisure - Maintenance Key"))
 
@@ -1309,6 +1329,10 @@ class DRWorld(World):
                     if level_req is not None:
                         _scoop_rule = And(_scoop_rule,
                                           CanReachLocation(f"Reach Level {level_req}"))
+                    if self.options.split_keys:
+                        _scoop_rule = And(_scoop_rule,
+                                          *[Has(key) for key in
+                                            SPLIT_KEY_SCOOP_DOORS.get(scoop_name, ())])
                     self.set_rule(loc, _scoop_rule)
 
             # Complete Memories is the post-chain anchor; gates on the last

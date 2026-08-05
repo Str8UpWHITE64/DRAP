@@ -291,6 +291,7 @@ _all_items = [DRItemData(row[0], row[1], row[2]) for row in [
     ("Food - Maintenance Key", 1034, DRItemCategory.LOCK),
     ("Maintenance - Wonderland Key", 1035, DRItemCategory.LOCK),
     ("Maintenance - Seon's Key", 1036, DRItemCategory.LOCK),
+    ("Paradise - Wonderland Key", 1037, DRItemCategory.LOCK),
 
     
     # Special Items
@@ -510,7 +511,8 @@ def BuildItemPool(multiworld, count, options, excluded_scoop_names=()):
         "North - Wonderland Key", "Leisure - North Key", "Crislip's - North Key",
         "Hideout - North Key", "North - Seon's Key", "Leisure - Maintenance Key",
         "Maintenance - Paradise Key", "Entrance - Maintenance Key", "Food - Maintenance Key",
-        "Fresca - Maintenance Key", "Maintenance - Wonderland Key", "Maintenance - Seon's Key"
+        "Fresca - Maintenance Key", "Maintenance - Wonderland Key", "Maintenance - Seon's Key",
+        "Paradise - Wonderland Key"
     }
     
     # Time keys to skip when scoop sanity is enabled

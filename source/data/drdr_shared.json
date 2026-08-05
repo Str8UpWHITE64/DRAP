@@ -420,6 +420,20 @@
       "destination": "s600"
     }
     ]
+    },
+    {
+  "name": "Paradise Plaza - Wonderland Plaza",
+  "key_item": "Paradise - Wonderland Key",
+  "transitions": [
+    {
+      "origin": "s200",
+      "destination": "s300"
+    },
+    {
+      "origin": "s300",
+      "destination": "s200"
+    }
+    ]
     }
   ],
   "time_keys": [
