@@ -22,6 +22,17 @@ from .DoorRandomization import generate_door_randomization_for_ap, DOOR_MODE_CHA
 # Region names in the AP graph match AREA_NAMES values, so explain_path can go
 # from a region back to the area code the door table is keyed on.
 AREA_TO_CODE = {name: code for code, name in AREA_NAMES.items()}
+
+# Region edges that are not doors in the shuffle table, so the door graph
+# cannot describe them. Greg's passage is held out of the shuffle on
+# purpose -- randomizing it causes problems -- so it is named here
+# instead.
+NON_DOOR_ENTRANCES = {
+    "Paradise Plaza -> Wonderland Plaza":
+        "Greg's secret passage, open once Out of Control is done",
+    "Wonderland Plaza -> Paradise Plaza":
+        "Greg's secret passage, open once Out of Control is done",
+}
 from .shared_data import (
     AREA_KEY_NAMES, SPLIT_AREA_NAMES, TIME_KEY_NAMES,
     AP_TRIGGER_LOCATIONS, expand_trigger_location_names,
@@ -1968,10 +1979,25 @@ class DRWorld(World):
         if not self.door_redirects:
             return []          # doors are vanilla; UT's own wording is fine
 
+        described = NON_DOOR_ENTRANCES.get(entrance.name)
+        if described is not None:
+            return [{"type": "color", "color": "green", "text": entrance.name},
+                    {"type": "text", "text": ": " + described}]
+
         src = entrance.parent_region.name if entrance.parent_region else None
         dst = entrance.connected_region.name if entrance.connected_region else None
         src_code = AREA_TO_CODE.get(src)
         dst_code = AREA_TO_CODE.get(dst)
+
+        # Only shuffled doors can be explained from the door graph. An edge with
+        # no door of its own would otherwise be answered with a route through
+        # some unrelated door that happens to link the same two areas -- walkable,
+        # but not the way the player was asking about, and possibly behind a key
+        # they do not hold.
+        if not any(d.get("from_area_code") == src_code
+                   and d.get("to_area_code") == dst_code
+                   for d in EMBEDDED_DOOR_DATA.values()):
+            return []
         if not src_code or not dst_code:
             return []          # Menu, Level Ups, Challenges and friends
 
