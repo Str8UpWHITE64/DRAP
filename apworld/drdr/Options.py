@@ -445,6 +445,28 @@ class PPStickersFiller(Toggle):
     default = False
 
 
+class SplitKeys(Toggle):
+    """
+    Normally, an area key opens all doors leading into an area. The 'Wonderland
+    Plaza key' opens the doors to it from both North Plaza and the Food Court.
+
+    In Split Keys, each individual entrance has its own key. Entering Wonderland
+    Plaza from North Plaza would require the 'North - Wonderland Key'. Entering
+    from Food Court, however, would require the 'Food - Wonderland Key'.
+
+    Keys work in both directions. The 'Leisure - Paradise Key' opens the door from
+    both Leisure Park into Paradise Plaza and from Paradise Plaza into Leisure Park.
+
+    Each key is named by area alphabetically (Crislip's - North, Food - Fresca, etc).
+
+    This makes the mall even more mazelike, increasing the difficulty. It also means
+    that, even if you already have access to an area through another path, each key
+    you are sent still matters because they open new shortcuts.
+    """
+    display_name = "Split Keys"
+    default = False
+    
+
 @dataclass
 class DROption(PerGameCommonOptions):
     start_inventory_from_pool: StartInventoryPool
@@ -476,6 +498,7 @@ class DROption(PerGameCommonOptions):
     dlc_outfits_enabled: DLCOutfitsEnabled
     pp_bonus_locations: PpBonusLocations
     pp_stickers_filler: PPStickersFiller
+    split_keys: SplitKeys
 
 dr_option_groups = [
     OptionGroup("Goal and Location Settings",
@@ -526,6 +549,7 @@ dr_option_groups = [
         [
             CultLimited,
             SurvivorRespawn,
+            SplitKeys,
             NightModeEnabled,
             HardcoreZombiesEnabled,
         ],

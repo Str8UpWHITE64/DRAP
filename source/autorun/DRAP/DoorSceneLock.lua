@@ -44,6 +44,110 @@ local LOCKED_SCENES = {
 }
 
 ------------------------------------------------------------
+-- Split Keys Lock State
+------------------------------------------------------------
+
+local LOCKED_SPLIT = {
+    -- Current area -> list of destinations
+
+    ["s135"] = {            -- Heliport
+        ["s136"] = false,   -- Security Room
+    },
+
+    ["s136"] = {            -- Security Room
+        ["s135"] = false,   -- Heliport
+        ["s231"] = true,    -- Rooftop
+        ["s100"] = true,    -- Entrance Plaza
+    },
+    
+    ["s231"] = {            -- Rooftop
+        ["s136"] = true,    -- Security Room
+        ["s230"] = true,    -- Warehouse
+    },
+    
+    ["s230"] = {            -- Warehouse
+        ["s231"] = true,    -- Rooftop
+        ["s200"] = true,    -- Paradise Plaza
+    },
+
+    ["s200"] = {            -- Paradise Plaza
+        ["s230"] = true,    -- Warehouse
+        ["s503"] = true,    -- Colby's Movieland
+        ["s700"] = true,    -- Leisure Park
+        ["s100"] = true,    -- Entrance Plaza
+        ["s600"] = true,    -- Maintenance Tunnel
+    },
+
+    ["s503"] = {            -- Colby's Movieland
+        ["s200"] = true,    -- Paradise Plaza
+    },
+
+    ["s700"] = {            -- Leisure Park
+        ["s200"] = true,    -- Paradise Plaza
+        ["sa00"] = true,    -- Food Court
+        ["s400"] = true,    -- North Plaza
+        ["s600"] = true,    -- Maintenance Tunnel
+    },
+
+    ["sa00"] = {            -- Food Court
+        ["s700"] = true,    -- Leisure Park
+        ["s300"] = true,    -- Wonderland Plaza
+        ["s900"] = true,    -- Al Fresca Plaza
+        ["s600"] = true,    -- Maintenance Tunnel
+    },
+
+    ["s300"] = {            -- Wonderland Plaza
+        ["sa00"] = true,    -- Food Court
+        ["s400"] = true,    -- North Plaza
+        ["s600"] = true,    -- Maintenance Tunnel
+    },
+
+    ["s400"] = {            -- North Plaza
+        ["s700"] = true,    -- Leisure Park
+        ["s300"] = true,    -- Wonderland Plaza
+        ["s501"] = true,    -- Crislip's Home Saloon
+        ["s500"] = true,    -- Seon's Food and Stuff
+        ["s401"] = true,    -- Carlito's Hideout
+    },
+
+    ["s500"] = {            -- Seon's Food and Stuff
+        ["s400"] = true,    -- North Plaza
+        ["s600"] = true,    -- Maintenance Tunnel
+    },
+
+    ["s501"] = {            -- Crislip's Home Saloon
+        ["s400"] = true,    -- North Plaza
+    },
+
+    ["s401"] = {            -- Carlito's Hideout
+        ["s400"] = true,    -- North Plaza
+    },
+
+    ["s900"] = {            -- Al Fresca Plaza
+        ["sa00"] = true,    -- Food Court
+        ["s100"] = true,    -- Entrance Plaza
+        ["s600"] = true,    -- Maintenance Tunnel
+    },
+
+    ["s100"] = {            -- Entrance Plaza
+        ["s900"] = true,    -- Al Fresca Plaza
+        ["s136"] = true,    -- Security Room
+        ["s200"] = true,    -- Paradise Plaza
+        ["s600"] = true,    -- Maintenance Tunnel
+    },
+
+    ["s600"] = {            -- Maintenance Tunnel
+        ["s900"] = true,    -- Al Fresca Plaza
+        ["s700"] = true,    -- Leisure Park
+        ["sa00"] = true,    -- Food Court
+        ["s300"] = true,    -- Wonderland Plaza
+        ["s200"] = true,    -- Paradise Plaza
+        ["s100"] = true,    -- Entrance Plaza
+        ["s500"] = true,    -- Seon's Food and Stuff
+    },
+}
+
+------------------------------------------------------------
 -- Public State
 ------------------------------------------------------------
 

@@ -98,6 +98,330 @@
       "in_item_pool": true
     }
   ],
+  "split_areas": [
+    {
+  "name": "Security Room - Rooftop",
+  "key_item": "Rooftop - Security Key",
+  "transitions": [
+    {
+      "origin": "s136",
+      "destination": "s231"
+    },
+    {
+      "origin": "s231",
+      "destination": "s136"
+    }
+    ]
+    },
+    {
+  "name": "Rooftop - Warehouse",
+  "key_item": "Rooftop - Warehouse Key",
+  "transitions": [
+    {
+      "origin": "s231",
+      "destination": "s230"
+    },
+    {
+      "origin": "s230",
+      "destination": "s231"
+    }
+    ]
+    },
+    {
+  "name": "Paradise Plaza - Warehouse",
+  "key_item": "Paradise - Warehouse Key",
+  "transitions": [
+    {
+      "origin": "s200",
+      "destination": "s230"
+    },
+    {
+      "origin": "s230",
+      "destination": "s200"
+    }
+    ]
+    },
+    {
+  "name": "Leisure Park - Paradise Plaza",
+  "key_item": "Leisure - Paradise Key",
+  "transitions": [
+    {
+      "origin": "s700",
+      "destination": "s200"
+    },
+    {
+      "origin": "s200",
+      "destination": "s700"
+    }
+    ]
+    },
+    {
+  "name": "Colby's Movieland - Paradise Plaza",
+  "key_item": "Colby's - Paradise Key",
+  "transitions": [
+    {
+      "origin": "s503",
+      "destination": "s200"
+    },
+    {
+      "origin": "s200",
+      "destination": "s503"
+    }
+    ]
+    },
+    {
+  "name": "Entrance Plaza - Paradise Plaza",
+  "key_item": "Entrance - Paradise Key",
+  "transitions": [
+    {
+      "origin": "s100",
+      "destination": "s200"
+    },
+    {
+      "origin": "s200",
+      "destination": "s100"
+    }
+    ]
+    },
+    {
+  "name": "Entrance Plaza - Security Room",
+  "key_item": "Entrance - Security Key",
+  "transitions": [
+    {
+      "origin": "s100",
+      "destination": "s136"
+    },
+    {
+      "origin": "s136",
+      "destination": "s100"
+    }
+    ]
+    },
+    {
+  "name": "Al Fresca - Entrance Plaza",
+  "key_item": "Entrance - Fresca Key",
+  "transitions": [
+    {
+      "origin": "s900",
+      "destination": "s100"
+    },
+    {
+      "origin": "s100",
+      "destination": "s900"
+    }
+    ]
+    },
+    {
+  "name": "Al Fresca Plaza - Food Court",
+  "key_item": "Food - Fresca Key",
+  "transitions": [
+    {
+      "origin": "s900",
+      "destination": "sa00"
+    },
+    {
+      "origin": "sa00",
+      "destination": "s900"
+    }
+    ]
+    },
+    {
+  "name": "Food Court - Leisure Park",
+  "key_item": "Food - Leisure Key",
+  "transitions": [
+    {
+      "origin": "sa00",
+      "destination": "s700"
+    },
+    {
+      "origin": "s700",
+      "destination": "sa00"
+    }
+    ]
+    },
+    {
+  "name": "Food Court - Wonderland Plaza",
+  "key_item": "Food - Wonderland Key",
+  "transitions": [
+    {
+      "origin": "sa00",
+      "destination": "s300"
+    },
+    {
+      "origin": "s300",
+      "destination": "sa00"
+    }
+    ]
+    },
+    {
+  "name": "North Plaza - Wonderland Plaza",
+  "key_item": "North - Wonderland Key",
+  "transitions": [
+    {
+      "origin": "s400",
+      "destination": "s300"
+    },
+    {
+      "origin": "s300",
+      "destination": "s400"
+    }
+    ]
+    },
+    {
+  "name": "Leisure Park - North Plaza",
+  "key_item": "Leisure - North Key",
+  "transitions": [
+    {
+      "origin": "s700",
+      "destination": "s400"
+    },
+    {
+      "origin": "s400",
+      "destination": "s700"
+    }
+    ]
+    },
+    {
+  "name": "Crislip's Home Saloon - North Plaza",
+  "key_item": "Crislip's - North Key",
+  "transitions": [
+    {
+      "origin": "s501",
+      "destination": "s400"
+    },
+    {
+      "origin": "s400",
+      "destination": "s501"
+    }
+    ]
+    },
+    {
+  "name": "Hideout - North Plaza",
+  "key_item": "Hideout - North Key",
+  "transitions": [
+    {
+      "origin": "s401",
+      "destination": "s400"
+    },
+    {
+      "origin": "s400",
+      "destination": "s401"
+    }
+    ]
+    },
+    {
+  "name": "North Plaza - Seon's Food and Stuff",
+  "key_item": "North - Seon's Key",
+  "transitions": [
+    {
+      "origin": "s400",
+      "destination": "s500"
+    },
+    {
+      "origin": "s500",
+      "destination": "s400"
+    }
+    ]
+    },
+    {
+  "name": "Leisure Park - Maintenance Tunnel",
+  "key_item": "Leisure - Maintenance Key",
+  "transitions": [
+    {
+      "origin": "s700",
+      "destination": "s600"
+    },
+    {
+      "origin": "s600",
+      "destination": "s700"
+    }
+    ]
+    },
+    {
+  "name": "Maintenance Tunnel - Paradise Plaza",
+  "key_item": "Maintenance - Paradise Key",
+  "transitions": [
+    {
+      "origin": "s600",
+      "destination": "s200"
+    },
+    {
+      "origin": "s200",
+      "destination": "s600"
+    }
+    ]
+    },
+    {
+  "name": "Maintenance Tunnel - Entrance Plaza",
+  "key_item": "Entrance - Maintenance Key",
+  "transitions": [
+    {
+      "origin": "s600",
+      "destination": "s100"
+    },
+    {
+      "origin": "s100",
+      "destination": "s600"
+    }
+    ]
+    },
+    {
+  "name": "Maintenance Tunnel - Al Fresca Plaza",
+  "key_item": "Fresca - Maintenance Key",
+  "transitions": [
+    {
+      "origin": "s600",
+      "destination": "s900"
+    },
+    {
+      "origin": "s900",
+      "destination": "s600"
+    }
+    ]
+    },
+    {
+  "name": "Maintenance Tunnel - Food Court",
+  "key_item": "Food - Maintenance Key",
+  "transitions": [
+    {
+      "origin": "s600",
+      "destination": "sa00"
+    },
+    {
+      "origin": "sa00",
+      "destination": "s600"
+    }
+    ]
+    },
+    {
+  "name": "Maintenance Tunnel - Wonderland Plaza",
+  "key_item": "Maintenance - Wonderland Key",
+  "transitions": [
+    {
+      "origin": "s600",
+      "destination": "s300"
+    },
+    {
+      "origin": "s300",
+      "destination": "s600"
+    }
+    ]
+    },
+    {
+  "name": "Maintenance Tunnel - Seon's Food and Stuff",
+  "key_item": "Maintenance - Seon's Key",
+  "transitions": [
+    {
+      "origin": "s600",
+      "destination": "s500"
+    },
+    {
+      "origin": "s500",
+      "destination": "s600"
+    }
+    ]
+    }
+  ],
   "time_keys": [
     {
       "name": "DAY2_06_AM",
