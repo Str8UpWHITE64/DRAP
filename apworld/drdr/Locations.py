@@ -547,6 +547,10 @@ location_tables = {
         DRLocationData("Bowl over 5 zombies", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Jump a vehicle 50 feet", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Hit a golf ball 100 feet", "Milk", DRLocationCategory.CHALLENGE),
+        # Appended, never inserted: ids are positional within the table.
+        # Both are sphere 0 by way of the Challenges blanket rule -- see #14.
+        DRLocationData("Welcome to Hell", "Milk", DRLocationCategory.CHALLENGE),
+        DRLocationData("Photojournalist", "Milk", DRLocationCategory.CHALLENGE),
 
     ]
 }

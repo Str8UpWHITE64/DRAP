@@ -32,6 +32,7 @@ AP.LevelTracker     = require("DRAP/trackers/LevelTracker")
 AP.EventTracker     = require("DRAP/trackers/EventTracker")
 AP.NpcTracker       = require("DRAP/trackers/NpcTracker")
 AP.PPStickerTracker = require("DRAP/trackers/PPStickerTracker")
+AP.AchievementTracker = require("DRAP/trackers/AchievementTracker")
 AP.SaveSlot         = require("DRAP/SaveSlot")
 AP.SaveDiagnostics  = require("DRAP/SaveDiagnostics")
 AP.TimeGate         = require("DRAP/TimeGate")
@@ -156,6 +157,12 @@ AP.SceneFixups.register()
 ------------------------------------------------------------
 -- Hook Wiring: Level Tracker
 ------------------------------------------------------------
+
+-- Achievement pop-ups are their own event, not a counted save field, so they
+-- arrive already resolved to a location name.
+AP.AchievementTracker.on_location_earned = function(loc_name)
+    AP_BRIDGE.check(loc_name)
+end
 
 AP.LevelTracker.on_level_changed = function(old_level, new_level)
     log(string.format("Level changed %d -> %d", old_level, new_level))
@@ -603,6 +610,7 @@ re.on_frame(function()
     safe_on_frame(AP.NpcCarryover,     "NpcCarryover")
     safe_on_frame(AP.ChallengeTracker, "ChallengeTracker")
     safe_on_frame(AP.LevelTracker,     "LevelTracker")
+    safe_on_frame(AP.AchievementTracker, "AchievementTracker")
     safe_on_frame(AP.EventTracker,     "EventTracker")
     safe_on_frame(AP.NpcTracker,       "NpcTracker")
     safe_on_frame(AP.TimeGate,         "TimeGate")
