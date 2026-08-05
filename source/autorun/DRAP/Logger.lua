@@ -20,7 +20,7 @@ local Logger = {}
 --- Client-side mod version, stamped into every log header so a pasted log
 --- identifies its own build. tools/build_release.py fails the build when this
 --- drifts from world_version in apworld/drdr/archipelago.json -- bump both.
-Logger.VERSION = "1.1.0"
+Logger.VERSION = "1.2.0-beta"
 
 ------------------------------------------------------------
 -- Levels
