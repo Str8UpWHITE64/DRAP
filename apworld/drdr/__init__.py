@@ -1459,7 +1459,7 @@ class DRWorld(World):
         self.set_rule(self.multiworld.get_location("Meet the Hall Family", self.player), And(CanReachRegion("Entrance Plaza"), (Has("Mark of the Sniper") if self.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM")))))
         self.set_rule(self.multiworld.get_location("Kill Roger and Jack (and Thomas if you want) and chat with Wayne", self.player), And(CanReachLocation("Meet the Hall Family"), (ep_shutter if self.options.scoop_sanity else True_())))
 
-        self.set_rule(self.multiworld.get_location("Witness Sean in Paradise Plaza", self.player), And(CanReachRegion("Paradise Plaza"), (Or(Has("The Cult"), Has("A Strange Group")) if self.options.scoop_sanity else Or(And(Has("DAY2_06_AM"), Has("DAY2_11_AM")), Has("A Strange Group")))))
+        self.set_rule(self.multiworld.get_location("Witness Sean in Paradise Plaza", self.player), And(CanReachRegion("Paradise Plaza"), (Or(Has("The Cult"), Has("A Strange Group")) if self.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM")))))
         self.set_rule(self.multiworld.get_location("Get grabbed by the raincoats", self.player), And(CanReachLocation("Witness Sean in Paradise Plaza"), CanReachRegion("Leisure Park")))
         self.set_rule(self.multiworld.get_location("Meet Sean", self.player), And(CanReachRegion("Colby's Movieland"), (Has("A Strange Group") if self.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM")))))
         self.set_rule(self.multiworld.get_location("Kill Sean", self.player), CanReachLocation("Meet Sean"))
