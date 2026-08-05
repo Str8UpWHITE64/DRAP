@@ -12,7 +12,11 @@ from .Options import DROption, dr_option_groups
 
 import re
 
-from .DoorRandomization import generate_door_randomization_for_ap, DOOR_MODE_CHAOS, DOOR_MODE_PAIRED, AREA_NAMES
+from .DoorRandomization import generate_door_randomization_for_ap, DOOR_MODE_CHAOS, DOOR_MODE_PAIRED, AREA_NAMES, EMBEDDED_DOOR_DATA
+
+# Region names in the AP graph match AREA_NAMES values, so explain_path can go
+# from a region back to the area code the door table is keyed on.
+AREA_TO_CODE = {name: code for code, name in AREA_NAMES.items()}
 from .shared_data import (
     AREA_KEY_NAMES, TIME_KEY_NAMES,
     AP_TRIGGER_LOCATIONS, expand_trigger_location_names,
@@ -1812,6 +1816,85 @@ class DRWorld(World):
         }
 
         return slot_data
+
+    def _shuffled_door_graph(self):
+        """area code -> [(door_id, vanilla target, where it leads now), ...].
+
+        A door leads wherever its redirect says, or where it always led if the
+        shuffle left it alone. Sorted so a given seed always explains a route
+        the same way. Built once; UT asks per hop.
+        """
+        if getattr(self, "_door_graph", None) is None:
+            graph = {}
+            for door_id in sorted(EMBEDDED_DOOR_DATA):
+                door = EMBEDDED_DOOR_DATA[door_id]
+                vanilla = door.get("to_area_code")
+                redirect = self.door_redirects.get(door_id)
+                target = redirect["target_area"] if redirect else vanilla
+                graph.setdefault(door.get("from_area_code"), []).append(
+                    (door_id, vanilla, target))
+            self._door_graph = graph
+        return self._door_graph
+
+    def explain_path(self, entrance, state):
+        """Spell out the doors to walk for one hop of /get_logical_path.
+
+        Under door randomization the region graph stays vanilla -- every area
+        key is precollected, so no entrance needs a key rule -- while the
+        doors underneath move. A hop like "Warehouse -> Paradise Plaza" can
+        take two or three doors through areas the path never names, so it is
+        resolved against the shuffled graph rather than assumed to be one
+        door. Nothing filters on reachability: with the shuffle on, every area
+        is already open.
+
+        Returning [] (falsy but not None) defers to UT's normal printing;
+        None would drop the hop from the path entirely.
+        """
+        if not self.door_redirects:
+            return []          # doors are vanilla; UT's own wording is fine
+
+        src = entrance.parent_region.name if entrance.parent_region else None
+        dst = entrance.connected_region.name if entrance.connected_region else None
+        src_code = AREA_TO_CODE.get(src)
+        dst_code = AREA_TO_CODE.get(dst)
+        if not src_code or not dst_code:
+            return []          # Menu, Level Ups, Challenges and friends
+
+        route = self._route_between(src_code, dst_code)
+        if not route:
+            return []          # can't model it; better UT's wording than a guess
+
+        steps = []
+        for i, (door_id, vanilla, target) in enumerate(route):
+            if door_id in self.door_redirects:
+                step = f"the door that normally leads to {AREA_NAMES.get(vanilla, vanilla)}"
+            else:
+                step = "the usual door"
+            if i < len(route) - 1:
+                step += f" (into {AREA_NAMES.get(target, target)})"
+            steps.append(step)
+
+        return [
+            {"type": "color", "color": "green", "text": entrance.name},
+            {"type": "text", "text": ": " + ", then ".join(steps)},
+        ]
+
+    def _route_between(self, src_code, dst_code):
+        """Fewest doors from one area to another, as [(door_id, vanilla, target)]."""
+        from collections import deque
+
+        graph = self._shuffled_door_graph()
+        queue = deque([(src_code, [])])
+        seen = {src_code}
+        while queue:
+            area, path = queue.popleft()
+            for door_id, vanilla, target in graph.get(area, ()):
+                if target == dst_code:
+                    return path + [(door_id, vanilla, target)]
+                if target not in seen:
+                    seen.add(target)
+                    queue.append((target, path + [(door_id, vanilla, target)]))
+        return None
 
     def write_spoiler(self, spoiler_handle) -> None:
         if self.options.scoop_sanity and self.scoop_order:
