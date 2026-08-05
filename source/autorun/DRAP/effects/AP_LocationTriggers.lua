@@ -57,19 +57,22 @@ local function _send_check(loc_name)
     end
 end
 
--- For a "counted" entry, walk count_names from end to start to find the
--- highest-index name already in COMPLETED_CHECKS. That's our starting
--- counter.
+-- For a "counted" entry the starting counter is the contiguous run of
+-- completed names from the start, NOT the highest completed index.
+-- is_completed reads the run ledger, which also carries server-confirmed
+-- checks, so a name can be complete without the player earning it here (an
+-- AP collect, or a check from an earlier save on this slot). Taking the
+-- highest hit made one stray completion at "Break 15 Plates" start the
+-- counter at 15, stranding counts 1-14. A gap means those are still owed.
 local function _bootstrap_counter(entry)
     if entry.type ~= "counted" then return end
     local names = entry.count_names or {}
-    for i = #names, 1, -1 do
-        if _is_check_completed(names[i]) then
-            _counters[entry.id] = i
-            return
-        end
+    local n = 0
+    for i = 1, #names do
+        if not _is_check_completed(names[i]) then break end
+        n = i
     end
-    _counters[entry.id] = 0
+    _counters[entry.id] = n
 end
 
 -- Register watchers for a single trigger entry. Status list events go
