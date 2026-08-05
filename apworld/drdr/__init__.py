@@ -4,13 +4,18 @@ from typing import Any, Dict, Set, List
 from BaseClasses import MultiWorld, Region, Item, Entrance, Tutorial, ItemClassification, LocationProgressType
 
 from worlds.AutoWorld import World, WebWorld
-from worlds.generic.Rules import set_rule, add_rule, add_item_rule, forbid_item
 
 from .Items import DRItem, DRItemCategory, item_dictionary, key_item_names, item_descriptions, BuildItemPool, specialty_items, progression_skills, microwave_food_items, challenge_tool_items
 from .Locations import DRLocation, DRLocationCategory, location_tables, location_dictionary
 from .Options import DROption, dr_option_groups
 
 import re
+
+import dataclasses
+
+from rule_builder.rules import (
+    And, AtLeast, CanReachLocation, CanReachRegion, Has, HasAll, Or, Rule, True_,
+)
 
 from .DoorRandomization import generate_door_randomization_for_ap, DOOR_MODE_CHAOS, DOOR_MODE_PAIRED, AREA_NAMES, EMBEDDED_DOOR_DATA
 
@@ -214,8 +219,39 @@ REGION_LEVEL_VALUES = {
 }
 
 def get_reachable_region_points(state, player: int) -> int:
-    return sum(value for region, value in REGION_LEVEL_VALUES.items() 
+    return sum(value for region, value in REGION_LEVEL_VALUES.items()
                if state.can_reach_region(region, player))
+
+
+@dataclasses.dataclass()
+class RegionPointsAtLeast(Rule["DRWorld"], game="Dead Rising Deluxe Remaster"):
+    """Level gates: every region the player can reach is worth points.
+
+    A count over the whole state, so none of the builder's primitives fit.
+    Holds only the threshold and the player id -- never the world, which
+    would keep the MultiWorld alive past generation.
+    """
+
+    count: int
+
+    def _instantiate(self, world) -> Rule.Resolved:
+        return self.Resolved(self.count, player=world.player)
+
+    class Resolved(Rule.Resolved):
+        count: int
+
+        def _evaluate(self, state) -> bool:
+            return get_reachable_region_points(state, self.player) >= self.count
+
+        def explain_json(self, state=None):
+            have = get_reachable_region_points(state, self.player) if state else None
+            return [
+                {"type": "text", "text": "Region points "},
+                {"type": "color",
+                 "color": "green" if have is not None and have >= self.count else "salmon",
+                 "text": "?" if have is None else str(have)},
+                {"type": "text", "text": f" of {self.count}"},
+            ]
 
 # PP Sticker groups: (count, required_regions, required_locations)
 # Used by milestone rules to dynamically count how many stickers the player can reach
@@ -708,75 +744,69 @@ class DRWorld(World):
         # exist, so calling state.can_reach_location on it would fail at rule
         # evaluation. In that mode we drop the gate — region requirements are
         # enough for Savior's purposes.
-        def ending_a_ok(state):
-            if not self.main_scoops_enabled:
-                return True
-            return state.can_reach_location(
-                "Ending A: Solve all of the cases and be on the helipad at 12pm",
-                self.player,
-            )
-
+        if not self.main_scoops_enabled:
+            ending_a_rule = True_()
+        else:
+            ending_a_rule = CanReachLocation(
+                "Ending A: Solve all of the cases and be on the helipad at 12pm")
         # Default per-location rule: requires reaching the location's region.
-        # Sphere-0 regions get `lambda: True` so fill can place progression
-        # items there from the first sweep. More specific rules below tighten
+        # Sphere-0 regions get True_() so fill can place progression items
+        # there from the first sweep. More specific rules below tighten
         # access where needed (set_rule replaces — later calls win).
         SPHERE_0_REGIONS = {"Menu", "Heliport", "Security Room", "Level Ups", "Challenges"}
 
         for region in self.multiworld.get_regions(self.player):
             if region.name in SPHERE_0_REGIONS:
                 for location in region.locations:
-                    set_rule(location, lambda state: True)
+                    self.set_rule(location, True_())
             else:
                 for location in region.locations:
-                    set_rule(location, lambda state, r=region.name:
-                             state.can_reach_region(r, self.player))
+                    self.set_rule(location, CanReachRegion(region.name))
 
         # Region-Based Levels
-        points = lambda state: get_reachable_region_points(state, self.player)
-
         for level in range(2, 7):      # Levels 2-6
-            set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
-                    lambda state, p=points: p(state) >= 1)
+            self.set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
+                          RegionPointsAtLeast(1))
 
         for level in range(7, 10):     # Levels 7-9
-            set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
-                    lambda state, p=points: p(state) >= 2)
+            self.set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
+                          RegionPointsAtLeast(2))
 
         for level in range(10, 12):    # Levels 10-11
-            set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
-                    lambda state, p=points: p(state) >= 4)
+            self.set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
+                          RegionPointsAtLeast(4))
 
         for level in range(12, 13):    # Levels 12
-            set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
-                    lambda state, p=points: p(state) >= 5)
+            self.set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
+                          RegionPointsAtLeast(5))
 
         for level in range(13, 16):    # Levels 13-15
-            set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
-                    lambda state, p=points: p(state) >= 7)
+            self.set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
+                          RegionPointsAtLeast(7))
 
         for level in range(16, 19):    # Levels 16-18
-            set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
-                    lambda state, p=points: p(state) >= 10)
+            self.set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
+                          RegionPointsAtLeast(10))
 
         for level in range(19, 22):    # Levels 19-21
-            set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
-                    lambda state, p=points: p(state) >= 13)
+            self.set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
+                          RegionPointsAtLeast(13))
 
         for level in range(22, 26):    # Levels 22-25
-            set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
-                    lambda state, p=points: p(state) >= 17)
+            self.set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
+                          RegionPointsAtLeast(17))
 
         for level in range(26, 31):    # Levels 26-30
-            set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
-                    lambda state, p=points: p(state) >= 22)
+            self.set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
+                          RegionPointsAtLeast(22))
 
         for level in range(31, 41):    # Levels 31-40
-            set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
-                    lambda state, p=points: p(state) >= 23)
+            self.set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
+                          RegionPointsAtLeast(23))
 
         for level in range(41, 51):    # Levels 41-50
-            set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
-                    lambda state, p=points: p(state) >= 25)
+            self.set_rule(self.multiworld.get_location(f"Reach Level {level}", self.player),
+                          RegionPointsAtLeast(25))
 
         # Exclude Levels Above code
         if self.options.exclude_levels:
@@ -834,7 +864,8 @@ class DRWorld(World):
         
         # Victory condition based on goal
         goal_location_name = self.GOAL_LOCATIONS[self.options.goal.value]
-        set_rule(self.multiworld.get_location("Victory", self.player), lambda state: state.can_reach_location(goal_location_name, self.player))
+        self.set_rule(self.multiworld.get_location("Victory", self.player),
+                      CanReachLocation(goal_location_name))
 
         # Savior goal: the synthetic goal location is reachable once the
         # player can reach at least `number_of_survivors` "Rescue X" locations.
@@ -845,18 +876,11 @@ class DRWorld(World):
             savior_player = self.player
             savior_rescue_locations = list(self.ALL_RESCUE_LOCATIONS)
 
-            def savior_rule(state, _target=savior_target, _player=savior_player,
-                            _locs=savior_rescue_locations):
-                reached = 0
-                for loc_name in _locs:
-                    if state.can_reach_location(loc_name, _player):
-                        reached += 1
-                        if reached >= _target:
-                            return True
-                return False
+            savior_rule = AtLeast(savior_target,
+                                  *[CanReachLocation(l) for l in savior_rescue_locations])
 
-            set_rule(self.multiworld.get_location(self.SAVIOR_GOAL_LOCATION, self.player),
-                     savior_rule)
+            self.set_rule(self.multiworld.get_location(self.SAVIOR_GOAL_LOCATION, self.player),
+                          savior_rule)
 
             # When main scoops are enabled under Savior, Ending A still exists
             # as filler — mark it excluded from progression so fill doesn't
@@ -884,11 +908,10 @@ class DRWorld(World):
         # is a safeguard for hand-edited orders.
         if (not self.options.scoop_sanity
                 or (self.scoop_order and self.scoop_order[0] == "Backup for Brad")):
-            _shutter = lambda state: state.can_reach_location("Escort Brad to see Dr Barnaby", self.player)
+            _shutter = CanReachLocation("Escort Brad to see Dr Barnaby")
         else:
-            _shutter = lambda state: state.can_reach_region("Warehouse", self.player)
-        ep_shutter = lambda state: (state.can_reach_region("Entrance Plaza", self.player)
-                                    and _shutter(state))
+            _shutter = CanReachRegion("Warehouse")
+        ep_shutter = And(CanReachRegion("Entrance Plaza"), _shutter)
 
         # PP-bonus rules (per-count for "counted" entries). Per-location rule
         # combines: required_regions (ALL reachable; first may be bypassed by
@@ -900,34 +923,27 @@ class DRWorld(World):
             restricted_mode_on = bool(self.options.restricted_item_mode.value)
 
             def _make_rule(required_regions, alt_item, req_loc, items_any,
-                           restricted_on=restricted_mode_on,
-                           player=self.player):
-                def rule(state):
-                    # Region gating: ALL required regions must be reachable,
-                    # except the first can be bypassed by alt_item.
-                    if required_regions:
-                        first = required_regions[0]
-                        first_ok = state.can_reach_region(first, player)
-                        if not first_ok and alt_item:
-                            first_ok = state.has(alt_item, player)
-                        if not first_ok:
-                            return False
-                        for r in required_regions[1:]:
-                            if not state.can_reach_region(r, player):
-                                return False
-                    if req_loc and not state.can_reach_location(req_loc, player):
-                        return False
-                    if restricted_on and items_any:
-                        if not any(state.has(it, player) for it in items_any):
-                            return False
-                    return True
-                return rule
+                           restricted_on=restricted_mode_on):
+                parts = []
+                # Region gating: ALL required regions must be reachable,
+                # except the first can be bypassed by alt_item.
+                if required_regions:
+                    first = CanReachRegion(required_regions[0])
+                    if alt_item:
+                        first = Or(first, Has(alt_item))
+                    parts.append(first)
+                    parts.extend(CanReachRegion(r) for r in required_regions[1:])
+                if req_loc:
+                    parts.append(CanReachLocation(req_loc))
+                if restricted_on and items_any:
+                    parts.append(Or(*[Has(it) for it in items_any]))
+                return And(*parts) if parts else True_()
 
             # Entries flagged ep_shutter sit inside Entrance Plaza's
             # storefronts, so reaching EP is not enough -- the shutter
             # cutscene has to have played.
-            def _gate_on_shutter(inner, shutter=ep_shutter):
-                return lambda state: shutter(state) and inner(state)
+            def _gate_on_shutter(inner):
+                return And(ep_shutter, inner)
 
             for _entry in AP_TRIGGER_LOCATIONS:
                 _names = expand_trigger_location_names(_entry)
@@ -968,28 +984,25 @@ class DRWorld(World):
                                          alts=_required_alts,
                                          req_loc=_req_loc,
                                          items_any=_items_any,
-                                         restricted_on=restricted_mode_on,
-                                         player=self.player):
-                        def rule(state):
-                            if required and not all(
-                                    state.can_reach_region(r, player)
-                                    for r in required):
-                                if restricted_on or not any(
-                                        state.has(it, player) for it in alts):
-                                    return False
-                            if req_loc and not state.can_reach_location(req_loc, player):
-                                return False
-                            if restricted_on and items_any:
-                                if not any(state.has(it, player) for it in items_any):
-                                    return False
-                            total = 0
-                            for r, c in counts.items():
-                                if state.can_reach_region(r, player):
-                                    total += c
-                                    if total >= n:
-                                        return True
-                            return False
-                        return rule
+                                         restricted_on=restricted_mode_on):
+                        parts = []
+                        if required:
+                            req = And(*[CanReachRegion(r) for r in required])
+                            # Outside restricted mode an alt item substitutes
+                            # for the required regions entirely.
+                            if not restricted_on and alts:
+                                req = Or(req, *[Has(it) for it in alts])
+                            parts.append(req)
+                        if req_loc:
+                            parts.append(CanReachLocation(req_loc))
+                        if restricted_on and items_any:
+                            parts.append(Or(*[Has(it) for it in items_any]))
+                        # Each region carries a count toward the target, so it
+                        # is listed once per unit it is worth.
+                        parts.append(AtLeast(n, *[CanReachRegion(r)
+                                                  for r, c in counts.items()
+                                                  for _ in range(c)]))
+                        return And(*parts) if len(parts) > 1 else parts[0]
 
                     _targets = [(_names[_i], _i + 1)
                                 for _i in range(min(_max, len(_names)))]
@@ -1003,7 +1016,7 @@ class DRWorld(World):
                         _rule = _make_count_rule(_n)
                         if _shuttered:
                             _rule = _gate_on_shutter(_rule)
-                        set_rule(_loc, _rule)
+                        self.set_rule(_loc, _rule)
                     continue
 
                 # Build a list of (location_name, required_regions) tuples
@@ -1034,31 +1047,31 @@ class DRWorld(World):
                     _rule = _make_rule(_regions, _alt_item, _req_loc, _items_any)
                     if _shuttered:
                         _rule = _gate_on_shutter(_rule)
-                    set_rule(_loc, _rule)
+                    self.set_rule(_loc, _rule)
 
         if not self.options.door_randomizer:
             # Normal key-based entrance rules
-            set_rule(self.multiworld.get_entrance("Security Room -> Rooftop", self.player), lambda state: state.has("Rooftop key", self.player))
-            set_rule(self.multiworld.get_entrance("Rooftop -> Warehouse", self.player), lambda state: state.has("Warehouse key", self.player))
-            set_rule(self.multiworld.get_entrance("Warehouse -> Paradise Plaza", self.player), lambda state: state.has("Paradise Plaza key", self.player))
-            set_rule(self.multiworld.get_entrance("Paradise Plaza -> Colby's Movieland", self.player), lambda state: state.has("Colby's Movieland key", self.player))
-            set_rule(self.multiworld.get_entrance("Paradise Plaza -> Leisure Park", self.player), lambda state: state.has("Leisure Park key", self.player))
-            set_rule(self.multiworld.get_entrance("Leisure Park -> Food Court", self.player), lambda state: state.has("Food Court key", self.player))
-            set_rule(self.multiworld.get_entrance("Leisure Park -> North Plaza", self.player), lambda state: state.has("North Plaza key", self.player))
-            set_rule(self.multiworld.get_entrance("Leisure Park -> Maintenance Tunnel", self.player), lambda state: state.has("Maintenance Tunnel key", self.player))
-            set_rule(self.multiworld.get_entrance("Food Court -> Al Fresca Plaza", self.player), lambda state: state.has("Al Fresca Plaza key", self.player))
-            set_rule(self.multiworld.get_entrance("Food Court -> Wonderland Plaza", self.player), lambda state: state.has("Wonderland Plaza key", self.player))
-            set_rule(self.multiworld.get_entrance("Food Court -> Leisure Park", self.player), lambda state: state.has("Leisure Park key", self.player))
-            set_rule(self.multiworld.get_entrance("Al Fresca Plaza -> Entrance Plaza", self.player), lambda state: state.has("Entrance Plaza key", self.player))
-            set_rule(self.multiworld.get_entrance("Al Fresca Plaza -> Food Court", self.player), lambda state: state.has("Food Court key", self.player))
-            set_rule(self.multiworld.get_entrance("Entrance Plaza -> Al Fresca Plaza", self.player), lambda state: state.has("Al Fresca Plaza key", self.player))
-            set_rule(self.multiworld.get_entrance("Wonderland Plaza -> North Plaza", self.player), lambda state: state.has("North Plaza key", self.player))
-            set_rule(self.multiworld.get_entrance("Wonderland Plaza -> Food Court", self.player), lambda state: state.has("Food Court key", self.player))
-            set_rule(self.multiworld.get_entrance("Seon's Food and Stuff -> North Plaza", self.player), lambda state: state.has("North Plaza key", self.player))
-            set_rule(self.multiworld.get_entrance("North Plaza -> Wonderland Plaza", self.player), lambda state: state.has("Wonderland Plaza key", self.player))
-            set_rule(self.multiworld.get_entrance("North Plaza -> Seon's Food and Stuff", self.player), lambda state: state.has("Seon's Food and Stuff key", self.player))
-            set_rule(self.multiworld.get_entrance("North Plaza -> Carlito's Hideout", self.player), lambda state: state.has("Carlito's Hideout key", self.player))
-            set_rule(self.multiworld.get_entrance("North Plaza -> Crislip's Home Saloon", self.player), lambda state: state.has("Crislip's Home Saloon key", self.player))
+            self.set_rule(self.multiworld.get_entrance("Security Room -> Rooftop", self.player), Has("Rooftop key"))
+            self.set_rule(self.multiworld.get_entrance("Rooftop -> Warehouse", self.player), Has("Warehouse key"))
+            self.set_rule(self.multiworld.get_entrance("Warehouse -> Paradise Plaza", self.player), Has("Paradise Plaza key"))
+            self.set_rule(self.multiworld.get_entrance("Paradise Plaza -> Colby's Movieland", self.player), Has("Colby's Movieland key"))
+            self.set_rule(self.multiworld.get_entrance("Paradise Plaza -> Leisure Park", self.player), Has("Leisure Park key"))
+            self.set_rule(self.multiworld.get_entrance("Leisure Park -> Food Court", self.player), Has("Food Court key"))
+            self.set_rule(self.multiworld.get_entrance("Leisure Park -> North Plaza", self.player), Has("North Plaza key"))
+            self.set_rule(self.multiworld.get_entrance("Leisure Park -> Maintenance Tunnel", self.player), Has("Maintenance Tunnel key"))
+            self.set_rule(self.multiworld.get_entrance("Food Court -> Al Fresca Plaza", self.player), Has("Al Fresca Plaza key"))
+            self.set_rule(self.multiworld.get_entrance("Food Court -> Wonderland Plaza", self.player), Has("Wonderland Plaza key"))
+            self.set_rule(self.multiworld.get_entrance("Food Court -> Leisure Park", self.player), Has("Leisure Park key"))
+            self.set_rule(self.multiworld.get_entrance("Al Fresca Plaza -> Entrance Plaza", self.player), Has("Entrance Plaza key"))
+            self.set_rule(self.multiworld.get_entrance("Al Fresca Plaza -> Food Court", self.player), Has("Food Court key"))
+            self.set_rule(self.multiworld.get_entrance("Entrance Plaza -> Al Fresca Plaza", self.player), Has("Al Fresca Plaza key"))
+            self.set_rule(self.multiworld.get_entrance("Wonderland Plaza -> North Plaza", self.player), Has("North Plaza key"))
+            self.set_rule(self.multiworld.get_entrance("Wonderland Plaza -> Food Court", self.player), Has("Food Court key"))
+            self.set_rule(self.multiworld.get_entrance("Seon's Food and Stuff -> North Plaza", self.player), Has("North Plaza key"))
+            self.set_rule(self.multiworld.get_entrance("North Plaza -> Wonderland Plaza", self.player), Has("Wonderland Plaza key"))
+            self.set_rule(self.multiworld.get_entrance("North Plaza -> Seon's Food and Stuff", self.player), Has("Seon's Food and Stuff key"))
+            self.set_rule(self.multiworld.get_entrance("North Plaza -> Carlito's Hideout", self.player), Has("Carlito's Hideout key"))
+            self.set_rule(self.multiworld.get_entrance("North Plaza -> Crislip's Home Saloon", self.player), Has("Crislip's Home Saloon key"))
 
             # Maintenance Tunnel doors: every mall<->tunnel door needs the
             # Maintenance Tunnel key plus the Access Key -- either the AP
@@ -1067,20 +1080,17 @@ class DRWorld(World):
             # exits also need the destination zone's key. The tunnel-to-EP
             # exit only exists in ScoopSanity (see create_connection).
             _mt_region = self.multiworld.get_region("Maintenance Tunnel", self.player)
-            _tunnel_door = lambda state: (state.has("Maintenance Tunnel key", self.player)
-                                          and (state.has("Maintenance Tunnel Access Key", self.player)
-                                               or state.can_reach_region("Maintenance Tunnel", self.player)))
+            _tunnel_door = And(Has("Maintenance Tunnel key"),
+                               Or(Has("Maintenance Tunnel Access Key"),
+                                  CanReachRegion("Maintenance Tunnel")))
             for _zone in MAINTENANCE_TUNNEL_ZONES:
                 _into = self.multiworld.get_entrance(f"{_zone} -> Maintenance Tunnel", self.player)
-                set_rule(_into, _tunnel_door)
+                self.set_rule(_into, _tunnel_door)
                 self.multiworld.register_indirect_condition(_mt_region, _into)
                 if _zone != "Entrance Plaza" or self.options.scoop_sanity:
-                    set_rule(self.multiworld.get_entrance(f"Maintenance Tunnel -> {_zone}", self.player),
-                             lambda state, k=f"{_zone} key": state.has("Maintenance Tunnel key", self.player)
-                                           and state.has(k, self.player))
-            set_rule(self.multiworld.get_entrance("Maintenance Tunnel -> Leisure Park", self.player),
-                     lambda state: state.has("Maintenance Tunnel key", self.player)
-                                   and state.has("Leisure Park key", self.player))
+                    self.set_rule(self.multiworld.get_entrance(f"Maintenance Tunnel -> {_zone}", self.player),
+                                  And(Has("Maintenance Tunnel key"), Has(f"{_zone} key")))
+            self.set_rule(self.multiworld.get_entrance("Maintenance Tunnel -> Leisure Park", self.player), And(Has("Maintenance Tunnel key"), Has("Leisure Park key")))
 
             # ScoopSanity-only entrance rules:
             #   * Security Room -> Entrance Plaza requires Rooftop key +
@@ -1092,19 +1102,15 @@ class DRWorld(World):
             #     through Al Fresca first, and the shutter opens during the
             #     Rescue the Professor escort, which chains behind EP reach.
             if self.options.scoop_sanity:
-                set_rule(self.multiworld.get_entrance("Security Room -> Entrance Plaza", self.player),
-                         lambda state: state.has("Rooftop key", self.player)
-                                       and state.has("Warehouse key", self.player)
-                                       and state.has("Entrance Plaza key", self.player))
-                set_rule(self.multiworld.get_entrance("Paradise Plaza -> Entrance Plaza", self.player),
-                         lambda state: state.has("Entrance Plaza key", self.player))
+                self.set_rule(self.multiworld.get_entrance("Security Room -> Entrance Plaza", self.player), And(Has("Rooftop key"), Has("Warehouse key"), Has("Entrance Plaza key")))
+                self.set_rule(self.multiworld.get_entrance("Paradise Plaza -> Entrance Plaza", self.player), Has("Entrance Plaza key"))
 
         # "Meet Jessie in the Warehouse" is a prologue main scoop that
         # always exists (see PROLOGUE_MAIN_SCOOPS). Its rule is set outside
         # the main_scoops_enabled guard so Savior+ScoopSanity still gates it
         # correctly. Other rules that reference it from within the guard are
         # fine because they only run when it's guaranteed to exist.
-        set_rule(self.multiworld.get_location("Meet Jessie in the Warehouse", self.player), lambda state: state.can_reach_region("Warehouse", self.player))
+        self.set_rule(self.multiworld.get_location("Meet Jessie in the Warehouse", self.player), CanReachRegion("Warehouse"))
 
         # Events — the rest of the main-scoop completion chain. These
         # locations are MAIN_SCOOP category and don't exist when
@@ -1114,95 +1120,95 @@ class DRWorld(World):
             # ScoopSanity overrides this rule per-event in the SCOOP_EVENTS
             # loop below; here is the vanilla path only (story chains from
             # Meet Jessie -> walk Brad through the mall to the safe room).
-            set_rule(self.multiworld.get_location("Complete Backup for Brad", self.player), lambda state: state.can_reach_location("Meet Jessie in the Warehouse", self.player) and state.can_reach_region("Leisure Park", self.player) and state.can_reach_region("Paradise Plaza", self.player) and state.can_reach_region("Food Court", self.player) and state.has("Food Court key", self.player))
+            self.set_rule(self.multiworld.get_location("Complete Backup for Brad", self.player), And(CanReachLocation("Meet Jessie in the Warehouse"), CanReachRegion("Leisure Park"), CanReachRegion("Paradise Plaza"), CanReachRegion("Food Court"), Has("Food Court key")))
 
-            set_rule(self.multiworld.get_location("Escort Brad to see Dr Barnaby", self.player), lambda state: state.can_reach_location("Complete Backup for Brad", self.player) and state.can_reach_region("Entrance Plaza", self.player) and state.can_reach_region("Al Fresca Plaza", self.player) and state.has("Entrance Plaza key", self.player))
+            self.set_rule(self.multiworld.get_location("Escort Brad to see Dr Barnaby", self.player), And(CanReachLocation("Complete Backup for Brad"), CanReachRegion("Entrance Plaza"), CanReachRegion("Al Fresca Plaza"), Has("Entrance Plaza key")))
 
-            set_rule(self.multiworld.get_location("Complete Temporary Agreement", self.player), lambda state: state.can_reach_location("Escort Brad to see Dr Barnaby", self.player))
-
-            if not self.options.scoop_sanity:
-                set_rule(self.multiworld.get_location("Meet back at the Security Room at 6am day 2", self.player), lambda state: state.has("DAY2_06_AM", self.player) and state.can_reach_location("Complete Temporary Agreement", self.player))
-
-                set_rule(self.multiworld.get_location("Complete Image in the Monitor", self.player), lambda state: state.can_reach_location("Meet back at the Security Room at 6am day 2", self.player))
-
-            set_rule(self.multiworld.get_location("Complete Rescue the Professor", self.player), lambda state: state.can_reach_location("Complete Image in the Monitor", self.player))
-
-            set_rule(self.multiworld.get_location("Meet Steven", self.player), lambda state: state.can_reach_location("Complete Rescue the Professor", self.player) and state.can_reach_region("North Plaza", self.player) and state.can_reach_region("Seon's Food and Stuff", self.player))
-
-            set_rule(self.multiworld.get_location("Clean up... Register 6!", self.player), lambda state: state.can_reach_location("Meet Steven", self.player))
-
-            set_rule(self.multiworld.get_location("Complete Medicine Run", self.player), lambda state: state.can_reach_location("Clean up... Register 6!", self.player))
-
-            set_rule(self.multiworld.get_location("Complete Professor's Past", self.player), lambda state: state.can_reach_location("Complete Medicine Run", self.player) and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player))
-
-            set_rule(self.multiworld.get_location("Complete Girl Hunting", self.player), lambda state: state.can_reach_location("Complete Professor's Past", self.player))
-
-            set_rule(self.multiworld.get_location("Beat up Isabela", self.player), lambda state: state.can_reach_location("Complete Girl Hunting", self.player))
-
-            set_rule(self.multiworld.get_location("Complete Promise to Isabela", self.player), lambda state: state.can_reach_location("Beat up Isabela", self.player) and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.has("DAY3_00_AM", self.player))
-
-            set_rule(self.multiworld.get_location("Save Isabela from the zombie", self.player), lambda state: state.can_reach_location("Complete Promise to Isabela", self.player))
-
-            set_rule(self.multiworld.get_location("Complete Transporting Isabela", self.player), lambda state: state.can_reach_location("Save Isabela from the zombie", self.player))
-
-            set_rule(self.multiworld.get_location("Carry Isabela back to the Security Room", self.player), lambda state: state.can_reach_location("Complete Transporting Isabela", self.player))
-
-            set_rule(self.multiworld.get_location("Complete Santa Cabeza", self.player), lambda state: state.can_reach_location("Carry Isabela back to the Security Room", self.player))
+            self.set_rule(self.multiworld.get_location("Complete Temporary Agreement", self.player), CanReachLocation("Escort Brad to see Dr Barnaby"))
 
             if not self.options.scoop_sanity:
-                set_rule(self.multiworld.get_location("Meet back at the Security Room at 11am day 3", self.player), lambda state: state.can_reach_location("Complete Santa Cabeza", self.player) and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.has("DAY3_00_AM", self.player) and state.has("DAY3_11_AM", self.player))
+                self.set_rule(self.multiworld.get_location("Meet back at the Security Room at 6am day 2", self.player), And(Has("DAY2_06_AM"), CanReachLocation("Complete Temporary Agreement")))
 
-                set_rule(self.multiworld.get_location("Complete Bomb Collector", self.player), lambda state: state.can_reach_location("Meet back at the Security Room at 11am day 3", self.player) and state.can_reach_region("Maintenance Tunnel", self.player))
+                self.set_rule(self.multiworld.get_location("Complete Image in the Monitor", self.player), CanReachLocation("Meet back at the Security Room at 6am day 2"))
 
-                set_rule(self.multiworld.get_location("Beat Drivin Carlito", self.player), lambda state: state.can_reach_location("Complete Bomb Collector", self.player) and state.can_reach_region("Maintenance Tunnel", self.player))
+            self.set_rule(self.multiworld.get_location("Complete Rescue the Professor", self.player), CanReachLocation("Complete Image in the Monitor"))
 
-                set_rule(self.multiworld.get_location("Meet back at the Security Room at 5pm day 3", self.player), lambda state: state.can_reach_location("Complete Bomb Collector", self.player) or state.can_reach_location("Beat Drivin Carlito", self.player))
+            self.set_rule(self.multiworld.get_location("Meet Steven", self.player), And(CanReachLocation("Complete Rescue the Professor"), CanReachRegion("North Plaza"), CanReachRegion("Seon's Food and Stuff")))
 
-                set_rule(self.multiworld.get_location("Escort Isabela to Carlito's Hideout and have a chat", self.player), lambda state: state.can_reach_location("Meet back at the Security Room at 5pm day 3", self.player) and state.can_reach_region("Carlito's Hideout", self.player))
+            self.set_rule(self.multiworld.get_location("Clean up... Register 6!", self.player), CanReachLocation("Meet Steven"))
+
+            self.set_rule(self.multiworld.get_location("Complete Medicine Run", self.player), CanReachLocation("Clean up... Register 6!"))
+
+            self.set_rule(self.multiworld.get_location("Complete Professor's Past", self.player), And(CanReachLocation("Complete Medicine Run"), Has("DAY2_06_AM"), Has("DAY2_11_AM")))
+
+            self.set_rule(self.multiworld.get_location("Complete Girl Hunting", self.player), CanReachLocation("Complete Professor's Past"))
+
+            self.set_rule(self.multiworld.get_location("Beat up Isabela", self.player), CanReachLocation("Complete Girl Hunting"))
+
+            self.set_rule(self.multiworld.get_location("Complete Promise to Isabela", self.player), And(CanReachLocation("Beat up Isabela"), Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM")))
+
+            self.set_rule(self.multiworld.get_location("Save Isabela from the zombie", self.player), CanReachLocation("Complete Promise to Isabela"))
+
+            self.set_rule(self.multiworld.get_location("Complete Transporting Isabela", self.player), CanReachLocation("Save Isabela from the zombie"))
+
+            self.set_rule(self.multiworld.get_location("Carry Isabela back to the Security Room", self.player), CanReachLocation("Complete Transporting Isabela"))
+
+            self.set_rule(self.multiworld.get_location("Complete Santa Cabeza", self.player), CanReachLocation("Carry Isabela back to the Security Room"))
+
+            if not self.options.scoop_sanity:
+                self.set_rule(self.multiworld.get_location("Meet back at the Security Room at 11am day 3", self.player), And(CanReachLocation("Complete Santa Cabeza"), Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM"), Has("DAY3_11_AM")))
+
+                self.set_rule(self.multiworld.get_location("Complete Bomb Collector", self.player), And(CanReachLocation("Meet back at the Security Room at 11am day 3"), CanReachRegion("Maintenance Tunnel")))
+
+                self.set_rule(self.multiworld.get_location("Beat Drivin Carlito", self.player), And(CanReachLocation("Complete Bomb Collector"), CanReachRegion("Maintenance Tunnel")))
+
+                self.set_rule(self.multiworld.get_location("Meet back at the Security Room at 5pm day 3", self.player), Or(CanReachLocation("Complete Bomb Collector"), CanReachLocation("Beat Drivin Carlito")))
+
+                self.set_rule(self.multiworld.get_location("Escort Isabela to Carlito's Hideout and have a chat", self.player), And(CanReachLocation("Meet back at the Security Room at 5pm day 3"), CanReachRegion("Carlito's Hideout")))
 
             if self.options.scoop_sanity:
                 self.multiworld.get_location("Beat Drivin Carlito", self.player).progress_type = LocationProgressType.EXCLUDED
 
                 self.multiworld.get_location("Rescue Greg Simpson", self.player).progress_type = LocationProgressType.EXCLUDED
 
-            set_rule(self.multiworld.get_location("Complete Jessie's Discovery", self.player), lambda state: state.can_reach_location("Escort Isabela to Carlito's Hideout and have a chat", self.player))
+            self.set_rule(self.multiworld.get_location("Complete Jessie's Discovery", self.player), CanReachLocation("Escort Isabela to Carlito's Hideout and have a chat"))
 
-            set_rule(self.multiworld.get_location("Meet Larry", self.player), lambda state: state.can_reach_location("Complete Jessie's Discovery", self.player))
+            self.set_rule(self.multiworld.get_location("Meet Larry", self.player), CanReachLocation("Complete Jessie's Discovery"))
 
-            set_rule(self.multiworld.get_location("Complete The Butcher", self.player), lambda state: state.can_reach_location("Meet Larry", self.player))
+            self.set_rule(self.multiworld.get_location("Complete The Butcher", self.player), CanReachLocation("Meet Larry"))
 
-            set_rule(self.multiworld.get_location("Complete Memories", self.player), lambda state: state.can_reach_location("Complete The Butcher", self.player))
+            self.set_rule(self.multiworld.get_location("Complete Memories", self.player), CanReachLocation("Complete The Butcher"))
 
             if not self.options.scoop_sanity:
-                set_rule(self.multiworld.get_location("Head back to the Security Room at the end of day 3", self.player), lambda state: state.can_reach_location("Complete Memories", self.player))
+                self.set_rule(self.multiworld.get_location("Head back to the Security Room at the end of day 3", self.player), CanReachLocation("Complete Memories"))
 
-                set_rule(self.multiworld.get_location("Witness Special Forces 10pm day 3", self.player), lambda state: state.can_reach_location("Complete Memories", self.player))
+                self.set_rule(self.multiworld.get_location("Witness Special Forces 10pm day 3", self.player), CanReachLocation("Complete Memories"))
 
-            set_rule(self.multiworld.get_location("Ending A: Solve all of the cases and be on the helipad at 12pm", self.player), lambda state: state.can_reach_location("Complete Memories", self.player) and state.can_reach_region("Heliport", self.player) and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.has("DAY3_00_AM", self.player) and state.has("DAY3_11_AM", self.player) and state.has("DAY4_12_PM", self.player))
+            self.set_rule(self.multiworld.get_location("Ending A: Solve all of the cases and be on the helipad at 12pm", self.player), And(CanReachLocation("Complete Memories"), CanReachRegion("Heliport"), Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM"), Has("DAY3_11_AM"), Has("DAY4_12_PM")))
 
         # Overtime rules only apply when goal is Ending S
         if self.options.goal.value == 0:
-            set_rule(self.multiworld.get_location("Get bit!", self.player), lambda state: state.can_reach_location("Ending A: Solve all of the cases and be on the helipad at 12pm", self.player))
+            self.set_rule(self.multiworld.get_location("Get bit!", self.player), CanReachLocation("Ending A: Solve all of the cases and be on the helipad at 12pm"))
 
-            set_rule(self.multiworld.get_location("Gather the suppressants and generator and talk to Isabela", self.player), lambda state: state.can_reach_location("Get bit!", self.player) and (state.can_reach_region("Paradise Plaza", self.player) and state.can_reach_region("Entrance Plaza", self.player) and state.can_reach_region("Al Fresca Plaza", self.player) and state.can_reach_region("Leisure Park", self.player) and state.can_reach_region("Food Court", self.player) and state.can_reach_region("Maintenance Tunnel", self.player) and state.can_reach_region("Wonderland Plaza", self.player)))
+            self.set_rule(self.multiworld.get_location("Gather the suppressants and generator and talk to Isabela", self.player), And(CanReachLocation("Get bit!"), And(CanReachRegion("Paradise Plaza"), CanReachRegion("Entrance Plaza"), CanReachRegion("Al Fresca Plaza"), CanReachRegion("Leisure Park"), CanReachRegion("Food Court"), CanReachRegion("Maintenance Tunnel"), CanReachRegion("Wonderland Plaza"))))
 
-            set_rule(self.multiworld.get_location("See the crashed helicopter", self.player), lambda state: state.can_reach_location("Get bit!", self.player))
+            self.set_rule(self.multiworld.get_location("See the crashed helicopter", self.player), CanReachLocation("Get bit!"))
 
-            set_rule(self.multiworld.get_location("Frank sees a sick-ass RC Drone", self.player), lambda state: state.can_reach_location("Get bit!", self.player))
+            self.set_rule(self.multiworld.get_location("Frank sees a sick-ass RC Drone", self.player), CanReachLocation("Get bit!"))
 
-            set_rule(self.multiworld.get_location("Give Isabela 5 queens", self.player), lambda state: state.can_reach_location("Gather the suppressants and generator and talk to Isabela", self.player))
+            self.set_rule(self.multiworld.get_location("Give Isabela 5 queens", self.player), CanReachLocation("Gather the suppressants and generator and talk to Isabela"))
 
-            set_rule(self.multiworld.get_location("Reach the end of the tunnel with Isabela", self.player), lambda state: state.can_reach_location("Give Isabela 5 queens", self.player))
+            self.set_rule(self.multiworld.get_location("Reach the end of the tunnel with Isabela", self.player), CanReachLocation("Give Isabela 5 queens"))
 
-            set_rule(self.multiworld.get_location("Get to the Humvee", self.player), lambda state: state.can_reach_location("Give Isabela 5 queens", self.player) and state.can_reach_region("Tunnels", self.player))
+            self.set_rule(self.multiworld.get_location("Get to the Humvee", self.player), And(CanReachLocation("Give Isabela 5 queens"), CanReachRegion("Tunnels")))
 
-            set_rule(self.multiworld.get_location("Fight a tank and win", self.player), lambda state: state.can_reach_location("Get to the Humvee", self.player))
+            self.set_rule(self.multiworld.get_location("Fight a tank and win", self.player), CanReachLocation("Get to the Humvee"))
 
-            set_rule(self.multiworld.get_location("Ending S: Beat up Brock with your bare fists!", self.player), lambda state: state.can_reach_location("Fight a tank and win", self.player))
+            self.set_rule(self.multiworld.get_location("Ending S: Beat up Brock with your bare fists!", self.player), CanReachLocation("Fight a tank and win"))
 
-            set_rule(self.multiworld.get_location("Kill 10 Special Forces", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player) and state.has("DAY3_11_AM", self.player) and state.can_reach_location("Get bit!", self.player) and state.can_reach_location("Ending A: Solve all of the cases and be on the helipad at 12pm", self.player))
+            self.set_rule(self.multiworld.get_location("Kill 10 Special Forces", self.player), And(CanReachRegion("Paradise Plaza"), Has("DAY3_11_AM"), CanReachLocation("Get bit!"), CanReachLocation("Ending A: Solve all of the cases and be on the helipad at 12pm")))
 
-            set_rule(self.multiworld.get_location("Kill 100 zombies with an RPG", self.player), lambda state: state.can_reach_region("Maintenance Tunnel", self.player) and state.can_reach_location("Get bit!", self.player))
+            self.set_rule(self.multiworld.get_location("Kill 100 zombies with an RPG", self.player), And(CanReachRegion("Maintenance Tunnel"), CanReachLocation("Get bit!")))
 
         # ScoopSanity: gate every event of every scoop uniformly on item
         # received, previous scoop's completion, scoop regions, and the
@@ -1219,271 +1225,269 @@ class DRWorld(World):
                              else None)
                 for event_name in SCOOP_EVENTS[scoop_name]:
                     loc = self.multiworld.get_location(event_name, self.player)
-                    set_rule(loc,
-                        lambda state, sn=scoop_name, p=prereq,
-                               rn=regions, lv=level_req:
-                            state.has(sn, self.player) and
-                            state.can_reach_location(p, self.player) and
-                            all(state.can_reach_region(r, self.player) for r in rn) and
-                            (lv is None or
-                             state.can_reach_location(f"Reach Level {lv}", self.player)))
+                    _scoop_rule = And(Has(scoop_name), CanReachLocation(prereq),
+                                      *[CanReachRegion(r) for r in regions])
+                    if level_req is not None:
+                        _scoop_rule = And(_scoop_rule,
+                                          CanReachLocation(f"Reach Level {level_req}"))
+                    self.set_rule(loc, _scoop_rule)
 
             # Complete Memories is the post-chain anchor; gates on the last
             # randomized scoop's completion regardless of which scoop that is.
             last_completion = SCOOP_COMPLETION_MAP[self.scoop_order[-1]]
-            set_rule(self.multiworld.get_location("Complete Memories", self.player),
-                lambda state, lc=last_completion: state.can_reach_location(lc, self.player))
+            self.set_rule(self.multiworld.get_location("Complete Memories", self.player),
+                          CanReachLocation(last_completion))
 
 
         # PP STICKER LOGIC
         # PP Stickers in Paradise Plaza
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 1", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 2", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 3", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 4", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 5", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 6", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 7", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 8", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 9", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 10", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 11", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 12", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 13", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 14", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 1", self.player), CanReachRegion("Paradise Plaza"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 2", self.player), CanReachRegion("Paradise Plaza"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 3", self.player), CanReachRegion("Paradise Plaza"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 4", self.player), CanReachRegion("Paradise Plaza"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 5", self.player), CanReachRegion("Paradise Plaza"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 6", self.player), CanReachRegion("Paradise Plaza"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 7", self.player), CanReachRegion("Paradise Plaza"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 8", self.player), CanReachRegion("Paradise Plaza"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 9", self.player), CanReachRegion("Paradise Plaza"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 10", self.player), CanReachRegion("Paradise Plaza"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 11", self.player), CanReachRegion("Paradise Plaza"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 12", self.player), CanReachRegion("Paradise Plaza"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 13", self.player), CanReachRegion("Paradise Plaza"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 14", self.player), CanReachRegion("Paradise Plaza"))
 
         # PP Stickers in Colby's Movieland
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 15", self.player), lambda state: state.can_reach_region("Colby's Movieland", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 16", self.player), lambda state: state.can_reach_region("Colby's Movieland", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 17", self.player), lambda state: state.can_reach_region("Colby's Movieland", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 18", self.player), lambda state: state.can_reach_region("Colby's Movieland", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 19", self.player), lambda state: state.can_reach_region("Colby's Movieland", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 20", self.player), lambda state: state.can_reach_region("Colby's Movieland", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 21", self.player), lambda state: state.can_reach_region("Colby's Movieland", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 22", self.player), lambda state: state.can_reach_region("Colby's Movieland", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 23", self.player), lambda state: state.can_reach_region("Colby's Movieland", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 24", self.player), lambda state: state.can_reach_region("Colby's Movieland", self.player))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 15", self.player), CanReachRegion("Colby's Movieland"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 16", self.player), CanReachRegion("Colby's Movieland"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 17", self.player), CanReachRegion("Colby's Movieland"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 18", self.player), CanReachRegion("Colby's Movieland"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 19", self.player), CanReachRegion("Colby's Movieland"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 20", self.player), CanReachRegion("Colby's Movieland"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 21", self.player), CanReachRegion("Colby's Movieland"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 22", self.player), CanReachRegion("Colby's Movieland"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 23", self.player), CanReachRegion("Colby's Movieland"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 24", self.player), CanReachRegion("Colby's Movieland"))
 
         # PP Stickers in Entrance Plaza -- behind the shutters (25-34), as are
         # the EP survivors and Wayne's check further down. ep_shutter is
         # defined above, alongside the PP-bonus rules that also need it.
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 25", self.player), ep_shutter)
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 26", self.player), ep_shutter)
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 27", self.player), ep_shutter)
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 28", self.player), ep_shutter)
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 29", self.player), ep_shutter)
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 30", self.player), ep_shutter)
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 31", self.player), ep_shutter)
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 32", self.player), ep_shutter)
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 33", self.player), ep_shutter)
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 34", self.player), ep_shutter)
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 25", self.player), ep_shutter)
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 26", self.player), ep_shutter)
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 27", self.player), ep_shutter)
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 28", self.player), ep_shutter)
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 29", self.player), ep_shutter)
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 30", self.player), ep_shutter)
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 31", self.player), ep_shutter)
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 32", self.player), ep_shutter)
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 33", self.player), ep_shutter)
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 34", self.player), ep_shutter)
 
         # PP Stickers in Al Fresca Plaza
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 35", self.player), lambda state: state.can_reach_region("Al Fresca Plaza", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 36", self.player), lambda state: state.can_reach_region("Al Fresca Plaza", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 37", self.player), lambda state: state.can_reach_region("Al Fresca Plaza", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 38", self.player), lambda state: state.can_reach_region("Al Fresca Plaza", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 39", self.player), lambda state: state.can_reach_region("Al Fresca Plaza", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 40", self.player), lambda state: state.can_reach_region("Al Fresca Plaza", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 41", self.player), lambda state: state.can_reach_region("Al Fresca Plaza", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 42", self.player), lambda state: state.can_reach_region("Al Fresca Plaza", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 43", self.player), lambda state: state.can_reach_region("Al Fresca Plaza", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 44", self.player), lambda state: state.can_reach_region("Al Fresca Plaza", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 45", self.player), lambda state: state.can_reach_region("Al Fresca Plaza", self.player))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 35", self.player), CanReachRegion("Al Fresca Plaza"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 36", self.player), CanReachRegion("Al Fresca Plaza"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 37", self.player), CanReachRegion("Al Fresca Plaza"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 38", self.player), CanReachRegion("Al Fresca Plaza"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 39", self.player), CanReachRegion("Al Fresca Plaza"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 40", self.player), CanReachRegion("Al Fresca Plaza"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 41", self.player), CanReachRegion("Al Fresca Plaza"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 42", self.player), CanReachRegion("Al Fresca Plaza"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 43", self.player), CanReachRegion("Al Fresca Plaza"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 44", self.player), CanReachRegion("Al Fresca Plaza"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 45", self.player), CanReachRegion("Al Fresca Plaza"))
 
         # PP Stickers in Food Court
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 46", self.player), lambda state: state.can_reach_region("Food Court", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 47", self.player), lambda state: state.can_reach_region("Food Court", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 48", self.player), lambda state: state.can_reach_region("Food Court", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 49", self.player), lambda state: state.can_reach_region("Food Court", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 50", self.player), lambda state: state.can_reach_region("Food Court", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 51", self.player), lambda state: state.can_reach_region("Food Court", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 52", self.player), lambda state: state.can_reach_region("Food Court", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 53", self.player), lambda state: state.can_reach_region("Food Court", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 54", self.player), lambda state: state.can_reach_region("Food Court", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 55", self.player), lambda state: state.can_reach_region("Food Court", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 56", self.player), lambda state: state.can_reach_region("Food Court", self.player))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 46", self.player), CanReachRegion("Food Court"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 47", self.player), CanReachRegion("Food Court"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 48", self.player), CanReachRegion("Food Court"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 49", self.player), CanReachRegion("Food Court"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 50", self.player), CanReachRegion("Food Court"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 51", self.player), CanReachRegion("Food Court"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 52", self.player), CanReachRegion("Food Court"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 53", self.player), CanReachRegion("Food Court"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 54", self.player), CanReachRegion("Food Court"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 55", self.player), CanReachRegion("Food Court"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 56", self.player), CanReachRegion("Food Court"))
 
         # PP Stickers in Wonderland Plaza
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 57", self.player), lambda state: state.can_reach_region("Wonderland Plaza", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 58", self.player), lambda state: state.can_reach_region("Wonderland Plaza", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 59", self.player), lambda state: state.can_reach_region("Wonderland Plaza", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 60", self.player), lambda state: state.can_reach_region("Wonderland Plaza", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 61", self.player), lambda state: state.can_reach_region("Wonderland Plaza", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 62", self.player), lambda state: state.can_reach_region("Wonderland Plaza", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 63", self.player), lambda state: state.can_reach_region("Wonderland Plaza", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 64", self.player), lambda state: state.can_reach_region("Wonderland Plaza", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 65", self.player), lambda state: state.can_reach_region("Wonderland Plaza", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 66", self.player), lambda state: state.can_reach_region("Wonderland Plaza", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 67", self.player), lambda state: state.can_reach_region("Wonderland Plaza", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 68", self.player), lambda state: state.can_reach_region("Wonderland Plaza", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 69", self.player), lambda state: state.can_reach_region("Wonderland Plaza", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 70", self.player), lambda state: state.can_reach_region("Wonderland Plaza", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 71", self.player), lambda state: state.can_reach_region("Wonderland Plaza", self.player))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 57", self.player), CanReachRegion("Wonderland Plaza"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 58", self.player), CanReachRegion("Wonderland Plaza"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 59", self.player), CanReachRegion("Wonderland Plaza"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 60", self.player), CanReachRegion("Wonderland Plaza"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 61", self.player), CanReachRegion("Wonderland Plaza"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 62", self.player), CanReachRegion("Wonderland Plaza"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 63", self.player), CanReachRegion("Wonderland Plaza"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 64", self.player), CanReachRegion("Wonderland Plaza"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 65", self.player), CanReachRegion("Wonderland Plaza"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 66", self.player), CanReachRegion("Wonderland Plaza"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 67", self.player), CanReachRegion("Wonderland Plaza"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 68", self.player), CanReachRegion("Wonderland Plaza"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 69", self.player), CanReachRegion("Wonderland Plaza"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 70", self.player), CanReachRegion("Wonderland Plaza"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 71", self.player), CanReachRegion("Wonderland Plaza"))
 
         # PP Stickers in North Plaza
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 72", self.player), lambda state: state.can_reach_region("North Plaza", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 73", self.player), lambda state: state.can_reach_region("North Plaza", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 76", self.player), lambda state: state.can_reach_region("North Plaza", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 77", self.player), lambda state: state.can_reach_region("North Plaza", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 78", self.player), lambda state: state.can_reach_region("North Plaza", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 79", self.player), lambda state: state.can_reach_region("North Plaza", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 80", self.player), lambda state: state.can_reach_region("North Plaza", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 81", self.player), lambda state: state.can_reach_region("North Plaza", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 82", self.player), lambda state: state.can_reach_region("North Plaza", self.player))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 72", self.player), CanReachRegion("North Plaza"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 73", self.player), CanReachRegion("North Plaza"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 76", self.player), CanReachRegion("North Plaza"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 77", self.player), CanReachRegion("North Plaza"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 78", self.player), CanReachRegion("North Plaza"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 79", self.player), CanReachRegion("North Plaza"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 80", self.player), CanReachRegion("North Plaza"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 81", self.player), CanReachRegion("North Plaza"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 82", self.player), CanReachRegion("North Plaza"))
 
         # PP Stickers in Seon's Food and Stuff
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 83", self.player), lambda state: state.can_reach_region("Seon's Food and Stuff", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 84", self.player), lambda state: state.can_reach_region("Seon's Food and Stuff", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 85", self.player), lambda state: state.can_reach_region("Seon's Food and Stuff", self.player))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 83", self.player), CanReachRegion("Seon's Food and Stuff"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 84", self.player), CanReachRegion("Seon's Food and Stuff"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 85", self.player), CanReachRegion("Seon's Food and Stuff"))
 
         # PP Stickers in Crislip's Home Saloon
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 74", self.player), lambda state: state.can_reach_region("Crislip's Home Saloon", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 75", self.player), lambda state: state.can_reach_region("Crislip's Home Saloon", self.player))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 74", self.player), CanReachRegion("Crislip's Home Saloon"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 75", self.player), CanReachRegion("Crislip's Home Saloon"))
 
         # PP Stickers in Leisure Park
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 86", self.player), lambda state: state.can_reach_region("Leisure Park", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 87", self.player), lambda state: state.can_reach_region("Leisure Park", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 88", self.player), lambda state: state.can_reach_region("Leisure Park", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 89", self.player), lambda state: state.can_reach_region("Leisure Park", self.player))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 86", self.player), CanReachRegion("Leisure Park"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 87", self.player), CanReachRegion("Leisure Park"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 88", self.player), CanReachRegion("Leisure Park"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 89", self.player), CanReachRegion("Leisure Park"))
 
         # PP Stickers in Maintenance Tunnel
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 90", self.player), lambda state: state.can_reach_region("Maintenance Tunnel", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 91", self.player), lambda state: state.can_reach_region("Maintenance Tunnel", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 92", self.player), lambda state: state.can_reach_region("Maintenance Tunnel", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 93", self.player), lambda state: state.can_reach_region("Maintenance Tunnel", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 94", self.player), lambda state: state.can_reach_region("Maintenance Tunnel", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 95", self.player), lambda state: state.can_reach_region("Maintenance Tunnel", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 96", self.player), lambda state: state.can_reach_region("Maintenance Tunnel", self.player))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 90", self.player), CanReachRegion("Maintenance Tunnel"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 91", self.player), CanReachRegion("Maintenance Tunnel"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 92", self.player), CanReachRegion("Maintenance Tunnel"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 93", self.player), CanReachRegion("Maintenance Tunnel"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 94", self.player), CanReachRegion("Maintenance Tunnel"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 95", self.player), CanReachRegion("Maintenance Tunnel"))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 96", self.player), CanReachRegion("Maintenance Tunnel"))
 
         # PP Stickers in Security Room
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 97", self.player), lambda state: state.can_reach_region("Security Room", self.player))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 97", self.player), CanReachRegion("Security Room"))
 
         # PP Stickers in Cultists' Hideout
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 98", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player) and state.can_reach_region("Leisure Park", self.player) and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.can_reach_location("Get grabbed by the raincoats", self.player))
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 99", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player) and state.can_reach_region("Leisure Park", self.player) and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.can_reach_location("Get grabbed by the raincoats", self.player))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 98", self.player), And(CanReachRegion("Paradise Plaza"), CanReachRegion("Leisure Park"), Has("DAY2_06_AM"), Has("DAY2_11_AM"), CanReachLocation("Get grabbed by the raincoats")))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 99", self.player), And(CanReachRegion("Paradise Plaza"), CanReachRegion("Leisure Park"), Has("DAY2_06_AM"), Has("DAY2_11_AM"), CanReachLocation("Get grabbed by the raincoats")))
 
         # PP Stickers in Rooftop
-        set_rule(self.multiworld.get_location("Photograph PP Sticker 100", self.player), lambda state: state.can_reach_region("Rooftop", self.player))
+        self.set_rule(self.multiworld.get_location("Photograph PP Sticker 100", self.player), CanReachRegion("Rooftop"))
 
         # SURVIVORS LOGIC
         # Survivors in Rooftop
-        set_rule(self.multiworld.get_location("Rescue Jeff Meyer", self.player), lambda state: state.can_reach_region("Rooftop", self.player))
-        set_rule(self.multiworld.get_location("Rescue Natalie Meyer", self.player), lambda state: state.can_reach_region("Rooftop", self.player))
+        self.set_rule(self.multiworld.get_location("Rescue Jeff Meyer", self.player), CanReachRegion("Rooftop"))
+        self.set_rule(self.multiworld.get_location("Rescue Natalie Meyer", self.player), CanReachRegion("Rooftop"))
 
         # Survivors in Paradise Plaza
-        set_rule(self.multiworld.get_location("Rescue Heather Tompkins", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.can_reach_location("Rescue Ross Folk", self.player) and state.can_reach_location("Rescue Tonya Waters", self.player)) or (self.options.scoop_sanity and state.has("Twin Sisters", self.player))))
-        set_rule(self.multiworld.get_location("Rescue Pamela Tompkins", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.can_reach_location("Rescue Ross Folk", self.player) and state.can_reach_location("Rescue Tonya Waters", self.player)) or (self.options.scoop_sanity and state.has("Twin Sisters", self.player))))
-        set_rule(self.multiworld.get_location("Rescue Ronald Shiner", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player) and (not self.options.restricted_item_mode or state.has("Orange Juice", self.player)) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player)) or (self.options.scoop_sanity and state.has("Restaurant Man", self.player))))
-        set_rule(self.multiworld.get_location("Rescue Jennifer Gorman", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player)) or (self.options.scoop_sanity and state.has("The Cult", self.player))))
-        set_rule(self.multiworld.get_location("Rescue Tad Hawthorne", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player) and state.can_reach_location("Kill Kent on day 3", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.has("DAY3_00_AM", self.player) and state.has("DAY3_11_AM", self.player)) or (self.options.scoop_sanity and state.has("Cut from the Same Cloth", self.player) and state.has("Photo Challenge", self.player) and state.has("Photographer's Pride", self.player))))
-        set_rule(self.multiworld.get_location("Rescue Simone Ravendark", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.has("DAY3_00_AM", self.player) and state.has("DAY3_11_AM", self.player) and state.can_reach_location("Complete Santa Cabeza", self.player)) or (self.options.scoop_sanity and state.has("A Woman in Despair", self.player))))
+        self.set_rule(self.multiworld.get_location("Rescue Heather Tompkins", self.player), And(CanReachRegion("Paradise Plaza"), (Has("Twin Sisters") if self.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM"), CanReachLocation("Rescue Ross Folk"), CanReachLocation("Rescue Tonya Waters")))))
+        self.set_rule(self.multiworld.get_location("Rescue Pamela Tompkins", self.player), And(CanReachRegion("Paradise Plaza"), (Has("Twin Sisters") if self.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM"), CanReachLocation("Rescue Ross Folk"), CanReachLocation("Rescue Tonya Waters")))))
+        self.set_rule(self.multiworld.get_location("Rescue Ronald Shiner", self.player), And(CanReachRegion("Paradise Plaza"), (Has("Orange Juice") if self.options.restricted_item_mode else True_()), (Has("Restaurant Man") if self.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM")))))
+        self.set_rule(self.multiworld.get_location("Rescue Jennifer Gorman", self.player), And(CanReachRegion("Paradise Plaza"), (Has("The Cult") if self.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM")))))
+        self.set_rule(self.multiworld.get_location("Rescue Tad Hawthorne", self.player), And(CanReachRegion("Paradise Plaza"), CanReachLocation("Kill Kent on day 3"), (And(Has("Cut from the Same Cloth"), Has("Photo Challenge"), Has("Photographer's Pride")) if self.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM"), Has("DAY3_11_AM")))))
+        self.set_rule(self.multiworld.get_location("Rescue Simone Ravendark", self.player), And(CanReachRegion("Paradise Plaza"), (Has("A Woman in Despair") if self.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM"), Has("DAY3_11_AM"), CanReachLocation("Complete Santa Cabeza")))))
         ## 1.1.0 HAS A BUG WITH "Rescue Simone Ravendark", THIS NEXT LINE EXCLUDES THIS CHECK IN ALL PLAY MODES AND SHOULD BE REMOVED UPON FIX BEING IMPLEMENTED
         self.multiworld.get_location("Rescue Simone Ravendark", self.player).progress_type = LocationProgressType.EXCLUDED
 
         # Survivors in Leisure Park
-        set_rule(self.multiworld.get_location("Rescue Sophie Richard", self.player), lambda state: state.can_reach_region("Leisure Park", self.player) and ((not self.options.scoop_sanity) or (self.options.scoop_sanity and state.has("The Convicts", self.player))))
+        self.set_rule(self.multiworld.get_location("Rescue Sophie Richard", self.player), And(CanReachRegion("Leisure Park"), (Has("The Convicts") if self.options.scoop_sanity else True_())))
 
         # Survivors in Food Court
-        set_rule(self.multiworld.get_location("Rescue Gil Jiminez", self.player), lambda state: state.can_reach_region("Food Court", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.has("DAY3_00_AM", self.player)) or (self.options.scoop_sanity and state.has("The Drunkard", self.player))))
+        self.set_rule(self.multiworld.get_location("Rescue Gil Jiminez", self.player), And(CanReachRegion("Food Court"), (Has("The Drunkard") if self.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM")))))
 
         # Survivors in Al Fresca Plaza
-        set_rule(self.multiworld.get_location("Rescue Aaron Swoop", self.player), lambda state: state.can_reach_region("Al Fresca Plaza", self.player) and ((not self.options.scoop_sanity) or (self.options.scoop_sanity and state.has("Barricade Pair", self.player))))
-        set_rule(self.multiworld.get_location("Rescue Burt Thompson", self.player), lambda state: state.can_reach_region("Al Fresca Plaza", self.player) and ((not self.options.scoop_sanity) or (self.options.scoop_sanity and state.has("Barricade Pair", self.player))))
-        set_rule(self.multiworld.get_location("Rescue Leah Stein", self.player), lambda state: state.can_reach_region("Al Fresca Plaza", self.player) and ((not self.options.scoop_sanity) or (self.options.scoop_sanity and state.has("A Mother's Lament", self.player))))
-        set_rule(self.multiworld.get_location("Rescue Gordon Stalworth", self.player), lambda state: state.can_reach_region("Al Fresca Plaza", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player)) or (self.options.scoop_sanity and state.has("The Coward", self.player))))
+        self.set_rule(self.multiworld.get_location("Rescue Aaron Swoop", self.player), And(CanReachRegion("Al Fresca Plaza"), (Has("Barricade Pair") if self.options.scoop_sanity else True_())))
+        self.set_rule(self.multiworld.get_location("Rescue Burt Thompson", self.player), And(CanReachRegion("Al Fresca Plaza"), (Has("Barricade Pair") if self.options.scoop_sanity else True_())))
+        self.set_rule(self.multiworld.get_location("Rescue Leah Stein", self.player), And(CanReachRegion("Al Fresca Plaza"), (Has("A Mother's Lament") if self.options.scoop_sanity else True_())))
+        self.set_rule(self.multiworld.get_location("Rescue Gordon Stalworth", self.player), And(CanReachRegion("Al Fresca Plaza"), (Has("The Coward") if self.options.scoop_sanity else Has("DAY2_06_AM"))))
 
         # Survivors in Entrance Plaza
-        set_rule(self.multiworld.get_location("Rescue Bill Brenton", self.player), ep_shutter)
-        set_rule(self.multiworld.get_location("Rescue Wayne Blackwell", self.player), lambda state: ep_shutter(state) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.can_reach_location("Meet the Hall Family", self.player)) or (self.options.scoop_sanity and state.has("Mark of the Sniper", self.player))))
-        set_rule(self.multiworld.get_location("Rescue Jolie Wu", self.player), lambda state: ep_shutter(state) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player)) or (self.options.scoop_sanity and state.has("The Woman Who Didn't Make it", self.player))))
-        set_rule(self.multiworld.get_location("Rescue Rachel Decker", self.player), lambda state: ep_shutter(state) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player)) or (self.options.scoop_sanity and state.has("The Woman Who Didn't Make it", self.player))))
-        set_rule(self.multiworld.get_location("Rescue Floyd Sanders", self.player), lambda state: ep_shutter(state) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player)) or (self.options.scoop_sanity and state.has("Antique Lover", self.player))))
+        self.set_rule(self.multiworld.get_location("Rescue Bill Brenton", self.player), ep_shutter)
+        self.set_rule(self.multiworld.get_location("Rescue Wayne Blackwell", self.player), And(ep_shutter, (Has("Mark of the Sniper") if self.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM"), CanReachLocation("Meet the Hall Family")))))
+        self.set_rule(self.multiworld.get_location("Rescue Jolie Wu", self.player), And(ep_shutter, (Has("The Woman Who Didn't Make it") if self.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM")))))
+        self.set_rule(self.multiworld.get_location("Rescue Rachel Decker", self.player), And(ep_shutter, (Has("The Woman Who Didn't Make it") if self.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM")))))
+        self.set_rule(self.multiworld.get_location("Rescue Floyd Sanders", self.player), And(ep_shutter, (Has("Antique Lover") if self.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM")))))
 
         # Survivors in Wonderland Plaza
-        set_rule(self.multiworld.get_location("Rescue Greg Simpson", self.player), lambda state: state.can_reach_region("Wonderland Plaza", self.player) and state.can_reach_region("Paradise Plaza", self.player) and ((not self.options.scoop_sanity) or (self.options.scoop_sanity and state.has("Out of Control", self.player)))) # Greg Simpson is the only Wonderland Plaza Survivor with additional Logic due to him unlocking the shortcut
-        set_rule(self.multiworld.get_location("Rescue Yuu Tanaka", self.player), lambda state: state.can_reach_region("Wonderland Plaza", self.player) and (not self.options.restricted_item_mode or state.has("Book [Japanese Conversation]", self.player)) and ((not self.options.scoop_sanity) or (self.options.scoop_sanity and state.has("Japanese Tourists", self.player))))
-        set_rule(self.multiworld.get_location("Rescue Shinji Kitano", self.player), lambda state: state.can_reach_region("Wonderland Plaza", self.player) and (not self.options.restricted_item_mode or state.has("Book [Japanese Conversation]", self.player)) and ((not self.options.scoop_sanity) or (self.options.scoop_sanity and state.has("Japanese Tourists", self.player))))
-        set_rule(self.multiworld.get_location("Rescue Tonya Waters", self.player), lambda state: state.can_reach_region("Wonderland Plaza", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player)) or (self.options.scoop_sanity and state.has("Lovers", self.player))))
-        set_rule(self.multiworld.get_location("Rescue Ross Folk", self.player), lambda state: state.can_reach_region("Wonderland Plaza", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player)) or (self.options.scoop_sanity and state.has("Lovers", self.player))))
-        set_rule(self.multiworld.get_location("Rescue Kay Nelson", self.player), lambda state: state.can_reach_region("Wonderland Plaza", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.can_reach_location("Kill Jo", self.player)) or (self.options.scoop_sanity and state.has("Above the Law", self.player))))
-        set_rule(self.multiworld.get_location("Rescue Lilly Deacon", self.player), lambda state: state.can_reach_region("Wonderland Plaza", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.can_reach_location("Kill Jo", self.player)) or (self.options.scoop_sanity and state.has("Above the Law", self.player))))
-        set_rule(self.multiworld.get_location("Rescue Kelly Carpenter", self.player), lambda state: state.can_reach_region("Wonderland Plaza", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.can_reach_location("Kill Jo", self.player)) or (self.options.scoop_sanity and state.has("Above the Law", self.player))))
-        set_rule(self.multiworld.get_location("Rescue Janet Star", self.player), lambda state: state.can_reach_region("Wonderland Plaza", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.can_reach_location("Kill Jo", self.player)) or (self.options.scoop_sanity and state.has("Above the Law", self.player))))
-        set_rule(self.multiworld.get_location("Rescue Sally Mills", self.player), lambda state: state.can_reach_region("Wonderland Plaza", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player)) or (self.options.scoop_sanity and state.has("Hanging by a Thread", self.player))))
-        set_rule(self.multiworld.get_location("Rescue Nick Evans", self.player), lambda state: state.can_reach_region("Wonderland Plaza", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player)) or (self.options.scoop_sanity and state.has("Hanging by a Thread", self.player))))
-        set_rule(self.multiworld.get_location("Rescue Mindy Baker", self.player), lambda state: state.can_reach_region("Wonderland Plaza", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.has("DAY3_00_AM", self.player) and state.can_reach_location("Defeat Paul", self.player)) or (self.options.scoop_sanity and state.has("Long Haired Punk", self.player))))
-        set_rule(self.multiworld.get_location("Rescue Debbie Willet", self.player), lambda state: state.can_reach_region("Wonderland Plaza", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.has("DAY3_00_AM", self.player) and state.can_reach_location("Defeat Paul", self.player)) or (self.options.scoop_sanity and state.has("Long Haired Punk", self.player))))
-        set_rule(self.multiworld.get_location("Rescue Paul Carson", self.player), lambda state: state.can_reach_region("Wonderland Plaza", self.player) and (not self.options.restricted_item_mode or state.has("Fire Extinguisher", self.player)) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.has("DAY3_00_AM", self.player) and state.can_reach_location("Defeat Paul", self.player)) or (self.options.scoop_sanity and state.has("Long Haired Punk", self.player))))
-        set_rule(self.multiworld.get_location("Rescue Leroy McKenna", self.player), lambda state: state.can_reach_region("Wonderland Plaza", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.has("DAY3_00_AM", self.player)) or (self.options.scoop_sanity and state.has("A Sick Man", self.player))))
-        set_rule(self.multiworld.get_location("Rescue Susan Walsh", self.player), lambda state: state.can_reach_region("Wonderland Plaza", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.has("DAY3_00_AM", self.player)) or (self.options.scoop_sanity and state.has("The Woman Left Behind", self.player))))
+        self.set_rule(self.multiworld.get_location("Rescue Greg Simpson", self.player), And(CanReachRegion("Wonderland Plaza"), CanReachRegion("Paradise Plaza"), (Has("Out of Control") if self.options.scoop_sanity else True_()))) # Greg Simpson is the only Wonderland Plaza Survivor with additional Logic due to him unlocking the shortcut
+        self.set_rule(self.multiworld.get_location("Rescue Yuu Tanaka", self.player), And(CanReachRegion("Wonderland Plaza"), (Has("Book [Japanese Conversation]") if self.options.restricted_item_mode else True_()), (Has("Japanese Tourists") if self.options.scoop_sanity else True_())))
+        self.set_rule(self.multiworld.get_location("Rescue Shinji Kitano", self.player), And(CanReachRegion("Wonderland Plaza"), (Has("Book [Japanese Conversation]") if self.options.restricted_item_mode else True_()), (Has("Japanese Tourists") if self.options.scoop_sanity else True_())))
+        self.set_rule(self.multiworld.get_location("Rescue Tonya Waters", self.player), And(CanReachRegion("Wonderland Plaza"), (Has("Lovers") if self.options.scoop_sanity else Has("DAY2_06_AM"))))
+        self.set_rule(self.multiworld.get_location("Rescue Ross Folk", self.player), And(CanReachRegion("Wonderland Plaza"), (Has("Lovers") if self.options.scoop_sanity else Has("DAY2_06_AM"))))
+        self.set_rule(self.multiworld.get_location("Rescue Kay Nelson", self.player), And(CanReachRegion("Wonderland Plaza"), (Has("Above the Law") if self.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM"), CanReachLocation("Kill Jo")))))
+        self.set_rule(self.multiworld.get_location("Rescue Lilly Deacon", self.player), And(CanReachRegion("Wonderland Plaza"), (Has("Above the Law") if self.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM"), CanReachLocation("Kill Jo")))))
+        self.set_rule(self.multiworld.get_location("Rescue Kelly Carpenter", self.player), And(CanReachRegion("Wonderland Plaza"), (Has("Above the Law") if self.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM"), CanReachLocation("Kill Jo")))))
+        self.set_rule(self.multiworld.get_location("Rescue Janet Star", self.player), And(CanReachRegion("Wonderland Plaza"), (Has("Above the Law") if self.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM"), CanReachLocation("Kill Jo")))))
+        self.set_rule(self.multiworld.get_location("Rescue Sally Mills", self.player), And(CanReachRegion("Wonderland Plaza"), (Has("Hanging by a Thread") if self.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM")))))
+        self.set_rule(self.multiworld.get_location("Rescue Nick Evans", self.player), And(CanReachRegion("Wonderland Plaza"), (Has("Hanging by a Thread") if self.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM")))))
+        self.set_rule(self.multiworld.get_location("Rescue Mindy Baker", self.player), And(CanReachRegion("Wonderland Plaza"), (Has("Long Haired Punk") if self.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM"), CanReachLocation("Defeat Paul")))))
+        self.set_rule(self.multiworld.get_location("Rescue Debbie Willet", self.player), And(CanReachRegion("Wonderland Plaza"), (Has("Long Haired Punk") if self.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM"), CanReachLocation("Defeat Paul")))))
+        self.set_rule(self.multiworld.get_location("Rescue Paul Carson", self.player), And(CanReachRegion("Wonderland Plaza"), (Has("Fire Extinguisher") if self.options.restricted_item_mode else True_()), (Has("Long Haired Punk") if self.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM"), CanReachLocation("Defeat Paul")))))
+        self.set_rule(self.multiworld.get_location("Rescue Leroy McKenna", self.player), And(CanReachRegion("Wonderland Plaza"), (Has("A Sick Man") if self.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM")))))
+        self.set_rule(self.multiworld.get_location("Rescue Susan Walsh", self.player), And(CanReachRegion("Wonderland Plaza"), (Has("The Woman Left Behind") if self.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM")))))
 
         # Survivors in North Plaza
-        set_rule(self.multiworld.get_location("Rescue David Bailey", self.player), lambda state: state.can_reach_region("North Plaza", self.player) and ((not self.options.scoop_sanity) or (self.options.scoop_sanity and state.has("Shadow of the North Plaza", self.player))))
-        set_rule(self.multiworld.get_location("Rescue Kindell Johnson", self.player), lambda state: state.can_reach_region("North Plaza", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.has("DAY3_00_AM", self.player)) or (self.options.scoop_sanity and state.has("Dressed for Action", self.player))))
-        set_rule(self.multiworld.get_location("Rescue Brett Styles", self.player), lambda state: state.can_reach_region("North Plaza", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.has("DAY3_00_AM", self.player)) or (self.options.scoop_sanity and state.has("Gun Shop Standoff", self.player))))
-        set_rule(self.multiworld.get_location("Rescue Jonathan Picardson", self.player), lambda state: state.can_reach_region("North Plaza", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.has("DAY3_00_AM", self.player)) or (self.options.scoop_sanity and state.has("Gun Shop Standoff", self.player))))
-        set_rule(self.multiworld.get_location("Rescue Alyssa Laurent", self.player), lambda state: state.can_reach_region("North Plaza", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.has("DAY3_00_AM", self.player)) or (self.options.scoop_sanity and state.has("Gun Shop Standoff", self.player))))
+        self.set_rule(self.multiworld.get_location("Rescue David Bailey", self.player), And(CanReachRegion("North Plaza"), (Has("Shadow of the North Plaza") if self.options.scoop_sanity else True_())))
+        self.set_rule(self.multiworld.get_location("Rescue Kindell Johnson", self.player), And(CanReachRegion("North Plaza"), (Has("Dressed for Action") if self.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM")))))
+        self.set_rule(self.multiworld.get_location("Rescue Brett Styles", self.player), And(CanReachRegion("North Plaza"), (Has("Gun Shop Standoff") if self.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM")))))
+        self.set_rule(self.multiworld.get_location("Rescue Jonathan Picardson", self.player), And(CanReachRegion("North Plaza"), (Has("Gun Shop Standoff") if self.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM")))))
+        self.set_rule(self.multiworld.get_location("Rescue Alyssa Laurent", self.player), And(CanReachRegion("North Plaza"), (Has("Gun Shop Standoff") if self.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM")))))
 
         # Survivors locked behind Hatchet Man (requires both North Plaza and Crislip's Home Saloon)
-        set_rule(self.multiworld.get_location("Rescue Josh Manning", self.player), lambda state: state.can_reach_region("North Plaza", self.player) and state.can_reach_region("Crislip's Home Saloon", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.can_reach_location("Kill Cliff", self.player)) or (self.options.scoop_sanity and state.has("The Hatchet Man", self.player))))
-        set_rule(self.multiworld.get_location("Rescue Barbara Patterson", self.player), lambda state: state.can_reach_region("North Plaza", self.player) and state.can_reach_region("Crislip's Home Saloon", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.can_reach_location("Kill Cliff", self.player)) or (self.options.scoop_sanity and state.has("The Hatchet Man", self.player))))
-        set_rule(self.multiworld.get_location("Rescue Rich Atkins", self.player), lambda state: state.can_reach_region("North Plaza", self.player) and state.can_reach_region("Crislip's Home Saloon", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.can_reach_location("Kill Cliff", self.player)) or (self.options.scoop_sanity and state.has("The Hatchet Man", self.player))))
+        self.set_rule(self.multiworld.get_location("Rescue Josh Manning", self.player), And(CanReachRegion("North Plaza"), CanReachRegion("Crislip's Home Saloon"), (Has("The Hatchet Man") if self.options.scoop_sanity else And(Has("DAY2_06_AM"), CanReachLocation("Kill Cliff")))))
+        self.set_rule(self.multiworld.get_location("Rescue Barbara Patterson", self.player), And(CanReachRegion("North Plaza"), CanReachRegion("Crislip's Home Saloon"), (Has("The Hatchet Man") if self.options.scoop_sanity else And(Has("DAY2_06_AM"), CanReachLocation("Kill Cliff")))))
+        self.set_rule(self.multiworld.get_location("Rescue Rich Atkins", self.player), And(CanReachRegion("North Plaza"), CanReachRegion("Crislip's Home Saloon"), (Has("The Hatchet Man") if self.options.scoop_sanity else And(Has("DAY2_06_AM"), CanReachLocation("Kill Cliff")))))
 
         # Survivors in Colby's Movieland
-        set_rule(self.multiworld.get_location("Rescue Beth Shrake", self.player), lambda state: state.can_reach_region("Colby's Movieland", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.has("DAY3_00_AM", self.player) and state.can_reach_location("Kill Sean", self.player)) or (self.options.scoop_sanity and state.has("A Strange Group", self.player))))
-        set_rule(self.multiworld.get_location("Rescue Michelle Feltz", self.player), lambda state: state.can_reach_region("Colby's Movieland", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.has("DAY3_00_AM", self.player) and state.can_reach_location("Kill Sean", self.player)) or (self.options.scoop_sanity and state.has("A Strange Group", self.player))))
-        set_rule(self.multiworld.get_location("Rescue Nathan Crabbe", self.player), lambda state: state.can_reach_region("Colby's Movieland", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.has("DAY3_00_AM", self.player) and state.can_reach_location("Kill Sean", self.player)) or (self.options.scoop_sanity and state.has("A Strange Group", self.player))))
-        set_rule(self.multiworld.get_location("Rescue Ray Mathison", self.player), lambda state: state.can_reach_region("Colby's Movieland", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.has("DAY3_00_AM", self.player) and state.can_reach_location("Kill Sean", self.player)) or (self.options.scoop_sanity and state.has("A Strange Group", self.player))))
-        set_rule(self.multiworld.get_location("Rescue Cheryl Jones", self.player), lambda state: state.can_reach_region("Colby's Movieland", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.has("DAY3_00_AM", self.player) and state.can_reach_location("Kill Sean", self.player)) or (self.options.scoop_sanity and state.has("A Strange Group", self.player))))
+        self.set_rule(self.multiworld.get_location("Rescue Beth Shrake", self.player), And(CanReachRegion("Colby's Movieland"), (Has("A Strange Group") if self.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM"), CanReachLocation("Kill Sean")))))
+        self.set_rule(self.multiworld.get_location("Rescue Michelle Feltz", self.player), And(CanReachRegion("Colby's Movieland"), (Has("A Strange Group") if self.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM"), CanReachLocation("Kill Sean")))))
+        self.set_rule(self.multiworld.get_location("Rescue Nathan Crabbe", self.player), And(CanReachRegion("Colby's Movieland"), (Has("A Strange Group") if self.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM"), CanReachLocation("Kill Sean")))))
+        self.set_rule(self.multiworld.get_location("Rescue Ray Mathison", self.player), And(CanReachRegion("Colby's Movieland"), (Has("A Strange Group") if self.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM"), CanReachLocation("Kill Sean")))))
+        self.set_rule(self.multiworld.get_location("Rescue Cheryl Jones", self.player), And(CanReachRegion("Colby's Movieland"), (Has("A Strange Group") if self.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM"), CanReachLocation("Kill Sean")))))
 
         # Psychopaths
-        set_rule(self.multiworld.get_location("Watch the convicts kill that poor guy", self.player), lambda state: state.can_reach_region("Leisure Park", self.player) and ((not self.options.scoop_sanity) or (self.options.scoop_sanity and state.has("The Convicts", self.player))))
+        self.set_rule(self.multiworld.get_location("Watch the convicts kill that poor guy", self.player), And(CanReachRegion("Leisure Park"), (Has("The Convicts") if self.options.scoop_sanity else True_())))
 
-        set_rule(self.multiworld.get_location("Meet Cletus", self.player), lambda state: state.can_reach_region("North Plaza", self.player) and ((not self.options.scoop_sanity) or (self.options.scoop_sanity and state.has("Cletus", self.player))))
-        set_rule(self.multiworld.get_location("Kill Cletus", self.player), lambda state: state.can_reach_location("Meet Cletus", self.player))
+        self.set_rule(self.multiworld.get_location("Meet Cletus", self.player), And(CanReachRegion("North Plaza"), (Has("Cletus") if self.options.scoop_sanity else True_())))
+        self.set_rule(self.multiworld.get_location("Kill Cletus", self.player), CanReachLocation("Meet Cletus"))
 
-        set_rule(self.multiworld.get_location("Meet Adam", self.player), lambda state: state.can_reach_region("Wonderland Plaza", self.player) and ((not self.options.scoop_sanity) or (self.options.scoop_sanity and state.has("Out of Control", self.player))))
-        set_rule(self.multiworld.get_location("Kill Adam", self.player), lambda state: state.can_reach_location("Meet Adam", self.player))
+        self.set_rule(self.multiworld.get_location("Meet Adam", self.player), And(CanReachRegion("Wonderland Plaza"), (Has("Out of Control") if self.options.scoop_sanity else True_())))
+        self.set_rule(self.multiworld.get_location("Kill Adam", self.player), CanReachLocation("Meet Adam"))
 
-        set_rule(self.multiworld.get_location("Meet Cliff", self.player), lambda state: state.can_reach_region("Crislip's Home Saloon", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player)) or (self.options.scoop_sanity and state.has("The Hatchet Man", self.player))))
-        set_rule(self.multiworld.get_location("Kill Cliff", self.player), lambda state: state.can_reach_location("Meet Cliff", self.player))
+        self.set_rule(self.multiworld.get_location("Meet Cliff", self.player), And(CanReachRegion("Crislip's Home Saloon"), (Has("The Hatchet Man") if self.options.scoop_sanity else Has("DAY2_06_AM"))))
+        self.set_rule(self.multiworld.get_location("Kill Cliff", self.player), CanReachLocation("Meet Cliff"))
 
-        set_rule(self.multiworld.get_location("Meet Jo", self.player), lambda state: state.can_reach_region("Wonderland Plaza", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player)) or (self.options.scoop_sanity and state.has("Above the Law", self.player))))
-        set_rule(self.multiworld.get_location("Kill Jo", self.player), lambda state: state.can_reach_location("Meet Jo", self.player))
+        self.set_rule(self.multiworld.get_location("Meet Jo", self.player), And(CanReachRegion("Wonderland Plaza"), (Has("Above the Law") if self.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM")))))
+        self.set_rule(self.multiworld.get_location("Kill Jo", self.player), CanReachLocation("Meet Jo"))
 
-        set_rule(self.multiworld.get_location("Meet the Hall Family", self.player), lambda state: state.can_reach_region("Entrance Plaza", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player)) or (self.options.scoop_sanity and state.has("Mark of the Sniper", self.player))))
-        set_rule(self.multiworld.get_location("Kill Roger and Jack (and Thomas if you want) and chat with Wayne", self.player), lambda state: state.can_reach_location("Meet the Hall Family", self.player) and (not self.options.scoop_sanity or ep_shutter(state)))
+        self.set_rule(self.multiworld.get_location("Meet the Hall Family", self.player), And(CanReachRegion("Entrance Plaza"), (Has("Mark of the Sniper") if self.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM")))))
+        self.set_rule(self.multiworld.get_location("Kill Roger and Jack (and Thomas if you want) and chat with Wayne", self.player), And(CanReachLocation("Meet the Hall Family"), (ep_shutter if self.options.scoop_sanity else True_())))
 
-        set_rule(self.multiworld.get_location("Witness Sean in Paradise Plaza", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player)) or (self.options.scoop_sanity and (state.has("The Cult", self.player)) or (state.has("A Strange Group", self.player)))))
-        set_rule(self.multiworld.get_location("Get grabbed by the raincoats", self.player), lambda state: state.can_reach_location("Witness Sean in Paradise Plaza", self.player) and state.can_reach_region("Leisure Park", self.player))
-        set_rule(self.multiworld.get_location("Meet Sean", self.player), lambda state: state.can_reach_region("Colby's Movieland", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.has("DAY3_00_AM", self.player)) or (self.options.scoop_sanity and state.has("A Strange Group", self.player))))
-        set_rule(self.multiworld.get_location("Kill Sean", self.player), lambda state: state.can_reach_location("Meet Sean", self.player))
+        self.set_rule(self.multiworld.get_location("Witness Sean in Paradise Plaza", self.player), And(CanReachRegion("Paradise Plaza"), (Or(Has("The Cult"), Has("A Strange Group")) if self.options.scoop_sanity else Or(And(Has("DAY2_06_AM"), Has("DAY2_11_AM")), Has("A Strange Group")))))
+        self.set_rule(self.multiworld.get_location("Get grabbed by the raincoats", self.player), And(CanReachLocation("Witness Sean in Paradise Plaza"), CanReachRegion("Leisure Park")))
+        self.set_rule(self.multiworld.get_location("Meet Sean", self.player), And(CanReachRegion("Colby's Movieland"), (Has("A Strange Group") if self.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM")))))
+        self.set_rule(self.multiworld.get_location("Kill Sean", self.player), CanReachLocation("Meet Sean"))
 
-        set_rule(self.multiworld.get_location("Meet Paul", self.player), lambda state: state.can_reach_region("Wonderland Plaza", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.has("DAY3_00_AM", self.player)) or (self.options.scoop_sanity and state.has("Long Haired Punk", self.player))))
-        set_rule(self.multiworld.get_location("Defeat Paul", self.player), lambda state: state.can_reach_location("Meet Paul", self.player))
+        self.set_rule(self.multiworld.get_location("Meet Paul", self.player), And(CanReachRegion("Wonderland Plaza"), (Has("Long Haired Punk") if self.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM")))))
+        self.set_rule(self.multiworld.get_location("Defeat Paul", self.player), CanReachLocation("Meet Paul"))
 
-        set_rule(self.multiworld.get_location("Meet Kent on day 1", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player) and ((not self.options.scoop_sanity) or (self.options.scoop_sanity and state.has("Cut from the Same Cloth", self.player))))
-        set_rule(self.multiworld.get_location("Complete Kent's day 1 photoshoot", self.player), lambda state: state.can_reach_location("Meet Kent on day 1", self.player))
-        set_rule(self.multiworld.get_location("Meet Kent on day 2", self.player), lambda state, masks=("Novelty Mask (Bear)", "Novelty Mask (Servbot)", "Novelty Mask (Horse)"): (state.can_reach_location("Complete Kent's day 1 photoshoot", self.player)) and (not self.options.restricted_item_mode or any(state.has(m, self.player) for m in masks)) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player)) or (self.options.scoop_sanity and state.has("Cut from the Same Cloth", self.player) and state.has("Photo Challenge", self.player))))
-        set_rule(self.multiworld.get_location("Complete Kent's day 2 photoshoot", self.player), lambda state: state.can_reach_location("Meet Kent on day 2", self.player))
-        set_rule(self.multiworld.get_location("Meet Kent on day 3", self.player), lambda state: state.can_reach_location("Complete Kent's day 2 photoshoot", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.has("DAY3_00_AM", self.player) and state.has("DAY3_11_AM", self.player)) or (self.options.scoop_sanity and state.has("Cut from the Same Cloth", self.player) and state.has("Photo Challenge", self.player) and state.has("Photographer's Pride", self.player))))
-        set_rule(self.multiworld.get_location("Kill Kent on day 3", self.player), lambda state: state.can_reach_location("Meet Kent on day 3", self.player))
+        self.set_rule(self.multiworld.get_location("Meet Kent on day 1", self.player), And(CanReachRegion("Paradise Plaza"), (Has("Cut from the Same Cloth") if self.options.scoop_sanity else True_())))
+        self.set_rule(self.multiworld.get_location("Complete Kent's day 1 photoshoot", self.player), CanReachLocation("Meet Kent on day 1"))
+        self.set_rule(self.multiworld.get_location("Meet Kent on day 2", self.player), And(CanReachLocation("Complete Kent's day 1 photoshoot"), (Or(Has("Novelty Mask (Bear)"), Has("Novelty Mask (Servbot)"), Has("Novelty Mask (Horse)")) if self.options.restricted_item_mode else True_()), (And(Has("Cut from the Same Cloth"), Has("Photo Challenge")) if self.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM")))))
+        self.set_rule(self.multiworld.get_location("Complete Kent's day 2 photoshoot", self.player), CanReachLocation("Meet Kent on day 2"))
+        self.set_rule(self.multiworld.get_location("Meet Kent on day 3", self.player), And(CanReachLocation("Complete Kent's day 2 photoshoot"), (And(Has("Cut from the Same Cloth"), Has("Photo Challenge"), Has("Photographer's Pride")) if self.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM"), Has("DAY3_11_AM")))))
+        self.set_rule(self.multiworld.get_location("Kill Kent on day 3", self.player), CanReachLocation("Meet Kent on day 3"))
 
         # Challenges
-        set_rule(self.multiworld.get_location("Reach Level 10!", self.player), lambda state: state.can_reach_location("Reach Level 10", self.player))
-        set_rule(self.multiworld.get_location("Reach Level 20!", self.player), lambda state: state.can_reach_location("Reach Level 20", self.player))
-        set_rule(self.multiworld.get_location("Reach Level 30!", self.player), lambda state: state.can_reach_location("Reach Level 30", self.player))
-        set_rule(self.multiworld.get_location("Reach Level 40!", self.player), lambda state: state.can_reach_location("Reach Level 40", self.player))
-        set_rule(self.multiworld.get_location("Reach max level", self.player), lambda state: state.can_reach_location("Reach Level 50", self.player))
-        set_rule(self.multiworld.get_location("Kill 500 zombies by vehicle", self.player), lambda state: state.can_reach_region("Maintenance Tunnel", self.player))
-        set_rule(self.multiworld.get_location("Kill 1000 zombies by vehicle", self.player), lambda state: state.can_reach_region("Maintenance Tunnel", self.player))
+        self.set_rule(self.multiworld.get_location("Reach Level 10!", self.player), CanReachLocation("Reach Level 10"))
+        self.set_rule(self.multiworld.get_location("Reach Level 20!", self.player), CanReachLocation("Reach Level 20"))
+        self.set_rule(self.multiworld.get_location("Reach Level 30!", self.player), CanReachLocation("Reach Level 30"))
+        self.set_rule(self.multiworld.get_location("Reach Level 40!", self.player), CanReachLocation("Reach Level 40"))
+        self.set_rule(self.multiworld.get_location("Reach max level", self.player), CanReachLocation("Reach Level 50"))
+        self.set_rule(self.multiworld.get_location("Kill 500 zombies by vehicle", self.player), CanReachRegion("Maintenance Tunnel"))
+        self.set_rule(self.multiworld.get_location("Kill 1000 zombies by vehicle", self.player), CanReachRegion("Maintenance Tunnel"))
         all_side_scoops = SURVIVOR_SCOOP_NAMES + PSYCHOPATH_SCOOP_NAMES
-        set_rule(self.multiworld.get_location("Get 50 survivors to join", self.player), lambda state, scoops=all_side_scoops: state.can_reach_region("Paradise Plaza", self.player) and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.has("DAY3_00_AM", self.player) and state.has("DAY3_11_AM", self.player) and state.can_reach_location("Kill Kent on day 3", self.player) and state.can_reach_location("Kill Cliff", self.player) and state.can_reach_location("Kill Jo", self.player) and state.can_reach_location("Kill Adam", self.player) and state.can_reach_location("Kill Sean", self.player) and state.can_reach_location("Kill Roger and Jack (and Thomas if you want) and chat with Wayne", self.player) and state.can_reach_location("Defeat Paul", self.player) and ((not self.options.scoop_sanity) or (self.options.scoop_sanity and state.has_all(scoops, self.player) and ending_a_ok(state))))
-        set_rule(self.multiworld.get_location("Encounter 10 survivors", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player) and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.has("DAY3_00_AM", self.player) and state.has("DAY3_11_AM", self.player) and state.can_reach_location("Kill Kent on day 3", self.player) and state.can_reach_location("Kill Cliff", self.player) and state.can_reach_location("Kill Jo", self.player) and state.can_reach_location("Kill Adam", self.player) and state.can_reach_location("Kill Sean", self.player) and state.can_reach_location("Kill Roger and Jack (and Thomas if you want) and chat with Wayne", self.player) and state.can_reach_location("Defeat Paul", self.player))
-        set_rule(self.multiworld.get_location("Encounter 50 survivors", self.player), lambda state, scoops=all_side_scoops: state.can_reach_region("Paradise Plaza", self.player) and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.has("DAY3_00_AM", self.player) and state.has("DAY3_11_AM", self.player) and state.can_reach_location("Kill Kent on day 3", self.player) and state.can_reach_location("Kill Cliff", self.player) and state.can_reach_location("Kill Jo", self.player) and state.can_reach_location("Kill Adam", self.player) and state.can_reach_location("Kill Sean", self.player) and state.can_reach_location("Kill Roger and Jack (and Thomas if you want) and chat with Wayne", self.player) and state.can_reach_location("Defeat Paul", self.player) and ((not self.options.scoop_sanity) or (self.options.scoop_sanity and state.has_all(scoops, self.player) and ending_a_ok(state))))
-        set_rule(self.multiworld.get_location("Save 10 survivors", self.player), lambda state, scoops=all_side_scoops: state.can_reach_region("Paradise Plaza", self.player) and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.has("DAY3_00_AM", self.player) and state.has("DAY3_11_AM", self.player) and state.has("DAY4_12_PM", self.player) and state.can_reach_location("Kill Kent on day 3", self.player) and state.can_reach_location("Kill Cliff", self.player) and state.can_reach_location("Kill Jo", self.player) and state.can_reach_location("Kill Adam", self.player) and state.can_reach_location("Kill Sean", self.player) and state.can_reach_location("Kill Roger and Jack (and Thomas if you want) and chat with Wayne", self.player) and state.can_reach_location("Defeat Paul", self.player) and ((not self.options.scoop_sanity) or (self.options.scoop_sanity and state.has_all(scoops, self.player) and ending_a_ok(state))))
-        set_rule(self.multiworld.get_location("Save 50 survivors", self.player), lambda state, scoops=all_side_scoops: state.can_reach_region("Paradise Plaza", self.player) and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.has("DAY3_00_AM", self.player) and state.has("DAY3_11_AM", self.player) and state.has("DAY4_12_PM", self.player) and state.can_reach_location("Kill Kent on day 3", self.player) and state.can_reach_location("Kill Cliff", self.player) and state.can_reach_location("Kill Jo", self.player) and state.can_reach_location("Kill Adam", self.player) and state.can_reach_location("Kill Sean", self.player) and state.can_reach_location("Kill Roger and Jack (and Thomas if you want) and chat with Wayne", self.player) and state.can_reach_location("Defeat Paul", self.player) and ((not self.options.scoop_sanity) or (self.options.scoop_sanity and state.has_all(scoops, self.player) and ending_a_ok(state))))
+        self.set_rule(self.multiworld.get_location("Get 50 survivors to join", self.player), And(CanReachRegion("Paradise Plaza"), Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM"), Has("DAY3_11_AM"), CanReachLocation("Kill Kent on day 3"), CanReachLocation("Kill Cliff"), CanReachLocation("Kill Jo"), CanReachLocation("Kill Adam"), CanReachLocation("Kill Sean"), CanReachLocation("Kill Roger and Jack (and Thomas if you want) and chat with Wayne"), CanReachLocation("Defeat Paul"), (And(HasAll(*all_side_scoops), ending_a_rule) if self.options.scoop_sanity else True_())))
+        self.set_rule(self.multiworld.get_location("Encounter 10 survivors", self.player), And(CanReachRegion("Paradise Plaza"), Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM"), Has("DAY3_11_AM"), CanReachLocation("Kill Kent on day 3"), CanReachLocation("Kill Cliff"), CanReachLocation("Kill Jo"), CanReachLocation("Kill Adam"), CanReachLocation("Kill Sean"), CanReachLocation("Kill Roger and Jack (and Thomas if you want) and chat with Wayne"), CanReachLocation("Defeat Paul")))
+        self.set_rule(self.multiworld.get_location("Encounter 50 survivors", self.player), And(CanReachRegion("Paradise Plaza"), Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM"), Has("DAY3_11_AM"), CanReachLocation("Kill Kent on day 3"), CanReachLocation("Kill Cliff"), CanReachLocation("Kill Jo"), CanReachLocation("Kill Adam"), CanReachLocation("Kill Sean"), CanReachLocation("Kill Roger and Jack (and Thomas if you want) and chat with Wayne"), CanReachLocation("Defeat Paul"), (And(HasAll(*all_side_scoops), ending_a_rule) if self.options.scoop_sanity else True_())))
+        self.set_rule(self.multiworld.get_location("Save 10 survivors", self.player), And(CanReachRegion("Paradise Plaza"), Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM"), Has("DAY3_11_AM"), Has("DAY4_12_PM"), CanReachLocation("Kill Kent on day 3"), CanReachLocation("Kill Cliff"), CanReachLocation("Kill Jo"), CanReachLocation("Kill Adam"), CanReachLocation("Kill Sean"), CanReachLocation("Kill Roger and Jack (and Thomas if you want) and chat with Wayne"), CanReachLocation("Defeat Paul"), (And(HasAll(*all_side_scoops), ending_a_rule) if self.options.scoop_sanity else True_())))
+        self.set_rule(self.multiworld.get_location("Save 50 survivors", self.player), And(CanReachRegion("Paradise Plaza"), Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM"), Has("DAY3_11_AM"), Has("DAY4_12_PM"), CanReachLocation("Kill Kent on day 3"), CanReachLocation("Kill Cliff"), CanReachLocation("Kill Jo"), CanReachLocation("Kill Adam"), CanReachLocation("Kill Sean"), CanReachLocation("Kill Roger and Jack (and Thomas if you want) and chat with Wayne"), CanReachLocation("Defeat Paul"), (And(HasAll(*all_side_scoops), ending_a_rule) if self.options.scoop_sanity else True_())))
 
         # These five survivor-count milestones are gated behind nearly every
         # late-game scoop, so they only become reachable once most of the
@@ -1499,12 +1503,12 @@ class DRWorld(World):
         ):
             self.multiworld.get_location(_name, self.player).progress_type = LocationProgressType.EXCLUDED
 
-        set_rule(self.multiworld.get_location("Kill 1000 zombies", self.player), lambda state: state.can_reach_region("Maintenance Tunnel", self.player))
-        set_rule(self.multiworld.get_location("Kill 2000 zombies", self.player), lambda state: state.can_reach_region("Maintenance Tunnel", self.player) and state.can_reach_region("North Plaza", self.player) and state.can_reach_region("Entrance Plaza", self.player))
-        set_rule(self.multiworld.get_location("Kill 5000 zombies", self.player), lambda state: state.can_reach_region("Maintenance Tunnel", self.player) and state.can_reach_region("North Plaza", self.player) and state.can_reach_region("Entrance Plaza", self.player) and state.can_reach_region("Wonderland Plaza", self.player) and state.can_reach_region("Al Fresca Plaza", self.player))
-        set_rule(self.multiworld.get_location("Kill 10000 zombies", self.player), lambda state: state.can_reach_region("Maintenance Tunnel", self.player) and state.can_reach_region("North Plaza", self.player) and state.can_reach_region("Entrance Plaza", self.player) and state.can_reach_region("Wonderland Plaza", self.player) and state.can_reach_region("Al Fresca Plaza", self.player) and ending_a_ok(state))
-        set_rule(self.multiworld.get_location("Walk a quarter marathon", self.player), lambda state: state.can_reach_region("Leisure Park", self.player) and state.can_reach_region("Al Fresca Plaza", self.player) and state.can_reach_region("Wonderland Plaza", self.player) and state.can_reach_region("North Plaza", self.player) and state.can_reach_region("Entrance Plaza", self.player) and state.can_reach_region("Food Court", self.player) and state.can_reach_region("Paradise Plaza", self.player) and state.can_reach_region("Seon's Food and Stuff", self.player) and state.can_reach_region("Crislip's Home Saloon", self.player) and state.can_reach_region("Colby's Movieland", self.player))
-        set_rule(self.multiworld.get_location("Destroy all of the wall plates in the Food Court", self.player), lambda state: state.can_reach_region("Food Court", self.player))
+        self.set_rule(self.multiworld.get_location("Kill 1000 zombies", self.player), CanReachRegion("Maintenance Tunnel"))
+        self.set_rule(self.multiworld.get_location("Kill 2000 zombies", self.player), And(CanReachRegion("Maintenance Tunnel"), CanReachRegion("North Plaza"), CanReachRegion("Entrance Plaza")))
+        self.set_rule(self.multiworld.get_location("Kill 5000 zombies", self.player), And(CanReachRegion("Maintenance Tunnel"), CanReachRegion("North Plaza"), CanReachRegion("Entrance Plaza"), CanReachRegion("Wonderland Plaza"), CanReachRegion("Al Fresca Plaza")))
+        self.set_rule(self.multiworld.get_location("Kill 10000 zombies", self.player), And(CanReachRegion("Maintenance Tunnel"), CanReachRegion("North Plaza"), CanReachRegion("Entrance Plaza"), CanReachRegion("Wonderland Plaza"), CanReachRegion("Al Fresca Plaza"), ending_a_rule))
+        self.set_rule(self.multiworld.get_location("Walk a quarter marathon", self.player), And(CanReachRegion("Leisure Park"), CanReachRegion("Al Fresca Plaza"), CanReachRegion("Wonderland Plaza"), CanReachRegion("North Plaza"), CanReachRegion("Entrance Plaza"), CanReachRegion("Food Court"), CanReachRegion("Paradise Plaza"), CanReachRegion("Seon's Food and Stuff"), CanReachRegion("Crislip's Home Saloon"), CanReachRegion("Colby's Movieland")))
+        self.set_rule(self.multiworld.get_location("Destroy all of the wall plates in the Food Court", self.player), CanReachRegion("Food Court"))
         # Psychopath encounter / photograph / kill lists.
         # Steven and Larry are MAIN_SCOOP-category locations (tied to the
         # Medicine Run and The Butcher story missions). When main scoops are
@@ -1531,27 +1535,29 @@ class DRWorld(World):
             photograph_psychos.extend([("Meet Steven", 1), ("Meet Larry", 1)])
             kill_psychos.extend([("Clean up... Register 6!", 1), ("Complete The Butcher", 1)])
 
-        set_rule(self.multiworld.get_location("Kill 1 psychopath", self.player),
-                 lambda state, names=meet_psycho_names: any(state.can_reach_location(n, self.player) for n in names))
-        set_rule(self.multiworld.get_location("Photograph 8 psychopaths", self.player),
-                 lambda state, psychopaths=photograph_psychos: sum(c for p, c in psychopaths if state.can_reach_location(p, self.player)) >= 8)
-        set_rule(self.multiworld.get_location("Kill 8 psychopaths", self.player),
-                 lambda state, psychopaths=kill_psychos: sum(c for p, c in psychopaths if state.can_reach_location(p, self.player)) >= 8)
-        set_rule(self.multiworld.get_location("Hit 10 zombies with a parasol", self.player), lambda state: ((state.can_reach_region("Entrance Plaza", self.player) or state.can_reach_region("Al Fresca Plaza", self.player) or state.can_reach_region("Crislip's Home Saloon", self.player)) and (not self.options.restricted_item_mode or state.has("Parasol", self.player))) or (not self.options.restricted_item_mode and state.has("Parasol", self.player) and (state.can_reach_region("Paradise Plaza", self.player))))
-        set_rule(self.multiworld.get_location("Kill 50 cultists", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player) and state.can_reach_location("Witness Sean in Paradise Plaza", self.player))
-        set_rule(self.multiworld.get_location("Photograph 30 survivors", self.player), lambda state: state.can_reach_region("Leisure Park", self.player) and state.can_reach_region("Al Fresca Plaza", self.player) and state.can_reach_region("Wonderland Plaza", self.player) and state.can_reach_region("North Plaza", self.player) and state.can_reach_region("Entrance Plaza", self.player) and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.has("DAY3_00_AM", self.player))
-        set_rule(self.multiworld.get_location("Escort 8 survivors at once", self.player), lambda state, counts=SCOOP_SURVIVOR_COUNTS: state.can_reach_region("Paradise Plaza", self.player) and state.can_reach_region("Al Fresca Plaza", self.player) and state.can_reach_location("Kill Jo", self.player) and state.can_reach_region("Food Court", self.player) and state.can_reach_region("Entrance Plaza", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player)) or (self.options.scoop_sanity and sum(c[0] for s, c in counts.items() if state.has(s, self.player)) >= 8)))
-        set_rule(self.multiworld.get_location("Frank the pimp", self.player), lambda state, counts=SCOOP_SURVIVOR_COUNTS: state.can_reach_region("Paradise Plaza", self.player) and state.can_reach_region("Al Fresca Plaza", self.player) and state.can_reach_location("Kill Jo", self.player) and state.can_reach_region("Food Court", self.player) and state.can_reach_region("Entrance Plaza", self.player) and ((not self.options.scoop_sanity and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player)) or (self.options.scoop_sanity and sum(c[1] for s, c in counts.items() if state.has(s, self.player)) >= 8)))
-        set_rule(self.multiworld.get_location("Jump a vehicle 50 feet", self.player), lambda state: state.can_reach_region("Leisure Park", self.player))
-        set_rule(self.multiworld.get_location("Bowl over 5 zombies", self.player), lambda state: ((state.can_reach_region("Paradise Plaza", self.player) or state.can_reach_region("Wonderland Plaza", self.player)) and (not self.options.restricted_item_mode or state.has("Bowling Ball", self.player))) or (not self.options.restricted_item_mode and state.has("Bowling Ball", self.player) and (state.can_reach_region("Paradise Plaza", self.player) or state.can_reach_region("Entrance Plaza", self.player))))
-        set_rule(self.multiworld.get_location("Hit a golf ball 100 feet", self.player), lambda state: ((state.can_reach_region("Paradise Plaza", self.player) or state.can_reach_region("Entrance Plaza", self.player)) and (not self.options.restricted_item_mode or state.has("Golf Club", self.player))) or (not self.options.restricted_item_mode and state.has("Golf Club", self.player) and state.can_reach_region("Rooftop", self.player)))
+        self.set_rule(self.multiworld.get_location("Kill 1 psychopath", self.player),
+                      Or(*[CanReachLocation(n) for n in meet_psycho_names]))
+        # AtLeast counts children that pass, so an encounter worth 3 psychos is
+        # simply listed three times; a weight of 0 drops out on its own.
+        self.set_rule(self.multiworld.get_location("Photograph 8 psychopaths", self.player),
+                      AtLeast(8, *[CanReachLocation(p) for p, c in photograph_psychos for _ in range(c)]))
+        self.set_rule(self.multiworld.get_location("Kill 8 psychopaths", self.player),
+                      AtLeast(8, *[CanReachLocation(p) for p, c in kill_psychos for _ in range(c)]))
+        self.set_rule(self.multiworld.get_location("Hit 10 zombies with a parasol", self.player), (And(Or(CanReachRegion("Entrance Plaza"), CanReachRegion("Al Fresca Plaza"), CanReachRegion("Crislip's Home Saloon")), Has("Parasol")) if self.options.restricted_item_mode else Or(CanReachRegion("Entrance Plaza"), CanReachRegion("Al Fresca Plaza"), CanReachRegion("Crislip's Home Saloon"), And(Has("Parasol"), CanReachRegion("Paradise Plaza")))))
+        self.set_rule(self.multiworld.get_location("Kill 50 cultists", self.player), And(CanReachRegion("Paradise Plaza"), CanReachLocation("Witness Sean in Paradise Plaza")))
+        self.set_rule(self.multiworld.get_location("Photograph 30 survivors", self.player), And(CanReachRegion("Leisure Park"), CanReachRegion("Al Fresca Plaza"), CanReachRegion("Wonderland Plaza"), CanReachRegion("North Plaza"), CanReachRegion("Entrance Plaza"), Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM")))
+        self.set_rule(self.multiworld.get_location("Escort 8 survivors at once", self.player), And(CanReachRegion("Paradise Plaza"), CanReachRegion("Al Fresca Plaza"), CanReachLocation("Kill Jo"), CanReachRegion("Food Court"), CanReachRegion("Entrance Plaza"), (AtLeast(8, *[Has(s) for s, c in SCOOP_SURVIVOR_COUNTS.items() for _ in range(c[0])]) if self.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM")))))
+        self.set_rule(self.multiworld.get_location("Frank the pimp", self.player), And(CanReachRegion("Paradise Plaza"), CanReachRegion("Al Fresca Plaza"), CanReachLocation("Kill Jo"), CanReachRegion("Food Court"), CanReachRegion("Entrance Plaza"), (AtLeast(8, *[Has(s) for s, c in SCOOP_SURVIVOR_COUNTS.items() for _ in range(c[1])]) if self.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM")))))
+        self.set_rule(self.multiworld.get_location("Jump a vehicle 50 feet", self.player), CanReachRegion("Leisure Park"))
+        self.set_rule(self.multiworld.get_location("Bowl over 5 zombies", self.player), (And(Or(CanReachRegion("Paradise Plaza"), CanReachRegion("Wonderland Plaza")), Has("Bowling Ball")) if self.options.restricted_item_mode else Or(CanReachRegion("Paradise Plaza"), CanReachRegion("Wonderland Plaza"), And(Has("Bowling Ball"), Or(CanReachRegion("Paradise Plaza"), CanReachRegion("Entrance Plaza"))))))
+        self.set_rule(self.multiworld.get_location("Hit a golf ball 100 feet", self.player), (And(Or(CanReachRegion("Paradise Plaza"), CanReachRegion("Entrance Plaza")), Has("Golf Club")) if self.options.restricted_item_mode else Or(CanReachRegion("Paradise Plaza"), CanReachRegion("Entrance Plaza"), And(Has("Golf Club"), CanReachRegion("Rooftop")))))
         # Challenge locations default to sphere 0 via the blanket rule above.
         # Falling far enough is awkward to arrange at the start, so this one is
         # pushed behind the Warehouse instead of being an early-game filler
         # slot nobody can identify (#14).
-        set_rule(self.multiworld.get_location("Fall from a high height", self.player), lambda state: state.can_reach_region("Warehouse", self.player))
-        set_rule(self.multiworld.get_location("Fire 30 bullets", self.player), lambda state: state.can_reach_location("Fire 300 bullets", self.player) or ((not self.options.restricted_item_mode or state.has("Handgun", self.player)) and (state.can_reach_region("North Plaza", self.player) or state.can_reach_region("Wonderland Plaza", self.player) or state.can_reach_region("Paradise Plaza", self.player) or state.can_reach_region("Al Fresca Plaza", self.player))))
-        set_rule(self.multiworld.get_location("Fire 300 bullets", self.player), lambda state, smallguns=("Handgun", "Submachine Gun", "Shotgun", "Sniper Rifle"), guns=("Handgun", "Submachine Gun", "Shotgun", "Sniper Rifle", "Heavy Machinegun", "Machinegun"): (state.can_reach_region("North Plaza", self.player) and (not self.options.restricted_item_mode or any(state.has(g, self.player) for g in smallguns))) or (not self.options.restricted_item_mode and any(state.has(g, self.player) for g in guns) and state.can_reach_region("Rooftop", self.player)))
+        self.set_rule(self.multiworld.get_location("Fall from a high height", self.player), CanReachRegion("Warehouse"))
+        self.set_rule(self.multiworld.get_location("Fire 30 bullets", self.player), Or(CanReachLocation("Fire 300 bullets"), And(Has("Handgun"), Or(CanReachRegion("North Plaza"), CanReachRegion("Wonderland Plaza"), CanReachRegion("Paradise Plaza"), CanReachRegion("Al Fresca Plaza"))) if self.options.restricted_item_mode else Or(CanReachRegion("North Plaza"), CanReachRegion("Wonderland Plaza"), CanReachRegion("Paradise Plaza"), CanReachRegion("Al Fresca Plaza"))))
+        self.set_rule(self.multiworld.get_location("Fire 300 bullets", self.player), (And(CanReachRegion("North Plaza"), Or(*[Has(g) for g in ("Handgun", "Submachine Gun", "Shotgun", "Sniper Rifle")])) if self.options.restricted_item_mode else Or(CanReachRegion("North Plaza"), And(Or(*[Has(g) for g in ("Handgun", "Submachine Gun", "Shotgun", "Sniper Rifle", "Heavy Machinegun", "Machinegun")]), CanReachRegion("Rooftop")))))
         # "Ride zombies for 50 feet" requires Zombie Ride only when that
         # skill is actually in the AP item pool. BuildItemPool adds skills
         # only when enable_skill_items is on AND vanilla_progression is
@@ -1559,12 +1565,15 @@ class DRWorld(World):
         # the engine grants skills on level-up and they aren't AP items,
         # so the location is reachable purely via region access.
         _zombie_ride_is_pool_item = bool(self.options.enable_skill_items) and self.options.vanilla_progression.value == 1
-        set_rule(self.multiworld.get_location("Ride zombies for 50 feet", self.player),
-                 lambda state, gated=_zombie_ride_is_pool_item:
-                     state.can_reach_region("Maintenance Tunnel", self.player)
-                     and (not gated or state.has("Zombie Ride", self.player)))
-        set_rule(self.multiworld.get_location("Change into 46 new outfits", self.player), lambda state: state.can_reach_region("Leisure Park", self.player) and state.can_reach_region("Al Fresca Plaza", self.player) and state.can_reach_region("Wonderland Plaza", self.player) and state.can_reach_region("North Plaza", self.player) and state.can_reach_region("Entrance Plaza", self.player) and state.can_reach_region("Food Court", self.player) and state.can_reach_region("Paradise Plaza", self.player) and state.can_reach_region("Seon's Food and Stuff", self.player) and state.can_reach_region("Crislip's Home Saloon", self.player) and state.can_reach_region("Colby's Movieland", self.player))
-        set_rule(self.multiworld.get_location("Change into 5 new outfits", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player))
+        # Whether Zombie Ride is in the pool is settled at generation time, so
+        # the branch belongs here rather than inside the rule.
+        _ride_rule = CanReachRegion("Maintenance Tunnel")
+        if _zombie_ride_is_pool_item:
+            _ride_rule = And(_ride_rule, Has("Zombie Ride"))
+        self.set_rule(self.multiworld.get_location("Ride zombies for 50 feet", self.player),
+                      _ride_rule)
+        self.set_rule(self.multiworld.get_location("Change into 46 new outfits", self.player), And(CanReachRegion("Leisure Park"), CanReachRegion("Al Fresca Plaza"), CanReachRegion("Wonderland Plaza"), CanReachRegion("North Plaza"), CanReachRegion("Entrance Plaza"), CanReachRegion("Food Court"), CanReachRegion("Paradise Plaza"), CanReachRegion("Seon's Food and Stuff"), CanReachRegion("Crislip's Home Saloon"), CanReachRegion("Colby's Movieland")))
+        self.set_rule(self.multiworld.get_location("Change into 5 new outfits", self.player), CanReachRegion("Paradise Plaza"))
         # PP Sticker group access for the "Photograph N PP Stickers"
         # challenge rules. Each group becomes (count, regions, locations,
         # predicate). The Brad-escort entry in the EP group (25-34) is a
@@ -1578,23 +1587,23 @@ class DRWorld(World):
                 for loc in region_locs
                 if loc.category == DRLocationCategory.MAIN_SCOOP
             }
-        pp_sticker_groups = []
+        # Each group is a batch of stickers sharing one set of requirements.
+        pp_sticker_group_rules = []
         for (count, regions, locs) in PP_STICKER_GROUPS:
-            pred = None
+            parts = []
             if "Escort Brad to see Dr Barnaby" in locs:
                 locs = [l for l in locs if l != "Escort Brad to see Dr Barnaby"]
-                pred = ep_shutter
+                parts.append(ep_shutter)
             if not self.main_scoops_enabled:
                 locs = [l for l in locs if l not in main_scoop_location_names]
-            pp_sticker_groups.append((count, regions, locs, pred))
+            parts.extend(CanReachRegion(r) for r in regions)
+            parts.extend(CanReachLocation(l) for l in locs)
+            pp_sticker_group_rules.append((count, And(*parts) if parts else True_()))
 
-        def _reachable_stickers(state, groups=pp_sticker_groups):
-            return sum(
-                count for (count, regions, locs, pred) in groups
-                if all(state.can_reach_region(r, self.player) for r in regions)
-                and all(state.can_reach_location(l, self.player) for l in locs)
-                and (pred is None or pred(state))
-            )
+        # A milestone is a weighted count, so each group is listed once per
+        # sticker it is worth and AtLeast does the summing.
+        _sticker_children = [rule for count, rule in pp_sticker_group_rules
+                             for _ in range(count)]
 
         for _n, _name in [
             (10, "Photograph 10 PP Stickers"), (20, "Photograph 20 PP Stickers"),
@@ -1603,11 +1612,11 @@ class DRWorld(World):
             (70, "Photograph 70 PP Stickers"), (80, "Photograph 80 PP Stickers"),
             (90, "Photograph 90 PP Stickers"), (100, "Photograph all PP Stickers"),
         ]:
-            set_rule(self.multiworld.get_location(_name, self.player),
-                     lambda state, n=_n: _reachable_stickers(state) >= n)
-        set_rule(self.multiworld.get_location("Get 10000 PP in one photo", self.player), lambda state: state.can_reach_region("Rooftop", self.player))
+            self.set_rule(self.multiworld.get_location(_name, self.player),
+                          AtLeast(_n, *_sticker_children))
+        self.set_rule(self.multiworld.get_location("Get 10000 PP in one photo", self.player), CanReachRegion("Rooftop"))
 
-        set_rule(self.multiworld.get_location("Find Greg's secret passage", self.player), lambda state: state.can_reach_location("Kill Adam", self.player))
+        self.set_rule(self.multiworld.get_location("Find Greg's secret passage", self.player), CanReachLocation("Kill Adam"))
         # Endings
         # set_rule(self.multiworld.get_location("Ending B: Don't solve all of the cases but be on the helipad at 12pm", self.player), lambda state: state.can_reach_region("Heliport", self.player) and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.has("DAY3_00_AM", self.player) and state.has("DAY3_11_AM", self.player) and state.has("DAY4_12_PM", self.player) and state.can_reach_location("Ending S: Beat up Brock with your bare fists!", self.player))
         # set_rule(self.multiworld.get_location("Ending C: Solve all of the cases but don't meet Isabela at 10am", self.player), lambda state: state.can_reach_location("Complete Memories", self.player) and state.can_reach_region("Heliport", self.player) and state.has("DAY2_06_AM", self.player) and state.has("DAY2_11_AM", self.player) and state.has("DAY3_00_AM", self.player) and state.has("DAY3_11_AM", self.player) and state.has("DAY4_12_PM", self.player) and state.can_reach_location("Ending S: Beat up Brock with your bare fists!", self.player))
@@ -1616,10 +1625,10 @@ class DRWorld(World):
         # set_rule(self.multiworld.get_location("Ending F: Fail to collect all of the bombs in time", self.player), lambda state: state.can_reach_location("Complete Bomb Collector", self.player))
 
         if not self.options.scoop_sanity:
-            set_rule(self.multiworld.get_location("Survive until 7pm on day 1", self.player), lambda state: state.can_reach_region("Paradise Plaza", self.player))
+            self.set_rule(self.multiworld.get_location("Survive until 7pm on day 1", self.player), CanReachRegion("Paradise Plaza"))
 
         # Victory Condition
-        self.multiworld.completion_condition[self.player] = lambda state: state.has("Victory", self.player)
+        self.set_completion_rule(Has("Victory"))
 
 
     def _build_door_overlay_data(self) -> Dict[str, Dict[str, str]]:
