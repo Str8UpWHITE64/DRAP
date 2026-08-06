@@ -60,6 +60,11 @@ function M.areas()
     return (data and data.areas) or {}
 end
 
+function M.split_areas()
+    ensure_loaded()
+    return (data and data.split_areas) or {}
+end
+
 function M.time_keys()
     ensure_loaded()
     return (data and data.time_keys) or {}

@@ -118,6 +118,7 @@ end
 
 AP.effects = AP.effects or {}
 AP.effects.AreaKeyEffects             = require("DRAP/effects/AreaKeyEffects")
+AP.effects.SplitKeyEffects            = require("DRAP/effects/SplitKeyEffects")
 AP.effects.TimeLockEffects            = require("DRAP/effects/TimeLockEffects")
 AP.effects.VictoryEffects             = require("DRAP/effects/VictoryEffects")
 AP.effects.SurvivorScoopCompletion    = require("DRAP/effects/SurvivorScoopCompletion")
@@ -136,6 +137,7 @@ AP.effects.AP_LocationTriggers        = require("DRAP/effects/AP_LocationTrigger
 AP.effects.DoorPromptOverlay          = require("DRAP/effects/DoorPromptOverlay")
 
 AP.effects.AreaKeyEffects.register_all()
+AP.effects.SplitKeyEffects.register_all()
 AP.effects.TimeLockEffects.register_all()
 AP.effects.VictoryEffects.register_all()
 AP.effects.SurvivorScoopCompletion.register_all()
@@ -358,6 +360,15 @@ local function run_slot_connect(slot_data)
         AP.DoorRandomizer.clear_redirects()
     end
 
+    -- Split Keys option. Door randomization grants every split key up front,
+    -- so the locks still go on and simply open as those keys arrive.
+    local split_keys_enabled = (type(slot_data) == "table" and slot_data.split_keys == true)
+    AP.SplitKeysEnabled = split_keys_enabled
+    if AP.DoorSceneLock then
+        AP.DoorSceneLock.set_split_keys_enabled(split_keys_enabled)
+    end
+    log("Split Keys enabled=" .. tostring(split_keys_enabled))
+
     -- Goal option
     local goal = (type(slot_data) == "table" and slot_data.goal) or 0
     AP.Goal = goal
@@ -550,6 +561,7 @@ local function try_reapply_if_ready()
     AP_BRIDGE.reapply_all_items()
     AP.ScoopUnlocker.reapply_unlocked_scoops()
     AP.effects.AreaKeyEffects.reapply()
+    AP.effects.SplitKeyEffects.reapply()
     AP.effects.TimeLockEffects.reapply()
     AP.effects.SurvivorScoopCompletion.reapply()
     AP.effects.SaviorGoalEffects.reapply()

@@ -34,7 +34,7 @@ NON_DOOR_ENTRANCES = {
         "Greg's secret passage, open once Out of Control is done",
 }
 from .shared_data import (
-    AREA_KEY_NAMES, SPLIT_AREA_NAMES, TIME_KEY_NAMES,
+    AREA_KEY_NAMES, SPLIT_AREA_NAMES, SPLIT_KEY_NAMES, TIME_KEY_NAMES,
     AP_TRIGGER_LOCATIONS, expand_trigger_location_names,
     trigger_location_required_regions,
     SCOOPS, COMPLETION_FLAGS,
@@ -403,6 +403,11 @@ class DRWorld(World):
             for key_name in AREA_KEY_NAMES:
                 self.multiworld.push_precollected(self.create_item(key_name))
             self.multiworld.push_precollected(self.create_item("Maintenance Tunnel Access Key"))
+            # Split Keys rules still name the per-door keys, so hand those over
+            # as well rather than leaving the rules asking for nothing
+            if self.options.split_keys:
+                for key_name in SPLIT_KEY_NAMES:
+                    self.multiworld.push_precollected(self.create_item(key_name))
 
             # Get the door randomizer mode (0 = chaos, 1 = paired)
             door_mode = self.options.door_randomizer_mode.value

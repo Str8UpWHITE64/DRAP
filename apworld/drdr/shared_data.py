@@ -193,6 +193,8 @@ AREA_KEY_NAMES: List[str] = [
 
 SPLIT_AREA_NAMES: List[str] = [s["name"] for s in SPLIT_AREAS if s.get("name")]
 
+SPLIT_KEY_NAMES: List[str] = [s["key_item"] for s in SPLIT_AREAS if s.get("key_item")]
+
 TIME_KEY_NAMES: List[str] = [t["name"] for t in TIME_KEYS if t.get("name")]
 
 

@@ -561,14 +561,16 @@ def BuildItemPool(multiworld, count, options, excluded_scoop_names=()):
     fillerList = nonTrapFiller + trapList
 
     for lock in lockList:
-        # Skip area keys if door randomizer is enabled (they're precollected)
-        if options.door_randomizer or options.split_keys and lock.name in area_key_names:
+        # Area keys are precollected under door randomization, and replaced by
+        # the per-door keys under Split Keys
+        if (options.door_randomizer or options.split_keys) and lock.name in area_key_names:
             continue
         # Skip time keys if scoop sanity is enabled
         if options.scoop_sanity and lock.name in time_key_names:
             continue
-        # Skip split keys unless split keys is enabled
-        if not options.split_keys and lock.name in split_key_names:
+        # Split keys exist only in their own mode, and door randomization
+        # precollects them
+        if lock.name in split_key_names and (not options.split_keys or options.door_randomizer):
             continue
 
         item = item_dictionary[lock.name]

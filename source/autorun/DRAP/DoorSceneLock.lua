@@ -47,105 +47,11 @@ local LOCKED_SCENES = {
 -- Split Keys Lock State
 ------------------------------------------------------------
 
-local LOCKED_SPLIT = {
-    -- Current area -> list of destinations
-
-    ["s135"] = {            -- Heliport
-        ["s136"] = false,   -- Security Room
-    },
-
-    ["s136"] = {            -- Security Room
-        ["s135"] = false,   -- Heliport
-        ["s231"] = true,    -- Rooftop
-        ["s100"] = true,    -- Entrance Plaza
-    },
-    
-    ["s231"] = {            -- Rooftop
-        ["s136"] = true,    -- Security Room
-        ["s230"] = true,    -- Warehouse
-    },
-    
-    ["s230"] = {            -- Warehouse
-        ["s231"] = true,    -- Rooftop
-        ["s200"] = true,    -- Paradise Plaza
-    },
-
-    ["s200"] = {            -- Paradise Plaza
-        ["s230"] = true,    -- Warehouse
-        ["s503"] = true,    -- Colby's Movieland
-        ["s700"] = true,    -- Leisure Park
-        ["s100"] = true,    -- Entrance Plaza
-        ["s600"] = true,    -- Maintenance Tunnel
-    },
-
-    ["s503"] = {            -- Colby's Movieland
-        ["s200"] = true,    -- Paradise Plaza
-    },
-
-    ["s700"] = {            -- Leisure Park
-        ["s200"] = true,    -- Paradise Plaza
-        ["sa00"] = true,    -- Food Court
-        ["s400"] = true,    -- North Plaza
-        ["s600"] = true,    -- Maintenance Tunnel
-    },
-
-    ["sa00"] = {            -- Food Court
-        ["s700"] = true,    -- Leisure Park
-        ["s300"] = true,    -- Wonderland Plaza
-        ["s900"] = true,    -- Al Fresca Plaza
-        ["s600"] = true,    -- Maintenance Tunnel
-    },
-
-    ["s300"] = {            -- Wonderland Plaza
-        ["sa00"] = true,    -- Food Court
-        ["s400"] = true,    -- North Plaza
-        ["s600"] = true,    -- Maintenance Tunnel
-    },
-
-    ["s400"] = {            -- North Plaza
-        ["s700"] = true,    -- Leisure Park
-        ["s300"] = true,    -- Wonderland Plaza
-        ["s501"] = true,    -- Crislip's Home Saloon
-        ["s500"] = true,    -- Seon's Food and Stuff
-        ["s401"] = true,    -- Carlito's Hideout
-    },
-
-    ["s500"] = {            -- Seon's Food and Stuff
-        ["s400"] = true,    -- North Plaza
-        ["s600"] = true,    -- Maintenance Tunnel
-    },
-
-    ["s501"] = {            -- Crislip's Home Saloon
-        ["s400"] = true,    -- North Plaza
-    },
-
-    ["s401"] = {            -- Carlito's Hideout
-        ["s400"] = true,    -- North Plaza
-    },
-
-    ["s900"] = {            -- Al Fresca Plaza
-        ["sa00"] = true,    -- Food Court
-        ["s100"] = true,    -- Entrance Plaza
-        ["s600"] = true,    -- Maintenance Tunnel
-    },
-
-    ["s100"] = {            -- Entrance Plaza
-        ["s900"] = true,    -- Al Fresca Plaza
-        ["s136"] = true,    -- Security Room
-        ["s200"] = true,    -- Paradise Plaza
-        ["s600"] = true,    -- Maintenance Tunnel
-    },
-
-    ["s600"] = {            -- Maintenance Tunnel
-        ["s900"] = true,    -- Al Fresca Plaza
-        ["s700"] = true,    -- Leisure Park
-        ["sa00"] = true,    -- Food Court
-        ["s300"] = true,    -- Wonderland Plaza
-        ["s200"] = true,    -- Paradise Plaza
-        ["s100"] = true,    -- Entrance Plaza
-        ["s500"] = true,    -- Seon's Food and Stuff
-    },
-}
+-- Split Keys locks a single door rather than a whole scene, so the state is
+-- keyed origin -> destination. Built from drdr_shared.json when the option is
+-- on; empty otherwise.
+local LOCKED_SPLIT = {}
+local split_keys_enabled = false
 
 ------------------------------------------------------------
 -- Public State
@@ -170,6 +76,17 @@ local pending_rescan = false
 local function scene_is_locked(scene_code)
     if testing_mode then return false end
     return LOCKED_SCENES[scene_code] == true
+end
+
+-- Split Keys replaces the area keys entirely, so no area key ever arrives to
+-- unlock a scene. The per-door state governs instead of the scene state.
+local function door_is_locked(origin_code, destination_code)
+    if testing_mode then return false end
+    if split_keys_enabled then
+        local from = LOCKED_SPLIT[origin_code]
+        return from ~= nil and from[destination_code] == true
+    end
+    return LOCKED_SCENES[destination_code] == true
 end
 
 local function current_event_blocks_s100_lock()
@@ -255,6 +172,9 @@ local function rescan_current_area_doors()
     M.CurrentAreaIndex = area_index
     local bypass_s100, ev = current_event_blocks_s100_lock()
 
+    -- Which side of the door the player is standing on ("SCN_s200" -> "s200")
+    local origin_code = level_path and (tostring(level_path):gsub("^SCN_", "")) or nil
+
     local ahlm = ahlm_mgr:get()
     if not ahlm then return end
 
@@ -292,7 +212,7 @@ local function rescan_current_area_doors()
                                 end
 
                                 if mHitData_val and jump_name ~= "" then
-                                    local locked = scene_is_locked(jump_name)
+                                    local locked = door_is_locked(origin_code, jump_name)
 
                                     if locked and jump_name == "s100" and bypass_s100 then
                                         enable_hitdata(li, mHitData_val)
@@ -335,6 +255,52 @@ end
 
 function M.is_scene_locked(scene_code)
     return scene_is_locked(tostring(scene_code))
+end
+
+------------------------------------------------------------
+-- Split Keys
+------------------------------------------------------------
+
+-- Turning the option on locks every transition in the shared data; the keys
+-- open them one at a time as they arrive.
+function M.set_split_keys_enabled(enabled)
+    split_keys_enabled = enabled == true
+    LOCKED_SPLIT = {}
+
+    if split_keys_enabled then
+        local SharedData = require("DRAP/SharedData")
+        local count = 0
+        for _, entry in ipairs(SharedData.split_areas()) do
+            for _, t in ipairs(entry.transitions or {}) do
+                if t.origin and t.destination then
+                    LOCKED_SPLIT[t.origin] = LOCKED_SPLIT[t.origin] or {}
+                    LOCKED_SPLIT[t.origin][t.destination] = true
+                    count = count + 1
+                end
+            end
+        end
+        M.log(string.format("Split Keys enabled, %d transitions locked", count))
+    else
+        M.log("Split Keys disabled")
+    end
+
+    pending_rescan = true
+    rescan_current_area_doors()
+end
+
+function M.unlock_transition(origin_code, destination_code)
+    local from = LOCKED_SPLIT[tostring(origin_code)]
+    if from then from[tostring(destination_code)] = nil end
+    pending_rescan = true
+    rescan_current_area_doors()
+end
+
+function M.is_transition_locked(origin_code, destination_code)
+    return door_is_locked(tostring(origin_code), tostring(destination_code))
+end
+
+function M.get_split_keys_enabled()
+    return split_keys_enabled
 end
 
 function M.is_on_title_screen()
