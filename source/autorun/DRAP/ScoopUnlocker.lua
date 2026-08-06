@@ -39,6 +39,23 @@ local EP270_TRIGGER_BOX = {
     min_z = 130.0, max_z = 140.0,
 }
 
+-- Simone Ravendark's corner of Paradise Plaza. Flag 295 tells the game Isabela
+-- is back in the Security Room, which Simone checks before agreeing to follow.
+-- 295 is also a Santa Cabeza byproduct, so once that mission completes the
+-- cascade sweep clears it every cycle and she can never be recruited -- the
+-- long-standing "Rescue Simone Ravendark" bug.
+--
+-- Rather than dropping 295 from the cascade (it is there for a reason we no
+-- longer have), hold it on just around her: ~8m of her spawn point, the same
+-- shape as the flag 301 Hideout toggle below. Outside the box the sweep goes
+-- back to clearing it.
+local SIMONE_FLAG = 295
+local SIMONE_BOX = {
+    min_x = 130.5, max_x = 146.5,
+    min_y = -6.0,  max_y = 8.0,
+    min_z = 11.5,  max_z = 27.5,
+}
+
 -- Engine's "EP-shutter cutscene played" markers, set only by that cutscene's
 -- tail (in no CASCADE/COMPLETION table). They live in save state, so a save
 -- reload resets them and our trigger refires -- no DRAP-side persistence.
@@ -518,6 +535,17 @@ local function get_current_area_index()
     return Shared.to_int(Shared.safe_get_field(am, f))
 end
 
+-- Is the player standing with Simone? Area first, so the position read is
+-- skipped everywhere else.
+local function player_is_with_simone()
+    if get_current_area_index() ~= PARADISE_PLAZA_AREA_INDEX then return false end
+    local x, y, z = get_player_pos_xyz()
+    if not x then return false end
+    return x >= SIMONE_BOX.min_x and x <= SIMONE_BOX.max_x
+       and y >= SIMONE_BOX.min_y and y <= SIMONE_BOX.max_y
+       and z >= SIMONE_BOX.min_z and z <= SIMONE_BOX.max_z
+end
+
 local function each_conflict_scoop()
     local names = {}
     for _, group_list in pairs(CONFLICT_GROUPS) do
@@ -709,6 +737,19 @@ local function enforce_flags_legacy()
         end
     end
 
+    -- Simone will not follow unless 295 says Isabela is in the Security Room.
+    -- Holding the cascade is not enough on its own: by the time the player
+    -- walks up, the sweep has already cleared it. Set it while they are next
+    -- to her, the same way flag 301 is handled in the Hideout.
+    if State.is_activated() and player_is_with_simone() and not raw_check_flag(SIMONE_FLAG) then
+        currently_unlocking = true
+        raw_set_flag_on(SIMONE_FLAG)
+        currently_unlocking = false
+        if verbose_logging then
+            M.log("Area toggle: enabled flag 295 (player with Simone Ravendark)")
+        end
+    end
+
     -- After "A Strange Group" is completed, keep the Raincoat cult spawning.
     -- Suppress completion/death flags but enforce the three cult-spawn flags.
     -- Flags auto-re-enabled by 326 (1222, 327, 1157, 3722, 1217, 1219, 1221, 1223, 3600)
@@ -831,7 +872,11 @@ local function enforce_flags_legacy()
     local cascade_details = {}
     for flag_id, owner_scoop in pairs(CASCADE_FLAGS) do
         local mission_active = received_scoops[owner_scoop] and not completed_scoops[owner_scoop]
-        if not mission_active and not is_in_completion_grace(owner_scoop) and raw_check_flag(flag_id) then
+        -- 295 is Santa Cabeza's byproduct but also what Simone checks, so it
+        -- stays on while the player is next to her (see SIMONE_BOX).
+        local held = (flag_id == SIMONE_FLAG) and player_is_with_simone()
+        if not mission_active and not held
+            and not is_in_completion_grace(owner_scoop) and raw_check_flag(flag_id) then
             raw_set_flag_off(flag_id)
             cascade_count = cascade_count + 1
             table.insert(cascade_details, string.format("%d(%s)", flag_id, owner_scoop))
@@ -2359,6 +2404,34 @@ _G.drap_ep270_show_pos = function()
         x, y, z, tostring(area), tostring(in_ep270_box(x, y, z)),
         tostring(ep270_gates_open()), tostring(f765), tostring(f2280)))
 end
+-- Simone's box was sized from her bundled spawn point, not measured in game.
+-- Stand next to her and call this to see whether she is covered; widen with
+-- drap_simone_set_box if the flag is not being held.
+_G.drap_simone_status = function()
+    local x, y, z = get_player_pos_xyz()
+    if not x then
+        M.log("Simone: player not spawned (no position available)")
+        return
+    end
+    M.log(string.format(
+        "Simone: pos=(%.2f, %.2f, %.2f) area=%s in_box=%s flag295=%s"
+            .. " box=x[%.1f,%.1f] y[%.1f,%.1f] z[%.1f,%.1f]",
+        x, y, z, tostring(get_current_area_index()),
+        tostring(player_is_with_simone()), tostring(raw_check_flag(SIMONE_FLAG)),
+        SIMONE_BOX.min_x, SIMONE_BOX.max_x, SIMONE_BOX.min_y,
+        SIMONE_BOX.max_y, SIMONE_BOX.min_z, SIMONE_BOX.max_z))
+end
+_G.drap_simone_set_box = function(min_x, max_x, min_y, max_y, min_z, max_z)
+    SIMONE_BOX = {
+        min_x = tonumber(min_x), max_x = tonumber(max_x),
+        min_y = tonumber(min_y), max_y = tonumber(max_y),
+        min_z = tonumber(min_z), max_z = tonumber(max_z),
+    }
+    M.log(string.format("Simone: box set to x[%.1f,%.1f] y[%.1f,%.1f] z[%.1f,%.1f]",
+        SIMONE_BOX.min_x, SIMONE_BOX.max_x, SIMONE_BOX.min_y,
+        SIMONE_BOX.max_y, SIMONE_BOX.min_z, SIMONE_BOX.max_z))
+end
+
 _G.drap_ep270_set_box = function(min_x, max_x, min_y, max_y, min_z, max_z)
     EP270_TRIGGER_BOX = {
         min_x = tonumber(min_x), max_x = tonumber(max_x),
