@@ -364,11 +364,35 @@ local function set_set_reply_handler(callback)
 	AP_REF.APClient:set_set_reply_handler(set_reply_handler)
 end
 
+-- "localhost" resolves to ::1 before 127.0.0.1 on Windows, and an
+-- Archipelago server with host: "0.0.0.0" in host.yaml listens on IPv4 only.
+-- The connect then goes to an address nothing is bound to and stalls with no
+-- error, which reads as the game hanging. Loopback by name always means this
+-- machine, so send it to IPv4 and skip the whole problem.
+local function prefer_ipv4_loopback(host)
+    if type(host) ~= "string" then return host end
+    -- Match the host component only. A prefix test would rewrite the likes of
+    -- "localhostings.example.com" into nonsense.
+    local scheme, rest = host:match("^(%a+://)(.*)$")
+    local body = rest or host
+    local name, tail = body:match("^([^:/]*)(.*)$")
+    if not name or name:lower() ~= "localhost" then return host end
+
+    local fixed = (scheme or "") .. "127.0.0.1" .. (tail or "")
+    Logger.info("AP_REF", string.format(
+        "using %s instead of %s (localhost prefers IPv6, which an IPv4-only"
+        .. " server never answers)", fixed, host))
+    return fixed
+end
+
 function APConnect(host)
     local uuid = ""
+    host = prefer_ipv4_loopback(host)
     AP_REF.APClient = AP(uuid, AP_REF.APGameName, host)
     table.insert(textLog, {{ text = "Connecting..." }})
     Logger.info("AP_REF", "connecting to " .. tostring(host))
+    AP_REF._connect_started_at = os.clock()
+    AP_REF._connect_warned = false
     set_socket_connected_handler(AP_REF.on_socket_connected)
     set_socket_error_handler(AP_REF.on_socket_error)
     set_socket_disconnected_handler(AP_REF.on_socket_disconnected)
@@ -616,7 +640,28 @@ local function ReadConfig()
     end
 end
 
+-- A connect that never completes used to leave "connecting to" as the last
+-- line in the log with no further sign of life. Say so once instead.
+local CONNECT_WARN_SECONDS = 10.0
+
+local function warn_if_connect_is_hanging()
+	if not AP_REF._connect_started_at or AP_REF._connect_warned then return end
+	if AP_REF.APClient and AP_REF.APClient:get_state()
+		and AP_REF.APClient:get_state() > 0 then
+		AP_REF._connect_started_at = nil
+		return
+	end
+	if (os.clock() - AP_REF._connect_started_at) < CONNECT_WARN_SECONDS then return end
+	AP_REF._connect_warned = true
+	Logger.info("AP_REF", string.format(
+		"still not connected after %.0fs -- check the server is up and that"
+		.. " the address matches how it is listening (netstat -ano | find"
+		.. " \"%s\")", CONNECT_WARN_SECONDS, tostring(AP_REF.APHost or "?")))
+	table.insert(textLog, {{ text = "Still connecting -- see the DRAP log." }})
+end
+
 re.on_frame(function()
+	pcall(warn_if_connect_is_hanging)
 	if mainWindowVisible then
 		main_menu()
 	end
