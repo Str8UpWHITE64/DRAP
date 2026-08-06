@@ -11,7 +11,8 @@ from typing import Any, List
 from BaseClasses import LocationProgressType
 
 from rule_builder.rules import (
-    And, AtLeast, CanReachLocation, CanReachRegion, Has, HasAll, Or, Rule, True_,
+    And, CanReachLocation, CanReachRegion, Has, HasAll, NestedRule, Or, Rule,
+    True_,
 )
 
 from .Locations import DRLocationCategory, location_tables
@@ -129,6 +130,72 @@ REGION_LEVEL_VALUES = {
     "Crislip's Home Saloon": 1,
     "Colby's Movieland": 1,
 }
+
+class AtLeast(NestedRule["DRWorld"], game="Dead Rising Deluxe Remaster"):
+    """True when at least `count` of the child rules pass.
+
+    Archipelago grew its own AtLeast after 0.6.7, so importing it would make
+    the apworld refuse to load on every released version. This is the same
+    rule, kept local until the released builder has one.
+
+    Weighted counts are expressed by listing a child once per unit it is
+    worth, so an encounter worth 3 psychopaths appears three times.
+    """
+
+    count: int
+
+    def __init__(self, count, *children, **kwargs):
+        super().__init__(*children, **kwargs)
+        self.count = count
+
+    def _instantiate(self, world) -> Rule.Resolved:
+        if self.count <= 0:
+            return True_().resolve(world)
+        return self.Resolved(
+            tuple(c.resolve(world) for c in self.children),
+            count=self.count,
+            player=world.player,
+            caching_enabled=getattr(world, "rule_caching_enabled", False),
+        )
+
+    def to_dict(self):
+        data = super().to_dict()
+        data["count"] = self.count
+        return data
+
+    @classmethod
+    def from_dict(cls, data, world_cls):
+        children = [world_cls.rule_from_dict(c) for c in data.get("children", ())]
+        return cls(data["count"], *children)
+
+    class Resolved(NestedRule.Resolved):
+        count: int
+
+        def _evaluate(self, state) -> bool:
+            hits = 0
+            for child in self.children:
+                if child(state):
+                    hits += 1
+                    if hits >= self.count:
+                        return True
+            return False
+
+        def explain_json(self, state=None):
+            if state is None:
+                head = str(self.count)
+            else:
+                passing = sum(1 for c in self.children if c(state))
+                head = f"{passing}/{self.count}"
+            out = [{"type": "text", "text": "At least "},
+                   {"type": "color", "color": "cyan", "text": head},
+                   {"type": "text", "text": " of ("}]
+            for i, child in enumerate(self.children):
+                if i:
+                    out.append({"type": "text", "text": ", "})
+                out.extend(child.explain_json(state))
+            out.append({"type": "text", "text": ")"})
+            return out
+
 
 def get_reachable_region_points(state, player: int) -> int:
     return sum(value for region, value in REGION_LEVEL_VALUES.items()
