@@ -271,13 +271,19 @@ def set_rules(world) -> None:
     # met Jessie (Warehouse reach) -- except when Backup for Brad is
     # first in the chain, where the runtime holds the trigger until the
     # Brad escort completes (the mission fires the cutscene itself).
-    # A shuffled chain keeps Backup out of the first slot, so that branch
-    # is for vanilla order (and hand-edited orders).
-    if (not world.options.scoop_sanity
-            or (world.scoop_order and world.scoop_order[0] == "Backup for Brad")):
+    # Under ScoopSanity the trigger spot always answers, whoever leads. It is
+    # only held shut while Backup for Brad is running, and that scoop cannot
+    # start until the Food Court and Entrance Plaza are reachable -- which is
+    # exactly what completing it needs. So either the trigger opens them or
+    # the mission can be finished.
+    if not world.options.scoop_sanity:
         _shutter = CanReachLocation("Escort Brad to see Dr Barnaby")
     else:
-        _shutter = CanReachRegion("Warehouse")
+        # Meeting Jessie by name, not Warehouse reach. The trigger spot only
+        # answers once AP is activated, which is that milestone; reaching the
+        # Warehouse merely coincides with it during the prologue. The scoop
+        # loop already words the same condition this way.
+        _shutter = CanReachLocation("Meet Jessie in the Warehouse")
     ep_shutter = And(CanReachRegion("Entrance Plaza"), _shutter)
 
 

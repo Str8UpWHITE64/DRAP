@@ -252,14 +252,13 @@ class DRWorld(World):
                     # case, and the runtime lets the mission fire the cutscene.
                     self.scoop_order = list(MAIN_SCOOP_NAMES)
                 else:
+                    # Backup for Brad may lead. It used to be swapped out of
+                    # the first slot because its mission holds the EP shutter
+                    # trigger shut, but the scoop can no longer start before
+                    # its regions are reachable, and until it starts the
+                    # trigger spot opens the shutters on its own.
                     scoop_order = list(MAIN_SCOOP_NAMES)
                     self.random.shuffle(scoop_order)
-                    # Backup for Brad never leads a shuffled chain -- its
-                    # mission owns the EP shutter cutscene and holds the
-                    # trigger spot closed until the escort completes.
-                    if scoop_order[0] == "Backup for Brad":
-                        swap = self.random.randrange(1, len(scoop_order))
-                        scoop_order[0], scoop_order[swap] = scoop_order[swap], scoop_order[0]
                     self.scoop_order = scoop_order
             # else: Savior+ScoopSanity — scoop_order stays empty.
 
