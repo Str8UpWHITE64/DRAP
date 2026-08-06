@@ -291,8 +291,8 @@ def set_rules(world) -> None:
     # met Jessie (Warehouse reach) -- except when Backup for Brad is
     # first in the chain, where the runtime holds the trigger until the
     # Brad escort completes (the mission fires the cutscene itself).
-    # Generation now keeps Backup out of the first slot, so that branch
-    # is a safeguard for hand-edited orders.
+    # A shuffled chain keeps Backup out of the first slot, so that branch
+    # is for vanilla order (and hand-edited orders).
     if (not world.options.scoop_sanity
             or (world.scoop_order and world.scoop_order[0] == "Backup for Brad")):
         _shutter = CanReachLocation("Escort Brad to see Dr Barnaby")

@@ -246,12 +246,17 @@ class DRWorld(World):
                     _ut_order = (_passthrough[self.game] or {}).get("scoop_order")
                 if _ut_order:
                     self.scoop_order = list(_ut_order)
+                elif not self.options.randomize_scoop_order:
+                    # Vanilla order, so Backup for Brad leads. set_rules gates
+                    # the Entrance Plaza shutter on the Brad escort in that
+                    # case, and the runtime lets the mission fire the cutscene.
+                    self.scoop_order = list(MAIN_SCOOP_NAMES)
                 else:
                     scoop_order = list(MAIN_SCOOP_NAMES)
                     self.random.shuffle(scoop_order)
-                    # Backup for Brad never leads the chain -- its mission
-                    # owns the EP shutter cutscene and holds the trigger
-                    # spot closed until the escort completes.
+                    # Backup for Brad never leads a shuffled chain -- its
+                    # mission owns the EP shutter cutscene and holds the
+                    # trigger spot closed until the escort completes.
                     if scoop_order[0] == "Backup for Brad":
                         swap = self.random.randrange(1, len(scoop_order))
                         scoop_order[0], scoop_order[swap] = scoop_order[swap], scoop_order[0]

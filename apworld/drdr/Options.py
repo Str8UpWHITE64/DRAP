@@ -127,6 +127,21 @@ class ScoopSanity(Toggle):
     default = True
 
 
+class RandomizeScoopOrder(DefaultOnToggle):
+    """
+    When enabled (the default), the main scoop chain is shuffled and you
+    receive the scoops in that new order.
+
+    When disabled, the chain keeps its vanilla order, starting with Backup for
+    Brad. You still have to receive each scoop as an item before you can do it,
+    and the level requirements per position still apply, so the run is paced
+    the same as a randomized one.
+
+    Has no effect if ScoopSanity is disabled.
+    """
+    display_name = "Randomize Scoop Order"
+
+
 class ExcludeLevels(Toggle):
     """
     When enabled, high level-up checks are prevented from having progression items.
@@ -479,6 +494,7 @@ class DROption(PerGameCommonOptions):
     door_randomizer_mode: DoorRandomizerMode
     randomize_rooftop_service_hallway_doors: RandomizeRooftopServiceHallwayDoors
     scoop_sanity: ScoopSanity
+    randomize_scoop_order: RandomizeScoopOrder
     exclude_levels: ExcludeLevels
     exclude_levels_above: ExcludeLevelsAbove
     enable_skill_items: EnableSkillItems
@@ -506,6 +522,7 @@ dr_option_groups = [
             Goal,
             NumberOfSurvivors,
             ScoopSanity,
+            RandomizeScoopOrder,
             PpBonusLocations,
             ExcludeLevels,
             ExcludeLevelsAbove,
