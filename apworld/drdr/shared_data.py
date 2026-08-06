@@ -191,6 +191,24 @@ AREA_KEY_NAMES: List[str] = [
     if a.get("in_item_pool") and a.get("key_item")
 ]
 
+# Main scoops that chain, mapped to the event that completes them, and
+# the event list per scoop. Both are read by the rules and by the
+# startup validation, so they live with the data they derive from.
+SCOOP_COMPLETION_MAP = {
+    s["name"]: s["completion_event"]
+    for s in SCOOPS
+    if s.get("category") == "Main" and s.get("chain_eligible")
+    and s.get("completion_event")
+}
+
+# Event list per scoop. Drives the ScoopSanity per-event override loop in
+# set_rules (each event is gated on the scoop). SCOOP_COMPLETION_MAP[scoop]
+# must appear in the list (it need not be last -- e.g. The Last Resort gates
+# an extra "Beat Drivin Carlito" after its completion).
+SCOOP_EVENTS = {
+    s["name"]: s["events"] for s in SCOOPS if s.get("events")
+}
+
 SPLIT_AREA_NAMES: List[str] = [s["name"] for s in SPLIT_AREAS if s.get("name")]
 
 SPLIT_KEY_NAMES: List[str] = [s["key_item"] for s in SPLIT_AREAS if s.get("key_item")]
