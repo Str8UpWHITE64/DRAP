@@ -78,10 +78,19 @@ local function scene_is_locked(scene_code)
     return LOCKED_SCENES[scene_code] == true
 end
 
+-- The Entrance Plaza door names the dummy Security Room (s138) as its target;
+-- SceneFixups catches that trigger and sends the player to the real s136
+-- instead. Both lock tables are keyed on the real scene, so without this the
+-- door reads as ungated and Split Keys never locks it.
+local SCENE_ALIASES = {
+    ["s138"] = "s136",
+}
+
 -- Split Keys replaces the area keys entirely, so no area key ever arrives to
 -- unlock a scene. The per-door state governs instead of the scene state.
 local function door_is_locked(origin_code, destination_code)
     if testing_mode then return false end
+    destination_code = SCENE_ALIASES[destination_code] or destination_code
     if split_keys_enabled then
         local from = LOCKED_SPLIT[origin_code]
         return from ~= nil and from[destination_code] == true

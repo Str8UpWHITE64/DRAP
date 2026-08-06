@@ -241,21 +241,68 @@ local function eligible_survivors()
     return out, groups
 end
 
+-- Scoops whose hostages are staged by a named cutscene, and the tracked
+-- location that fires when it plays. For these, the cutscene is the only
+-- trustworthy answer to "have they spawned yet".
+--
+-- A sibling being alive is NOT good enough. Cheryl Jones stands in Colby's
+-- Movieland before Meet Sean runs, so the sibling check read the group as
+-- already spawned and repaired the other four at their captive spots; the
+-- cutscene then staged its own copies and the player got duplicates.
+-- Out of Control is deliberately absent. Greg Simpson does not appear when
+-- Adam is met -- he spawns after Adam dies and a second cutscene runs -- so
+-- gating on Meet Adam would let the repair fire while he is still legitimately
+-- absent. He has one sibling-less entry, so he keeps declining instead.
+local STAGING_EVENTS = {
+    ["A Strange Group"]  = "Meet Sean",
+    ["Above the Law"]    = "Meet Jo",
+    ["Long Haired Punk"] = "Meet Paul",
+}
+
+local STAGED_EVENT_NAMES = {}
+for _, event in pairs(STAGING_EVENTS) do STAGED_EVENT_NAMES[event] = true end
+
+-- Staging cutscenes seen SINCE THE CURRENT SAVE WAS LOADED. Cleared alongside
+-- the census session state -- a check sent in an earlier save says nothing
+-- about whether the scene has played in this one.
+local staged_this_session = {}
+
+--- Record a tracked location as it fires. Called from the event hook.
+function M.note_tracked_location(desc)
+    if desc and STAGED_EVENT_NAMES[desc] then
+        if not staged_this_session[desc] then
+            M.log(string.format("staging cutscene seen: %s", desc))
+        end
+        staged_this_session[desc] = true
+    end
+end
+
 -- Has this scoop's spawn event run yet? -> "yes" / "no" / "unknown".
 --
 -- Psychopath-scoop hostages are staged with the psycho and only exist once its
--- cutscene plays, so "missing" is normally "not yet". A sibling seen alive
--- proves the event fired, which makes a still-absent member a real failure.
+-- cutscene plays, so "missing" is normally "not yet".
+--
+-- For a scoop in STAGING_EVENTS the cutscene decides. Everything else falls
+-- back to a sibling seen alive this save, which proves the event fired and
+-- makes a still-absent member a real failure.
 --
 -- alive_session, NOT ever_alive: the question is about THIS save. Persisted
--- history made A Strange Group look already-spawned and its members were placed
--- at their captive spots before Meet Sean ran, which the scene then duplicated.
+-- history made groups look already-spawned and their members were placed at
+-- their captive spots early, which the scene then duplicated.
 --
 -- UNKNOWN means no sibling can ever answer -- five scoops (Out of Control,
 -- Photographer's Pride, Mark of the Sniper, The Convicts, The Cult) have a
 -- single rescuable member, the rest of their npcs being psychos with no
--- SurvivorType. Callers decline on it; drap_recover_force is the override.
-local function group_spawn_state(stypes, self_stype)
+-- SurvivorType. Jennifer Gorman is the same shape: she spawns alone, so no
+-- sibling will ever vouch for her. Callers decline on UNKNOWN, which is the
+-- safe answer while none of them have been reported missing;
+-- drap_recover_force is the override.
+local function group_spawn_state(stypes, self_stype, scoop_name)
+    local event = STAGING_EVENTS[scoop_name]
+    if event then
+        return staged_this_session[event] and "yes" or "no"
+    end
+
     local others = 0
     for _, st in ipairs(stypes or {}) do
         if st ~= self_stype then
@@ -690,6 +737,7 @@ local RESTORE_MAX_TRIES = 20
 --- straight past the cross-session gate, which had correctly declined.
 function M.schedule_party_restore()
     Census.begin_save_session()
+    staged_this_session = {}
     lost_first_seen = {}
     restore_state = { at = os.clock() + RESTORE_SETTLE_SECONDS, tries = 0 }
 end
@@ -851,7 +899,8 @@ local function run_repair_check(area, by_stype)
             -- both carry evidence the NPC already existed.
             if repairable and verdict == Census.VERDICT.NEVER_SPAWNED
                 and info.category ~= "Survivor" then
-                local state = group_spawn_state(groups[info.scoop], stype)
+                local state = group_spawn_state(groups[info.scoop], stype,
+                                                info.scoop)
                 if state ~= "yes" then
                     repairable = false
                     M.log.debug(string.format(
@@ -1068,7 +1117,7 @@ _G.drap_census_status = function()
         -- Cutscene-staged NPCs are deliberately held back until their scoop's
         -- group is known to have spawned; say so rather than looking idle.
         if category and category ~= "Survivor" then
-            local st = group_spawn_state(status_groups[scoop], stype)
+            local st = group_spawn_state(status_groups[scoop], stype, scoop)
             if st ~= "yes" then table.insert(gates, "held:group=" .. st) end
         end
         table.insert(lines, string.format(

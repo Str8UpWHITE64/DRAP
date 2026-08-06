@@ -188,6 +188,12 @@ AP.EventTracker.on_tracked_location = function(desc, source, raw_id, extra)
     log(string.format("Tracked location: %s", tostring(desc)))
     AP.AP_BRIDGE.check(desc)
 
+    -- Cutscene-staged survivors wait on their scoop's cutscene rather
+    -- than on a sibling being alive, so tell SurvivorRecovery it ran.
+    if AP.effects.SurvivorRecovery.note_tracked_location then
+        pcall(AP.effects.SurvivorRecovery.note_tracked_location, desc)
+    end
+
     -- Forward events to ScoopUnlocker for milestone/chain tracking
     if AP.ScoopUnlocker and AP.ScoopUnlocker.on_event_tracked then
         pcall(AP.ScoopUnlocker.on_event_tracked, desc)
