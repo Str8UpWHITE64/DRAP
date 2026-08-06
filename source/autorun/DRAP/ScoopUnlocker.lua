@@ -1341,7 +1341,7 @@ State.init({
     prerequisites = SCOOP_PREREQUISITES,
     flag_prerequisites = SCOOP_FLAG_PREREQUISITES,
     flag_prereq_bypass = { ["Mark of the Sniper"] = "any_main_completed" },
-    item_requirements = { ["Hideout"] = "Carlito's Hideout key" },
+    item_requirements = { ["Hideout"] = "Carlito's Hideout Key" },
     chain_final = "The Facts",
     log = M.log,
     now = os.clock,
@@ -2034,7 +2034,7 @@ function M.draw_tab_content(debug)
     end
 
     if State.is_item_deferred("Hideout") then
-        imgui.text_colored("Hideout deferred: waiting for Carlito's Hideout key", 0xFF00AAFF)
+        imgui.text_colored("Hideout deferred: waiting for Carlito's Hideout Key", 0xFF00AAFF)
     end
 
     for _, s in ipairs(status_list) do
@@ -2317,7 +2317,7 @@ function M.on_frame()
     end
 
     -- Poll-class deferral retries (flag prereqs + required items, e.g.
-    -- the Carlito's Hideout key). The state machine only checks scoops
+    -- the Carlito's Hideout Key). The state machine only checks scoops
     -- that previously deferred, so the common case is a single next().
     State.poll_deferred_retries()
 

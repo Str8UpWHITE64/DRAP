@@ -73,7 +73,7 @@ DEAD_END_AREAS = {
 # Only the Entrance Plaza <-> Security Room pair is a pure cutscene in vanilla
 # — the game transports the player there once via cinematic and it's never
 # walkable again. Heliport <-> Security Room IS walkable (door-randomizer
-# precollects the Heliport key, which unlocks that door), so it stays in the
+# precollects the Heliport Key, which unlocks that door), so it stays in the
 # reachability graph.
 #
 # Under ScoopSanity, the Entrance Plaza <-> Security Room pair becomes

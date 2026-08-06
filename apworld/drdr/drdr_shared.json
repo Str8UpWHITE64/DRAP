@@ -3,97 +3,97 @@
   "areas": [
     {
       "name": "Heliport",
-      "key_item": "Heliport key",
+      "key_item": "Heliport Key",
       "scene_code": "s135",
       "in_item_pool": false
     },
     {
       "name": "Security Room",
-      "key_item": "Security Room key",
+      "key_item": "Security Room Key",
       "scene_code": "s136",
       "in_item_pool": false
     },
     {
       "name": "Rooftop",
-      "key_item": "Rooftop key",
+      "key_item": "Rooftop Key",
       "scene_code": "s231",
       "in_item_pool": true
     },
     {
       "name": "Warehouse",
-      "key_item": "Warehouse key",
+      "key_item": "Warehouse Key",
       "scene_code": "s230",
       "in_item_pool": true
     },
     {
       "name": "Paradise Plaza",
-      "key_item": "Paradise Plaza key",
+      "key_item": "Paradise Plaza Key",
       "scene_code": "s200",
       "in_item_pool": true
     },
     {
       "name": "Colby's Movieland",
-      "key_item": "Colby's Movieland key",
+      "key_item": "Colby's Movieland Key",
       "scene_code": "s503",
       "in_item_pool": true
     },
     {
       "name": "Leisure Park",
-      "key_item": "Leisure Park key",
+      "key_item": "Leisure Park Key",
       "scene_code": "s700",
       "in_item_pool": true
     },
     {
       "name": "North Plaza",
-      "key_item": "North Plaza key",
+      "key_item": "North Plaza Key",
       "scene_code": "s400",
       "in_item_pool": true
     },
     {
       "name": "Crislip's Home Saloon",
-      "key_item": "Crislip's Home Saloon key",
+      "key_item": "Crislip's Home Saloon Key",
       "scene_code": "s501",
       "in_item_pool": true
     },
     {
       "name": "Food Court",
-      "key_item": "Food Court key",
+      "key_item": "Food Court Key",
       "scene_code": "sa00",
       "in_item_pool": true
     },
     {
       "name": "Wonderland Plaza",
-      "key_item": "Wonderland Plaza key",
+      "key_item": "Wonderland Plaza Key",
       "scene_code": "s300",
       "in_item_pool": true
     },
     {
       "name": "Al Fresca Plaza",
-      "key_item": "Al Fresca Plaza key",
+      "key_item": "Al Fresca Plaza Key",
       "scene_code": "s900",
       "in_item_pool": true
     },
     {
       "name": "Entrance Plaza",
-      "key_item": "Entrance Plaza key",
+      "key_item": "Entrance Plaza Key",
       "scene_code": "s100",
       "in_item_pool": true
     },
     {
       "name": "Seon's Food and Stuff",
-      "key_item": "Seon's Food and Stuff key",
+      "key_item": "Seon's Food and Stuff Key",
       "scene_code": "s500",
       "in_item_pool": true
     },
     {
       "name": "Maintenance Tunnel",
-      "key_item": "Maintenance Tunnel key",
+      "key_item": "Maintenance Tunnel Key",
       "scene_code": "s600",
       "in_item_pool": true
     },
     {
       "name": "Carlito's Hideout",
-      "key_item": "Carlito's Hideout key",
+      "key_item": "Carlito's Hideout Key",
       "scene_code": "s401",
       "in_item_pool": true
     }
@@ -101,7 +101,7 @@
   "split_areas": [
     {
   "name": "Security Room - Rooftop",
-  "key_item": "Rooftop - Security Key",
+  "key_item": "Rooftop - Security Room Key",
   "transitions": [
     {
       "origin": "s136",
@@ -129,7 +129,7 @@
     },
     {
   "name": "Paradise Plaza - Warehouse",
-  "key_item": "Paradise - Warehouse Key",
+  "key_item": "Paradise Plaza - Warehouse Key",
   "transitions": [
     {
       "origin": "s200",
@@ -143,7 +143,7 @@
     },
     {
   "name": "Leisure Park - Paradise Plaza",
-  "key_item": "Leisure - Paradise Key",
+  "key_item": "Leisure Park - Paradise Plaza Key",
   "transitions": [
     {
       "origin": "s700",
@@ -157,7 +157,7 @@
     },
     {
   "name": "Colby's Movieland - Paradise Plaza",
-  "key_item": "Colby's - Paradise Key",
+  "key_item": "Colby's Movieland - Paradise Plaza Key",
   "transitions": [
     {
       "origin": "s503",
@@ -171,7 +171,7 @@
     },
     {
   "name": "Entrance Plaza - Paradise Plaza",
-  "key_item": "Entrance - Paradise Key",
+  "key_item": "Entrance Plaza - Paradise Plaza Key",
   "transitions": [
     {
       "origin": "s100",
@@ -185,7 +185,7 @@
     },
     {
   "name": "Entrance Plaza - Security Room",
-  "key_item": "Entrance - Security Key",
+  "key_item": "Entrance Plaza - Security Room Key",
   "transitions": [
     {
       "origin": "s100",
@@ -199,7 +199,7 @@
     },
     {
   "name": "Al Fresca - Entrance Plaza",
-  "key_item": "Entrance - Fresca Key",
+  "key_item": "Al Fresca Plaza - Entrance Plaza Key",
   "transitions": [
     {
       "origin": "s900",
@@ -213,7 +213,7 @@
     },
     {
   "name": "Al Fresca Plaza - Food Court",
-  "key_item": "Food - Fresca Key",
+  "key_item": "Al Fresca Plaza - Food Court Key",
   "transitions": [
     {
       "origin": "s900",
@@ -227,7 +227,7 @@
     },
     {
   "name": "Food Court - Leisure Park",
-  "key_item": "Food - Leisure Key",
+  "key_item": "Food Court - Leisure Park Key",
   "transitions": [
     {
       "origin": "sa00",
@@ -241,7 +241,7 @@
     },
     {
   "name": "Food Court - Wonderland Plaza",
-  "key_item": "Food - Wonderland Key",
+  "key_item": "Food Court - Wonderland Plaza Key",
   "transitions": [
     {
       "origin": "sa00",
@@ -255,7 +255,7 @@
     },
     {
   "name": "North Plaza - Wonderland Plaza",
-  "key_item": "North - Wonderland Key",
+  "key_item": "North Plaza - Wonderland Plaza Key",
   "transitions": [
     {
       "origin": "s400",
@@ -269,7 +269,7 @@
     },
     {
   "name": "Leisure Park - North Plaza",
-  "key_item": "Leisure - North Key",
+  "key_item": "Leisure Park - North Plaza Key",
   "transitions": [
     {
       "origin": "s700",
@@ -283,7 +283,7 @@
     },
     {
   "name": "Crislip's Home Saloon - North Plaza",
-  "key_item": "Crislip's - North Key",
+  "key_item": "Crislip's Home Saloon - North Plaza Key",
   "transitions": [
     {
       "origin": "s501",
@@ -297,7 +297,7 @@
     },
     {
   "name": "Hideout - North Plaza",
-  "key_item": "Hideout - North Key",
+  "key_item": "Carlito's Hideout - North Plaza Key",
   "transitions": [
     {
       "origin": "s401",
@@ -311,7 +311,7 @@
     },
     {
   "name": "North Plaza - Seon's Food and Stuff",
-  "key_item": "North - Seon's Key",
+  "key_item": "North Plaza - Seon's Food and Stuff Key",
   "transitions": [
     {
       "origin": "s400",
@@ -325,7 +325,7 @@
     },
     {
   "name": "Leisure Park - Maintenance Tunnel",
-  "key_item": "Leisure - Maintenance Key",
+  "key_item": "Leisure Park - Maintenance Tunnel Key",
   "transitions": [
     {
       "origin": "s700",
@@ -339,7 +339,7 @@
     },
     {
   "name": "Maintenance Tunnel - Paradise Plaza",
-  "key_item": "Maintenance - Paradise Key",
+  "key_item": "Maintenance Tunnel - Paradise Plaza Key",
   "transitions": [
     {
       "origin": "s600",
@@ -353,7 +353,7 @@
     },
     {
   "name": "Maintenance Tunnel - Entrance Plaza",
-  "key_item": "Entrance - Maintenance Key",
+  "key_item": "Entrance Plaza - Maintenance Tunnel Key",
   "transitions": [
     {
       "origin": "s600",
@@ -367,7 +367,7 @@
     },
     {
   "name": "Maintenance Tunnel - Al Fresca Plaza",
-  "key_item": "Fresca - Maintenance Key",
+  "key_item": "Al Fresca Plaza - Maintenance Tunnel Key",
   "transitions": [
     {
       "origin": "s600",
@@ -381,7 +381,7 @@
     },
     {
   "name": "Maintenance Tunnel - Food Court",
-  "key_item": "Food - Maintenance Key",
+  "key_item": "Food Court - Maintenance Tunnel Key",
   "transitions": [
     {
       "origin": "s600",
@@ -395,7 +395,7 @@
     },
     {
   "name": "Maintenance Tunnel - Wonderland Plaza",
-  "key_item": "Maintenance - Wonderland Key",
+  "key_item": "Maintenance Tunnel - Wonderland Plaza Key",
   "transitions": [
     {
       "origin": "s600",
@@ -409,7 +409,7 @@
     },
     {
   "name": "Maintenance Tunnel - Seon's Food and Stuff",
-  "key_item": "Maintenance - Seon's Key",
+  "key_item": "Maintenance Tunnel - Seon's Food and Stuff Key",
   "transitions": [
     {
       "origin": "s600",
@@ -423,7 +423,7 @@
     },
     {
   "name": "Paradise Plaza - Wonderland Plaza",
-  "key_item": "Paradise - Wonderland Key",
+  "key_item": "Paradise Plaza - Wonderland Plaza Key",
   "transitions": [
     {
       "origin": "s200",

@@ -448,13 +448,13 @@ class PPStickersFiller(Toggle):
 class SplitKeys(Toggle):
     """
     Normally, an area key opens all doors leading into an area. The 'Wonderland
-    Plaza key' opens the doors to it from both North Plaza and the Food Court.
+    Plaza Key' opens the doors to it from both North Plaza and the Food Court.
 
     In Split Keys, each individual entrance has its own key. Entering Wonderland
-    Plaza from North Plaza would require the 'North - Wonderland Key'. Entering
-    from Food Court, however, would require the 'Food - Wonderland Key'.
+    Plaza from North Plaza would require the 'North Plaza - Wonderland Plaza Key'. Entering
+    from Food Court, however, would require the 'Food Court - Wonderland Plaza Key'.
 
-    Keys work in both directions. The 'Leisure - Paradise Key' opens the door from
+    Keys work in both directions. The 'Leisure Park - Paradise Plaza Key' opens the door from
     both Leisure Park into Paradise Plaza and from Paradise Plaza into Leisure Park.
 
     Each key is named by area alphabetically (Crislip's - North, Food - Fresca, etc).

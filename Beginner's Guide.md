@@ -116,6 +116,6 @@ DRDR can be an intimidating AP to play at first. The HUD isn't entirely clear on
 - pp_bonus_locations: Enabled
 - restricted_item_mode: Disabled
 - cult_limited: Enabled
-- start_inventory_from_pool: Rooftop key: 1, Warehouse key: 1
-- start_hints: Paradise Plaza key, Entrance Plaza key, Al Fresca Plaza key, Leisure Park key, Maintenance Tunnel key, Maintenance Tunnel Access Key
+- start_inventory_from_pool: Rooftop Key: 1, Warehouse Key: 1
+- start_hints: Paradise Plaza Key, Entrance Plaza Key, Al Fresca Plaza Key, Leisure Park Key, Maintenance Tunnel Key, Maintenance Tunnel Access Key
 - exclude_locations: Escort 8 survivors at once, Frank the pimp, Photograph 30 survivors, Encounter 50 survivors, Get 50 survivors to join, Save 50 survivors, Kill 8 psychopaths, Photograph 8 psychopaths, Photograph 70 PP Stickers, Photograph 80 PP Stickers, Photograph 90 PP Stickers, Photograph all PP Stickers, Change into 46 new outfits
