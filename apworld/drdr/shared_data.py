@@ -213,6 +213,28 @@ SPLIT_AREA_NAMES: List[str] = [s["name"] for s in SPLIT_AREAS if s.get("name")]
 
 SPLIT_KEY_NAMES: List[str] = [s["key_item"] for s in SPLIT_AREAS if s.get("key_item")]
 
+# Area code -> the codes reachable through one door. Read by the rules for
+# sanity checks and by the mod to answer "can the player get there yet",
+# which is what stops a scoop starting behind a locked door.
+AREA_GRAPH: Dict[str, List[str]] = _DATA.get("area_graph", {})
+
+# Split Keys only: escorts that walk a fixed route need those exact doors, so
+# reaching the regions another way is not enough. The mod gates on the same
+# list, or it starts a mission the logic says is not available.
+SCOOP_SPLIT_KEY_DOORS: Dict[str, List[str]] = {
+    s["name"]: list(s["required_split_keys"])
+    for s in SCOOPS
+    if s.get("required_split_keys")
+}
+
+# Region(s) the player must physically reach to complete each scoop. Lives
+# here rather than in Rules.py because the mod gates on the same list.
+SCOOP_REGION_REQUIREMENTS: Dict[str, List[str]] = {
+    s["name"]: list(s["required_regions"])
+    for s in SCOOPS
+    if s.get("required_regions")
+}
+
 TIME_KEY_NAMES: List[str] = [t["name"] for t in TIME_KEYS if t.get("name")]
 
 

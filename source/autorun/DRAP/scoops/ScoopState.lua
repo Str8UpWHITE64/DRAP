@@ -57,6 +57,11 @@ local cfg = {
     -- the prereq protects against)
     flag_prereq_bypass = {},
     item_requirements = {},    -- name -> AP item name (Hideout key)
+    region_requirements = {},  -- name -> { area codes the scoop needs }
+    any_order = false,         -- player picks which main scoop to start
+    split_keys = false,        -- Split Keys option is on
+    split_key_doors = {},      -- name -> { split key items the route needs }
+    can_reach_area = function(_) return true end,
     chain_final = nil,         -- scoop auto-unlocked when the chain ends
     log = function(_) end,
     now = function() return 0 end,
@@ -204,6 +209,87 @@ function M.get_current_chain_index()
     return #M.scoop_order + 1
 end
 
+-- Any Order support -------------------------------------------------------
+--
+-- A main scoop can be started when the player holds its item, can walk to
+-- every region it needs, and has no other main scoop already running. The
+-- reachability question is the same one that defers a scoop in the chain,
+-- so both modes refuse for the same reasons.
+
+--- The main scoop currently running, if any. Received but not completed.
+function M.set_any_order(v)
+    cfg.any_order = v == true
+end
+
+function M.set_split_keys(v)
+    cfg.split_keys = v == true
+end
+
+function M.is_any_order()
+    return cfg.any_order == true
+end
+
+function M.active_main_scoop()
+    for _, name in ipairs(M.scoop_order) do
+        if M.received[name] and not M.completed[name] then return name end
+    end
+    return nil
+end
+
+--- Why `scoop_name` cannot be started right now, or nil if it can.
+function M.main_scoop_blocker(scoop_name)
+    if not cfg.any_order then return "not in any-order mode" end
+    if not ap_activated then return "not started yet" end
+    if M.completed[scoop_name] then return "already done" end
+    if M.received[scoop_name] then return "already running" end
+    if not M.ap_received[scoop_name] then return "not received" end
+
+    local active = M.active_main_scoop()
+    if active then return string.format("'%s' is still running", active) end
+
+    for _, code in ipairs(cfg.region_requirements[scoop_name] or {}) do
+        if not cfg.can_reach_area(code) then
+            return "cannot get there yet"
+        end
+    end
+    if cfg.split_keys then
+        for _, key in ipairs(cfg.split_key_doors[scoop_name] or {}) do
+            if not cfg.has_item(key) then
+                return "needs " .. key
+            end
+        end
+    end
+    return nil
+end
+
+--- Main scoops in order, each with what the UI needs to draw a row.
+function M.main_scoop_menu()
+    local out = {}
+    for i, name in ipairs(M.scoop_order) do
+        out[#out + 1] = {
+            name = name,
+            position = i,
+            completed = M.completed[name] == true,
+            running = (M.received[name] and not M.completed[name]) == true,
+            held = M.ap_received[name] == true,
+            blocker = M.main_scoop_blocker(name),
+        }
+    end
+    return out
+end
+
+--- Start a main scoop the player chose. Returns ok, reason.
+function M.activate_main_scoop(scoop_name)
+    local blocker = M.main_scoop_blocker(scoop_name)
+    if blocker then
+        cfg.log(string.format("Refused to start '%s': %s", scoop_name, blocker))
+        return false, blocker
+    end
+    cfg.log(string.format("Starting '%s' by player choice", scoop_name))
+    M.request_unlock(scoop_name)
+    return true, nil
+end
+
 function M.get_current_chain_scoop()
     local idx = M.get_current_chain_index()
     if idx > 0 and idx <= #M.scoop_order then
@@ -215,6 +301,22 @@ end
 function M.try_advance_chain()
     if not scoop_order_set or #M.scoop_order == 0 then return end
     if not ap_activated then return end
+
+    -- Any Order: the player starts scoops themselves, so nothing is unlocked
+    -- automatically. The all-complete tail below still runs, since The Facts
+    -- is not something they choose.
+    if cfg.any_order then
+        for _, name in ipairs(M.scoop_order) do
+            if not M.completed[name] then return end
+        end
+        local final = cfg.chain_final
+        if final and not M.received[final] and not M.completed[final] then
+            cfg.log(string.format(
+                "All main scoops completed -- triggering '%s'", final))
+            M.request_unlock(final)
+        end
+        return
+    end
 
     for i, name in ipairs(M.scoop_order) do
         if not M.completed[name] then
@@ -318,6 +420,33 @@ function M.request_unlock(scoop_name)
         return false, "item"
     end
 
+    -- Do not start a mission the player cannot walk to. The rules already
+    -- require these regions for the check, so the mission would sit active
+    -- and unreachable until the right key turned up.
+    for _, code in ipairs(cfg.region_requirements[scoop_name] or {}) do
+        if not cfg.can_reach_area(code) then
+            poll_deferred[scoop_name] = "region"
+            cfg.log(string.format(
+                "Region deferred: '%s' -- cannot reach %s yet", scoop_name, code))
+            return false, "region"
+        end
+    end
+
+    -- Split Keys: the two escorts walk a fixed route, so those exact doors
+    -- have to be open. Reaching the regions some other way is not enough --
+    -- the rules demand these keys, and starting without them hands the
+    -- player a mission the logic says they cannot finish.
+    if cfg.split_keys then
+        for _, key in ipairs(cfg.split_key_doors[scoop_name] or {}) do
+            if not cfg.has_item(key) then
+                poll_deferred[scoop_name] = "split_key"
+                cfg.log(string.format(
+                    "Route deferred: '%s' -- waiting for '%s'", scoop_name, key))
+                return false, "split_key"
+            end
+        end
+    end
+
     poll_deferred[scoop_name] = nil
     M.received[scoop_name] = true
     cfg.on_unlock(scoop_name, scoop)
@@ -338,6 +467,16 @@ function M.poll_deferred_retries()
             elseif reason == "item" then
                 local item = cfg.item_requirements[scoop_name]
                 ready = item and cfg.has_item(item)
+            elseif reason == "split_key" then
+                ready = true
+                for _, key in ipairs(cfg.split_key_doors[scoop_name] or {}) do
+                    if not cfg.has_item(key) then ready = false break end
+                end
+            elseif reason == "region" then
+                ready = true
+                for _, code in ipairs(cfg.region_requirements[scoop_name] or {}) do
+                    if not cfg.can_reach_area(code) then ready = false break end
+                end
             end
             if ready then table.insert(to_retry, scoop_name) end
         else

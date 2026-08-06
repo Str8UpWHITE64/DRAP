@@ -17,32 +17,12 @@ from rule_builder.rules import (
 
 from .Locations import DRLocationCategory, location_tables
 from .shared_data import (
-    SCOOP_COMPLETION_MAP, SCOOP_EVENTS,
+    SCOOP_COMPLETION_MAP, SCOOP_EVENTS, SCOOP_REGION_REQUIREMENTS,
+    SCOOP_SPLIT_KEY_DOORS as SPLIT_KEY_SCOOP_DOORS,
     AP_TRIGGER_LOCATIONS, expand_trigger_location_names,
     trigger_location_required_regions,
 )
 
-# Region(s) the player must physically reach to complete each scoop.
-# Scoops in the Security Room (always reachable) are omitted.
-SCOOP_REGION_REQUIREMENTS = {
-    "Backup for Brad": ["Food Court", "Entrance Plaza"],
-    "Rescue the Professor": ["Entrance Plaza", "Paradise Plaza"],
-    "Medicine Run": ["Seon's Food and Stuff"],
-    "Girl Hunting": ["North Plaza"],
-    "A Promise to Isabela": ["North Plaza", "Rooftop"],
-    "The Last Resort": ["Maintenance Tunnel", "Leisure Park"],
-    "Hideout": ["Paradise Plaza", "Leisure Park", "North Plaza", "Carlito's Hideout"],
-    "The Butcher": ["Maintenance Tunnel"],
-}
-
-# Split Keys only. These escorts walk a fixed route, so those doors must be
-# open -- reaching the regions another way is not enough. The ScoopSanity
-# loop rebuilds scoop rules from scratch and would otherwise drop them.
-SPLIT_KEY_SCOOP_DOORS = {
-    "Rescue the Professor": ["Entrance Plaza - Paradise Plaza Key"],
-    "Hideout": ["Paradise Plaza - Warehouse Key", "Leisure Park - Paradise Plaza Key",
-                "Leisure Park - North Plaza Key", "Carlito's Hideout - North Plaza Key"],
-}
 
 # Level requirements for each main scoop position (0-indexed) in the shuffled order.
 # Scoops at higher positions require higher levels, spreading them across spheres.
@@ -644,12 +624,21 @@ def set_rules(world) -> None:
     # Day items aren't checked -- the engine sets time flags on chain advance.
     if world.options.scoop_sanity and world.scoop_order:
         for i, scoop_name in enumerate(world.scoop_order):
-            prereq = ("Meet Jessie in the Warehouse" if i == 0
-                      else SCOOP_COMPLETION_MAP[world.scoop_order[i - 1]])
+            # Any Order drops the chain link: every scoop answers only to
+            # meeting Jessie, its own item, its regions and its level gate.
+            if world.options.main_scoops_any_order or i == 0:
+                prereq = "Meet Jessie in the Warehouse"
+            else:
+                prereq = SCOOP_COMPLETION_MAP[world.scoop_order[i - 1]]
             regions = SCOOP_REGION_REQUIREMENTS.get(scoop_name, [])
-            level_req = (SCOOP_POSITION_LEVEL_GATES[i]
-                         if i < len(SCOOP_POSITION_LEVEL_GATES)
-                         else None)
+            # The level gates spread a CHAIN across spheres. Choosing the order
+            # already does that, and the mod does not enforce them, so keeping
+            # them would only put scoops in logic the player can already start.
+            level_req = None
+            if not world.options.main_scoops_any_order:
+                level_req = (SCOOP_POSITION_LEVEL_GATES[i]
+                             if i < len(SCOOP_POSITION_LEVEL_GATES)
+                             else None)
             for event_name in SCOOP_EVENTS[scoop_name]:
                 loc = world.multiworld.get_location(event_name, world.player)
                 _scoop_rule = And(Has(scoop_name), CanReachLocation(prereq),
@@ -663,11 +652,18 @@ def set_rules(world) -> None:
                                         SPLIT_KEY_SCOOP_DOORS.get(scoop_name, ())])
                 world.set_rule(loc, _scoop_rule)
 
-        # Complete Memories is the post-chain anchor; gates on the last
-        # randomized scoop's completion regardless of which scoop that is.
-        last_completion = SCOOP_COMPLETION_MAP[world.scoop_order[-1]]
+        # Complete Memories is the post-chain anchor. In a chain, finishing the
+        # last scoop proves every earlier one is done, so it gates on that
+        # alone. Any Order breaks that implication -- the last-placed scoop can
+        # be taken first -- so there it has to name all of them.
+        if world.options.main_scoops_any_order:
+            _memories = And(*[CanReachLocation(SCOOP_COMPLETION_MAP[s])
+                              for s in world.scoop_order])
+        else:
+            _memories = CanReachLocation(
+                SCOOP_COMPLETION_MAP[world.scoop_order[-1]])
         world.set_rule(world.multiworld.get_location("Complete Memories", world.player),
-                      CanReachLocation(last_completion))
+                      _memories)
 
 
     # --------------------------------------------------------------------

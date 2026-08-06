@@ -142,6 +142,22 @@ class RandomizeScoopOrder(DefaultOnToggle):
     display_name = "Randomize Scoop Order"
 
 
+class MainScoopsAnyOrder(Toggle):
+    """
+    When enabled, any main scoop you have received can be started as soon as
+    you can reach it, instead of waiting for its turn in the chain. Activate
+    the one you want from the Scoops window; only one runs at a time.
+
+    The per-position level requirements do not apply in this mode. They exist
+    to spread a fixed chain across the run, which choosing the order already
+    does, so a scoop is available as soon as you can reach it.
+
+    Has no effect if ScoopSanity is disabled.
+    """
+    display_name = "Main Scoops In Any Order"
+    default = False
+
+
 class ExcludeLevels(Toggle):
     """
     When enabled, high level-up checks are prevented from having progression items.
@@ -495,6 +511,7 @@ class DROption(PerGameCommonOptions):
     randomize_rooftop_service_hallway_doors: RandomizeRooftopServiceHallwayDoors
     scoop_sanity: ScoopSanity
     randomize_scoop_order: RandomizeScoopOrder
+    main_scoops_any_order: MainScoopsAnyOrder
     exclude_levels: ExcludeLevels
     exclude_levels_above: ExcludeLevelsAbove
     enable_skill_items: EnableSkillItems
@@ -523,6 +540,7 @@ dr_option_groups = [
             NumberOfSurvivors,
             ScoopSanity,
             RandomizeScoopOrder,
+            MainScoopsAnyOrder,
             PpBonusLocations,
             ExcludeLevels,
             ExcludeLevelsAbove,

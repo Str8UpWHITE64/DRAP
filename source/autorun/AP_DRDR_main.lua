@@ -373,7 +373,16 @@ local function run_slot_connect(slot_data)
     if AP.DoorSceneLock then
         AP.DoorSceneLock.set_split_keys_enabled(split_keys_enabled)
     end
+    AP.ScoopUnlocker.set_split_keys_enabled(split_keys_enabled)
     log("Split Keys enabled=" .. tostring(split_keys_enabled))
+
+    -- Main Scoops In Any Order: the chain stops auto-advancing and the
+    -- player picks the next main scoop from the Scoops window.
+    local any_order_enabled = (type(slot_data) == "table"
+        and slot_data.main_scoops_any_order == true)
+    AP.MainScoopsAnyOrder = any_order_enabled
+    AP.ScoopUnlocker.set_any_order_enabled(any_order_enabled)
+    log("Main scoops in any order enabled=" .. tostring(any_order_enabled))
 
     -- Goal option
     local goal = (type(slot_data) == "table" and slot_data.goal) or 0

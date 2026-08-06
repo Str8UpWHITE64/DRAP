@@ -659,6 +659,7 @@ class DRWorld(World):
         hostile_max = int(self.options.hostile_survivor_count_max.value)
         cult_limited_enabled = bool(self.options.cult_limited.value)
         split_keys_enabled = bool(self.options.split_keys.value)
+        any_order_enabled = bool(self.options.main_scoops_any_order.value)
         survivor_respawn_enabled = bool(self.options.survivor_respawn.value)
         # Hardcore implies Night — auto-enable Night when Hardcore is on so
         # the Lua side can rely on the single flag without extra logic.
@@ -733,6 +734,7 @@ class DRWorld(World):
                 "hostile_survivor_count_max": hostile_max,
                 "cult_limited": cult_limited_enabled,
                 "split_keys": split_keys_enabled,
+                "main_scoops_any_order": any_order_enabled,
                 "survivor_respawn": survivor_respawn_enabled,
                 "night_mode_enabled": night_mode_enabled,
                 "hardcore_zombies_enabled": hardcore_zombies_enabled,
@@ -764,6 +766,7 @@ class DRWorld(World):
             "hostile_survivor_count_max": hostile_max,
             "cult_limited": cult_limited_enabled,
             "split_keys": split_keys_enabled,
+            "main_scoops_any_order": any_order_enabled,
             "survivor_respawn": survivor_respawn_enabled,
             "night_mode_enabled": night_mode_enabled,
             "hardcore_zombies_enabled": hardcore_zombies_enabled,

@@ -1379,6 +1379,56 @@ end
 -- Wire the pure state machine to this module's engine adapters. Must run
 -- after the locals it captures (raw_check_flag,
 -- apply_unlock_writes, save_state) are defined.
+-- Scoop -> the area codes it needs reachable, from drdr_shared.json's
+-- required_regions. Region names are mapped through the areas table so the
+-- rules and the mod stay keyed on the same list.
+-- Scoop -> the split keys its route needs, from drdr_shared.json. Only
+-- consulted when Split Keys is on; the other modes have no such items.
+local function build_split_key_doors()
+    local out, n = {}, 0
+    for _, scoop in ipairs(SharedData.scoops()) do
+        local keys = scoop.required_split_keys
+        if scoop.name and keys and #keys > 0 then
+            out[scoop.name] = keys
+            n = n + 1
+        end
+    end
+    M.log(string.format("Split-key routes loaded for %d scoop(s)", n))
+    return out
+end
+
+local function build_region_requirements()
+    local code_for = {}
+    for _, area in ipairs(SharedData.areas()) do
+        if area.name and area.scene_code then
+            code_for[area.name] = area.scene_code
+        end
+    end
+    local out, n = {}, 0
+    for _, scoop in ipairs(SharedData.scoops()) do
+        local regions = scoop.required_regions
+        if scoop.name and regions and #regions > 0 then
+            local codes = {}
+            for _, region in ipairs(regions) do
+                local code = code_for[region]
+                if code then
+                    codes[#codes + 1] = code
+                else
+                    M.log(string.format(
+                        "region requirement '%s' for '%s' has no area code",
+                        tostring(region), tostring(scoop.name)))
+                end
+            end
+            if #codes > 0 then
+                out[scoop.name] = codes
+                n = n + 1
+            end
+        end
+    end
+    M.log(string.format("Region requirements loaded for %d scoop(s)", n))
+    return out
+end
+
 State.init({
     scoop_data = SCOOP_DATA,
     conflict_groups = CONFLICT_GROUPS,
@@ -1386,7 +1436,10 @@ State.init({
     prerequisites = SCOOP_PREREQUISITES,
     flag_prerequisites = SCOOP_FLAG_PREREQUISITES,
     flag_prereq_bypass = { ["Mark of the Sniper"] = "any_main_completed" },
-    item_requirements = { ["Hideout"] = "Carlito's Hideout Key" },
+    -- Hideout used to wait on "Carlito's Hideout Key" by name, which does not
+    -- exist under Split Keys. Its required_regions already include Carlito's
+    -- Hideout, and reaching that asks the right question in every mode.
+    item_requirements = {},
     chain_final = "The Facts",
     log = M.log,
     now = os.clock,
@@ -1397,7 +1450,17 @@ State.init({
     end,
     on_unlock = apply_unlock_writes,
     on_state_changed = function() save_state() end,
+    region_requirements = build_region_requirements(),
+    split_key_doors = build_split_key_doors(),
+    can_reach_area = function(code)
+        local dsl = AP and AP.DoorSceneLock
+        -- No lock module means no locks to respect; never hold a
+        -- scoop back on a question we cannot answer.
+        if not (dsl and dsl.can_reach_area) then return true end
+        return dsl.can_reach_area(code)
+    end,
 })
+
 
 -- World-stability gate: unlock flag-writes must never land during load
 -- screens, the title screen, or just after a load. An item replaying on
@@ -1783,6 +1846,26 @@ function M.is_scoop_sanity_enabled()
     return scoop_sanity_enabled
 end
 
+-- Any Order: the chain stops auto-advancing and the player starts main
+-- scoops from the GUI instead. State owns the rules; this just forwards.
+function M.set_split_keys_enabled(enabled)
+    State.set_split_keys(enabled == true)
+    M.log("Split key routes " .. (enabled and "ENFORCED" or "off"))
+end
+
+function M.set_any_order_enabled(enabled)
+    State.set_any_order(enabled == true)
+    M.log("Main scoops in any order " .. (enabled and "ENABLED" or "DISABLED"))
+end
+
+function M.main_scoop_menu()
+    return State.main_scoop_menu()
+end
+
+function M.activate_main_scoop(name)
+    return State.activate_main_scoop(name)
+end
+
 function M.set_cult_limited_enabled(enabled)
     cult_limited_enabled = enabled
     M.log("Cultists " .. (enabled and "ENABLED" or "DISABLED"))
@@ -1953,22 +2036,44 @@ function M.draw_tab_content(debug)
         imgui.separator()
 
         if not debug then
-            imgui.text("Main Story:")
+            local any_order = State.is_any_order()
+            local running = any_order and State.active_main_scoop() or nil
+            imgui.text(any_order and "Main Story (pick one):" or "Main Story:")
             for i, name in ipairs(scoop_order) do
                 local color
                 local has_item = ap_received[name] or received_scoops[name]
+                -- In any-order there is no "current" scoop, so the highlight
+                -- follows whichever one the player started.
+                local highlight = any_order and running or current_chain_name
                 if completed_scoops[name] then
                     color = 0xFF888888          -- gray: completed
-                elseif name == current_chain_name and has_item then
+                elseif name == highlight and has_item then
                     color = 0xFF00FF00          -- green: current + received
-                elseif name == current_chain_name then
+                elseif name == highlight then
                     color = 0xFF0000FF          -- red: current + not received (yellow was confusing)
                 elseif has_item then
                     color = 0xFFFF8800          -- blue: received + not current
                 else
                     color = 0xFF0000FF          -- red: not received + not current
                 end
-                imgui.text_colored(string.format("  %d. %s", i, name), color)
+
+                local label = string.format("  %d. %s", i, name)
+                if any_order and not completed_scoops[name] then
+                    local blocker = State.main_scoop_blocker(name)
+                    if blocker == nil then
+                        if imgui.button("Start##" .. name) then
+                            M.activate_main_scoop(name)
+                        end
+                        imgui.same_line()
+                        imgui.text_colored(label, color)
+                    else
+                        -- Say why rather than dropping the row; "where did it
+                        -- go" is a worse question than "why can I not."
+                        imgui.text_colored(label .. "  -- " .. blocker, color)
+                    end
+                else
+                    imgui.text_colored(label, color)
+                end
             end
         else
             local chain_idx = M.get_current_chain_index()

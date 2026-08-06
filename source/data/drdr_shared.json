@@ -2970,6 +2970,7 @@
   "scoops": [
     {
       "name": "Backup for Brad",
+      "required_regions": ["Food Court", "Entrance Plaza"],
       "category": "Main",
       "order": 2,
       "primary_flag": 268,
@@ -3050,6 +3051,8 @@
     },
     {
       "name": "Rescue the Professor",
+      "required_split_keys": ["Entrance Plaza - Paradise Plaza Key"],
+      "required_regions": ["Entrance Plaza", "Paradise Plaza"],
       "category": "Main",
       "order": 6,
       "primary_flag": 275,
@@ -3080,6 +3083,7 @@
     },
     {
       "name": "Medicine Run",
+      "required_regions": ["Seon's Food and Stuff"],
       "category": "Main",
       "order": 7,
       "primary_flag": 2311,
@@ -3137,6 +3141,7 @@
     },
     {
       "name": "Girl Hunting",
+      "required_regions": ["North Plaza"],
       "category": "Main",
       "order": 9,
       "primary_flag": 284,
@@ -3164,6 +3169,7 @@
     },
     {
       "name": "A Promise to Isabela",
+      "required_regions": ["North Plaza", "Rooftop"],
       "category": "Main",
       "order": 10,
       "primary_flag": 773,
@@ -3228,6 +3234,7 @@
     },
     {
       "name": "The Last Resort",
+      "required_regions": ["Maintenance Tunnel", "Leisure Park"],
       "category": "Main",
       "order": 12,
       "primary_flag": 294,
@@ -3259,6 +3266,8 @@
     },
     {
       "name": "Hideout",
+      "required_split_keys": ["Paradise Plaza - Warehouse Key", "Leisure Park - Paradise Plaza Key", "Leisure Park - North Plaza Key", "Carlito's Hideout - North Plaza Key"],
+      "required_regions": ["Paradise Plaza", "Leisure Park", "North Plaza", "Carlito's Hideout"],
       "category": "Main",
       "order": 13,
       "primary_flag": 776,
@@ -3321,6 +3330,7 @@
     },
     {
       "name": "The Butcher",
+      "required_regions": ["Maintenance Tunnel"],
       "category": "Main",
       "order": 15,
       "primary_flag": 302,
@@ -4650,5 +4660,24 @@
       "scq_no": 9,
       "pos_tbl": 31
     }
-  ]
+  ],
+  "area_graph": {
+    "s100": ["s136", "s200", "s600", "s900"],
+    "s135": ["s136"],
+    "s136": ["s100", "s135", "s231"],
+    "s200": ["s100", "s230", "s300", "s503", "s600", "s700"],
+    "s230": ["s200", "s231"],
+    "s231": ["s136", "s230"],
+    "s300": ["s200", "s400", "s600", "sa00"],
+    "s400": ["s300", "s401", "s500", "s501", "s700"],
+    "s401": ["s400"],
+    "s500": ["s400", "s600"],
+    "s501": ["s400"],
+    "s503": ["s200"],
+    "s600": ["s100", "s200", "s300", "s500", "s601", "s700", "s900", "sa00"],
+    "s601": ["s600"],
+    "s700": ["s200", "s400", "s600", "sa00"],
+    "s900": ["s100", "s600", "sa00"],
+    "sa00": ["s300", "s600", "s700", "s900"]
+  }
 }

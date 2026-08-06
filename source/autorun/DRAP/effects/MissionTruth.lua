@@ -369,6 +369,16 @@ end
 local function compute_target()
     if not scoop_unlocker then return nil end
     if State.is_endgame_reached() then return nil end
+    -- Any Order has no "next" scoop -- the player picks. Show the one they
+    -- actually started, or the placeholder. Falling back to the chain here
+    -- put the first unfinished scoop in the box just for being held, so the
+    -- HUD named a mission that was not running.
+    if State.is_any_order() then
+        local running = State.active_main_scoop()
+        if running then return target_for_main(running) end
+        return make_target(WAITING_TITLE, WAITING_INFO, nil, nil)
+    end
+
     -- current objective: chain order if set, else any manually-active main
     local current = scoop_unlocker.get_current_chain_scoop()
     if current and (scoop_unlocker.is_scoop_active(current)
@@ -427,6 +437,11 @@ local frame_installed = false
 
 function M.init(deps)
     scoop_unlocker = deps and deps.scoop_unlocker
+    -- Both tables are rebuilt, not appended to. init used to only append, so
+    -- a second call left every repurposed box listed twice and the HUD drew
+    -- the same objective once per copy.
+    MAIN_CASE_POS = {}
+    repurposed_scoops = {}
     -- main-case pos-table indices (redirect-from set)
     for _, g in ipairs(SharedData.main_case_guides()) do
         if g.pos_tbl then MAIN_CASE_POS[g.pos_tbl] = true end

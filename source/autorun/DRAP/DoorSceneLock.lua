@@ -2,6 +2,7 @@
 -- Disables doors by toggling HIT_DATA.mHitData.Disabled for locked scenes
 
 local Shared = require("DRAP/Shared")
+local SharedData = require("DRAP/SharedData")
 
 local M = Shared.create_module("DoorSceneLock")
 local testing_mode = false
@@ -68,6 +69,7 @@ local HITDATA_PATCHES = {}
 local last_area_index = nil
 local last_level_path = nil
 local pending_rescan = false
+local _warned_no_graph = false
 
 ------------------------------------------------------------
 -- Helpers
@@ -277,7 +279,6 @@ function M.set_split_keys_enabled(enabled)
     LOCKED_SPLIT = {}
 
     if split_keys_enabled then
-        local SharedData = require("DRAP/SharedData")
         local count = 0
         for _, entry in ipairs(SharedData.split_areas()) do
             for _, t in ipairs(entry.transitions or {}) do
@@ -300,8 +301,10 @@ end
 function M.unlock_transition(origin_code, destination_code)
     local from = LOCKED_SPLIT[tostring(origin_code)]
     if from then from[tostring(destination_code)] = nil end
+    -- Deliberately no immediate rescan. Reconnecting replays every split key
+    -- at once, which is 48 unlocks, and each rescan walks the area's layout
+    -- list through reflection. on_frame drains pending_rescan next tick.
     pending_rescan = true
-    rescan_current_area_doors()
 end
 
 function M.is_transition_locked(origin_code, destination_code)
@@ -310,6 +313,57 @@ end
 
 function M.get_split_keys_enabled()
     return split_keys_enabled
+end
+
+------------------------------------------------------------
+-- Reachability
+------------------------------------------------------------
+
+-- Which areas the player could walk to from the safe room right now, given
+-- whatever doors are open. Recomputed per call -- the answer changes every
+-- time a key arrives, and the graph is 17 nodes.
+--
+-- This is the only question that survives all three modes. Area keys lock by
+-- destination scene, Split Keys by transition, and door randomization locks
+-- nothing at all (every key is precollected), so a search over the live lock
+-- state answers all of them without a key list per mode.
+--
+-- Under door randomization the edges are the vanilla ones while the game has
+-- rerouted them. That does not matter here: nothing is locked, so the search
+-- reports everything reachable, which is what the randomizer guarantees.
+function M.reachable_areas(start_code)
+    start_code = tostring(start_code or "s136")
+    local graph = SharedData.area_graph()
+    local seen = { [start_code] = true }
+    local queue, head = { start_code }, 1
+    while head <= #queue do
+        local at = queue[head]
+        head = head + 1
+        for _, to in ipairs(graph[at] or {}) do
+            if not seen[to] and not door_is_locked(at, to) then
+                seen[to] = true
+                queue[#queue + 1] = to
+            end
+        end
+    end
+    return seen
+end
+
+function M.can_reach_area(area_code, start_code)
+    if not area_code then return false end
+    -- An old reframework/data/drdr_shared.json has no area_graph, and without
+    -- it every area reads as unreachable -- which would defer every scoop
+    -- forever and look exactly like a hang. Answer yes when we cannot answer
+    -- at all; the rules still gate the checks either way.
+    if not next(SharedData.area_graph()) then
+        if not _warned_no_graph then
+            _warned_no_graph = true
+            M.log("area_graph missing from shared data -- scoop reachability"
+                .. " gating is off (update reframework/data/drdr_shared.json)")
+        end
+        return true
+    end
+    return M.reachable_areas(start_code)[tostring(area_code)] == true
 end
 
 function M.is_on_title_screen()

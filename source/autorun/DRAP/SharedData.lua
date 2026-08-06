@@ -65,6 +65,14 @@ function M.split_areas()
     return (data and data.split_areas) or {}
 end
 
+-- Area code -> list of codes one door away. Used to answer "can the player
+-- get there yet" against the live door locks, which is what keeps a scoop
+-- from starting behind a door they cannot open.
+function M.area_graph()
+    ensure_loaded()
+    return (data and data.area_graph) or {}
+end
+
 function M.time_keys()
     ensure_loaded()
     return (data and data.time_keys) or {}
