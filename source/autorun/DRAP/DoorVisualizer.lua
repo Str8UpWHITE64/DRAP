@@ -156,6 +156,11 @@ local DOOR_MAP_POSITIONS = {
     ["SCN_s400|s300|door1"] = {262.1, 233.5},
     ["SCN_s300|s400|door1"] = {262.7, 249.2},
     ["SCN_s300|sa00|door0"] = {204.2, 497.4},
+    ["SCN_s300|s600|door0"] = {182.8, 334.7},
+    ["SCN_s600|s300|door0"] = {193.2, 325.3},
+    ["SCN_s100|s600|door0"] = {545.3, 604.6},
+    ["SCN_s600|s100|door0"] = {534.7, 595.4},
+    ["SCN_sa00|s900|door0"] = {257.6, 568.5},
 }
 
 -- Vanilla door definitions: every passable door in the game with its
@@ -212,6 +217,11 @@ local VANILLA_DOORS = {
     ["SCN_sa00|s300|door0"] = {from_area = "sa00", to_area = "s300", door_no = 0},
     ["SCN_sa00|s600|door0"] = {from_area = "sa00", to_area = "s600", door_no = 0},
     ["SCN_sa00|s700|door0"] = {from_area = "sa00", to_area = "s700", door_no = 0},
+    ["SCN_s300|s600|door0"] = {from_area = "s300", to_area = "s600", door_no = 0},
+    ["SCN_s600|s300|door0"] = {from_area = "s600", to_area = "s300", door_no = 0},
+    ["SCN_s100|s600|door0"] = {from_area = "s100", to_area = "s600", door_no = 0},
+    ["SCN_s600|s100|door0"] = {from_area = "s600", to_area = "s100", door_no = 0},
+    ["SCN_sa00|s900|door0"] = {from_area = "sa00", to_area = "s900", door_no = 0},
 }
 
 ------------------------------------------------------------
