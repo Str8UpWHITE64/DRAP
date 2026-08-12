@@ -228,14 +228,23 @@ class DRWorld(World):
                         self._pp_bonus_excluded_names.add(_n)
 
         # Door Locks needs the shuffled layout in the region graph and a
-        # two-way guarantee, so it is paired mode only. Split Keys is not
-        # supported yet -- its keys name area pairs, which the shuffle breaks.
+        # two-way guarantee, so it is paired mode only.
         self.door_locks_active = bool(
             self.options.door_randomizer
             and self.options.door_locks
             and self.options.door_randomizer_mode.value == DOOR_MODE_PAIRED
-            and not self.options.split_keys
         )
+
+        # Door Locks gates each door by the key for the area it now leads to,
+        # so the area keys are the ones that have to be in play. Split Keys
+        # names door pairs instead, which the shuffle has already broken.
+        # Clamped at the option rather than tracked alongside it, because the
+        # item pool and the rules both read it in a dozen places and a second
+        # flag would only have to agree with this one.
+        self.split_keys_clamped = bool(
+            self.door_locks_active and self.options.split_keys)
+        if self.split_keys_clamped:
+            self.options.split_keys.value = 0
 
         # Under ScoopSanity the mall opens off the Security Room door, and that
         # door only opens after Jessie -- who is in the Warehouse. So the route

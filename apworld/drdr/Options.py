@@ -58,7 +58,10 @@ class DoorLocks(Toggle):
     With this on, the logic follows the doors where they actually go and a door
     is locked by the key for wherever it now leads.
 
-    Paired mode only, and the per-door Split Keys option is not supported yet.
+    Paired mode only. A door is locked by the key for the area it now leads to,
+    so this needs the area keys. Selecting 'Door Randomizer', 'Door Locks' and
+    'Split Keys' together swaps the per-door keys out and uses the area keys
+    for that run.
 
     Has no effect if Door Randomizer is disabled.
     """
@@ -589,6 +592,10 @@ class SplitKeys(Toggle):
     This makes the mall even more mazelike, increasing the difficulty. It also means
     that, even if you already have access to an area through another path, each key
     you are sent still matters because they open new shortcuts.
+
+    Selecting this with 'Door Randomizer' and 'Door Locks' swaps back to the
+    area keys for that run. Door Locks gates a door by the key for the area it
+    now leads to, which a per-door key cannot name once the doors have moved.
     """
     display_name = "Split Keys"
     default = False
