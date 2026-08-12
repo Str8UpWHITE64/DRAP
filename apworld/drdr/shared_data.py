@@ -64,6 +64,11 @@ TIME_KEYS: List[Dict[str, Any]] = _DATA.get("time_keys", [])
 ITEMS: List[Dict[str, Any]] = _DATA.get("items", [])
 SURVIVORS: List[Dict[str, Any]] = _DATA.get("survivors", [])
 STICKERS: List[Dict[str, Any]] = _DATA.get("stickers", [])
+# region -> {tier: [thresholds]} for the Zombie Kill Tiers option.
+# Shared because the Lua side needs the same numbers to drive the
+# feature in vanilla, where there is no slot data to send them.
+ZOMBIE_KILL_TIERS: Dict[str, Dict[str, List[int]]] = _DATA.get(
+    "zombie_kill_tiers", {})
 
 # Scoop name -> list of survivor display names rescued as part of that scoop.
 # Only includes scoops whose Lua SCOOP_DATA.npcs contains at least one name

@@ -551,6 +551,13 @@ AP_REF.on_retrieved = function(a1, a2, a3)
             table_preview(a1), table_preview(a2), table_preview(a3)))
     end
 
+    -- The binding allows one retrieved handler, so anything else that reads
+    -- DataStorage is forwarded from here. KillTracker picks out its own keys
+    -- and ignores the rest.
+    if _G.AP and _G.AP.KillTracker and _G.AP.KillTracker.on_retrieved then
+        pcall(_G.AP.KillTracker.on_retrieved, a1, a2, a3)
+    end
+
     local key = ack_storage_key
     if not key then return end
     for _, cand in ipairs({ a1, a2, a3 }) do
@@ -569,6 +576,14 @@ AP_REF.on_retrieved = function(a1, a2, a3)
                 return
             end
         end
+    end
+end
+
+-- SetReply is the only confirmation a DataStorage write landed. Nothing in
+-- Bridge writes, so this exists purely to hand replies to the modules that do.
+AP_REF.on_set_reply = function(message)
+    if _G.AP and _G.AP.KillTracker and _G.AP.KillTracker.on_set_reply then
+        pcall(_G.AP.KillTracker.on_set_reply, message)
     end
 end
 

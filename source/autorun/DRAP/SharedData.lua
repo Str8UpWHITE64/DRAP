@@ -65,6 +65,14 @@ function M.split_areas()
     return (data and data.split_areas) or {}
 end
 
+-- Region -> { tier -> { thresholds } } for the Zombie Kill Tiers option. A
+-- connected slot sends its own tier's thresholds, so this is only read when
+-- there is no slot to ask: the vanilla debug path.
+function M.zombie_kill_tiers()
+    ensure_loaded()
+    return (data and data.zombie_kill_tiers) or {}
+end
+
 -- Area code -> list of codes one door away. Used to answer "can the player
 -- get there yet" against the live door locks, which is what keeps a scoop
 -- from starting behind a door they cannot open.

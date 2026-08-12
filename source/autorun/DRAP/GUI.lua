@@ -15,6 +15,7 @@ local ItemSpawner = nil
 local ScoopUnlocker = nil
 local DoorVisualizer = nil
 local BookSkills = nil
+local KillTracker = nil
 
 local function ensure_modules()
     if not ItemSpawner then
@@ -33,6 +34,10 @@ local function ensure_modules()
         local ok, mod = pcall(require, "DRAP/effects/BookSkills")
         if ok then BookSkills = mod end
     end
+    if not KillTracker then
+        local ok, mod = pcall(require, "DRAP/trackers/KillTracker")
+        if ok then KillTracker = mod end
+    end
 end
 
 ------------------------------------------------------------
@@ -50,6 +55,22 @@ local active_tab = "Items"
 
 local TAB_LIST = { "Items", "Keys", "Books", "Scoops", "Doors" }
 
+-- Kills only exists on a seed that turned the tier on, so an empty tab never
+-- invites a player to look for something that is not there. Debug mode always
+-- shows it: a missing tab cannot say whether the option is off or the tracker
+-- is broken, and that is exactly the question debug mode is for.
+local function tab_list()
+    local kills_on = KillTracker and KillTracker.is_enabled
+        and KillTracker.is_enabled()
+    if not (kills_on or debug_mode) then
+        return TAB_LIST
+    end
+    local tabs = {}
+    for _, name in ipairs(TAB_LIST) do table.insert(tabs, name) end
+    table.insert(tabs, "Kills")
+    return tabs
+end
+
 local function draw_window()
     if not window_visible then return end
 
@@ -63,7 +84,7 @@ local function draw_window()
     end
 
     -- Tab buttons
-    for i, tab_name in ipairs(TAB_LIST) do
+    for i, tab_name in ipairs(tab_list()) do
         if i > 1 then imgui.same_line() end
         local is_active = (active_tab == tab_name)
         if is_active then
@@ -109,6 +130,12 @@ local function draw_window()
             DoorVisualizer.draw_tab_content(debug_mode)
         else
             imgui.text_colored("DoorVisualizer not loaded", 0xFFFF8800)
+        end
+    elseif active_tab == "Kills" then
+        if KillTracker and KillTracker.draw_tab_content then
+            KillTracker.draw_tab_content(debug_mode)
+        else
+            imgui.text_colored("KillTracker not loaded", 0xFFFF8800)
         end
     end
 

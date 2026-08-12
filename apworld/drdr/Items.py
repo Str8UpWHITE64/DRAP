@@ -458,6 +458,16 @@ specialty_items = {
     "Raw Meat",        # gates "Use N Microwaves" (alongside Uncooked Pizza)
     # Required for Honey Hunt in restricted_item_mode:
     "Queen",
+    # Something to kill 500+ zombies in an area with, for the Zombie Kill
+    # Tiers checks. Only restricted mode needs them in the pool -- everywhere
+    # else these are lying on the floor, so those checks lean on how much of
+    # the mall is open instead. Handgun/Shotgun/Submachine Gun are above.
+    "Katana",
+    "Hunting Knife",
+    "Machete",
+    "Baseball Bat",
+    "Fire Ax",
+    "Small Chainsaw",
 }
 
 # Food items that stand in for Seon's Food and Stuff access in the

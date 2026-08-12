@@ -16,7 +16,8 @@ from rule_builder.rules import (
 )
 
 from .DoorRandomization import AREA_NAMES, EMBEDDED_DOOR_DATA
-from .Locations import DRLocationCategory, location_tables
+from .Locations import (DRLocationCategory, location_tables,
+                        ZOMBIE_KILL_REGION_OF, ZOMBIE_KILL_TIERS)
 from .shared_data import (
     AREA_KEY_NAMES,
     SCOOP_COMPLETION_MAP, SCOOP_EVENTS, SCOOP_REGION_REQUIREMENTS,
@@ -95,6 +96,62 @@ SCOOP_SURVIVOR_COUNTS = {
     "Out of Control": (1, 0),               # Greg Simpson (M)
     "The Convicts": (1, 1),                 # Sophie Richard (F)
 }
+
+# How much of the mall has to be open before a kill threshold counts, in the
+# same currency as the level gates below. 25 rather than 26 at the top: 26 is
+# every region, and a region of slack keeps an awkward key placement from
+# making a check unreachable.
+KILL_POINT_GATES = {
+    250: 10, 500: 13, 1000: 17, 2000: 22,
+    5000: 23, 10000: 24, 15000: 25, 20000: 25, 28594: 25,
+}
+
+# The threshold at which an area starts wanting a weapon, and the one at which
+# it also wants the Queen.
+KILL_WEAPON_FROM = 500
+KILL_QUEEN_FROM = 2000
+
+# Restricted Items only: something to kill with. Everywhere else these are on
+# the floor for the taking, so the points above carry those seeds instead.
+#
+# Each area lists alternatives; an alternative is everything that must hold at
+# once. A "loc:" entry is a location to reach, anything else is an item.
+KILL_WEAPONS = {
+    "Paradise Plaza":        [["Katana"], ["Submachine Gun"],
+                              ["Hunting Knife"], ["Handgun"]],
+    "Al Fresca Plaza":       [["Katana"], ["Submachine Gun"],
+                              ["Hunting Knife"], ["Handgun"]],
+    "Entrance Plaza":        [["Submachine Gun"], ["Hunting Knife"], ["Katana"]],
+    "Food Court":            [["Submachine Gun"]],
+    "Wonderland Plaza":      [["Hunting Knife"], ["Handgun"],
+                              ["loc:Kill Adam", "Small Chainsaw"]],
+    "North Plaza":           [["Katana"], ["Hunting Knife"], ["Shotgun"],
+                              ["Handgun"]],
+    # Both of these change when the car keys land.
+    "Leisure Park":          [["Submachine Gun"]],
+    "Maintenance Tunnel":    [["Submachine Gun"]],
+    "Seon's Food and Stuff": [["Hunting Knife", "Queen"]],
+    "Crislip's Home Saloon": [["Fire Ax", "Queen"],
+                              ["loc:Kill Cliff", "Machete"]],
+    "Colby's Movieland":     [["Baseball Bat", "Queen"]],
+}
+
+
+def _kill_weapon_rule(region):
+    """The weapon half of a kill rule, as an Or over the area's alternatives."""
+    alternatives = []
+    for spec in KILL_WEAPONS.get(region, []):
+        parts = [CanReachLocation(name[4:]) if name.startswith("loc:")
+                 else Has(name) for name in spec]
+        alternatives.append(parts[0] if len(parts) == 1 else And(*parts))
+    if not alternatives:
+        return None
+    return alternatives[0] if len(alternatives) == 1 else Or(*alternatives)
+
+
+# Entrance Plaza kills at or below this need no key: the prologue puts
+# the player there before one exists.
+PROLOGUE_FREE_KILLS = 25
 
 # Determines the value of the region towards levels
 REGION_LEVEL_VALUES = {
@@ -525,6 +582,52 @@ def set_rules(world) -> None:
     for level in range(41, 51):    # Levels 41-50
         world.set_rule(world.multiworld.get_location(f"Reach Level {level}", world.player),
                       RegionPointsAtLeast(25))
+
+    # Zombie kill checks. They sit in their own region, so every one needs its
+    # rule spelled out -- see the note in Locations.py. The Entrance Plaza's
+    # smallest ask for nothing: the prologue puts the player there without a
+    # key, so they are sphere 0 and give the fill somewhere early.
+    for _kill_name, _kill_region in ZOMBIE_KILL_REGION_OF.items():
+        try:
+            _kill_loc = world.multiworld.get_location(_kill_name, world.player)
+        except KeyError:
+            continue        # not created at this tier
+        _threshold = int(re.match(r"Kill (\d+) ", _kill_name).group(1))
+        if _kill_region == "Entrance Plaza" and _threshold <= PROLOGUE_FREE_KILLS:
+            world.set_rule(_kill_loc, True_())
+            continue
+
+        _parts = [CanReachRegion(_kill_region)]
+
+        # Applies in both item modes: it is about progress through the run,
+        # not about pickups.
+        _points = KILL_POINT_GATES.get(_threshold)
+        if _points:
+            _parts.append(RegionPointsAtLeast(_points))
+
+        # Something to kill with, and the Queen on top from 2000.
+        if world.options.restricted_item_mode and _threshold >= KILL_WEAPON_FROM:
+            _weapon = _kill_weapon_rule(_kill_region)
+            if _weapon is not None:
+                _parts.append(_weapon)
+            if _threshold >= KILL_QUEEN_FROM:
+                _parts.append(Has("Queen"))
+
+        world.set_rule(_kill_loc,
+                       _parts[0] if len(_parts) == 1 else And(*_parts))
+
+    # Zombie Genocider: the top threshold in every area, which is the same
+    # 53,594 kills as clearing all 92 checks and eleven rules instead of 92.
+    if world.options.goal.value == 3:
+        _tops = [
+            CanReachLocation(f"Kill {max(_tiers['genocide'])} zombies in {_region}")
+            for _region, _tiers in ZOMBIE_KILL_TIERS.items()
+        ]
+        world.set_rule(
+            world.multiworld.get_location(
+                "Zombie Genocider: Kill 53,594 zombies across the mall",
+                world.player),
+            And(*_tops))
 
     # Exclude Rescues Above code
     if world.options.exclude_rescues:

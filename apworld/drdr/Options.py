@@ -95,11 +95,18 @@ class Goal(Choice):
               "Number of Survivors" below). In ScoopSanity, there will not be any
               Main Scoop locations. If ScoopSanity is off, then Ending S / Ending A
               locations still exist as normal but are filler-only and not the goal.
+
+    Zombie Genocider:
+              Kill 53,594 zombies spread across every area of the mall. Forces
+              "Zombie Kill Tiers" to genocide whatever it is set to. Like
+              Savior, ScoopSanity drops the Main Scoop locations; without
+              ScoopSanity they stay as ordinary checks.
     """
     display_name = "Goal"
     option_ending_s = 0
     option_ending_a = 1
     option_savior = 2
+    option_zombie_genocider = 3
     default = 0
 
 
@@ -222,6 +229,29 @@ class ExcludeRescuesAbove(Range):
     range_start = 5
     range_end = 48
     default = 35
+
+
+class ZombieKillTiers(Choice):
+    """
+    Adds "Kill N zombies in <area>" checks, counted per area as you kill.
+
+    Right now the only reason to kill zombies anywhere in particular is the
+    Maintenance Tunnel, where a car makes the global kill counts trivial.
+    These spread the killing across the mall.
+
+    none:      no area kill checks at all.
+    normal:    one for each main plaza, two in Leisure Park, three in the
+               Maintenance Tunnel. The small stores get none.
+    nightmare: two per main plaza, one per small store, and more outdoors.
+    genocide:  every threshold, up to 28594 in the Maintenance Tunnel. Clearing
+               all of them is 53594 kills -- the Zombie Genocider count.
+    """
+    display_name = "Zombie Kill Tiers"
+    option_none = 0
+    option_normal = 1
+    option_nightmare = 2
+    option_genocide = 3
+    default = 0
 
 
 class EnableSkillItems(DefaultOnToggle):
@@ -583,6 +613,7 @@ class DROption(PerGameCommonOptions):
     exclude_levels_above: ExcludeLevelsAbove
     exclude_rescues: ExcludeRescues
     exclude_rescues_above: ExcludeRescuesAbove
+    zombie_kill_tiers: ZombieKillTiers
     enable_skill_items: EnableSkillItems
     enable_stat_items: EnableStatItems
     enable_extra_stat_buffs: EnableExtraStatBuffs
@@ -616,6 +647,7 @@ dr_option_groups = [
             ExcludeLevelsAbove,
             ExcludeRescues,
             ExcludeRescuesAbove,
+            ZombieKillTiers,
             PPStickersFiller,
             OvertimeProgressionGating,
         ],

@@ -8,7 +8,10 @@ from Options import OptionError
 from worlds.AutoWorld import World, WebWorld
 
 from .Items import DRItem, DRItemCategory, item_dictionary, key_item_names, item_descriptions, BuildItemPool, specialty_items, progression_skills, microwave_food_items, challenge_tool_items
-from .Locations import DRLocation, DRLocationCategory, location_tables, location_dictionary
+from .Locations import (DRLocation, DRLocationCategory, location_tables,
+                        location_dictionary, ZOMBIE_KILL_TIERS,
+                        ZOMBIE_KILL_TIER_NAMES, zombie_kill_locations,
+                        ZOMBIE_KILL_REGION_OF)
 from .Options import DROption, dr_option_groups
 
 
@@ -175,7 +178,7 @@ class DRWorld(World):
         # Savior+ScoopSanity drops main scoops entirely — the player wins by
         # rescuing survivors, so main scoops would only advance unused state.
         self.main_scoops_enabled = not (
-            self.options.goal.value == 2 and self.options.scoop_sanity
+            self.options.goal.value in (2, 3) and self.options.scoop_sanity
         )
 
         self.enabled_location_categories.add(DRLocationCategory.SURVIVOR)
@@ -187,6 +190,20 @@ class DRWorld(World):
             self.enabled_location_categories.add(DRLocationCategory.OVERTIME_SCOOP)
         self.enabled_location_categories.add(DRLocationCategory.PSYCHO_SCOOP)
         self.enabled_location_categories.add(DRLocationCategory.CHALLENGE)
+        # Every kill location exists in the tables so IDs stay stable; the
+        # tier decides which are created.
+        self.zombie_kill_tier = ZOMBIE_KILL_TIER_NAMES[
+            self.options.zombie_kill_tiers.value]
+        # The Genocider goal is the top tier by definition, so it forces it
+        # rather than generating a seed that cannot be won.
+        if self.options.goal.value == 3:
+            self.zombie_kill_tier = "genocide"
+        _kill_active = set(zombie_kill_locations(self.zombie_kill_tier))
+        self._zombie_kill_excluded_names = {
+            n for n in zombie_kill_locations("genocide") if n not in _kill_active
+        }
+        if _kill_active:
+            self.enabled_location_categories.add(DRLocationCategory.ZOMBIE_KILL)
         if self.options.pp_bonus_locations:
             self.enabled_location_categories.add(DRLocationCategory.PP_BONUS)
 
@@ -329,7 +346,8 @@ class DRWorld(World):
             "Carlito's Hideout",
             "Cave",
             "Level Ups",
-            "Challenges"
+            "Challenges",
+            "Zombie Kills"
         ]})
 
         # Area pairs that a real door joins in the vanilla table. Under Door
@@ -458,12 +476,16 @@ class DRWorld(World):
 
         create_connection("Menu", "Level Ups")
         create_connection("Menu", "Challenges")
+        # Reached from Menu, not from the areas they name: their rules are
+        # written out in Rules.py so the prologue ones can skip the area.
+        create_connection("Menu", "Zombie Kills")
 
 
     GOAL_LOCATIONS = {
         0: "Ending S: Beat up Brock with your bare fists!",   # Ending S
         1: "Ending A: Solve all of the cases and be on the helipad at 12pm",  # Ending A
         2: "Savior: Rescue enough survivors to escape",        # Savior (count-based)
+        3: "Zombie Genocider: Kill 53,594 zombies across the mall",
     }
 
     # Name of the goal location used by the Savior goal. Must match the entry
@@ -492,6 +514,7 @@ class DRWorld(World):
     GOAL_ONLY_EVENT_LOCATIONS = {
         "Ending S: Beat up Brock with your bare fists!",
         "Savior: Rescue enough survivors to escape",
+        "Zombie Genocider: Kill 53,594 zombies across the mall",
     }
 
     # MAIN_SCOOP-category locations that fire automatically during the forced
@@ -536,6 +559,9 @@ class DRWorld(World):
                 # created this seed (set populated in __init__ above).
                 if (location.category == DRLocationCategory.PP_BONUS
                         and location.name in self._pp_bonus_excluded_names):
+                    continue
+                if (location.category == DRLocationCategory.ZOMBIE_KILL
+                        and location.name in self._zombie_kill_excluded_names):
                     continue
                 new_location = DRLocation(
                     self.player,
@@ -812,6 +838,13 @@ class DRWorld(World):
         scoop_sanity_enabled = bool(self.options.scoop_sanity.value)
         exclude_levels_enabled = bool(self.options.exclude_levels.value)
         exclude_rescues_enabled = bool(self.options.exclude_rescues.value)
+        # Per-region thresholds the Lua tracker sends checks at. Regions
+        # with none at this tier are left out entirely.
+        zombie_kill_thresholds = {
+            region: list(tiers[self.zombie_kill_tier])
+            for region, tiers in ZOMBIE_KILL_TIERS.items()
+            if tiers[self.zombie_kill_tier]
+        }
         pp_stickers_filler_enabled = bool(self.options.pp_stickers_filler.value)
 
         # Player-stats / progression options (PlayerStats + PlayerBuffs +
@@ -898,6 +931,7 @@ class DRWorld(World):
                 "exclude_levels_above": self.options.exclude_levels_above.value,
                 "exclude_rescues": exclude_rescues_enabled,
                 "exclude_rescues_above": self.options.exclude_rescues_above.value,
+                "zombie_kill_tiers": self.zombie_kill_tier,
                 "enable_skill_items": enable_skill_items,
                 "enable_stat_items": enable_stat_items,
                 "enable_extra_stat_buffs": enable_extra_stat_buffs,
@@ -944,6 +978,8 @@ class DRWorld(World):
             "scoop_sanity": scoop_sanity_enabled,
             "exclude_levels": exclude_levels_enabled,
             "exclude_rescues": exclude_rescues_enabled,
+            "zombie_kill_tier": self.zombie_kill_tier,
+            "zombie_kill_thresholds": zombie_kill_thresholds,
             "scoop_order": self.scoop_order if scoop_sanity_enabled else {},
             # Player-stats slot data (read by Lua on slot connect)
             "vanilla_progression": vanilla_progression_value,

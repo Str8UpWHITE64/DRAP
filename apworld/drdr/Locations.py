@@ -1,10 +1,11 @@
 from enum import IntEnum
-from typing import Optional, NamedTuple, Dict
+from typing import Optional, NamedTuple, Dict, List
 
 from BaseClasses import Location, Region
 from .Items import DRItem
 from .shared_data import (
     AP_TRIGGER_LOCATIONS,
+    ZOMBIE_KILL_TIERS as SHARED_ZOMBIE_KILL_TIERS,
     expand_trigger_location_names,
     trigger_location_region,
 )
@@ -20,7 +21,8 @@ class DRLocationCategory(IntEnum):
     OVERTIME_SCOOP = 6,
     PSYCHO_SCOOP = 7,
     CHALLENGE = 8,
-    PP_BONUS = 9
+    PP_BONUS = 9,
+    ZOMBIE_KILL = 10
 
 
 class DRLocationData(NamedTuple):
@@ -73,7 +75,8 @@ class DRLocation(Location):
             "Cave",
             "Level Ups",
             "Challenges",
-            "Meat Processing Area"
+            "Meat Processing Area",
+            "Zombie Kills"
         ]
 
         output = {}
@@ -630,7 +633,7 @@ location_tables = {
         DRLocationData("Jump a vehicle 50 feet", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Hit a golf ball 100 feet", "Milk", DRLocationCategory.CHALLENGE),
         # Appended, never inserted: ids are positional within the table.
-        # Both are sphere 0 by way of the Challenges blanket rule -- see #14.
+        # Both are sphere 0 by way of the Challenges blanket rule.
         DRLocationData("Welcome to Hell", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Photojournalist", "Milk", DRLocationCategory.CHALLENGE),
 
@@ -695,3 +698,72 @@ for _entry in AP_TRIGGER_LOCATIONS:
 location_dictionary: Dict[str, DRLocationData] = {}
 for location_table in location_tables.values():
     location_dictionary.update({location_data.name: location_data for location_data in location_table})
+
+
+# ----------------------------------------------------------------------------
+# Zombie Kills
+#
+# Kills are counted per area at runtime by hooking the engine's own increment,
+# so a check lands the moment the kill happens rather than on the way out of
+# the area. There is no engine-side per-area counter -- these are DRAP's.
+#
+# Each area's top threshold is what it takes to clear: 6 mains at 2000, 3
+# minors at 1000, Leisure Park at 10000 and the Tunnels at 28594 come to
+# 53594, the Zombie Genocider number.
+# ----------------------------------------------------------------------------
+
+ZOMBIE_KILL_TIER_NAMES = ["none", "normal", "nightmare", "genocide"]
+
+# region -> {tier: [thresholds]}, from drdr_shared.json so the runtime can
+# read the same numbers. A tier lists every threshold active at it, not just
+# the ones it adds.
+ZOMBIE_KILL_TIERS: Dict[str, Dict[str, List[int]]] = SHARED_ZOMBIE_KILL_TIERS
+
+
+def zombie_kill_location_name(threshold: int, region: str) -> str:
+    return f"Kill {threshold} zombies in {region}"
+
+
+def zombie_kill_locations(tier: str) -> List[str]:
+    """Every kill location active at a tier, in table order."""
+    out: List[str] = []
+    for region, tiers in ZOMBIE_KILL_TIERS.items():
+        for threshold in tiers.get(tier, []):
+            out.append(zombie_kill_location_name(threshold, region))
+    return out
+
+
+# Kill locations live in their own table rather than in each area's, because
+# their rules are not just "can you reach this area" -- the Entrance Plaza's
+# smallest are reachable during the prologue before any key, and the rest
+# carry mall-progress and weapon requirements. A location cannot escape its
+# region's reachability, so the region is a neutral one and Rules.py writes
+# out every rule.
+#
+# The full genocide set always exists; the tier decides which are created.
+location_tables["Zombie Kills"] = [
+    DRLocationData(zombie_kill_location_name(_threshold, _region),
+                   "Milk", DRLocationCategory.ZOMBIE_KILL)
+    for _region, _tiers in ZOMBIE_KILL_TIERS.items()
+    for _threshold in _tiers["genocide"]
+]
+
+# The Zombie Genocider goal, in the region its checks live in. Appended after
+# the generated entries so their IDs keep their positions.
+location_tables["Zombie Kills"].append(DRLocationData(
+    "Zombie Genocider: Kill 53,594 zombies across the mall",
+    "Victory", DRLocationCategory.EVENT))
+
+# The area each kill location counts for, which its rule needs and its region
+# no longer says.
+ZOMBIE_KILL_REGION_OF = {
+    zombie_kill_location_name(_threshold, _region): _region
+    for _region, _tiers in ZOMBIE_KILL_TIERS.items()
+    for _threshold in _tiers["genocide"]
+}
+
+location_dictionary.update({
+    location_data.name: location_data
+    for location_table in location_tables.values()
+    for location_data in location_table
+})

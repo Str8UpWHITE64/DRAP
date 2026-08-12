@@ -35,6 +35,7 @@ AP.EventTracker     = require("DRAP/trackers/EventTracker")
 AP.NpcTracker       = require("DRAP/trackers/NpcTracker")
 AP.PPStickerTracker = require("DRAP/trackers/PPStickerTracker")
 AP.AchievementTracker = require("DRAP/trackers/AchievementTracker")
+AP.KillTracker      = require("DRAP/trackers/KillTracker")
 AP.SaveSlot         = require("DRAP/SaveSlot")
 AP.SaveDiagnostics  = require("DRAP/SaveDiagnostics")
 AP.TimeGate         = require("DRAP/TimeGate")
@@ -440,6 +441,15 @@ local function run_slot_connect(slot_data)
     AP.ScoopSanityEnabled = scoop_sanity_enabled
     AP.ScoopUnlocker.set_scoop_sanity_enabled(scoop_sanity_enabled)
     log("ScoopSanity enabled=" .. tostring(scoop_sanity_enabled))
+
+    -- Zombie Kill Tiers. Thresholds arrive per region; an empty table (or
+    -- an older seed with no key) leaves the tracker dormant and unhooked.
+    local kill_thresholds = (type(slot_data) == "table"
+        and type(slot_data.zombie_kill_thresholds) == "table"
+        and slot_data.zombie_kill_thresholds) or {}
+    AP.KillTracker.configure(kill_thresholds)
+    log("Zombie Kill Tiers: " .. tostring((type(slot_data) == "table"
+        and slot_data.zombie_kill_tier) or "none"))
 
     -- Cult Limited option
     local cult_limited_enabled = (type(slot_data) == "table" and slot_data.cult_limited == true)
