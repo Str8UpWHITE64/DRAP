@@ -411,8 +411,9 @@ _all_items = [DRItemData(row[0], row[1], row[2]) for row in [
     # exists in that mode. BuildItemPool drops it otherwise.
     ("Convicts Respawn Trap", 4076, DRItemCategory.TRAP),
 
-    # Overtime suppressant ingredients. The mod holds the pickup until the
-    # matching item arrives, so all eight are needed to hand them in.
+    # Overtime suppressant ingredients. No longer items -- the checks come
+    # from the pickup flags instead, so nothing holds them. Kept here so the
+    # IDs stay put for anything already reading the table.
     ("Blender", 5000, DRItemCategory.LOCK),
     ("First Aid Kit", 5001, DRItemCategory.LOCK),
     ("Coffee Filters", 5002, DRItemCategory.LOCK),
@@ -618,20 +619,19 @@ def BuildItemPool(multiworld, count, options, excluded_scoop_names=(),
     # so they would be items with nothing to open.
     overtime_gating_on = bool(getattr(options, "overtime_progression_gating",
                                       type("X", (), {"value": False})()).value)
+    # Dropped as items entirely: their checks read the pickup flags now.
+    suppressant_names = {
+        "Blender", "First Aid Kit", "Coffee Filters", "Magnifying Glass",
+        "Camp Stove", "Developing Solution", "Perfume Bottle", "Cold Spray",
+    }
     overtime_item_names = {
-        "Blender",
-        "First Aid Kit",
-        "Coffee Filters",
-        "Magnifying Glass",
-        "Camp Stove",
-        "Developing Solution",
-        "Perfume Bottle",
-        "Cold Spray",
         "Cave Key",
         "Humvee Key",
     }
 
     for lock in lockList:
+        if lock.name in suppressant_names:
+            continue
         if lock.name in overtime_item_names                 and (options.goal.value != 0 or not overtime_gating_on):
             continue
         # Area keys are precollected under door randomization, and replaced by

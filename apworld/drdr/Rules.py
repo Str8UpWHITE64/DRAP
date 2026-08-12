@@ -773,27 +773,37 @@ def set_rules(world) -> None:
 
         world.set_rule(world.multiworld.get_location("Get bit!", world.player), CanReachLocation("Ending A: Solve all of the cases and be on the helipad at 12pm"))
 
-        # The mod holds each ingredient until its item arrives, so finding
-        # one only needs Overtime and the room it sits in.
-        world.set_rule(world.multiworld.get_location("Find the Blender", world.player), And(CanReachLocation("Get bit!"), CanReachRegion("Food Court")))
-        world.set_rule(world.multiworld.get_location("Find the First Aid Kit", world.player), And(CanReachLocation("Get bit!"), CanReachRegion("Seon's Food and Stuff")))
-        world.set_rule(world.multiworld.get_location("Find the Coffee Filters", world.player), And(CanReachLocation("Get bit!"), CanReachRegion("Security Room")))
-        world.set_rule(world.multiworld.get_location("Find the Magnifying Glass", world.player), And(CanReachLocation("Get bit!"), CanReachRegion("Wonderland Plaza")))
-        world.set_rule(world.multiworld.get_location("Find the Camp Stove", world.player), And(CanReachLocation("Get bit!"), CanReachRegion("Entrance Plaza")))
-        world.set_rule(world.multiworld.get_location("Find the Developing Solution", world.player), And(CanReachLocation("Get bit!"), CanReachRegion("Paradise Plaza")))
-        world.set_rule(world.multiworld.get_location("Find the Perfume Bottle", world.player), And(CanReachLocation("Get bit!"), CanReachRegion("Entrance Plaza")))
-        world.set_rule(world.multiworld.get_location("Find the Cold Spray", world.player), And(CanReachLocation("Get bit!"), CanReachRegion("Paradise Plaza")))
+        # Where each ingredient actually is. The items were removed, so this is
+        # what ties a hand-in to having been somewhere to pick it up -- Has()
+        # used to do that job.
+        _where = {
+            "Blender": Or(CanReachRegion("Food Court"),
+                          CanReachRegion("Al Fresca Plaza"),
+                          CanReachRegion("Paradise Plaza")),
+            "First Aid Kit": CanReachRegion("Seon's Food and Stuff"),
+            "Coffee Filters": CanReachRegion("Security Room"),
+            "Magnifying Glass": CanReachRegion("Wonderland Plaza"),
+            "Camp Stove": CanReachRegion("Entrance Plaza"),
+            "Perfume Bottle": CanReachRegion("Entrance Plaza"),
+            "Developing Solution": CanReachRegion("Paradise Plaza"),
+            "Cold Spray": CanReachRegion("Paradise Plaza"),
+        }
+        for _name, _where_rule in _where.items():
+            world.set_rule(
+                world.multiworld.get_location(f"Find the {_name}", world.player),
+                And(CanReachLocation("Get bit!"), _where_rule))
+            world.set_rule(
+                world.multiworld.get_location(f"Give Isabela the {_name}",
+                                              world.player),
+                And(CanReachLocation("Get bit!"),
+                    CanReachRegion("Carlito's Hideout"), _where_rule))
 
-        # Completing the mission needs all eight. Isabela accepts them one at
-        # a time, so each hand-in is its own check above; this is the mission.
-        if _gating:
-            _suppressants = And(Has("Blender"), Has("First Aid Kit"),
-                                Has("Coffee Filters"), Has("Magnifying Glass"),
-                                Has("Camp Stove"), Has("Developing Solution"),
-                                Has("Perfume Bottle"), Has("Cold Spray"))
-        else:
-            _suppressants = True_()
-        world.set_rule(world.multiworld.get_location("Scramble for a Suppressant", world.player), And(CanReachLocation("Get bit!"), _suppressants))
+
+        # The mission needs all eight ingredients, and each is reachable
+        # exactly when its own hand-in is.
+        world.set_rule(world.multiworld.get_location("Scramble for a Suppressant", world.player),
+                       And(*[CanReachLocation(f"Give Isabela the {_n}")
+                             for _n in _where]))
 
         world.set_rule(world.multiworld.get_location("See the crashed helicopter", world.player), And(CanReachRegion("Leisure Park"), CanReachLocation("Get bit!")))
         world.set_rule(world.multiworld.get_location("Hella Copter - Shoot down the Special Forces Helicopter", world.player), CanReachLocation("See the crashed helicopter"))
@@ -802,15 +812,7 @@ def set_rules(world) -> None:
 
         # She accepts them one at a time, so each hand-in is its own check
         # -- gated on the item, because the mod holds the pickup until then.
-        world.set_rule(world.multiworld.get_location("Give Isabela the Blender", world.player), And(Has("Blender") if _gating else True_(), CanReachRegion("Carlito's Hideout"), CanReachLocation("Get bit!")))
-        world.set_rule(world.multiworld.get_location("Give Isabela the First Aid Kit", world.player), And(Has("First Aid Kit") if _gating else True_(), CanReachRegion("Carlito's Hideout"), CanReachLocation("Get bit!")))
-        world.set_rule(world.multiworld.get_location("Give Isabela the Coffee Filters", world.player), And(Has("Coffee Filters") if _gating else True_(), CanReachRegion("Carlito's Hideout"), CanReachLocation("Get bit!")))
-        world.set_rule(world.multiworld.get_location("Give Isabela the Magnifying Glass", world.player), And(Has("Magnifying Glass") if _gating else True_(), CanReachRegion("Carlito's Hideout"), CanReachLocation("Get bit!")))
-        world.set_rule(world.multiworld.get_location("Give Isabela the Camp Stove", world.player), And(Has("Camp Stove") if _gating else True_(), CanReachRegion("Carlito's Hideout"), CanReachLocation("Get bit!")))
-        world.set_rule(world.multiworld.get_location("Give Isabela the Developing Solution", world.player), And(Has("Developing Solution") if _gating else True_(), CanReachRegion("Carlito's Hideout"), CanReachLocation("Get bit!")))
-        world.set_rule(world.multiworld.get_location("Give Isabela the Perfume Bottle", world.player), And(Has("Perfume Bottle") if _gating else True_(), CanReachRegion("Carlito's Hideout"), CanReachLocation("Get bit!")))
-        world.set_rule(world.multiworld.get_location("Give Isabela the Cold Spray", world.player), And(Has("Cold Spray") if _gating else True_(), CanReachRegion("Carlito's Hideout"), CanReachLocation("Get bit!")))
-        world.set_rule(world.multiworld.get_location("Give Isabela the Generator", world.player), And(CanReachLocation("Scramble for a Suppressant"), CanReachRegion("Carlito's Hideout")))
+        world.set_rule(world.multiworld.get_location("Give Isabela the Generator", world.player), And(CanReachLocation("Scramble for a Suppressant"), CanReachRegion("Carlito's Hideout"), CanReachLocation("See the crashed helicopter")))
 
         # Queens are handed over after the serum is made.
         _needs_queen = (world.options.restricted_item_mode

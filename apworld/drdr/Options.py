@@ -403,11 +403,12 @@ class OvertimeProgressionGating(Toggle):
     the queens, the gates in the cave, the suppressant hand-ins and the rest --
     they are simply not held back by anything.
 
-    With this on, three things are gated behind items the multiworld has to
-    send you. The eight suppressant ingredients cannot be picked up until their
-    item arrives, though walking up to one still sends its check. Isabela will
-    not leave for the cave without the Cave Key. The Humvee will not start
-    without the Humvee Key.
+    With this on, two things are gated behind items the multiworld has to send
+    you. Isabela will not leave for the cave without the Cave Key, and the
+    Humvee will not start without the Humvee Key.
+
+    The suppressant ingredients are not gated either way -- they are picked up
+    normally and their checks fire when you collect them.
 
     This option has no effect unless the goal is Ending S.
     """

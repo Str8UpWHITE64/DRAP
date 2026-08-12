@@ -144,25 +144,6 @@ end
 --- Receiving the item hands it over outright: setting the flags the pickup
 --- would have set puts it in Key Items and despawns the world object, so the
 --- player never walks back for something they already own.
-local function grant(item)
-    -- Deferred, not dropped: the caller keeps it in pending_grant and this is
-    -- retried every frame, so it lands the moment Overtime starts.
-    if not in_overtime() then
-        say_once("early:" .. item.name,
-            item.name .. " received before Overtime -- held until it starts")
-        return false
-    end
-    local efm = sdk.get_managed_singleton("app.solid.gamemastering.EventFlagsManager")
-    if not efm then return false end
-    local set = 0
-    for _, flag in ipairs(item.pickup_flags or {}) do
-        local ok = pcall(function() efm:call("evFlagOn", flag) end)
-        if ok then set = set + 1 end
-    end
-    M.log(string.format("%s received -- %d/%d flag(s) set, object despawns",
-        item.name, set, #(item.pickup_flags or {})))
-    return set > 0
-end
 
 ------------------------------------------------------------
 -- Identity
@@ -302,41 +283,10 @@ local function should_block(pim)
         note_cave_interaction(go_name)
     end
 
-    local item = item_for(go_name)
-    if not item then return false end
-
-    -- Everything past here is a known Overtime item, so silence would be a
-    -- puzzle. Each way out says so once.
-    if not (Activation.is_active() or console_override) then
-        say_once("inactive", string.format(
-            "%s reached, but DRAP is dormant -- connect a slot, or"
-            .. " drap_ot_gate(true) to test offline", item.name))
-        return false
-    end
-    if has_received(item.name) then
-        say_once("recv:" .. item.name,
-            item.name .. " already received -- pickup allowed")
-        return false
-    end
-
-    -- Reaching for it is the check. Sent once; the bridge dedupes the rest.
-    if not sent[item.name] then
-        sent[item.name] = true
-        local bridge = AP and AP.AP_BRIDGE
-        if bridge and bridge.check then
-            pcall(bridge.check, "Find the " .. item.name)
-        end
-        -- No toast: the check delivery announces itself, and the player never
-        -- comes back for the object -- receiving the item sets its flags.
-        M.log(string.format("reached %s (%s) -- check sent, pickup %s",
-            item.name, tostring(go_name),
-            gating and "held" or "allowed (gating off)"))
-    end
-
-    -- With the gating off the check is all we wanted; the player keeps the
-    -- item as they always would.
-    if not gating then return false end
-    return not dry_run
+    -- Ingredients are no longer held: their checks come from the pickup
+    -- flags. Only the Cave and the Humvee gate anything now, and both are
+    -- handled elsewhere.
+    return false
 end
 
 local function cave_blocked()
@@ -548,21 +498,13 @@ local function install_sign_hook()
     end
 end
 
---- Items that arrive before Overtime have nothing to write to yet, so a
---- pending set is replayed once the flag manager exists.
-local pending_grant = {}
+
 
 function M.register()
+    -- Nothing to register: the ingredients are not items. ITEMS is still
+    -- built because the flag poll below needs their pickup flags.
     local n = build_items()
-    for _, item in pairs(ITEMS) do
-        ItemEffects.register(item.name, {
-            on_replay = "apply",          -- idempotent: setting a set flag is a no-op
-            apply = function()
-                if not grant(item) then pending_grant[item.name] = item end
-            end,
-        })
-    end
-    M.log(string.format("%d Overtime item(s) loaded and registered", n))
+    M.log(string.format("%d Overtime ingredient(s) tracked for checks", n))
 end
 
 --- RegisterInteraction only fires as an object comes into range, so skipping
@@ -688,18 +630,14 @@ local function check_humvee_proximity()
     M.log("player reached the Humvee without the " .. HUMVEE_ITEM)
 end
 
---- With the gating off the player picks ingredients up normally, and may have
---- done so before ever connecting -- the object is gone, so reaching for it
---- can never fire again and its check would be lost for good. Reading the
---- pickup flags as levels recovers those, the same way the convict flags work.
----
---- Deliberately not run while gating: grant() sets these very flags when the
---- multiworld sends an item, which would hand out "Find the ..." to a player
---- who never went looking for it.
+--- The only way an ingredient check is sent. Reading the pickup flags rather
+--- than hooking the grab also catches one collected before the player ever
+--- connected, the same way the convict flags work. Nothing sets these flags on
+--- the player's behalf any more, so a check cannot be handed to someone who
+--- never went looking.
 local flag_poll_at = 0
 
 local function poll_pickup_flags()
-    if gating then return end
     local now = os.clock()
     if now - flag_poll_at < 2.0 then return end
     flag_poll_at = now
@@ -732,12 +670,6 @@ function M.on_frame()
     if not register_hooked then install_register_hook() end
     if not sign_hooked then install_sign_hook() end
     if not pop_hooked then install_cave_hooks() end
-
-    if next(pending_grant) then
-        for name, item in pairs(pending_grant) do
-            if grant(item) then pending_grant[name] = nil end
-        end
-    end
 
     -- Remove any element we refused. Done here rather than inside the hook so
     -- we are not calling back into the UI mid-update.
@@ -835,21 +767,19 @@ end
 ---   drap_ot_gate_grant("Humvee Key")         -- receive it
 ---   drap_ot_gate_grant("Humvee Key", false)  -- take it back and re-test
 _G.drap_ot_gate_grant = function(name, on)
-    if not name then M.log("usage: drap_ot_gate_grant(\"Blender\" [, false])"); return end
+    if not name then
+        M.log("usage: drap_ot_gate_grant(\"Cave Key\" [, false])")
+        return
+    end
     name = tostring(name)
 
     if on == false then
         granted[name] = nil
-        -- Only the bookkeeping. An Overtime item whose flags were already set
-        -- stays picked up, because those flags are the game's own record.
-        M.log("revoked " .. name .. " (flags already set are left alone)")
+        M.log("revoked " .. name)
         return
     end
 
     granted[name] = true
-    for _, item in pairs(ITEMS) do
-        if item.name == name then grant(item) end
-    end
     -- Anything muted for this item has to be takeable again.
     for go_name, _ in pairs(muted) do
         local item = item_for(go_name)
