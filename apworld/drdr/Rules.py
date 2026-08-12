@@ -932,7 +932,10 @@ def set_rules(world) -> None:
     world.set_rule(world.multiworld.get_location("Rescue Floyd Sanders", world.player), And(ep_shutter, (Has("Antique Lover") if world.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM")))))
 
     # Survivors in Wonderland Plaza
-    world.set_rule(world.multiworld.get_location("Rescue Greg Simpson", world.player), And(CanReachRegion("Wonderland Plaza"), CanReachRegion("Paradise Plaza"), (Has("Out of Control") if world.options.scoop_sanity else True_()))) # Greg Simpson is the only Wonderland Plaza Survivor with additional Logic due to him unlocking the shortcut
+    # Greg is the one Wonderland survivor with extra logic: he opens the
+    # passage. Under Split Keys the door has its own key, and without it he
+    # will not join -- reaching both areas by another route is not enough.
+    world.set_rule(world.multiworld.get_location("Rescue Greg Simpson", world.player), And(CanReachRegion("Wonderland Plaza"), CanReachRegion("Paradise Plaza"), (Has("Out of Control") if world.options.scoop_sanity else True_()), (Has("Paradise Plaza - Wonderland Plaza Key") if world.options.split_keys else True_())))
     world.set_rule(world.multiworld.get_location("Rescue Yuu Tanaka", world.player), And(CanReachRegion("Wonderland Plaza"), (Has("Book [Japanese Conversation]") if world.options.restricted_item_mode else True_()), (Has("Japanese Tourists") if world.options.scoop_sanity else True_())))
     world.set_rule(world.multiworld.get_location("Rescue Shinji Kitano", world.player), And(CanReachRegion("Wonderland Plaza"), (Has("Book [Japanese Conversation]") if world.options.restricted_item_mode else True_()), (Has("Japanese Tourists") if world.options.scoop_sanity else True_())))
     world.set_rule(world.multiworld.get_location("Rescue Tonya Waters", world.player), And(CanReachRegion("Wonderland Plaza"), (Has("Lovers") if world.options.scoop_sanity else Has("DAY2_06_AM"))))
