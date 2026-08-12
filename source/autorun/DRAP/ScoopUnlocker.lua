@@ -479,6 +479,35 @@ local _ep_270_fired_at_clock = 0
 -- and we're not racing it.
 local pending_flag_clears = {}
 
+-- A run started over on a slot that has already played. The ledger is keyed
+-- per slot and survives a new game, so its completed mains describe the
+-- previous run while this save is back at the beginning. JESSIE_FLAG is the
+-- save's own answer -- off until the player talks to Jessie -- so the two
+-- disagreeing is what a restart looks like.
+--
+-- Latched, because once Jessie is met in the new run there is nothing left to
+-- tell the two apart.
+local restarted_run = false
+local restarted_decided = false
+
+local function note_run_shape()
+    if restarted_decided then return end
+    -- An Overtime save has Jessie off with the slot's mains done, which is the
+    -- same shape as a restarted run and is not one. Measured in a vanilla
+    -- Overtime save: 769 off, 2052/514 on.
+    if State.is_endgame_reached() then return end
+    local decided, restarted = State.restart_decision(
+        false, Shared.is_in_game(), raw_check_flag(JESSIE_FLAG),
+        find_completed_main_scoop() ~= nil)
+    if not decided then return end
+    restarted_decided = true
+    restarted_run = restarted == true
+    if restarted_run then
+        M.log("Restarted run: this slot has mains done but this save is "
+            .. "pre-Jessie -- the EP shutter cutscene will fire again")
+    end
+end
+
 -- ScoopSanity-only: fire flag 270 (EP-shutter cutscene) the first time the
 -- player walks into the configured AABB in Entrance Plaza after AP activates.
 -- Persisted via engine flags 765/2280 so save reload/new game come for free.
@@ -487,12 +516,25 @@ local pending_flag_clears = {}
 local function try_fire_ep270_in_scoop_sanity()
     if not scoop_sanity_enabled then return end
     if not State.is_activated() then return end
+    -- The 72-hour shutter cutscene has no business firing in Overtime. The
+    -- completed-main guard used to block this as a side effect; nothing should
+    -- depend on that.
+    if State.is_endgame_reached() then return end
     if ep270_gates_open() then return end
 
-    -- Any later completed main already opened the shutters, so the cutscene
-    -- is redundant (and would re-show closed-shutter state the world moved past).
-    local later_main = find_completed_main_scoop()
-    if later_main then return end
+    note_run_shape()
+
+    -- Nothing before Jessie, exactly as in a new game -- she is what opens the
+    -- way into the mall.
+    if not raw_check_flag(JESSIE_FLAG) then return end
+
+    -- A later completed main already opened the shutters, so the cutscene is
+    -- redundant. Not on a restarted run: those completions belong to the run
+    -- before, and this save's shutters are still shut.
+    if not restarted_run then
+        local later_main = find_completed_main_scoop()
+        if later_main then return end
+    end
 
     -- Don't pre-fire while a first-in-chain Backup for Brad is pending -- its
     -- mission flow fires 270 itself. received/completed, NOT

@@ -157,6 +157,27 @@ function M.has_prerequisites_met(scoop_name)
     return true
 end
 
+--- Is this a run started over on a slot that has already played?
+---
+--- The ledger is keyed per slot and survives a new game, so its completed
+--- mains describe the previous run while the save is back at the beginning.
+--- The save's own answer is the Jessie flag, off until she is met. The two
+--- disagreeing is what a restart looks like.
+---
+--- Latched: once Jessie is met there is nothing left to tell them apart.
+--- @param decided boolean whether a verdict has already been reached
+--- @return boolean decided, boolean restarted
+function M.restart_decision(decided, in_game, jessie_met, completed_mains)
+    if decided then return true, nil end     -- caller keeps its answer
+    if not in_game then return false, false end
+    -- Past the prologue, so the ledger describes this save.
+    if jessie_met then return true, false end
+    -- Pre-Jessie with mains already done on the slot: a new run.
+    if completed_mains then return true, true end
+    -- A genuine first run, still before Jessie. Nothing to decide yet.
+    return false, false
+end
+
 -- Any completed main-category scoop, or nil. Used by the EP-shutter
 -- special cases in ScoopUnlocker and the flag-prereq bypass here.
 function M.find_completed_main()
