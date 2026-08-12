@@ -41,7 +41,6 @@ local M = {}
 --   scoop_data, controlled_flags, cascade_flags, all_side_scoop_flags,
 --   blacklist, protected_primary_flags, main_blocks_side,
 --   post_jessie_flags, queen_spawn_flag, cult_on, cult_off,
---   endgame_flags
 function M.build(deps)
     local D = deps
 
@@ -59,22 +58,16 @@ function M.build(deps)
     local function policy(p) table.insert(policies, p) end
 
     ----------------------------------------------------------------
-    policy{
-        name = "endgame", priority = 100,
-        collect = function(ctx, claim)
-            if not ctx.endgame then return end
-            for _, fid in ipairs(D.endgame_flags) do
-                claim(fid, "on")
-            end
-            -- Hideout 301 cutscene prevention: ON inside the hideout,
-            -- OFF everywhere else.
-            if ctx.area == ctx.hideout_area then
-                claim(301, "on")
-            else
-                claim(301, "off")
-            end
-        end,
-    }
+    -- Nothing is claimed in Overtime, deliberately. The game already puts
+    -- the world in the state Overtime needs on the way in: a vanilla save
+    -- measured at the Overtime spawn had 301, 2322, 265, 355, 2052 and 514
+    -- already on, with no mod running at all.
+    --
+    -- What used to be here forced 2052/514 on -- which the game does itself --
+    -- and drove 301 on inside the hideout and OFF everywhere else. That last
+    -- one was the only difference from vanilla we could find, and vanilla
+    -- never turns 301 off. Every other policy below already returns early on
+    -- ctx.endgame; this finishes the rule rather than starting a new one.
 
     ----------------------------------------------------------------
     policy{

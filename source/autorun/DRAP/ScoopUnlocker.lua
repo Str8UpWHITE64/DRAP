@@ -632,7 +632,11 @@ end
 
 -- Enforcement flag lists, shared by the legacy loops and the reconciler
 -- policies. This is the only copy.
-local ENDGAME_FLAGS = { 2052, 514 }
+-- 2052 and 514 are the flags Overtime runs on. Kept as a record, not
+-- enforced: a vanilla save has both on at the Overtime spawn without
+-- any mod. If one is ever found off mid-Overtime, this is the pair to
+-- look at first.
+-- local ENDGAME_FLAGS = { 2052, 514 }
 -- 265 (EV_EVENT08_00) is deliberately NOT enforced steady-state. It's a
 -- main-event PHASE flag (naturally on in the prologue, one-shot at activation,
 -- Hideout's secondary while active). Holding it on post-Jessie is a state
@@ -718,39 +722,9 @@ end
 -- The legacy write loops. Authoritative while the reconciler runs in
 -- shadow mode; deleted once shadow shows sustained agreement.
 local function enforce_flags_legacy()
-    -- Overtime: skip all enforcement except endgame flags + hideout 301 cutscene prevention
-    if State.is_endgame_reached() then
-        for _, fid in ipairs(ENDGAME_FLAGS) do
-            if not raw_check_flag(fid) then
-                currently_unlocking = true
-                raw_set_flag_on(fid)
-                currently_unlocking = false
-                if verbose_logging then
-                    M.log(string.format("Endgame: enforced flag %d", fid))
-                end
-            end
-        end
-
-        if get_current_area_index() == HIDEOUT_AREA_INDEX then
-            if not raw_check_flag(301) then
-                currently_unlocking = true
-                raw_set_flag_on(301)
-                currently_unlocking = false
-                if verbose_logging then
-                    M.log("Overtime: enabled flag 301 (player in Carlito's Hideout)")
-                end
-            end
-        else
-            if raw_check_flag(301) then
-                raw_set_flag_off(301)
-                if verbose_logging then
-                    M.log("Overtime: disabled flag 301 (player left Carlito's Hideout)")
-                end
-            end
-        end
-
-        return
-    end
+    -- Overtime enforces nothing. See the note in FlagPolicies where the
+    -- endgame policy used to be.
+    if State.is_endgame_reached() then return end
 
     enforce_blacklist()
     enforce_queen_spawning()
@@ -1089,7 +1063,6 @@ local function get_reconciler_policies()
             queen_spawn_flag = QUEEN_SPAWN_FLAG,
             cult_on = CULT_ON,
             cult_off = CULT_OFF,
-            endgame_flags = ENDGAME_FLAGS,
         })
     end
     return reconciler_policies
@@ -1228,7 +1201,13 @@ local function install_hooks()
                     -- cutscene early and fires 2308 before Backup for Brad has
                     -- arrived. We don't mark _logged_completion_events, so the
                     -- legitimate completion can still fire later.
+                    -- Not in Overtime: the 72-hour mains are behind the
+                    -- player, and clearing one of their completion flags
+                    -- there tells the game a scene it already played has not
+                    -- happened. This guard is separate from the enforcement
+                    -- loop's because this runs from the evFlagOn hook.
                     local ss_block = scoop_sanity_enabled
+                                  and not State.is_endgame_reached()
                                   and completion.scoop
                                   and SCOOP_DATA[completion.scoop]
                                   and SCOOP_DATA[completion.scoop].category == "Main"
@@ -1429,6 +1408,14 @@ local function apply_unlock_writes(scoop_name, scoop)
                 end
             end
         end
+    end
+
+    -- Overtime has no use for an armed 72-hour mission, and unlocks are
+    -- driven by the ledger, which is per slot and survives a new game.
+    if State.is_endgame_reached() then
+        M.log(string.format("Skipped unlocking '%s' -- Overtime writes no flags",
+            scoop_name))
+        return
     end
 
     local count = 0
