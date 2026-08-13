@@ -208,6 +208,10 @@ _all_items = [DRItemData(row[0], row[1], row[2]) for row in [
     ("Toolbox", 162, DRItemCategory.WEAPON),
     ("Toy Cube", 163, DRItemCategory.WEAPON),
     ("Toy Laser Sword", 164, DRItemCategory.WEAPON),
+    # ITEM_NO_ROCKET_R. Its name was blank in drdr_shared.json, so nothing
+    # could register it and it was never obtainable -- while "Kill 100
+    # zombies with an RPG" has always been a location.
+    ("Rocket Launcher", 205, DRItemCategory.WEAPON),
     ("TV", 165, DRItemCategory.WEAPON),
     ("Vase", 166, DRItemCategory.WEAPON),
     ("Water Gun", 167, DRItemCategory.WEAPON),
@@ -459,6 +463,10 @@ specialty_items = {
     "Shotgun",
     "Sniper Rifle",
     "Submachine Gun",
+    # "Kill 100 zombies with an RPG" in restricted_item_mode: either the RPG
+    # itself in Overtime, or the two halves the blender turns into one.
+    "Rocket Launcher",
+    "Mega Buster",
     # Required for Kent Day 2 in restricted_item_mode:
     "Novelty Mask (Bear)",
     "Novelty Mask (Horse)",
@@ -512,6 +520,7 @@ overpowered_items = {
     "Book [Martial Arts]",          # massively-boosted unarmed damage
     "Laser Sword",                  # high-damage, high-durability weapon
     "Real Mega Buster",             # high-damage ranged weapon
+    "Rocket Launcher",              # one-shots almost anything
 }
 
 # Skill items that gate logic when Options.enable_skill_items is on, and
@@ -592,6 +601,15 @@ def BuildItemPool(multiworld, count, options, excluded_scoop_names=(),
         remaining_count = remaining_count - 1
         included_itemcount = included_itemcount + 1
 
+    # Book [Blender] is the one thing both RPG routes need, and on any goal
+    # without Overtime it is the only route -- so one has to exist in every
+    # mode, the same reasoning as the Queen above.
+    if "Book [Blender]" not in (options.guaranteed_items.value or {}):
+        item = item_dictionary["Book [Blender]"]
+        item_pool.append(item)
+        remaining_count = remaining_count - 1
+        included_itemcount = included_itemcount + 1
+
     itemList = [item for item in _all_items]
     lockList = [item for item in _all_items if item.category == DRItemCategory.LOCK]
     scoopList = [item for item in _all_items if item.category == DRItemCategory.SCOOP]
@@ -615,8 +633,12 @@ def BuildItemPool(multiworld, count, options, excluded_scoop_names=(),
     )]
 
     # Strip overpowered filler entries when the option is on. Guaranteed
-    # Items (added unconditionally above) and Restricted-mode specialty
-    # items (none of which overlap with overpowered_items) are unaffected.
+    # Items (added unconditionally above) and Restricted-mode specialty items
+    # are unaffected -- this only filters the filler list.
+    #
+    # Rocket Launcher is overpowered AND a Restricted specialty: excluding it
+    # drops the filler copies while the guaranteed one survives, so the RPG
+    # check stays reachable.
     if getattr(options, "exclude_overpowered_items",
                type("X", (), {"value": False})()).value:
         nonTrapFiller = [it for it in nonTrapFiller if it.name not in overpowered_items]

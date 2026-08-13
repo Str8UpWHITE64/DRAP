@@ -675,6 +675,16 @@ class DRWorld(World):
         elif name == "Queen" and self.options.scoop_sanity:
             # Gates queen spawning, so state.has must be able to see it.
             item_classification = ItemClassification.progression
+        elif name in ("Mega Buster", "Fire Extinguisher"):
+            # The RPG rule asks whether each blender ingredient is obtainable
+            # in every mode -- "sent it OR can walk to it" without Restricted,
+            # both with it -- so state.has must see them either way.
+            item_classification = ItemClassification.progression
+        elif name == "Book [Blender]":
+            # Both routes to "Kill 100 zombies with an RPG" go through it, and
+            # on goals without Overtime it is the only route, so state.has
+            # must see it in every mode.
+            item_classification = ItemClassification.progression
         elif name in microwave_food_items and self.options.pp_bonus_locations:
             # Food items bypass the Seon's requirement in the microwave
             # rules, so state.has must be able to see them in every mode.

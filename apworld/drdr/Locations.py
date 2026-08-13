@@ -600,7 +600,7 @@ location_tables = {
         DRLocationData("Kill 8 psychopaths", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Kill 50 cultists", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Hit 10 zombies with a parasol", "Milk", DRLocationCategory.CHALLENGE),
-        DRLocationData("Kill 100 zombies with an RPG", "Milk", DRLocationCategory.OVERTIME_SCOOP),
+        DRLocationData("Kill 100 zombies with an RPG", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Photograph 10 survivors", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Photograph 30 survivors", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Photograph 8 psychopaths", "Milk", DRLocationCategory.CHALLENGE),

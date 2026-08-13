@@ -881,7 +881,6 @@ def set_rules(world) -> None:
 
         world.set_rule(world.multiworld.get_location("Kill 10 Special Forces", world.player), And(CanReachRegion("Paradise Plaza"), Has("DAY3_11_AM"), CanReachLocation("Get bit!"), CanReachLocation("Ending A: Solve all of the cases and be on the helipad at 12pm")))
 
-        world.set_rule(world.multiworld.get_location("Kill 100 zombies with an RPG", world.player), And(CanReachRegion("Maintenance Tunnel"), CanReachLocation("Get bit!")))
 
     # ScoopSanity: gate every event of every scoop uniformly on item
     # received, previous scoop's completion, scoop regions, and the
@@ -1097,6 +1096,41 @@ def set_rules(world) -> None:
                   AtLeast(8, *[CanReachLocation(p) for p, c in photograph_psychos for _ in range(c)]))
     world.set_rule(world.multiworld.get_location("Kill 8 psychopaths", world.player),
                   AtLeast(8, *[CanReachLocation(p) for p, c in kill_psychos for _ in range(c)]))
+    # Kill 100 zombies with an RPG. The blender turns a Mega Buster and a Fire
+    # Extinguisher into one long before Overtime, which is why this is a
+    # Challenge rather than an Overtime check -- every goal can reach it.
+    #
+    # Obtaining an ingredient differs by mode: without Restricted you can pick
+    # one off the floor, so being sent it OR being able to walk to it is
+    # enough. Restricted can only use what it was sent, and still has to go
+    # and collect it, so it needs both.
+    _restricted = bool(world.options.restricted_item_mode)
+
+    def _obtainable(item_name, region):
+        if _restricted:
+            return And(Has(item_name), CanReachRegion(region))
+        return Or(Has(item_name), CanReachRegion(region))
+
+    _rpg_blend = [
+        _obtainable("Mega Buster", "Colby's Movieland"),
+        _obtainable("Fire Extinguisher", "Warehouse"),
+        Has("Book [Blender]"),
+    ]
+    # Restricted cannot pick the blender's output up either.
+    if _restricted:
+        _rpg_blend.append(Has("Rocket Launcher"))
+    _rpg_rule = And(*_rpg_blend)
+
+    if world.options.goal.value == 0:
+        # Overtime is the other way to find one -- Ending S only, and naming
+        # "Get bit!" on any other goal would not resolve.
+        _rpg_ot = [CanReachLocation("Get bit!")]
+        if _restricted:
+            _rpg_ot.append(Has("Rocket Launcher"))
+        _rpg_rule = Or(_rpg_rule, And(*_rpg_ot))
+
+    world.set_rule(world.multiworld.get_location("Kill 100 zombies with an RPG", world.player), _rpg_rule)
+
     world.set_rule(world.multiworld.get_location("Hit 10 zombies with a parasol", world.player), (And(Or(CanReachRegion("Entrance Plaza"), CanReachRegion("Al Fresca Plaza"), CanReachRegion("Crislip's Home Saloon")), Has("Parasol")) if world.options.restricted_item_mode else Or(CanReachRegion("Entrance Plaza"), CanReachRegion("Al Fresca Plaza"), CanReachRegion("Crislip's Home Saloon"), And(Has("Parasol"), CanReachRegion("Paradise Plaza")))))
     world.set_rule(world.multiworld.get_location("Kill 50 cultists", world.player), And(CanReachRegion("Paradise Plaza"), CanReachLocation("Witness Sean in Paradise Plaza")))
     world.set_rule(world.multiworld.get_location("Photograph 30 survivors", world.player), And(CanReachRegion("Leisure Park"), CanReachRegion("Al Fresca Plaza"), CanReachRegion("Wonderland Plaza"), CanReachRegion("North Plaza"), CanReachRegion("Entrance Plaza"), Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM")))
