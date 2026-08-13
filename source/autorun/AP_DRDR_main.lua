@@ -518,9 +518,16 @@ local function run_slot_connect(slot_data)
                             and tonumber(slot_data.zombie_spawn_multiplier)) or 1
         AP.effects.ZombieEffects.set_spawn_multiplier(spawn_mult)
 
-        log(string.format("Zombie difficulty: night=%s hardcore=%s spawn=%sx",
-            tostring(night_enabled), tostring(hardcore_enabled),
-            tostring(spawn_mult)))
+        -- Night lighting rides Night Mode but only under ScoopSanity: without
+        -- it the clock runs and the game cycles to night on its own. Opens
+        -- after Meet Jessie, polled module-side.
+        AP.effects.ZombieEffects.set_night_lighting(night_enabled,
+            scoop_sanity_enabled)
+
+        log(string.format("Zombie difficulty: night=%s hardcore=%s spawn=%sx "
+            .. "lighting=%s", tostring(night_enabled),
+            tostring(hardcore_enabled), tostring(spawn_mult),
+            tostring(night_enabled and scoop_sanity_enabled)))
     end
 
     -- Costume randomizer toggles (3 independent options):

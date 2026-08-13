@@ -431,8 +431,13 @@ class NightModeEnabled(Toggle):
     The glowing red eyes come with it. Every zombie gets them, including ones
     that spawn later, so the mall looks like night even in daylight.
 
-    The lighting itself is unchanged — the sun and the mall lights stay as
-    they are for the current hour.
+    With ScoopSanity on, the mall lighting goes to night as well — the sun
+    goes down and the interior lights come up — starting once you have met
+    Jessie in the warehouse, so the prologue plays in its intended daylight.
+
+    Without ScoopSanity the lighting is left alone. The clock is still running
+    in that mode and the game cycles into night on its own, so there is no
+    reason to override it.
     """
     display_name = "Night Mode"
     default = False
