@@ -512,8 +512,15 @@ local function run_slot_connect(slot_data)
         else
             AP.effects.ZombieEffects.set_permanent_hardcore(false)
         end
-        log(string.format("Zombie difficulty: night=%s hardcore=%s",
-            tostring(night_enabled), tostring(hardcore_enabled)))
+        -- Spawn multiplier is independent of the two flags: it scales how many
+        -- zombies each area asks for, rather than how they behave.
+        local spawn_mult = (type(slot_data) == "table"
+                            and tonumber(slot_data.zombie_spawn_multiplier)) or 1
+        AP.effects.ZombieEffects.set_spawn_multiplier(spawn_mult)
+
+        log(string.format("Zombie difficulty: night=%s hardcore=%s spawn=%sx",
+            tostring(night_enabled), tostring(hardcore_enabled),
+            tostring(spawn_mult)))
     end
 
     -- Costume randomizer toggles (3 independent options):

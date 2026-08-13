@@ -880,6 +880,8 @@ class DRWorld(World):
         hardcore_zombies_enabled = bool(self.options.hardcore_zombies_enabled.value)
         if hardcore_zombies_enabled:
             night_mode_enabled = True
+        # 1 is vanilla; the Lua side clamps to the same maximum.
+        zombie_spawn_multiplier = int(self.options.zombie_spawn_multiplier.value)
 
         # Costume randomizer toggles. Body-first randomization rule (DLC
         # anchor overrides accessories, regular Body co-randomizes
@@ -955,6 +957,7 @@ class DRWorld(World):
                 "overtime_progression_gating": overtime_gating_enabled,
                 "night_mode_enabled": night_mode_enabled,
                 "hardcore_zombies_enabled": hardcore_zombies_enabled,
+                "zombie_spawn_multiplier": zombie_spawn_multiplier,
                 "random_starting_costume": random_starting_costume,
                 "costume_chaos_mode": costume_chaos_mode,
                 "dlc_outfits_enabled": dlc_outfits_enabled,
@@ -1002,6 +1005,7 @@ class DRWorld(World):
             "overtime_progression_gating": overtime_gating_enabled,
             "night_mode_enabled": night_mode_enabled,
             "hardcore_zombies_enabled": hardcore_zombies_enabled,
+            "zombie_spawn_multiplier": zombie_spawn_multiplier,
             "random_starting_costume": random_starting_costume,
             "costume_chaos_mode": costume_chaos_mode,
             "dlc_outfits_enabled": dlc_outfits_enabled,

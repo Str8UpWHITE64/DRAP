@@ -428,12 +428,33 @@ class NightModeEnabled(Toggle):
       * Higher chance for zombies to block counterattacks (Day 45% → Night 55%)
       * Slightly more aggressive overall behavior
 
-    The "glowing eyes" visual effect that normally accompanies night does
-    NOT carry over — that's tied to a separate render pass. This is purely
-    a difficulty modifier.
+    The glowing red eyes come with it. Every zombie gets them, including ones
+    that spawn later, so the mall looks like night even in daylight.
+
+    The lighting itself is unchanged — the sun and the mall lights stay as
+    they are for the current hour.
     """
     display_name = "Night Mode"
     default = False
+
+
+class ZombieSpawnMultiplier(Range):
+    """
+    Multiplies the number of zombies each area spawns.
+
+    1 is vanilla and 5 is the maximum. At 5 an area that normally holds a
+    hundred zombies will hold roughly five hundred, which changes how you move
+    through the mall — crowds become walls, and routes that were a jog become
+    a fight.
+
+    This costs performance. Every extra zombie is more to draw, animate and
+    path, so higher values are not recommended on lower-end machines. If the
+    frame rate suffers, lower the value.
+    """
+    display_name = "Zombie Spawn Multiplier"
+    range_start = 1
+    range_end = 5
+    default = 1
 
 
 class HardcoreZombiesEnabled(Toggle):
@@ -635,6 +656,7 @@ class DROption(PerGameCommonOptions):
     overtime_progression_gating: OvertimeProgressionGating
     night_mode_enabled: NightModeEnabled
     hardcore_zombies_enabled: HardcoreZombiesEnabled
+    zombie_spawn_multiplier: ZombieSpawnMultiplier
     random_starting_costume: RandomStartingCostume
     costume_chaos_mode: CostumeChaosMode
     dlc_outfits_enabled: DLCOutfitsEnabled
@@ -701,6 +723,7 @@ dr_option_groups = [
             SplitKeys,
             NightModeEnabled,
             HardcoreZombiesEnabled,
+            ZombieSpawnMultiplier,
         ],
     ),
     OptionGroup(

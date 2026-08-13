@@ -1,5 +1,6 @@
 -- DRAP/effects/ZombieEffects.lua
--- Difficulty modifiers (Night Mode, Hardcore Zombies) via ZombieDefinitionUserData.
+-- Difficulty modifiers: Night Mode (params + glowing eyes), Hardcore
+-- Zombies, and the zombie spawn multiplier.
 -- See docs/reframework/features/zombie_effects.md.
 --
 -- Two activation paths:
@@ -95,6 +96,111 @@ local function _install_night_hook()
 end
 
 ------------------------------------------------------------
+-- Glowing night eyes
+------------------------------------------------------------
+-- Per-zombie state on ZombieThinkBehavior, reached via uZombie.mZombieThink.
+-- setNightEye() builds the eye effect; writing mNightEye alone does not.
+-- Zombies stream in constantly, so this sweeps on a tick rather than once.
+
+local NIGHT_EYE_INTERVAL = 30    -- frames between sweeps
+
+local _night_eyes = false
+local _eye_tick = 0
+
+local function _each_zombie_think(fn)
+    local zm = _zm()
+    if not zm then return 0 end
+    local list = safe(function() return zm:get_field("mpZombie") end)
+    if not list then return 0 end
+    local n = tonumber(safe(function() return list:call("get_Count") end)) or 0
+    local hit = 0
+    for i = 0, n - 1 do
+        local z = safe(function() return list:call("get_Item", i) end)
+        local th = z and safe(function() return z:get_field("mZombieThink") end)
+        if th and fn(th) then hit = hit + 1 end
+    end
+    return hit
+end
+
+--- Order matters: setNightZombieCtrl() recomputes mNight from the in-game
+--- hour, so the flags go last or they read back false immediately.
+local function _set_night_eye(th, on)
+    local ok = pcall(function() th:call("setNightEye", on) end)
+    pcall(function() th:call("setNightZombieCtrl") end)
+    pcall(function() th:set_field("mNight", on) end)
+    pcall(function() th:set_field("mNightEye", on) end)
+    return ok
+end
+
+local function _sweep_night_eyes()
+    _each_zombie_think(function(th)
+        if safe(function() return th:get_field("mNightEye") end) ~= _night_eyes then
+            return _set_night_eye(th, _night_eyes)
+        end
+        return false
+    end)
+end
+
+------------------------------------------------------------
+-- Zombie spawn multiplier
+------------------------------------------------------------
+-- mAllSetCnt on the selected layout is how many zombies the area asks for, and
+-- mSpeedyNum its share of fast ones. MaxNormalZombieNum, spawn range, the
+-- additional count and the per-type maxima are ceilings, not requests --
+-- raising them changes nothing.
+--
+-- The layout resource is rebuilt per area load, so scaling has to happen in a
+-- pre-hook on instantinateZombies rather than as a one-shot write.
+
+local ELM_TYPE = "app.solid.gamemastering.EnemyLayoutManager"
+local SPAWN_MULT_MAX = 5
+
+local _spawn_mult = 1
+local _spawn_bases = {}          -- layout resource id -> vanilla {cnt, spd}
+local _spawn_hook_installed = false
+
+local function _selected_layout()
+    local e = sdk.get_managed_singleton(ELM_TYPE)
+    if not e then return nil, nil end
+    local sel = safe(function() return e:get_field("SelectedZombieSet") end)
+    local res = sel and safe(function() return sel:get_field("CurrentLayoutResource") end)
+    local lay = res and safe(function() return res:get_field("mLayout") end)
+    return lay, res
+end
+
+--- Baselines are keyed per layout resource: mAllSetCnt differs per area, and a
+--- single shared baseline would scale an already-scaled number after a move.
+local function _apply_spawn_scale()
+    if _spawn_mult <= 1 then return end
+    local lay, res = _selected_layout()
+    if not lay then return end
+    local rid = tostring(res and safe(function() return res:get_field("mId") end) or "?")
+    if not _spawn_bases[rid] then
+        _spawn_bases[rid] = {
+            cnt = tonumber(safe(function() return lay:get_field("mAllSetCnt") end)) or 0,
+            spd = tonumber(safe(function() return lay:get_field("mSpeedyNum") end)) or 0,
+        }
+    end
+    local b = _spawn_bases[rid]
+    pcall(function() lay:set_field("mAllSetCnt", math.floor(b.cnt * _spawn_mult)) end)
+    pcall(function() lay:set_field("mSpeedyNum", math.floor(b.spd * _spawn_mult)) end)
+end
+
+local function _install_spawn_hook()
+    if _spawn_hook_installed then return end
+    local td = sdk.find_type_definition(ELM_TYPE)
+    local fn = td and td:get_method("instantinateZombies")
+    if not fn then
+        log("WARN: EnemyLayoutManager.instantinateZombies() not found -- "
+            .. "spawn multiplier unavailable")
+        return
+    end
+    sdk.hook(fn, function(args) pcall(_apply_spawn_scale) end, nil)
+    _spawn_hook_installed = true
+    log("instantinateZombies() pre-hook installed (gated by multiplier)")
+end
+
+------------------------------------------------------------
 -- Timed-effect scheduler (capture / apply / restore)
 ------------------------------------------------------------
 
@@ -111,6 +217,12 @@ re.on_frame(function()
             _timed[name] = nil
             log(string.format("'%s' restored after expiration", name))
         end
+    end
+
+    -- Night eyes share this callback rather than registering a second one.
+    _eye_tick = _eye_tick + 1
+    if _night_eyes and _eye_tick % NIGHT_EYE_INTERVAL == 0 then
+        pcall(_sweep_night_eyes)
     end
 end)
 
@@ -163,6 +275,9 @@ end
 local function _apply_night()
     _install_night_hook()
     _night_active = true
+    -- Glowing eyes, on the zombies standing here now and on later spawns.
+    _night_eyes = true
+    pcall(_sweep_night_eyes)
     local def = _def()
     if not def then return end
     for _, p in ipairs(NIGHT_PAIRS) do
@@ -176,6 +291,9 @@ end
 
 local function _restore_night(saved)
     _night_active = false
+    -- Clear the eyes off anything still standing, then stop sweeping.
+    _night_eyes = false
+    pcall(_sweep_night_eyes)
     local def = _def()
     if not def or not saved then return end
     for fname, v in pairs(saved.day_values or {}) do _write(def, fname, v) end
@@ -272,6 +390,31 @@ function M.is_permanent_night_active()    return _permanent.night.active end
 function M.is_permanent_hardcore_active() return _permanent.hardcore.active end
 
 ------------------------------------------------------------
+-- Spawn multiplier (slot-data driven)
+------------------------------------------------------------
+
+--- 1 is vanilla; values above it scale how many zombies each area asks for.
+--- Clamped to SPAWN_MULT_MAX because the cost is frame rate, not correctness.
+function M.set_spawn_multiplier(n)
+    n = tonumber(n) or 1
+    if n < 1 then n = 1 end
+    if n > SPAWN_MULT_MAX then n = SPAWN_MULT_MAX end
+    _spawn_mult = n
+    if n > 1 then
+        _install_spawn_hook()
+        -- Apply to the area already loaded; every later area is covered by the
+        -- hook, which runs before the game places enemies.
+        pcall(_apply_spawn_scale)
+        log(string.format("Zombie spawn multiplier: %dx", n))
+    else
+        log("Zombie spawn multiplier: 1x (vanilla)")
+    end
+    return true
+end
+
+function M.get_spawn_multiplier() return _spawn_mult end
+
+------------------------------------------------------------
 -- Timed activation (manual / testing / future trap items)
 ------------------------------------------------------------
 
@@ -333,5 +476,6 @@ end
 _G.drap_zomb_night    = function(s) M.night_mode(s)    end
 _G.drap_zomb_hardcore = function(s) M.hardcore_zombies(s) end
 _G.drap_zomb_active   = function() return M.get_active_effects() end
+_G.drap_zomb_spawn    = function(n) return M.set_spawn_multiplier(n) end
 
 return M
