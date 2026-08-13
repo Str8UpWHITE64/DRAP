@@ -129,14 +129,17 @@ KILL_CAR_KEYS = {
     "Maintenance Tunnel": ("Sedan Key", "Truck Key"),
 }
 
-# The vehicle challenges. Killing by vehicle works in anything with wheels, so
-# any mall car will do; the jump needs a car that can carry the ramp, which
-# rules out the motorcycle and the truck. The convicts' Humvee is excluded from
-# both for the same reason it is excluded above -- it is not there until they
-# have been dealt with.
-KILL_BY_VEHICLE_KEYS = ("Sedan Key", "Sports Car Key", "Truck Key",
-                        "Motorcycle Key")
-JUMP_VEHICLE_KEYS = ("Sedan Key", "Sports Car Key")
+# Where each car is parked. A key on its own is not a car -- the player has to
+# reach it -- and under Door Randomizer vehicles cannot be driven between
+# areas, so pairing each key with its home region is correct either way. The
+# convicts' Humvee is absent for the same reason it is absent above: it does
+# not exist until they have been dealt with.
+CAR_HOME = {
+    "Sedan Key": "Maintenance Tunnel",
+    "Truck Key": "Maintenance Tunnel",
+    "Sports Car Key": "Leisure Park",
+    "Motorcycle Key": "Leisure Park",
+}
 
 # Restricted Items only: something to kill with. Everywhere else these are on
 # the floor for the taking, so the points above carry those seeds instead.
@@ -1139,9 +1142,35 @@ def set_rules(world) -> None:
     # Car Keys moves the vehicle challenges behind the key for a vehicle that
     # is actually in the region. Leisure Park parks the sports car and a
     # motorcycle; the Maintenance Tunnels have the sedan and the box truck.
-    _jump_car = Or(*[Has(k) for k in JUMP_VEHICLE_KEYS]) if world.options.car_keys else True_()
-    _kill_car = Or(*[Has(k) for k in KILL_BY_VEHICLE_KEYS]) if world.options.car_keys else True_()
-    world.set_rule(world.multiworld.get_location("Jump a vehicle 50 feet", world.player), And(CanReachRegion("Leisure Park"), _jump_car))
+    if world.options.car_keys:
+        # Door Randomizer stops vehicles being driven between areas, so a car
+        # is only usable where it is parked. Without it they can be driven
+        # anywhere, and only collecting them is region-bound.
+        _cars_travel = not world.options.door_randomizer
+        _usable = [And(Has(_k), CanReachRegion(_r)) for _k, _r in CAR_HOME.items()]
+
+        # The ramp is in Leisure Park and only these two can take it.
+        _jump_alts = [And(Has("Sports Car Key"), CanReachRegion("Leisure Park"))]
+        if _cars_travel:
+            # The sedan lives in the Tunnel, so this route means fetching it
+            # and driving it over -- which needs doors where they belong.
+            _jump_alts.append(And(Has("Sedan Key"),
+                                  CanReachRegion(CAR_HOME["Sedan Key"]),
+                                  CanReachRegion("Leisure Park")))
+        _jump_rule = Or(*_jump_alts) if len(_jump_alts) > 1 else _jump_alts[0]
+
+        # Counts this high are only practical in the Tunnel, so it stays
+        # required either way. What can satisfy it is what differs: any car
+        # when they can be driven over, only a Tunnel one when they cannot.
+        if _cars_travel:
+            _kill_rule = And(CanReachRegion("Maintenance Tunnel"), Or(*_usable))
+        else:
+            _kill_rule = And(CanReachRegion("Maintenance Tunnel"),
+                             Or(Has("Sedan Key"), Has("Truck Key")))
+    else:
+        _jump_rule = CanReachRegion("Leisure Park")
+        _kill_rule = CanReachRegion("Maintenance Tunnel")
+    world.set_rule(world.multiworld.get_location("Jump a vehicle 50 feet", world.player), _jump_rule)
     world.set_rule(world.multiworld.get_location("Bowl over 5 zombies", world.player), (And(Or(CanReachRegion("Paradise Plaza"), CanReachRegion("Wonderland Plaza")), Has("Bowling Ball")) if world.options.restricted_item_mode else Or(CanReachRegion("Paradise Plaza"), CanReachRegion("Wonderland Plaza"), And(Has("Bowling Ball"), Or(CanReachRegion("Paradise Plaza"), CanReachRegion("Entrance Plaza"))))))
     world.set_rule(world.multiworld.get_location("Hit a golf ball 100 feet", world.player), (And(Or(CanReachRegion("Paradise Plaza"), CanReachRegion("Entrance Plaza")), Has("Golf Club")) if world.options.restricted_item_mode else Or(CanReachRegion("Paradise Plaza"), CanReachRegion("Entrance Plaza"), And(Has("Golf Club"), CanReachRegion("Rooftop")))))
 
@@ -1153,8 +1182,8 @@ def set_rules(world) -> None:
     world.set_rule(world.multiworld.get_location("Reach Level 30!", world.player), CanReachLocation("Reach Level 30"))
     world.set_rule(world.multiworld.get_location("Reach Level 40!", world.player), CanReachLocation("Reach Level 40"))
     world.set_rule(world.multiworld.get_location("Reach max level", world.player), CanReachLocation("Reach Level 50"))
-    world.set_rule(world.multiworld.get_location("Kill 500 zombies by vehicle", world.player), And(CanReachRegion("Maintenance Tunnel"), _kill_car))
-    world.set_rule(world.multiworld.get_location("Kill 1000 zombies by vehicle", world.player), And(CanReachRegion("Maintenance Tunnel"), _kill_car))
+    world.set_rule(world.multiworld.get_location("Kill 500 zombies by vehicle", world.player), _kill_rule)
+    world.set_rule(world.multiworld.get_location("Kill 1000 zombies by vehicle", world.player), _kill_rule)
     all_side_scoops = SURVIVOR_SCOOP_NAMES + PSYCHOPATH_SCOOP_NAMES
     world.set_rule(world.multiworld.get_location("Get 50 survivors to join", world.player), And(CanReachRegion("Paradise Plaza"), Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM"), Has("DAY3_11_AM"), CanReachLocation("Kill Kent on day 3"), CanReachLocation("Kill Cliff"), CanReachLocation("Kill Jo"), CanReachLocation("Kill Adam"), CanReachLocation("Kill Sean"), CanReachLocation("Kill Roger and Jack (and Thomas if you want) and chat with Wayne"), CanReachLocation("Defeat Paul"), (And(HasAll(*all_side_scoops), ending_a_rule) if world.options.scoop_sanity else True_())))
     world.set_rule(world.multiworld.get_location("Encounter 10 survivors", world.player), And(CanReachRegion("Paradise Plaza"), Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM"), Has("DAY3_11_AM"), CanReachLocation("Kill Kent on day 3"), CanReachLocation("Kill Cliff"), CanReachLocation("Kill Jo"), CanReachLocation("Kill Adam"), CanReachLocation("Kill Sean"), CanReachLocation("Kill Roger and Jack (and Thomas if you want) and chat with Wayne"), CanReachLocation("Defeat Paul")))
