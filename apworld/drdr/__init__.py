@@ -198,6 +198,12 @@ class DRWorld(World):
         # rather than generating a seed that cannot be won.
         if self.options.goal.value == 3:
             self.zombie_kill_tier = "genocide"
+        # Restricted Item Mode implies Car Keys -- the keys were asked for as
+        # part of that mode, and locking every pickup while leaving the cars
+        # free to drive reads as an oversight. Promoted here so the item pool,
+        # the rules and slot_data all agree without repeating the condition.
+        if self.options.restricted_item_mode:
+            self.options.car_keys.value = 1
         _kill_active = set(zombie_kill_locations(self.zombie_kill_tier))
         self._zombie_kill_excluded_names = {
             n for n in zombie_kill_locations("genocide") if n not in _kill_active
@@ -882,6 +888,7 @@ class DRWorld(World):
             night_mode_enabled = True
         # 1 is vanilla; the Lua side clamps to the same maximum.
         zombie_spawn_multiplier = int(self.options.zombie_spawn_multiplier.value)
+        car_keys_enabled = bool(self.options.car_keys.value)
 
         # Costume randomizer toggles. Body-first randomization rule (DLC
         # anchor overrides accessories, regular Body co-randomizes
@@ -958,6 +965,7 @@ class DRWorld(World):
                 "night_mode_enabled": night_mode_enabled,
                 "hardcore_zombies_enabled": hardcore_zombies_enabled,
                 "zombie_spawn_multiplier": zombie_spawn_multiplier,
+                "car_keys": car_keys_enabled,
                 "random_starting_costume": random_starting_costume,
                 "costume_chaos_mode": costume_chaos_mode,
                 "dlc_outfits_enabled": dlc_outfits_enabled,
@@ -1006,6 +1014,7 @@ class DRWorld(World):
             "night_mode_enabled": night_mode_enabled,
             "hardcore_zombies_enabled": hardcore_zombies_enabled,
             "zombie_spawn_multiplier": zombie_spawn_multiplier,
+            "car_keys": car_keys_enabled,
             "random_starting_costume": random_starting_costume,
             "costume_chaos_mode": costume_chaos_mode,
             "dlc_outfits_enabled": dlc_outfits_enabled,

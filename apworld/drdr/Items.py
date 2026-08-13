@@ -426,6 +426,16 @@ _all_items = [DRItemData(row[0], row[1], row[2]) for row in [
     ("Cave Key", 5008, DRItemCategory.LOCK),
     # The Humvee will not start without it.
     ("Humvee Key", 5009, DRItemCategory.LOCK),
+    # Car Keys: one per drivable vehicle type. Both motorcycles share the one
+    # key -- the game gives them the same RIDE_CAR_TYPE, so there is nothing to
+    # tell them apart even if we wanted to.
+    ("Sedan Key", 5010, DRItemCategory.LOCK),
+    ("Sports Car Key", 5011, DRItemCategory.LOCK),
+    ("Truck Key", 5012, DRItemCategory.LOCK),
+    ("Motorcycle Key", 5013, DRItemCategory.LOCK),
+    # The convicts' vehicle. Shares its RIDE_CAR_TYPE with the Overtime
+    # Humvee, so the runtime tells them apart by GameObject name.
+    ("Convict Humvee Key", 5014, DRItemCategory.LOCK),
     # Note: Night Mode + Hardcore Zombies are NOT items — they are YAML
     # options (`night_mode_enabled`, `hardcore_zombies_enabled` in Options.py)
     # applied at slot-connect by DRAP/effects/ZombieEffects.lua.
@@ -628,11 +638,21 @@ def BuildItemPool(multiworld, count, options, excluded_scoop_names=(),
         "Cave Key",
         "Humvee Key",
     }
+    # Only exist when Car Keys is on; without it nothing locks the vehicles,
+    # so they would be items with nothing to open.
+    car_key_names = {
+        "Sedan Key", "Sports Car Key", "Truck Key", "Motorcycle Key",
+        "Convict Humvee Key",
+    }
+    car_keys_on = bool(getattr(options, "car_keys",
+                               type("X", (), {"value": False})()).value)
 
     for lock in lockList:
         if lock.name in suppressant_names:
             continue
         if lock.name in overtime_item_names                 and (options.goal.value != 0 or not overtime_gating_on):
+            continue
+        if lock.name in car_key_names and not car_keys_on:
             continue
         # Area keys are precollected under door randomization, and replaced by
         # the per-door keys under Split Keys

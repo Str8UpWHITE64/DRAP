@@ -140,6 +140,7 @@ AP.effects.PlayerStats                = require("DRAP/effects/PlayerStats")
 AP.effects.PlayerBuffs                = require("DRAP/effects/PlayerBuffs")
 AP.effects.HostileSurvivorTrap        = require("DRAP/effects/HostileSurvivorTrap")
 AP.effects.ZombieEffects              = require("DRAP/effects/ZombieEffects")
+AP.effects.VehicleGate                = require("DRAP/effects/VehicleGate")
 AP.effects.CostumeRandomizer          = require("DRAP/effects/CostumeRandomizer")
 AP.effects.AP_LocationTriggers        = require("DRAP/effects/AP_LocationTriggers")
 AP.effects.DoorPromptOverlay          = require("DRAP/effects/DoorPromptOverlay")
@@ -158,6 +159,7 @@ AP.effects.PlayerBuffs.register()
 AP.effects.HostileSurvivorTrap.register()
 AP.effects.ConvictRespawnTrap.register()
 AP.effects.ZombieEffects.register()
+AP.effects.VehicleGate.register()
 AP.effects.CostumeRandomizer.register()
 AP.effects.AP_LocationTriggers.register()
 AP.effects.DoorPromptOverlay.register()
@@ -528,6 +530,14 @@ local function run_slot_connect(slot_data)
             .. "lighting=%s", tostring(night_enabled),
             tostring(hardcore_enabled), tostring(spawn_mult),
             tostring(night_enabled and scoop_sanity_enabled)))
+    end
+
+    -- Car Keys: the drivable vehicles wait on their key. Independent of
+    -- Restricted Item Mode, and the Humvee is not part of it -- that stays
+    -- with OvertimeItemGate.
+    if AP.effects.VehicleGate then
+        AP.effects.VehicleGate.set_enabled(
+            type(slot_data) == "table" and slot_data.car_keys == true)
     end
 
     -- Costume randomizer toggles (3 independent options):

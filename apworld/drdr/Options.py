@@ -443,6 +443,37 @@ class NightModeEnabled(Toggle):
     default = False
 
 
+class CarKeys(Toggle):
+    """
+    When enabled, the mall's drivable vehicles stay locked until the
+    multiworld sends you their key. Five keys cover every vehicle:
+
+      * Sedan Key          — the white sedan in the Maintenance Tunnels
+      * Sports Car Key     — the red sports car in Leisure Park
+      * Truck Key          — the box truck in the Maintenance Tunnels
+      * Motorcycle Key     — both motorcycles, in Leisure Park and (after
+                             Girl Hunting) North Plaza
+      * Convict Humvee Key — the convicts' vehicle in Leisure Park
+
+    The vehicle challenges move behind the keys they can be done with: the
+    "Kill N zombies by vehicle" checks take any car, and "Jump a vehicle 50
+    feet" needs the sedan or the sports car.
+
+    The per-area zombie kill checks in Leisure Park and the Maintenance
+    Tunnels also want a car once the counts climb — from 1,000 and 2,000
+    respectively. The convicts' Humvee never counts toward logic, since it
+    only exists after the convicts have been dealt with.
+
+    Restricted Item Mode turns this on automatically. It can also be run on
+    its own, without item restriction.
+
+    The Overtime Humvee is unaffected; it has its own key under Overtime
+    Progression Gating.
+    """
+    display_name = "Car Keys"
+    default = False
+
+
 class ZombieSpawnMultiplier(Range):
     """
     Multiplies the number of zombies each area spawns.
@@ -662,6 +693,7 @@ class DROption(PerGameCommonOptions):
     night_mode_enabled: NightModeEnabled
     hardcore_zombies_enabled: HardcoreZombiesEnabled
     zombie_spawn_multiplier: ZombieSpawnMultiplier
+    car_keys: CarKeys
     random_starting_costume: RandomStartingCostume
     costume_chaos_mode: CostumeChaosMode
     dlc_outfits_enabled: DLCOutfitsEnabled
@@ -729,6 +761,7 @@ dr_option_groups = [
             NightModeEnabled,
             HardcoreZombiesEnabled,
             ZombieSpawnMultiplier,
+            CarKeys,
         ],
     ),
     OptionGroup(

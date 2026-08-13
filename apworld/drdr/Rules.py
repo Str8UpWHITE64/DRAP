@@ -111,6 +111,33 @@ KILL_POINT_GATES = {
 KILL_WEAPON_FROM = 500
 KILL_QUEEN_FROM = 2000
 
+# Car Keys only: the two areas with drivable vehicles want a key for one that
+# is actually parked there once the counts get high. The thresholds differ
+# because the areas do -- Leisure Park tops out at 10000 and the Tunnel at
+# 28594, so the Tunnel can afford to start later.
+#
+# The convicts' Humvee is deliberately not listed even though it sits in
+# Leisure Park: it only exists once the convicts have spawned and been killed,
+# which under ScoopSanity waits on their scoop. Putting it here would let the
+# fill assume a vehicle the player may not be able to reach yet.
+KILL_CAR_FROM = {
+    "Leisure Park": 1000,
+    "Maintenance Tunnel": 2000,
+}
+KILL_CAR_KEYS = {
+    "Leisure Park": ("Sports Car Key", "Motorcycle Key"),
+    "Maintenance Tunnel": ("Sedan Key", "Truck Key"),
+}
+
+# The vehicle challenges. Killing by vehicle works in anything with wheels, so
+# any mall car will do; the jump needs a car that can carry the ramp, which
+# rules out the motorcycle and the truck. The convicts' Humvee is excluded from
+# both for the same reason it is excluded above -- it is not there until they
+# have been dealt with.
+KILL_BY_VEHICLE_KEYS = ("Sedan Key", "Sports Car Key", "Truck Key",
+                        "Motorcycle Key")
+JUMP_VEHICLE_KEYS = ("Sedan Key", "Sports Car Key")
+
 # Restricted Items only: something to kill with. Everywhere else these are on
 # the floor for the taking, so the points above carry those seeds instead.
 #
@@ -605,6 +632,14 @@ def set_rules(world) -> None:
         if _points:
             _parts.append(RegionPointsAtLeast(_points))
 
+        # A car for the areas that have one, once the count is past what is
+        # reasonable on foot. Independent of item mode.
+        if world.options.car_keys:
+            _car_from = KILL_CAR_FROM.get(_kill_region)
+            if _car_from is not None and _threshold >= _car_from:
+                _parts.append(Or(*[Has(k)
+                                   for k in KILL_CAR_KEYS[_kill_region]]))
+
         # Something to kill with, and the Queen on top from 2000.
         if world.options.restricted_item_mode and _threshold >= KILL_WEAPON_FROM:
             _weapon = _kill_weapon_rule(_kill_region)
@@ -1067,7 +1102,12 @@ def set_rules(world) -> None:
     world.set_rule(world.multiworld.get_location("Photograph 30 survivors", world.player), And(CanReachRegion("Leisure Park"), CanReachRegion("Al Fresca Plaza"), CanReachRegion("Wonderland Plaza"), CanReachRegion("North Plaza"), CanReachRegion("Entrance Plaza"), Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM")))
     world.set_rule(world.multiworld.get_location("Escort 8 survivors at once", world.player), And(CanReachRegion("Paradise Plaza"), CanReachRegion("Al Fresca Plaza"), CanReachLocation("Kill Jo"), CanReachRegion("Food Court"), CanReachRegion("Entrance Plaza"), (AtLeast(8, *[Has(s) for s, c in SCOOP_SURVIVOR_COUNTS.items() for _ in range(c[0])]) if world.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM")))))
     world.set_rule(world.multiworld.get_location("Frank the pimp", world.player), And(CanReachRegion("Paradise Plaza"), CanReachRegion("Al Fresca Plaza"), CanReachLocation("Kill Jo"), CanReachRegion("Food Court"), CanReachRegion("Entrance Plaza"), (AtLeast(8, *[Has(s) for s, c in SCOOP_SURVIVOR_COUNTS.items() for _ in range(c[1])]) if world.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM")))))
-    world.set_rule(world.multiworld.get_location("Jump a vehicle 50 feet", world.player), CanReachRegion("Leisure Park"))
+    # Car Keys moves the vehicle challenges behind the key for a vehicle that
+    # is actually in the region. Leisure Park parks the sports car and a
+    # motorcycle; the Maintenance Tunnels have the sedan and the box truck.
+    _jump_car = Or(*[Has(k) for k in JUMP_VEHICLE_KEYS]) if world.options.car_keys else True_()
+    _kill_car = Or(*[Has(k) for k in KILL_BY_VEHICLE_KEYS]) if world.options.car_keys else True_()
+    world.set_rule(world.multiworld.get_location("Jump a vehicle 50 feet", world.player), And(CanReachRegion("Leisure Park"), _jump_car))
     world.set_rule(world.multiworld.get_location("Bowl over 5 zombies", world.player), (And(Or(CanReachRegion("Paradise Plaza"), CanReachRegion("Wonderland Plaza")), Has("Bowling Ball")) if world.options.restricted_item_mode else Or(CanReachRegion("Paradise Plaza"), CanReachRegion("Wonderland Plaza"), And(Has("Bowling Ball"), Or(CanReachRegion("Paradise Plaza"), CanReachRegion("Entrance Plaza"))))))
     world.set_rule(world.multiworld.get_location("Hit a golf ball 100 feet", world.player), (And(Or(CanReachRegion("Paradise Plaza"), CanReachRegion("Entrance Plaza")), Has("Golf Club")) if world.options.restricted_item_mode else Or(CanReachRegion("Paradise Plaza"), CanReachRegion("Entrance Plaza"), And(Has("Golf Club"), CanReachRegion("Rooftop")))))
 
@@ -1079,8 +1119,8 @@ def set_rules(world) -> None:
     world.set_rule(world.multiworld.get_location("Reach Level 30!", world.player), CanReachLocation("Reach Level 30"))
     world.set_rule(world.multiworld.get_location("Reach Level 40!", world.player), CanReachLocation("Reach Level 40"))
     world.set_rule(world.multiworld.get_location("Reach max level", world.player), CanReachLocation("Reach Level 50"))
-    world.set_rule(world.multiworld.get_location("Kill 500 zombies by vehicle", world.player), CanReachRegion("Maintenance Tunnel"))
-    world.set_rule(world.multiworld.get_location("Kill 1000 zombies by vehicle", world.player), CanReachRegion("Maintenance Tunnel"))
+    world.set_rule(world.multiworld.get_location("Kill 500 zombies by vehicle", world.player), And(CanReachRegion("Maintenance Tunnel"), _kill_car))
+    world.set_rule(world.multiworld.get_location("Kill 1000 zombies by vehicle", world.player), And(CanReachRegion("Maintenance Tunnel"), _kill_car))
     all_side_scoops = SURVIVOR_SCOOP_NAMES + PSYCHOPATH_SCOOP_NAMES
     world.set_rule(world.multiworld.get_location("Get 50 survivors to join", world.player), And(CanReachRegion("Paradise Plaza"), Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM"), Has("DAY3_11_AM"), CanReachLocation("Kill Kent on day 3"), CanReachLocation("Kill Cliff"), CanReachLocation("Kill Jo"), CanReachLocation("Kill Adam"), CanReachLocation("Kill Sean"), CanReachLocation("Kill Roger and Jack (and Thomas if you want) and chat with Wayne"), CanReachLocation("Defeat Paul"), (And(HasAll(*all_side_scoops), ending_a_rule) if world.options.scoop_sanity else True_())))
     world.set_rule(world.multiworld.get_location("Encounter 10 survivors", world.player), And(CanReachRegion("Paradise Plaza"), Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM"), Has("DAY3_11_AM"), CanReachLocation("Kill Kent on day 3"), CanReachLocation("Kill Cliff"), CanReachLocation("Kill Jo"), CanReachLocation("Kill Adam"), CanReachLocation("Kill Sean"), CanReachLocation("Kill Roger and Jack (and Thomas if you want) and chat with Wayne"), CanReachLocation("Defeat Paul")))

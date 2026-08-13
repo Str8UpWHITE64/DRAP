@@ -337,8 +337,10 @@ local function install_cave_hooks()
             -- bug, and the player may well try again an hour later.
             local Notify = package.loaded["DRAP/Notify"] or require("DRAP/Notify")
             if Notify and Notify.send then
+                local name = Notify.span
+                    and Notify.span(CAVE_ITEM, "location", true) or CAVE_ITEM
                 pcall(Notify.send,
-                    "Isabela will not leave without the " .. CAVE_ITEM .. ".",
+                    "Isabela will not leave without the " .. name .. ".",
                     { duration = 6.0 })
             end
         end,
@@ -623,8 +625,12 @@ local function check_humvee_proximity()
 
     local Notify = package.loaded["DRAP/Notify"] or require("DRAP/Notify")
     if Notify and Notify.send then
+        -- Green and bold on the key name, matching the car keys in
+        -- VehicleGate and the door names in DoorPromptOverlay.
+        local name = Notify.span and Notify.span(HUMVEE_ITEM, "location", true)
+            or HUMVEE_ITEM
         pcall(Notify.send,
-            "You need the " .. HUMVEE_ITEM .. " to drive the Humvee.",
+            "You need the " .. name .. " to drive the Humvee.",
             { duration = 6.0 })
     end
     M.log("player reached the Humvee without the " .. HUMVEE_ITEM)
