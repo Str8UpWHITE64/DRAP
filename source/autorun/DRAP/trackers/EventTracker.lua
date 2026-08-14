@@ -123,7 +123,7 @@ local TRACKED_EVENT_FLAGS = {
     [447]  = 'Kill the convicts',
     [1299] = 'Kill the convicts',
 
-    -- Inside the Cave, in the order they are opened: Isabela crawls through
+    -- Inside the tunnel, in the order they are opened: Isabela crawls through
     -- the first gate, opens the second, and the lever raises the last.
     -- Deliberately not 527 or 529 -- those pair with 528 and 530 but switch
     -- off again moments later, and these are read as levels, so a momentary

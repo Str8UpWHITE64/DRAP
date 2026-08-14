@@ -738,7 +738,7 @@ end
 -- Existing HIT_DATA Borrowing (for warp)
 ------------------------------------------------------------
 
--- The last HIT_DATA we managed to borrow, kept across areas. The Cave has
+-- The last HIT_DATA we managed to borrow, kept across areas. The tunnel has
 -- none of its own, so without this the warp works in one direction only:
 -- you can get in and then cannot get out.
 local last_hit_data = nil
@@ -805,7 +805,7 @@ function M.warp_to(area_name, pos, angle, label)
     end
 
     -- Built rather than borrowed. Borrowing rewrites a real door's
-    -- destination, which persists until that layout reloads -- and the Cave
+    -- destination, which persists until that layout reloads -- and the tunnel
     -- has no doors to borrow in the first place. HIT_DATA is a managed class
     -- with a vtable, so one can be made; the caller sets every field the jump
     -- reads and the other 32 default harmlessly.
@@ -849,14 +849,14 @@ function M.warp_to(area_name, pos, angle, label)
     return false
 end
 
--- Spots inside the Overtime Cave, read with drap_player_pos() while standing
--- in each. Not door anchors -- the Cave has no doors we can capture, and
+-- Spots inside the Clock Tower Tunnel, read with drap_player_pos() while
+-- standing in each. Not door anchors -- it has no doors we can capture, and
 -- sb01/sb02 are joined by a load zone -- so these are player positions, which
 -- is what makes them safe to land on.
 --
--- Reaching the Cave normally costs five queens, so without these the only way
+-- Reaching it normally costs five queens, so without these the only way
 -- to test anything past Isabela is to play the whole chain again.
-local CAVE_SPOTS = {
+local TUNNEL_SPOTS = {
     entrance     = { "sb00", { x =  -3.600, y = -16.576, z =  -61.500 } },
     middle       = { "sb01", { x =  -0.361, y = -47.451, z = -336.366 } },
     exit         = { "sb02", { x =  -0.457, y = -50.073, z = -346.448 } },
@@ -914,8 +914,8 @@ local function build_warp_targets()
         }
     end
 
-    -- The Cave has no doors, so its spots ride along as their own area.
-    for name, entry in pairs(CAVE_SPOTS) do
+    -- The tunnel has no doors, so its spots ride along as their own area.
+    for name, entry in pairs(TUNNEL_SPOTS) do
         local code = entry[1]
         local list = warp_targets[code]
         if not list then list = {}; warp_targets[code] = list end
@@ -942,14 +942,14 @@ end
 
 function M.area_display_name(code) return display_name(code) end
 
---- @param spot string one of CAVE_SPOTS; lists them when omitted or unknown
-function M.warp_to_cave(spot)
-    local entry = CAVE_SPOTS[tostring(spot or "")]
+--- @param spot string one of TUNNEL_SPOTS; lists them when omitted or unknown
+function M.warp_to_tunnel(spot)
+    local entry = TUNNEL_SPOTS[tostring(spot or "")]
     if not entry then
         local names = {}
-        for k in pairs(CAVE_SPOTS) do names[#names + 1] = k end
+        for k in pairs(TUNNEL_SPOTS) do names[#names + 1] = k end
         table.sort(names)
-        M.log("usage: drap_warp_cave(\"" .. table.concat(names, "\" | \"") .. "\")")
+        M.log("usage: drap_warp_tunnel(\"" .. table.concat(names, "\" | \"") .. "\")")
         return false
     end
     local info = Shared.SCENE_INFO[entry[1]]
@@ -995,11 +995,11 @@ end
 --- of it and a reload is the only recovery.
 _G.drap_warp_home = function() return M.warp_to_security_room() end
 
---- drap_warp_cave("humvee") -- straight to the tank fight trigger
-_G.drap_warp_cave = function(spot) return M.warp_to_cave(spot) end
+--- drap_warp_tunnel("humvee") -- straight to the tank fight trigger
+_G.drap_warp_tunnel = function(spot) return M.warp_to_tunnel(spot) end
 
 --- Logs the area and position on every area change. Left on, walking or
---- warping through the Cave records all five scenes without anyone having to
+--- warping through the tunnel records all five scenes without anyone having to
 --- remember to type anything -- which is how the codes got lost last time.
 _G.drap_trace_areas = function(on)
     trace_areas = (on ~= false)

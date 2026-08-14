@@ -177,10 +177,10 @@ Shared.SCENE_INFO = {
     -- by cutscene, not through a door.
     s504 = { name = "Cultists' Hideout",     index = 1284 },
 
-    -- The Overtime Cave, in the order it is played. No door anywhere leads
-    -- here -- it is entered from Isabela's departure cutscene -- so these
-    -- never appear in the area graph and are not lockable. Named so area
-    -- readouts say where the player is instead of printing a raw index.
+    -- The Clock Tower Tunnel, in the order it is played. No door anywhere
+    -- leads here -- it is entered from Isabela's departure cutscene -- so
+    -- these never appear in the area graph and are not lockable. Named so
+    -- area readouts say where the player is instead of a raw index.
     --
     -- Indices read in game with drap_player_pos(), not derived: the code looks
     -- like hex and here it happens to be, but s135 is 287 rather than 309, so
@@ -190,11 +190,11 @@ Shared.SCENE_INFO = {
     -- areaJump fires between them and the door capture never sees it.
     -- The tank fight and Brock are both sb03; sb04 has never been entered and
     -- has no index or confirmed contents.
-    sb00 = { name = "Cave - Entrance",       index = 2816 },
-    sb01 = { name = "Cave - Middle",         index = 2817 },
-    sb02 = { name = "Cave - Exit",           index = 2818 },
-    sb03 = { name = "Cave - Battleground",   index = 2819 },
-    sb04 = { name = "Cave - Unvisited"       },
+    sb00 = { name = "Clock Tower Tunnel - Entrance",     index = 2816 },
+    sb01 = { name = "Clock Tower Tunnel - Middle",       index = 2817 },
+    sb02 = { name = "Clock Tower Tunnel - Exit",         index = 2818 },
+    sb03 = { name = "Clock Tower Tunnel - Battleground", index = 2819 },
+    sb04 = { name = "Clock Tower Tunnel - Unvisited"     },
 }
 
 --- Reverse map: engine area index → scene code. Built once at module load.

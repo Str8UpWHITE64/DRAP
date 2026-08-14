@@ -72,7 +72,7 @@ class DRLocation(Location):
             "Colby's Movieland",
             "Maintenance Tunnel",
             "Carlito's Hideout",
-            "Cave",
+            "Clock Tower Tunnel",
             "Level Ups",
             "Challenges",
             "Meat Processing Area",
@@ -504,7 +504,7 @@ location_tables = {
         DRLocationData("Give Isabela 4 Queens", "Milk", DRLocationCategory.OVERTIME_SCOOP),
     ],
 
-    "Cave": [
+    "Clock Tower Tunnel": [
         DRLocationData("Proceed through the cave with Isabela", "Milk", DRLocationCategory.OVERTIME_SCOOP),
         DRLocationData("Open Gate 1", "Milk", DRLocationCategory.OVERTIME_SCOOP),
         DRLocationData("Open Gate 2", "Milk", DRLocationCategory.OVERTIME_SCOOP),

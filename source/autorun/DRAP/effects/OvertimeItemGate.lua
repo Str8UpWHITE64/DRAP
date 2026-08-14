@@ -82,14 +82,14 @@ local sign_ui = nil       -- the live SignBoardUI, captured from its own hook
 local pending_del = {}    -- element index -> true, deleted on the next frame
 
 ------------------------------------------------------------
--- The Cave
+-- The Clock Tower Tunnel
 ------------------------------------------------------------
 -- Handing over the fifth queen opens a yes/no box, and Yes leaves for the
--- Cave. Every way of suppressing that box left Isabela unresponsive: its
+-- tunnel. Every way of suppressing that box left Isabela unresponsive: its
 -- callback tidies the conversation up as well as starting the cutscene. So the
 -- callback still runs -- with ForceCancel set first, which makes it take the
 -- No branch. Both buttons then read as No and she stays normal.
-local CAVE_ITEM = "Cave Key"
+local TUNNEL_ITEM = "Clock Tower Tunnel Key"
 local POP_TYPE = "app.solid.gui.PopUI_Base"
 -- Identifies her prompt, so no other dialog in the game is touched.
 local POP_MATCH = "absolutely sure"
@@ -246,13 +246,13 @@ local function is_humvee(go_name)
     return false
 end
 
---- Names every interactable in a Cave scene, once each. This is how the
+--- Names every interactable in a tunnel scene, once each. This is how the
 --- Humvee was identified as Vehicle_om009a_Hammer_EV, and it is the tool to
 --- reach for if a patch renames it and the gate stops holding.
-local function note_cave_interaction(go_name)
+local function note_tunnel_interaction(go_name)
     if humvee_seen[go_name] then return end
     humvee_seen[go_name] = true
-    M.log("interaction seen in the Cave: " .. tostring(go_name)
+    M.log("interaction seen in the tunnel: " .. tostring(go_name)
         .. (is_humvee(go_name) and "  <- matches the Humvee patterns" or ""))
 end
 
@@ -270,39 +270,39 @@ local function should_block(pim)
     end
     if not go_name then return false end
 
-    -- Confined to the Cave, and that is load bearing rather than tidiness:
+    -- Confined to the tunnel, and that is load bearing rather than tidiness:
     -- the patterns are broad guesses, and "car" would otherwise match the
     -- convicts' vehicle and the cars in Leisure Park. The Overtime Humvee only
     -- exists here, so nothing outside can be caught by a wrong guess.
-    local scene = Shared.SCENE_INFO[current_scene_code() or ""]
-    local in_cave = scene ~= nil
-                    and tostring(scene.name):find("Cave", 1, true) ~= nil
-    if in_cave then
+    -- Matched on the scene code, not the display name: sb00..sb04 are the
+    -- tunnel and nothing else, and a rename cannot quietly unhook this.
+    local code = current_scene_code() or ""
+    if code:sub(1, 2) == "sb" then
         -- Few interactables down here, so naming them all is cheap and is how
         -- the Humvee's real name gets found.
-        note_cave_interaction(go_name)
+        note_tunnel_interaction(go_name)
     end
 
     -- Ingredients are no longer held: their checks come from the pickup
-    -- flags. Only the Cave and the Humvee gate anything now, and both are
+    -- flags. Only the tunnel and the Humvee gate anything now, and both are
     -- handled elsewhere.
     return false
 end
 
-local function cave_blocked()
+local function tunnel_blocked()
     if not (enabled and gating and in_overtime()) then return false end
     if not (Activation.is_active() or console_override) then return false end
-    return not has_received(CAVE_ITEM)
+    return not has_received(TUNNEL_ITEM)
 end
 
-local function install_cave_hooks()
+local function install_tunnel_hooks()
     if pop_hooked then return end
     local td = sdk.find_type_definition(POP_TYPE)
     if not td then return end
     local open_m = td:get_method("openPop")
     local invoke_m = td:get_method("invokeCallbackOnClose")
     if not (open_m and invoke_m) then
-        M.log.warn("PopUI_Base methods missing -- the Cave is not gated")
+        M.log.warn("PopUI_Base methods missing -- the tunnel is not gated")
         pop_hooked = true
         return
     end
@@ -310,7 +310,7 @@ local function install_cave_hooks()
     local ok_open = pcall(sdk.hook, open_m,
         function(args)
             pop_is_target = false
-            if not cave_blocked() then return end
+            if not tunnel_blocked() then return end
             local data
             pcall(function() data = sdk.to_managed_object(args[3]) end)
             if not data then return end
@@ -327,18 +327,18 @@ local function install_cave_hooks()
             pop_is_target = false
             -- Re-checked here as well as at openPop: the key can land while
             -- the box is up, and there is no reason to refuse it then.
-            if not cave_blocked() then return end
+            if not tunnel_blocked() then return end
             local this = sdk.to_managed_object(args[2])
             if not this then return end
             pcall(function() this:set_field("ForceCancel", true) end)
-            M.log("Cave departure declined -- no " .. CAVE_ITEM)
+            M.log("Tunnel departure declined -- no " .. TUNNEL_ITEM)
 
             -- Every time, not once: answering Yes and going nowhere reads as a
             -- bug, and the player may well try again an hour later.
             local Notify = package.loaded["DRAP/Notify"] or require("DRAP/Notify")
             if Notify and Notify.send then
                 local name = Notify.span
-                    and Notify.span(CAVE_ITEM, "location", true) or CAVE_ITEM
+                    and Notify.span(TUNNEL_ITEM, "location", true) or TUNNEL_ITEM
                 pcall(Notify.send,
                     "Isabela will not leave without the " .. name .. ".",
                     { duration = 6.0 })
@@ -348,9 +348,9 @@ local function install_cave_hooks()
 
     pop_hooked = true
     if ok_open and ok_invoke then
-        M.log("Cave gate armed on " .. POP_TYPE)
+        M.log("Tunnel gate armed on " .. POP_TYPE)
     else
-        M.log.warn("could not hook PopUI_Base -- the Cave is not gated")
+        M.log.warn("could not hook PopUI_Base -- the tunnel is not gated")
     end
 end
 
@@ -675,7 +675,7 @@ function M.on_frame()
     if not hook_installed then install_hook() end
     if not register_hooked then install_register_hook() end
     if not sign_hooked then install_sign_hook() end
-    if not pop_hooked then install_cave_hooks() end
+    if not pop_hooked then install_tunnel_hooks() end
 
     -- Remove any element we refused. Done here rather than inside the hook so
     -- we are not calling back into the UI mid-update.
@@ -711,7 +711,7 @@ function M.set_enabled(on, from_console, gate)
     said = {}
     if enabled then
         install_hook(); install_register_hook(); install_sign_hook()
-        install_cave_hooks()
+        install_tunnel_hooks()
     end
     M.log(string.format("gate %s, gating %s%s",
         enabled and "ON" or "off (not Ending S)",
@@ -767,14 +767,14 @@ end
 
 --- Pretend the multiworld sent one, so the gate can be tested without a slot.
 --- Stands in for a slot sending the item, so the gates can be tested with no
---- server. Any name works, including "Cave Key" and "Humvee Key", which are
---- pure gate items with nothing to unlock in the world.
+--- server. Any name works, including "Clock Tower Tunnel Key" and "Humvee
+--- Key", which are pure gate items with nothing to unlock in the world.
 ---
 ---   drap_ot_gate_grant("Humvee Key")         -- receive it
 ---   drap_ot_gate_grant("Humvee Key", false)  -- take it back and re-test
 _G.drap_ot_gate_grant = function(name, on)
     if not name then
-        M.log("usage: drap_ot_gate_grant(\"Cave Key\" [, false])")
+        M.log("usage: drap_ot_gate_grant(\"Clock Tower Tunnel Key\" [, false])")
         return
     end
     name = tostring(name)
@@ -830,10 +830,10 @@ _G.drap_humvee_name = function(name)
     return humvee_patterns
 end
 
-_G.drap_ot_cave = function()
-    M.log(string.format("Cave: blocked=%s  %s received=%s  hooked=%s",
-        tostring(cave_blocked()), CAVE_ITEM,
-        tostring(has_received(CAVE_ITEM)), tostring(pop_hooked)))
+_G.drap_ot_tunnel = function()
+    M.log(string.format("Tunnel: blocked=%s  %s received=%s  hooked=%s",
+        tostring(tunnel_blocked()), TUNNEL_ITEM,
+        tostring(has_received(TUNNEL_ITEM)), tostring(pop_hooked)))
 end
 
 _G.drap_ot_gate_status = function()

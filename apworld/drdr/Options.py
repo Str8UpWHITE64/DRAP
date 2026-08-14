@@ -400,12 +400,12 @@ class OvertimeProgressionGating(Toggle):
     than the same run with a different ending.
 
     With this off, Overtime plays as it always has. Its checks still exist --
-    the queens, the gates in the cave, the suppressant hand-ins and the rest --
+    the queens, the gates in the tunnel, the suppressant hand-ins and the rest --
     they are simply not held back by anything.
 
     With this on, two things are gated behind items the multiworld has to send
-    you. Isabela will not leave for the cave without the Cave Key, and the
-    Humvee will not start without the Humvee Key.
+    you. Isabela will not leave for the tunnel without the Clock Tower Tunnel
+    Key, and the Humvee will not start without the Humvee Key.
 
     The suppressant ingredients are not gated either way -- they are picked up
     normally and their checks fire when you collect them.

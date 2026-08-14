@@ -426,8 +426,8 @@ _all_items = [DRItemData(row[0], row[1], row[2]) for row in [
     ("Developing Solution", 5005, DRItemCategory.LOCK),
     ("Perfume Bottle", 5006, DRItemCategory.LOCK),
     ("Cold Spray", 5007, DRItemCategory.LOCK),
-    # Isabela will not leave for the Cave without it.
-    ("Cave Key", 5008, DRItemCategory.LOCK),
+    # Isabela will not leave for the tunnel without it.
+    ("Clock Tower Tunnel Key", 5008, DRItemCategory.LOCK),
     # The Humvee will not start without it.
     ("Humvee Key", 5009, DRItemCategory.LOCK),
     # Car Keys: one per drivable vehicle type. Both motorcycles share the one
@@ -657,7 +657,7 @@ def BuildItemPool(multiworld, count, options, excluded_scoop_names=(),
         "Camp Stove", "Developing Solution", "Perfume Bottle", "Cold Spray",
     }
     overtime_item_names = {
-        "Cave Key",
+        "Clock Tower Tunnel Key",
         "Humvee Key",
     }
     # Only exist when Car Keys is on; without it nothing locks the vehicles,

@@ -359,7 +359,7 @@ class DRWorld(World):
             "Maintenance Tunnel",
             "Meat Processing Area",
             "Carlito's Hideout",
-            "Cave",
+            "Clock Tower Tunnel",
             "Level Ups",
             "Challenges",
             "Zombie Kills"
@@ -486,8 +486,8 @@ class DRWorld(World):
         
         create_connection("Seon's Food and Stuff", "North Plaza")
 
-        create_connection("Carlito's Hideout", "Cave")
-        create_connection("Leisure Park", "Cave")
+        create_connection("Carlito's Hideout", "Clock Tower Tunnel")
+        create_connection("Leisure Park", "Clock Tower Tunnel")
 
         create_connection("Menu", "Level Ups")
         create_connection("Menu", "Challenges")

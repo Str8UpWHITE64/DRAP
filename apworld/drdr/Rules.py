@@ -863,20 +863,21 @@ def set_rules(world) -> None:
 
         world.set_rule(world.multiworld.get_location("Proceed through the cave with Isabela", world.player), CanReachLocation("Honey Hunt"))
 
-        # Isabela refuses to leave without the key, so the Cave is behind it
+        # Isabela refuses to leave without the key, so the tunnel is behind it
         # however the player got to her.
         if _gating:
-            for _entrance in ("Carlito's Hideout -> Cave", "Leisure Park -> Cave"):
+            for _entrance in ("Carlito's Hideout -> Clock Tower Tunnel",
+                              "Leisure Park -> Clock Tower Tunnel"):
                 world.set_rule(world.multiworld.get_entrance(_entrance, world.player),
-                              Has("Cave Key"))
+                              Has("Clock Tower Tunnel Key"))
 
-        # The Cave in the order it is walked: Isabela crawls through the first
+        # The tunnel in the order it is walked: Isabela crawls through the first
         # gate, opens the second, then the lever raises the last one.
         world.set_rule(world.multiworld.get_location("Open Gate 1", world.player), CanReachLocation("Proceed through the cave with Isabela"))
         world.set_rule(world.multiworld.get_location("Open Gate 2", world.player), CanReachLocation("Open Gate 1"))
         world.set_rule(world.multiworld.get_location("Raise the final gate", world.player), CanReachLocation("Open Gate 2"))
 
-        world.set_rule(world.multiworld.get_location("Get to the Humvee", world.player), And(Has("Humvee Key") if _gating else True_(), CanReachLocation("Raise the final gate"), CanReachRegion("Cave")))
+        world.set_rule(world.multiworld.get_location("Get to the Humvee", world.player), And(Has("Humvee Key") if _gating else True_(), CanReachLocation("Raise the final gate"), CanReachRegion("Clock Tower Tunnel")))
 
         world.set_rule(world.multiworld.get_location("Fight a tank and win", world.player), CanReachLocation("Get to the Humvee"))
 
