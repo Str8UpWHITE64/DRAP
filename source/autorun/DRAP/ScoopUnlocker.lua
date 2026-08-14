@@ -486,9 +486,16 @@ local pending_flag_clears = {}
 -- disagreeing is what a restart looks like.
 --
 -- Latched, because once Jessie is met in the new run there is nothing left to
--- tell the two apart.
+-- tell the two apart. The window it has to answer in is pre-Jessie only, so
+-- on_frame polls it directly rather than the EP-shutter code -- that runs
+-- behind is_activated(), which is false for exactly that window.
 local restarted_run = false
 local restarted_decided = false
+
+local function forget_run_shape()
+    restarted_run = false
+    restarted_decided = false
+end
 
 local function note_run_shape()
     if restarted_decided then return end
@@ -521,8 +528,6 @@ local function try_fire_ep270_in_scoop_sanity()
     -- depend on that.
     if State.is_endgame_reached() then return end
     if ep270_gates_open() then return end
-
-    note_run_shape()
 
     -- Nothing before Jessie, exactly as in a new game -- she is what opens the
     -- way into the mall.
@@ -1776,6 +1781,7 @@ function M.reset_for_new_game()
     _last_cascade_signature = nil
     _logged_completion_events = {}
     _logged_suppressions = {}
+    forget_run_shape()
 
     State.reset_for_new_game()
 end
@@ -2434,6 +2440,14 @@ function M.on_frame()
     if not in_game then
         jessie_false_since = nil
     end
+
+    -- Is this save a fresh run on a slot that has already played? Only
+    -- answerable before Jessie, which is also the only stretch where AP is
+    -- deactivated -- so ask here, not from the EP-shutter code.
+    if in_game and scoop_sanity_enabled then
+        note_run_shape()
+    end
+
     if in_game and State.is_activated() then
         local jessie_on = raw_check_flag(JESSIE_FLAG)
         if jessie_on == false then
@@ -2441,6 +2455,9 @@ function M.on_frame()
             if os.clock() - jessie_false_since >= RELOAD_CONFIRM_SECONDS then
                 jessie_false_since = nil
                 M.log("RELOAD DETECTED: Flag 769 off -- deactivating until Meet Jessie replays")
+                -- A different save is loaded now, so the previous answer
+                -- describes a run that is no longer on screen.
+                forget_run_shape()
                 State.deactivate_for_reload()
             end
         else
