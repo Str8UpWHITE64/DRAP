@@ -1207,7 +1207,7 @@ def set_rules(world) -> None:
     # slot nobody can identify (#14).
     world.set_rule(world.multiworld.get_location("Fall from a high height", world.player), CanReachRegion("Warehouse"))
     world.set_rule(world.multiworld.get_location("Fire 30 bullets", world.player), Or(CanReachLocation("Fire 300 bullets"), And(Has("Handgun"), Or(CanReachRegion("North Plaza"), CanReachRegion("Wonderland Plaza"), CanReachRegion("Paradise Plaza"), CanReachRegion("Al Fresca Plaza"))) if world.options.restricted_item_mode else Or(CanReachRegion("North Plaza"), CanReachRegion("Wonderland Plaza"), CanReachRegion("Paradise Plaza"), CanReachRegion("Al Fresca Plaza"))))
-    world.set_rule(world.multiworld.get_location("Fire 300 bullets", world.player), (And(CanReachRegion("North Plaza"), Or(*[Has(g) for g in ("Handgun", "Submachine Gun", "Shotgun", "Sniper Rifle")])) if world.options.restricted_item_mode else Or(CanReachRegion("North Plaza"), And(Or(*[Has(g) for g in ("Handgun", "Submachine Gun", "Shotgun", "Sniper Rifle", "Heavy Machinegun", "Machinegun")]), CanReachRegion("Rooftop")))))
+    world.set_rule(world.multiworld.get_location("Fire 300 bullets", world.player), (And(CanReachRegion("North Plaza"), Or(*[Has(g) for g in (("Handgun", "Shotgun", "Sniper Rifle") if world.options.door_randomizer else ("Handgun", "Submachine Gun", "Shotgun", "Sniper Rifle"))])) if world.options.restricted_item_mode else Or(CanReachRegion("North Plaza"), And(Or(*[Has(g) for g in ("Handgun", "Submachine Gun", "Shotgun", "Sniper Rifle", "Heavy Machinegun", "Machinegun")]), CanReachRegion("Rooftop")))))
     # "Ride zombies for 50 feet" requires Zombie Ride only when that
     # skill is actually in the AP item pool. BuildItemPool adds skills
     # only when enable_skill_items is on AND vanilla_progression is
@@ -1223,7 +1223,7 @@ def set_rules(world) -> None:
     world.set_rule(world.multiworld.get_location("Ride zombies for 50 feet", world.player),
                   _ride_rule)
     world.set_rule(world.multiworld.get_location("Change into 46 new outfits", world.player), And(CanReachRegion("Leisure Park"), CanReachRegion("Al Fresca Plaza"), CanReachRegion("Wonderland Plaza"), CanReachRegion("North Plaza"), CanReachRegion("Entrance Plaza"), CanReachRegion("Food Court"), CanReachRegion("Paradise Plaza"), CanReachRegion("Seon's Food and Stuff"), CanReachRegion("Crislip's Home Saloon"), CanReachRegion("Colby's Movieland")))
-    world.set_rule(world.multiworld.get_location("Change into 5 new outfits", world.player), CanReachRegion("Paradise Plaza"))
+    world.set_rule(world.multiworld.get_location("Change into 5 new outfits", world.player), Or(CanReachRegion("Paradise Plaza"), CanReachRegion("Entrance Plaza"), CanReachRegion("Wonderland Plaza")))
 
     # --------------------------------------------------------------------
     # PP Stickers
