@@ -48,6 +48,28 @@ local turbo_complete_callback = nil
 local TURBO_SPEED_VALUE = 2000
 local NORMAL_SPEED_VALUE = 50
 
+-- Night mode borrows the clock.
+--
+-- mClock is a plain tick count from Day 0 00:00 at 30 ticks per second, and
+-- everything else is derived from it -- mDay/mHour/mMinute/mSecond by division,
+-- and SCQManager's mDate from those. So writing 0 puts the world at midnight
+-- and the engine lights it as night itself. That is the real thing, not the
+-- WorldDayNight controller, which could never be seeked and only ever gave
+-- back frame 0 whatever we asked for.
+--
+-- Borrowed rather than given, because the prologue's scheduled events sit at
+-- 35h and 36h. Letting time run again from 0 would walk back through the
+-- opening cutscenes, so releasing puts the clock no earlier than the run start.
+local NIGHT_CLOCK = 0
+-- Day 1 12:01, not 12:00. The run starts at 3888000 (the engine's
+-- SURVIVAL_START_TIME) and five scheduled events sit on exactly that tick, so
+-- restoring to it would park the clock on a due-time -- the likeliest way to
+-- make an opening cutscene fire a second time. One minute past clears all of
+-- them and is still well before the next event at 43h.
+local RUN_START_CLOCK = 3888000 + 1800
+local night_clock_armed = false
+local night_clock_held = nil      -- the mClock we replaced, nil when not holding
+
 ------------------------------------------------------------
 -- Helpers: mDate parse/format
 ------------------------------------------------------------
@@ -73,6 +95,31 @@ end
 -- Core Time Control
 ------------------------------------------------------------
 
+--- Hold the clock at midnight. Re-applied rather than written once: a save
+--- load brings the save's own mClock back, and the hold has to survive that.
+local function apply_night_clock(gm)
+    if not (night_clock_armed and gm) then return end
+    local cur = tonumber(gm.mClock)
+    if cur == nil or cur == NIGHT_CLOCK then return end
+    -- Only the first value is the one we owe back; later re-applies are the
+    -- save's copy of midnight coming round again.
+    if night_clock_held == nil then night_clock_held = cur end
+    gm.mClock = NIGHT_CLOCK
+    M.log(string.format("Night mode: mClock %d -> %d (midnight)", cur, NIGHT_CLOCK))
+end
+
+--- Give the clock back before time is allowed to run, never behind the run
+--- start -- see the note by NIGHT_CLOCK.
+local function release_night_clock(gm)
+    if night_clock_held == nil then return end
+    local restore = math.max(night_clock_held, RUN_START_CLOCK)
+    night_clock_held = nil
+    if not gm then return end
+    gm.mClock = restore
+    M.log(string.format("Night mode: clock released to %d (%.2fh)",
+        restore, restore / 108000))
+end
+
 local function apply_gate_state()
     -- Don't interfere while turbo advance is running
     if turbo_active then return end
@@ -95,7 +142,13 @@ local function apply_gate_state()
             gm.mTimeAdd = 0
             M.log("Time frozen (mTimeAdd set to 0).")
         end
+
+        -- Only while frozen. With time running the game cycles day to night on
+        -- its own and pinning midnight would fight a working mechanic.
+        apply_night_clock(gm)
     else
+        release_night_clock(gm)
+
         -- Only restore once when transitioning from frozen to unfrozen
         if saved_time_add ~= nil then
             -- Only restore if time is currently frozen (mTimeAdd == 0)
@@ -163,6 +216,10 @@ local function start_turbo()
         M.log("ERROR: GameTimeSpeedManager not available for turbo")
         return false
     end
+
+    -- Before anything runs the clock forward. Turbo from midnight would cross
+    -- the prologue's scheduled events at 35h and 36h on its way to the target.
+    release_night_clock(gm_mgr:get())
 
     gts.SpeedUpTurboValue = TURBO_SPEED_VALUE
     gts:call("switchTimeSpeedMode(app.solid.gamemastering.GameTimeSpeedManager.Mode)", 2)
@@ -282,6 +339,29 @@ end
 ------------------------------------------------------------
 -- Public API
 ------------------------------------------------------------
+
+--- Arm or disarm night mode's hold on the clock. Armed only, not applied here:
+--- the hold goes on when time freezes and comes off when it runs, which
+--- apply_gate_state already sequences.
+--- @param on boolean
+function M.set_night_clock(on)
+    on = (on == true)
+    if night_clock_armed == on then return night_clock_armed end
+    night_clock_armed = on
+    if on then
+        M.log("Night mode: clock hold armed (midnight while time is frozen)")
+        apply_gate_state()
+    else
+        release_night_clock(gm_mgr:get())
+        M.log("Night mode: clock hold disarmed")
+    end
+    return night_clock_armed
+end
+
+--- Whether the clock is currently being held at midnight.
+function M.is_night_clock_held()
+    return night_clock_armed and night_clock_held ~= nil
+end
 
 --- Gets the current mDate value
 --- @return number|nil The current mDate

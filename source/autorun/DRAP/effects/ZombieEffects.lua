@@ -203,85 +203,56 @@ end
 ------------------------------------------------------------
 -- Night lighting
 ------------------------------------------------------------
--- WorldDayNight_Controller drives the global day/night lighting; TIC_S*/TEC_S*
--- are the current area's own lighting and are different objects per area, so
--- they are left alone and interiors keep their look.
+-- Set the clock to midnight and let the engine light it.
 --
--- The value has to be re-applied: daylight comes back on every area load, and
--- the manager re-drives the controllers whenever the clock advances by
--- updateMinSecond. Re-applying from a post-hook on the manager's own
--- lateUpdate lands after it has had its say.
+-- mClock is a plain tick count from Day 0 00:00, 30 ticks per second, and the
+-- day/hour/minute readout and SCQManager's mDate are all derived from it. Zero
+-- is midnight, so the game renders its own night -- the real thing, including
+-- the interiors that a global controller override never reached.
+--
+-- This replaces driving WorldDayNight_Controller.updateFrame. That controller
+-- could not be seeked: it reset its timeline to 0 whatever frame we asked for,
+-- measured by asking for 45 and 120 and reading 0.0 back both times, so the
+-- result was approximate at best.
+--
+-- TimeGate owns the write, because it owns the clock and has to give it back
+-- before anything runs time forward. Here we only decide whether to ask.
 --
 -- ScoopSanity only. Without it the clock runs and the game cycles day to night
--- on its own; pinning the lighting would fight a working mechanic. With it,
--- time is frozen and there is no cycle to override. Also gated on Meet Jessie
--- so the prologue plays in its intended daylight.
-
-local TIM_TYPE = "app.solid.gamemastering.TimeInterpolateManager"
-local WORLD_CONTROLLER = "WorldDayNight"
-
--- The controller's timeline runs 0..240 for one day, so 10 frames per hour and
--- frame 0 is midnight. The value is not actually selectable: writing any frame
--- to this controller resets its timeline to 0 rather than seeking, measured by
--- asking for 45 and 120 and reading 0.0 back both times. Midnight is what night
--- mode wants, so 0 is both what we ask for and what we get.
-local NIGHT_FRAME = 0.0
+-- by itself; holding midnight would fight a working mechanic. Also gated on
+-- Meet Jessie so the prologue plays in its intended daylight.
+--
+-- The glowing eyes stay separate: the engine only sets those at Day 1 19:00,
+-- so midnight alone does not produce them.
 
 local _light_night = false        -- option wants night lighting
 local _light_gate_open = false    -- ScoopSanity + Jessie both satisfied
-local _light_hook_installed = false
 
-local function _controllers()
-    local sm = sdk.get_native_singleton("via.SceneManager")
-    local td = sdk.find_type_definition("via.SceneManager")
-    if not (sm and td) then return {} end
-    local scene = safe(function()
-        return sdk.call_native_func(sm, td, "get_CurrentScene")
-    end)
-    if not scene then return {} end
-    local arr = safe(function()
-        return scene:call("findComponents(System.Type)",
-            sdk.typeof("app.solid.gamemastering.TimeInterpolateController"))
-    end)
-    local n = arr and tonumber(safe(function() return arr:get_size() end)) or 0
-    local list = {}
-    for i = 0, n - 1 do
-        local c = safe(function() return arr:get_element(i) end)
-        local id = c and tostring(safe(function()
-            return c:get_field("ControllerId")
-        end))
-        if c and id and id:find(WORLD_CONTROLLER, 1, true) then
-            table.insert(list, c)
-        end
-    end
-    return list
+local function _time_gate()
+    local ok, TG = pcall(require, "DRAP/TimeGate")
+    if ok then return TG end
+    return nil
 end
 
-local function _apply_night_lighting()
-    for _, c in ipairs(_controllers()) do
-        pcall(function() c:call("updateFrame", NIGHT_FRAME) end)
-    end
+local function _scoop_state()
+    local ok, S = pcall(require, "DRAP/scoops/ScoopState")
+    if ok then return S end
+    return nil
 end
 
-local function _install_light_hook()
-    if _light_hook_installed then return end
-    local td = sdk.find_type_definition(TIM_TYPE)
-    local fn = td and td:get_method("lateUpdate")
-    if not fn then
-        log("WARN: TimeInterpolateManager.lateUpdate() not found -- night "
-            .. "lighting unavailable")
-        return
-    end
-    sdk.hook(fn,
-        function(args) end,
-        function(retval)
-            if _light_night and _light_gate_open then
-                pcall(_apply_night_lighting)
-            end
-            return retval
-        end)
-    _light_hook_installed = true
-    log("lateUpdate hook installed for night lighting (gated)")
+--- Overtime runs on this same clock and has its own scheduled events -- one at
+--- Day 6 11:00 in s700 -- so holding it at Day 0 midnight would be 72-hour
+--- state applied where it does not belong.
+---
+--- Checked every poll rather than only when the gate opens: a run reaches the
+--- endgame and enters Overtime in the SAME session the gate opened in, and
+--- Overtime freezes time with Jessie eventually reading true, which is exactly
+--- the shape that would otherwise keep the hold on.
+local function _in_overtime()
+    local S = _scoop_state()
+    if not (S and S.is_endgame_reached) then return false end
+    local ok, v = pcall(S.is_endgame_reached)
+    return ok and v == true
 end
 
 ------------------------------------------------------------
@@ -502,47 +473,56 @@ function M.get_spawn_multiplier() return _spawn_mult end
 -- Night lighting (slot-data driven, ScoopSanity + Jessie gated)
 ------------------------------------------------------------
 
---- Enable the pinned night lighting. ScoopSanity only -- see the note above
---- the hook. Does nothing until Meet Jessie is complete.
+--- Enable night lighting. ScoopSanity only -- see the note above. Does nothing
+--- until Meet Jessie is complete.
 function M.set_night_lighting(enable, scoop_sanity)
     enable = (enable == true) and (scoop_sanity == true)
     _light_night = enable
     if enable then
-        _install_light_hook()
-        log(string.format("Night lighting armed (frame %.1f, waiting on "
-            .. "Meet Jessie)", NIGHT_FRAME))
+        log("Night lighting armed (waiting on Meet Jessie)")
     else
         _light_gate_open = false
+        local TG = _time_gate()
+        if TG and TG.set_night_clock then TG.set_night_clock(false) end
         log("Night lighting off")
     end
     return true
 end
 
---- Polled from the frame loop: the gate opens once Meet Jessie is complete and
---- never closes for the session. has_met_jessie is tri-state, so a nil read is
---- "ask again later" rather than "not yet".
+--- Polled from the frame loop. Opens once Meet Jessie is complete, and closes
+--- again on reaching the endgame -- Overtime is the one thing that takes it
+--- back. has_met_jessie is tri-state, so a nil read is "ask again later"
+--- rather than "not yet".
 local function _refresh_light_gate()
-    if not _light_night or _light_gate_open then return end
+    if not _light_night then return end
+
+    if _in_overtime() then
+        if _light_gate_open then
+            _light_gate_open = false
+            local TG = _time_gate()
+            if TG and TG.set_night_clock then TG.set_night_clock(false) end
+            log("Night lighting off (Overtime runs on its own clock)")
+        end
+        return
+    end
+
+    if _light_gate_open then return end
     local SU = _G.AP and _G.AP.ScoopUnlocker
     if not (SU and SU.has_met_jessie) then return end
     local met = SU.has_met_jessie()
     if met == true then
         _light_gate_open = true
+        local TG = _time_gate()
+        if TG and TG.set_night_clock then TG.set_night_clock(true) end
         log("Night lighting active (Meet Jessie complete)")
     end
 end
 
 function M.is_night_lighting_active()
-    return _light_night and _light_gate_open
-end
-
---- Tune the night point without a rebuild; one in-game day is about 83 frames.
-function M.set_night_frame(v)
-    NIGHT_FRAME = tonumber(v) or NIGHT_FRAME
-    log(string.format("Night lighting frame -> %.1f (note: the controller "
-        .. "resets to 0 rather than seeking, so this may not take effect)",
-        NIGHT_FRAME))
-    return NIGHT_FRAME
+    if not (_light_night and _light_gate_open) then return false end
+    local TG = _time_gate()
+    if TG and TG.is_night_clock_held then return TG.is_night_clock_held() end
+    return true
 end
 
 -- Gate polling gets its own callback: _refresh_light_gate is defined below the
@@ -618,6 +598,7 @@ _G.drap_zomb_night    = function(s) M.night_mode(s)    end
 _G.drap_zomb_hardcore = function(s) M.hardcore_zombies(s) end
 _G.drap_zomb_active   = function() return M.get_active_effects() end
 _G.drap_zomb_spawn    = function(n) return M.set_spawn_multiplier(n) end
-_G.drap_zomb_frame    = function(v) return M.set_night_frame(v) end
+-- drap_zomb_frame is gone with the WorldDayNight controller it tuned. The
+-- night point is not a setting any more -- it is midnight on the game clock.
 
 return M
