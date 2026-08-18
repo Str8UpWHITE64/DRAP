@@ -141,6 +141,33 @@ local function update_trap_area_lock()
     end
 end
 
+-- Hold off for a moment after an area change.
+--
+-- Spawns land at the player plus a fixed sideways offset, and the area index
+-- flips while the load is still finishing -- which releases the lock above and
+-- lets a banked trap fire against the load-in position. That spot is usually a
+-- doorway, so 1.5m to the side is a wall, and the NPC arrives inside it.
+--
+-- The offset itself is still blind: this makes the common case rare rather
+-- than making the spawn safe.
+local AREA_SETTLE_SECONDS = 5.0
+local last_seen_area = nil
+local area_entered_at = 0
+
+local function update_area_settle()
+    local area = get_area_index()
+    if area == nil then return end
+    if area ~= last_seen_area then
+        last_seen_area = area
+        area_entered_at = os.clock()
+    end
+end
+
+local function area_settled()
+    if last_seen_area == nil then return false end
+    return (os.clock() - area_entered_at) >= AREA_SETTLE_SECONDS
+end
+
 local function get_player_pos()
     local pm = get_player_mgr()
     if not pm then return nil end
@@ -201,6 +228,10 @@ local function can_fire_now()
     if not player then return false, "player not in-game" end
 
     if in_sanctuary() then return false, "in sanctuary scene" end
+
+    if not area_settled() then
+        return false, "just changed areas -- letting the player walk in"
+    end
 
     if trap_area_lock ~= nil then
         return false, "trap already fired in this area"
@@ -370,6 +401,7 @@ end
 -- minutes, which is exactly the silent loss that replaced.
 re.on_frame(function()
     update_trap_area_lock()
+    update_area_settle()
 end)
 
 ------------------------------------------------------------
