@@ -22,13 +22,18 @@ local ss_mgr = M:add_singleton("ss", "app.solid.SolidStorage")
 ------------------------------------------------------------
 
 local CHALLENGES = {
-    -- Queens handed to Isabela in Overtime. The fifth is Honey Hunt, which the
-    -- game flags itself, so this stops at four rather than doubling up.
+    -- Queens handed to Isabela in Overtime. The fifth is Honey Hunt, counted
+    -- here rather than left to the game: the game only marks it on answering
+    -- Yes to leaving, and Overtime gating holds that to No until the Clock
+    -- Tower Tunnel Key arrives. queenBeeCount reads 5 with the box declined.
+    -- EventTracker still sends it on mEventNo 126; checks are idempotent, so
+    -- the duplicate is a spare rather than a problem.
     queenBeeCount = {
         label   = "Queens given to Isabela",
-        targets = { 1, 2, 3, 4 },
+        targets = { 1, 2, 3, 4, 5 },
         location_ids = { "Give Isabela 1 Queen", "Give Isabela 2 Queens",
-                         "Give Isabela 3 Queens", "Give Isabela 4 Queens" },
+                         "Give Isabela 3 Queens", "Give Isabela 4 Queens",
+                         "Honey Hunt" },
     },
     PlayerLevel = {
         label   = "Reach Level",
