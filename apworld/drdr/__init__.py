@@ -861,8 +861,9 @@ class DRWorld(World):
         door_randomizer_enabled = bool(self.options.door_randomizer.value)
         door_randomizer_mode = self.options.door_randomizer_mode.value
         scoop_sanity_enabled = bool(self.options.scoop_sanity.value)
-        exclude_levels_enabled = bool(self.options.exclude_levels.value)
-        exclude_rescues_enabled = bool(self.options.exclude_rescues.value)
+        # Derived from the sliders now: their maxima mean "exclude nothing".
+        exclude_levels_enabled = self.options.exclude_levels_above.value < 50
+        exclude_rescues_enabled = self.options.exclude_rescues_above.value < 48
         # Per-region thresholds the Lua tracker sends checks at. Regions
         # with none at this tier are left out entirely.
         zombie_kill_thresholds = {
@@ -871,6 +872,7 @@ class DRWorld(World):
             if tiers[self.zombie_kill_tier]
         }
         pp_stickers_filler_enabled = bool(self.options.pp_stickers_filler.value)
+        overtime_checks_filler_enabled = bool(self.options.overtime_checks_filler.value)
 
         # Player-stats / progression options (PlayerStats + PlayerBuffs +
         # HostileSurvivorTrap on the Lua side read these from slot_data).
@@ -981,6 +983,7 @@ class DRWorld(World):
                 "dlc_outfits_enabled": dlc_outfits_enabled,
                 "pp_bonus_locations": pp_bonus_locations_enabled,
                 "pp_stickers_filler": pp_stickers_filler_enabled,
+                "overtime_checks_filler": overtime_checks_filler_enabled,
             },
             "goal": goal,
             "number_of_survivors": number_of_survivors,

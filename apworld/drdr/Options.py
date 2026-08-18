@@ -185,20 +185,13 @@ class MainScoopsAnyOrder(Toggle):
     default = False
 
 
-class ExcludeLevels(Toggle):
-    """
-    When enabled, high level-up checks are prevented from having progression items.
-    This can be used to limit grinding and allows more control over the potential length of a run.
-    """
-    display_name = "Exclude Levels"
-    default = True
-
-
 class ExcludeLevelsAbove(Range):
     """
-    If 'Exclude Levels' is enabled, any level-ups above the chosen value will still
-    exist as checks but will be prevented from having progression items.
-    If 'Exclude Levels' is disabled, this value can be ignored.
+    Level-ups above this value still exist as checks but are prevented from
+    holding progression items, which limits how much grinding a run can
+    demand.
+
+    50 is max level, so setting it there excludes nothing.
     """
 
     display_name = "Exclude Levels Above"
@@ -207,25 +200,14 @@ class ExcludeLevelsAbove(Range):
     default = 30
 
 
-class ExcludeRescues(Toggle):
-    """
-    When enabled, high "Rescue N survivors" checks are prevented from having
-    progression items. The later ones need most of the mall rescued, so an
-    item behind one sits at the end of the run.
-    """
-    display_name = "Exclude Rescues"
-    default = True
-
-
 class ExcludeRescuesAbove(Range):
     """
-    If 'Exclude Rescues' is enabled, any "Rescue N survivors" check above the
-    chosen value will still exist as a check but will be prevented from having
-    progression items. If 'Exclude Rescues' is disabled, this value can be
-    ignored.
+    "Rescue N survivors" checks above this value still exist as checks but are
+    prevented from holding progression items. The later ones need most of the
+    mall rescued, so an item behind one sits at the end of the run.
 
     The checks are every fifth survivor up to 45, plus 48 -- every survivor in
-    the mall. A value of 48 excludes nothing.
+    the mall. Setting it to 48 excludes nothing.
     """
 
     display_name = "Exclude Rescues Above"
@@ -324,7 +306,7 @@ class VanillaProgression(Choice):
 class TrapPercentage(Range):
     """
     Percentage of filler-item slots that become traps. 0 = no traps,
-    25 = balanced default, 50 = aggressive, 100 = chaos. The selected
+    10 = default, 50 = aggressive, 100 = chaos. The selected
     fraction of filler slots is dedicated to traps and round-robin
     distributed across all six trap types (Stomach Ache Trap, Zombait
     Trap, Slow Trap, Damage Player Trap, Hostile NPC Trap, Special
@@ -334,7 +316,7 @@ class TrapPercentage(Range):
     display_name = "Trap Percentage"
     range_start = 0
     range_end = 100
-    default = 25
+    default = 10
 
 
 class HostileSurvivorCountMin(Range):
@@ -632,6 +614,21 @@ class PPStickersFiller(Toggle):
     default = False
 
 
+class OvertimeChecksFiller(Toggle):
+    """
+    When enabled, every check in Overtime still exists but will only ever hold
+    filler, so no progression is placed past the point of no return.
+
+    The Overtime items are untouched: the Clock Tower Tunnel Key and the Humvee
+    Key are still progression and can still be what the multiworld sends you.
+    This only stops Overtime's own checks from holding anything you need.
+
+    Has no effect on Ending A, which drops the Overtime checks entirely.
+    """
+    display_name = "Overtime Checks Filler"
+    default = False
+
+
 class SplitKeys(Toggle):
     """
     Normally, an area key opens all doors leading into an area. The 'Wonderland
@@ -674,9 +671,7 @@ class DROption(PerGameCommonOptions):
     scoop_sanity: ScoopSanity
     randomize_scoop_order: RandomizeScoopOrder
     main_scoops_any_order: MainScoopsAnyOrder
-    exclude_levels: ExcludeLevels
     exclude_levels_above: ExcludeLevelsAbove
-    exclude_rescues: ExcludeRescues
     exclude_rescues_above: ExcludeRescuesAbove
     zombie_kill_tiers: ZombieKillTiers
     enable_skill_items: EnableSkillItems
@@ -684,6 +679,7 @@ class DROption(PerGameCommonOptions):
     enable_extra_stat_buffs: EnableExtraStatBuffs
     vanilla_progression: VanillaProgression
     exclude_overpowered_items: ExcludeOverpoweredItems
+    overtime_checks_filler: OvertimeChecksFiller
     trap_percentage: TrapPercentage
     hostile_survivor_count_min: HostileSurvivorCountMin
     hostile_survivor_count_max: HostileSurvivorCountMax
@@ -710,13 +706,12 @@ dr_option_groups = [
             RandomizeScoopOrder,
             MainScoopsAnyOrder,
             PpBonusLocations,
-            ExcludeLevels,
             ExcludeLevelsAbove,
-            ExcludeRescues,
             ExcludeRescuesAbove,
             ZombieKillTiers,
             PPStickersFiller,
             OvertimeProgressionGating,
+            OvertimeChecksFiller,
         ],
     ),
     OptionGroup(

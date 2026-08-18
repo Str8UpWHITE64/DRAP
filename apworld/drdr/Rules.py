@@ -680,30 +680,29 @@ def set_rules(world) -> None:
             And(*_tops))
 
     # Exclude Rescues Above code
-    if world.options.exclude_rescues:
-        rescue_threshold = world.options.exclude_rescues_above.value
+    rescue_threshold = world.options.exclude_rescues_above.value
 
-        # 48 is every survivor in the mall, so it excludes nothing
-        if rescue_threshold < 48:
-            for location in world.multiworld.get_locations(world.player):
-                match = re.fullmatch(r"Rescue (\d+) survivors", location.name)
-                if match and int(match.group(1)) > rescue_threshold:
-                    location.progress_type = LocationProgressType.EXCLUDED
+    # 48 is every survivor in the mall, so it excludes nothing -- which is how
+    # the slider turns itself off, and why there is no separate toggle.
+    if rescue_threshold < 48:
+        for location in world.multiworld.get_locations(world.player):
+            match = re.fullmatch(r"Rescue (\d+) survivors", location.name)
+            if match and int(match.group(1)) > rescue_threshold:
+                location.progress_type = LocationProgressType.EXCLUDED
 
     # Exclude Levels Above code
-    if world.options.exclude_levels:
-        threshold = world.options.exclude_levels_above.value
+    threshold = world.options.exclude_levels_above.value
 
-        # Only run if we're not effectively excluding nothing
-        if threshold < 50:
-            for location in world.multiworld.get_locations(world.player):
-                name = location.name
-                match = re.match(r"Reach Level (\d+)", name)
+    # 50 is max level, so it excludes nothing -- the slider's own off switch.
+    if threshold < 50:
+        for location in world.multiworld.get_locations(world.player):
+            name = location.name
+            match = re.match(r"Reach Level (\d+)", name)
 
-                if match:
-                    level_number = int(match.group(1))
-                    if level_number > threshold:
-                        location.progress_type = LocationProgressType.EXCLUDED
+            if match:
+                level_number = int(match.group(1))
+                if level_number > threshold:
+                    location.progress_type = LocationProgressType.EXCLUDED
 
                 elif name == "Reach Level 30!":
                     if 30 > threshold:
@@ -1257,6 +1256,26 @@ def set_rules(world) -> None:
                   _ride_rule)
     world.set_rule(world.multiworld.get_location("Change into 46 new outfits", world.player), And(CanReachRegion("Leisure Park"), CanReachRegion("Al Fresca Plaza"), CanReachRegion("Wonderland Plaza"), CanReachRegion("North Plaza"), CanReachRegion("Entrance Plaza"), CanReachRegion("Food Court"), CanReachRegion("Paradise Plaza"), CanReachRegion("Seon's Food and Stuff"), CanReachRegion("Crislip's Home Saloon"), CanReachRegion("Colby's Movieland")))
     world.set_rule(world.multiworld.get_location("Change into 5 new outfits", world.player), Or(CanReachRegion("Paradise Plaza"), CanReachRegion("Entrance Plaza"), CanReachRegion("Wonderland Plaza")))
+
+    # --------------------------------------------------------------------
+    # Overtime checks as filler
+    # --------------------------------------------------------------------
+    # Keyed off the category rather than the names: Overtime picks up checks
+    # over time and a name list would quietly fall behind.
+    #
+    # Items are deliberately untouched. The Clock Tower Tunnel Key and Humvee
+    # Key stay progression -- the ask was to stop needing what is IN Overtime,
+    # not to stop needing a key to get through it.
+    if world.options.overtime_checks_filler:
+        _overtime_names = {
+            _d.name
+            for _table in location_tables.values()
+            for _d in _table
+            if _d.category == DRLocationCategory.OVERTIME_SCOOP
+        }
+        for location in world.multiworld.get_locations(world.player):
+            if location.name in _overtime_names:
+                location.progress_type = LocationProgressType.EXCLUDED
 
     # --------------------------------------------------------------------
     # PP Stickers
