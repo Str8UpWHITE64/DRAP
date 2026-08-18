@@ -16,6 +16,19 @@ local FLAG_BLACKLIST = {
     [300] = "Kills all NPCs when enabled"
 }
 
+-- Scoop list colors. imgui here takes 0xAABBGGRR, NOT ARGB -- 0xFFFF8800 is
+-- blue, not orange, which is easy to get wrong when adding one.
+--
+-- blocked covers two reasons on purpose: in Any Order you cannot reach it, in
+-- a chain it is not its turn. Either way you have it and cannot go. ready is
+-- Any Order only and never appears next to a startable row, since nothing is
+-- startable while a scoop runs.
+local COLOR_DONE    = 0xFF888888   -- grey
+local COLOR_NO_ITEM = 0xFF555555   -- dim grey
+local COLOR_GO      = 0xFF00FF00   -- green
+local COLOR_READY   = 0xFFCCFF66   -- mint: green over blue
+local COLOR_BLOCKED = 0xFFFF8800   -- blue
+
 local FLAG_TRIGGERS = {
     [392] = { enable = { 300 } },   -- Carlito's Hideout: enable 300 so player can enter
     [355] = { disable = { 300 } },  -- Carlito's Hideout: disable 300 once inside (kills NPCs if left on)
@@ -2056,11 +2069,28 @@ local filter_category = "All"
 local show_only_received = false
 local hide_completed = false
 
-local CATEGORY_COLORS = {
-    Main = 0xFFFFFF00,
-    Survivor = 0xFF66FF66,
-    Psychopath = 0xFFFF6666,
-}
+-- Survivors and psychopaths used to get their own tints, which competed with
+-- the state colors on the same row -- a green survivor and a green "you can
+-- start this" meant different things. Both read the palette now; the category
+-- is already in the name and in the list order.
+
+--- Rescued so far, what to count towards, and which kind that is.
+---
+--- The count is the milestone checks' own, so the header and "Rescue 25
+--- survivors" cannot disagree. The target is the Savior goal when that is the
+--- goal and the next milestone otherwise -- milestones exist in every mode.
+--- nil when SaviorGoalEffects is absent, rather than a guess.
+local function rescue_progress()
+    local sg = _G.AP and _G.AP.effects and _G.AP.effects.SaviorGoalEffects
+    if not (sg and sg.progress) then return nil end
+    local ok, rescued, goal_target = pcall(sg.progress)
+    if not ok or type(rescued) ~= "number" then return nil end
+    if sg.is_savior_goal and sg.is_savior_goal() then
+        return rescued, goal_target, "goal"
+    end
+    local ok2, next_up = pcall(sg.next_milestone)
+    return rescued, (ok2 and next_up) or nil, "milestone"
+end
 
 function M.draw_tab_content(debug)
     if debug then
@@ -2143,15 +2173,23 @@ function M.draw_tab_content(debug)
                 -- follows whichever one the player started.
                 local highlight = any_order and running or current_chain_name
                 if completed_scoops[name] then
-                    color = 0xFF888888          -- gray: completed
-                elseif name == highlight and has_item then
-                    color = 0xFF00FF00          -- green: current + received
+                    color = COLOR_DONE
+                elseif not has_item then
+                    color = COLOR_NO_ITEM
                 elseif name == highlight then
-                    color = 0xFF0000FF          -- red: current + not received (yellow was confusing)
-                elseif has_item then
-                    color = 0xFFFF8800          -- blue: received + not current
+                    color = COLOR_GO            -- the one you are doing
+                elseif any_order then
+                    if State.main_scoop_blocker(name) == nil then
+                        color = COLOR_GO        -- startable right now
+                    elseif State.main_scoop_reachable(name) then
+                        -- Everything but the queue: you could start this the
+                        -- moment the running one finishes.
+                        color = COLOR_READY
+                    else
+                        color = COLOR_BLOCKED
+                    end
                 else
-                    color = 0xFF0000FF          -- red: not received + not current
+                    color = COLOR_BLOCKED       -- chain: not its turn yet
                 end
 
                 local label = string.format("  %d. %s", i, name)
@@ -2281,7 +2319,8 @@ function M.draw_tab_content(debug)
     end
 
     if State.is_item_deferred("Hideout") then
-        imgui.text_colored("Hideout deferred: waiting for Carlito's Hideout Key", 0xFF00AAFF)
+        imgui.text_colored("Hideout deferred: waiting for Carlito's Hideout Key",
+            COLOR_READY)
     end
 
     for _, s in ipairs(status_list) do
@@ -2299,35 +2338,42 @@ function M.draw_tab_content(debug)
         if not debug and s.category ~= "Main" and not s.received and not is_deferred then show = false end
 
         if show then
-            local color = CATEGORY_COLORS[s.category] or 0xFFFFFFFF
+            local color
             local is_current_chain = (s.name == current_chain_scoop)
 
             local status_str = ""
             if s.completed then
-                color = 0xFF888888
+                color = COLOR_DONE
+            elseif not s.ap_item_received then
+                color = COLOR_NO_ITEM
             elseif is_current_chain and s.received then
                 status_str = " [CURRENT]"
-                color = 0xFF00FF00          -- green: current + received
-            elseif is_current_chain then
-                status_str = " [CURRENT]"
-                color = 0xFF00AAFF          -- orange: current + not received
-            elseif s.main_blocked and s.ap_item_received then
+                color = COLOR_GO
+            elseif s.main_blocked then
                 status_str = " - deferred (" .. tostring(s.main_blocker) .. " active)"
-                color = 0xFF00AAFF          -- orange: blocked by active main
-            elseif s.conflict_blocked and s.ap_item_received then
+                color = COLOR_READY
+            elseif s.conflict_blocked then
                 status_str = " - deferred (" .. tostring(s.conflict_blocker) .. " active)"
-                color = 0xFF00AAFF          -- orange: blocked by conflict group
-            elseif s.received and s.category == "Main" then
-                status_str = " [RECV]"
-                color = 0xFFFF8800          -- blue: received + not current (main)
-            elseif s.received and debug then
-                status_str = " [RECV]"
+                color = COLOR_READY
+            elseif s.received then
+                -- Unlocked and out in the world: go do it. A main in a chain
+                -- that is not the current one is waiting its turn instead.
+                if s.category == "Main" and not is_current_chain then
+                    status_str = " [RECV]"
+                    color = COLOR_BLOCKED
+                else
+                    if debug then status_str = " [RECV]" end
+                    color = COLOR_GO
+                end
+            else
+                -- Item arrived, not unlocked yet.
+                if is_current_chain then status_str = " [CURRENT]" end
+                color = COLOR_BLOCKED
             end
 
-            -- Partial-rescue signal: if the scoop has rescuable survivors and
-            -- some (but not all) have been rescued, tint amber so the player
-            -- knows they're missing someone. Overrides the cascade above
-            -- (except completion, which always wins -- see s.completed branch).
+            -- The one color that is not about what you can act on: amber
+            -- means someone in this scoop is still out there. Overrides the
+            -- cascade above, except completion.
             if not s.completed and AP.effects and AP.effects.SurvivorScoopCompletion then
                 local n_rescued, total = AP.effects.SurvivorScoopCompletion.progress(s.name)
                 if total > 0 and n_rescued > 0 and n_rescued < total then
@@ -2391,6 +2437,25 @@ function M.draw_tab_content(debug)
                 if not side_header_shown and s.category ~= "Main" then
                     side_header_shown = true
                     imgui.text("Side Quests:")
+                    local rescued, aim, kind = rescue_progress()
+                    if rescued then
+                        imgui.same_line()
+                        local text, tint
+                        if aim and kind == "goal" then
+                            text = string.format("   Rescued: %d / %d",
+                                                 rescued, aim)
+                            tint = rescued >= aim and COLOR_GO or COLOR_READY
+                        elseif aim then
+                            text = string.format("   Rescued: %d  (next %d)",
+                                                 rescued, aim)
+                            tint = COLOR_READY
+                        else
+                            -- Savior met, or every milestone sent.
+                            text = string.format("   Rescued: %d", rescued)
+                            tint = COLOR_GO
+                        end
+                        imgui.text_colored(text, tint)
+                    end
                 end
 
                 if s.completion_event and not s.completed then

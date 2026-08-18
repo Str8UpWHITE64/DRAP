@@ -135,6 +135,25 @@ function M.progress()
     return count_rescued(), target()
 end
 
+--- Whether the target from progress() is the win condition. Exported so the
+--- scoops window does not need its own copy of the goal number.
+function M.is_savior_goal()
+    return is_savior_goal()
+end
+
+--- The next milestone the player has not reached, or nil once all are done.
+---
+--- The milestones exist in every mode, not just Savior, so a run with no
+--- rescue target still has something to count towards -- which is what the
+--- scoops window shows when there is no Savior goal.
+function M.next_milestone()
+    local n = count_rescued()
+    for _, threshold in ipairs(RESCUE_MILESTONES) do
+        if n < threshold then return threshold end
+    end
+    return nil
+end
+
 function M.register_all()
     if is_savior_goal() then
         log(string.format("Savior goal active: target = %d survivors", target()))

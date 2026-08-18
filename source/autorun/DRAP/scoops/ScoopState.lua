@@ -283,6 +283,28 @@ function M.main_scoop_blocker(scoop_name)
     return nil
 end
 
+--- Can the player physically get to this scoop and open its doors?
+---
+--- The same region and split-key questions main_scoop_blocker asks, without
+--- the active-scoop check that short-circuits them. Separate because the UI
+--- needs to tell "you could start this if nothing else were running" apart
+--- from "you cannot get there yet" -- blocker() answers "already running" for
+--- both and never reaches the region checks.
+function M.main_scoop_reachable(scoop_name)
+    if not cfg.any_order then return false end
+    if not ap_activated then return false end
+    if not M.ap_received[scoop_name] then return false end
+    for _, code in ipairs(cfg.region_requirements[scoop_name] or {}) do
+        if not cfg.can_reach_area(code) then return false end
+    end
+    if cfg.split_keys then
+        for _, key in ipairs(cfg.split_key_doors[scoop_name] or {}) do
+            if not cfg.has_item(key) then return false end
+        end
+    end
+    return true
+end
+
 --- Main scoops in order, each with what the UI needs to draw a row.
 function M.main_scoop_menu()
     local out = {}
