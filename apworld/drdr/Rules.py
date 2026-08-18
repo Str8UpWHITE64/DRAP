@@ -141,11 +141,28 @@ CAR_HOME = {
     "Motorcycle Key": "Leisure Park",
 }
 
+# Where an SMG can actually be picked up, confirmed in game. Leisure Park has
+# none, so naming the item there on its own would ask for something the area
+# cannot supply -- it has to be carried in from one of these.
+SMG_AREAS = ("Al Fresca Plaza", "Entrance Plaza", "Paradise Plaza",
+             "Food Court", "Maintenance Tunnel")
+
+
+def _smg_from_elsewhere():
+    """SMG plus any one area that stocks one, as separate alternatives.
+
+    Alternatives are ORed and the entries within one are ANDed, so this reads
+    as: have the SMG, and be able to reach somewhere it spawns.
+    """
+    return [["Submachine Gun", "region:" + area] for area in SMG_AREAS]
+
+
 # Restricted Items only: something to kill with. Everywhere else these are on
 # the floor for the taking, so the points above carry those seeds instead.
 #
 # Each area lists alternatives; an alternative is everything that must hold at
-# once. A "loc:" entry is a location to reach, anything else is an item.
+# once. A "loc:" entry is a location to reach, a "region:" entry an area to
+# reach, anything else is an item.
 KILL_WEAPONS = {
     "Paradise Plaza":        [["Katana"], ["Submachine Gun"],
                               ["Hunting Knife"], ["Handgun"]],
@@ -160,8 +177,11 @@ KILL_WEAPONS = {
                               ["loc:Kill Adam", "Small Chainsaw"]],
     "North Plaza":           [["Katana"], ["Hunting Knife"], ["Shotgun"],
                               ["Handgun"]],
-    # Both of these change when the car keys land.
-    "Leisure Park":          [["Submachine Gun"]],
+    # Leisure Park has no SMG of its own, so it needs the item AND somewhere
+    # that stocks one. See SMG_AREAS. The Tunnel has one, so it just needs the
+    # item. From 1000 and 2000 respectively both also want a car key -- that is
+    # KILL_CAR_FROM below, stacked on top of this rather than replacing it.
+    "Leisure Park":          _smg_from_elsewhere(),
     "Maintenance Tunnel":    [["Submachine Gun"]],
     "Seon's Food and Stuff": [["Hunting Knife", "Queen"]],
     "Crislip's Home Saloon": [["Fire Ax", "Queen"],
@@ -174,8 +194,14 @@ def _kill_weapon_rule(region):
     """The weapon half of a kill rule, as an Or over the area's alternatives."""
     alternatives = []
     for spec in KILL_WEAPONS.get(region, []):
-        parts = [CanReachLocation(name[4:]) if name.startswith("loc:")
-                 else Has(name) for name in spec]
+        parts = []
+        for name in spec:
+            if name.startswith("loc:"):
+                parts.append(CanReachLocation(name[4:]))
+            elif name.startswith("region:"):
+                parts.append(CanReachRegion(name[7:]))
+            else:
+                parts.append(Has(name))
         alternatives.append(parts[0] if len(parts) == 1 else And(*parts))
     if not alternatives:
         return None
