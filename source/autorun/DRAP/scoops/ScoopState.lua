@@ -242,6 +242,14 @@ function M.set_any_order(v)
     cfg.any_order = v == true
 end
 
+--- Read sides of the config the scoops window needs to explain a block.
+--- Exposed rather than rebuilt there: two copies of "which areas does this
+--- scoop need" would drift.
+function M.is_split_keys() return cfg.split_keys == true end
+function M.region_requirements(name) return cfg.region_requirements[name] or {} end
+function M.split_key_doors(name) return cfg.split_key_doors[name] or {} end
+function M.has_item(name) return cfg.has_item(name) == true end
+
 function M.set_split_keys(v)
     cfg.split_keys = v == true
 end
@@ -285,13 +293,15 @@ end
 
 --- Can the player physically get to this scoop and open its doors?
 ---
---- The same region and split-key questions main_scoop_blocker asks, without
---- the active-scoop check that short-circuits them. Separate because the UI
---- needs to tell "you could start this if nothing else were running" apart
---- from "you cannot get there yet" -- blocker() answers "already running" for
---- both and never reaches the region checks.
+--- The region and split-key questions main_scoop_blocker asks, without the
+--- checks that short-circuit them. blocker() answers "already running" or
+--- "not in any-order mode" and never reaches the region tests, so the UI
+--- cannot use it to tell "you could get there, something is just in the way"
+--- apart from "you cannot get there at all".
+---
+--- Deliberately not gated on any_order: a chain run wants the same split, so
+--- that blue means one thing everywhere -- you cannot reach it.
 function M.main_scoop_reachable(scoop_name)
-    if not cfg.any_order then return false end
     if not ap_activated then return false end
     if not M.ap_received[scoop_name] then return false end
     for _, code in ipairs(cfg.region_requirements[scoop_name] or {}) do

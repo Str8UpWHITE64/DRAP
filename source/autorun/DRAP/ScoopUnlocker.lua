@@ -19,15 +19,16 @@ local FLAG_BLACKLIST = {
 -- Scoop list colors. imgui here takes 0xAABBGGRR, NOT ARGB -- 0xFFFF8800 is
 -- blue, not orange, which is easy to get wrong when adding one.
 --
--- blocked covers two reasons on purpose: in Any Order you cannot reach it, in
--- a chain it is not its turn. Either way you have it and cannot go. ready is
--- Any Order only and never appears next to a startable row, since nothing is
--- startable while a scoop runs.
+-- blocked means one thing in both modes: you have the scoop and cannot reach
+-- it. ready is everything else in the way -- the queue in a chain, another
+-- scoop running in Any Order -- so a blue row is always worth investigating
+-- and a mint one never is.
 local COLOR_DONE    = 0xFF888888   -- grey
 local COLOR_NO_ITEM = 0xFF555555   -- dim grey
 local COLOR_GO      = 0xFF00FF00   -- green
 local COLOR_READY   = 0xFFCCFF66   -- mint: green over blue
 local COLOR_BLOCKED = 0xFFFF8800   -- blue
+local COLOR_INFO    = 0xFFFFFFFF   -- white: quest detail, not a state
 
 local FLAG_TRIGGERS = {
     [392] = { enable = { 300 } },   -- Carlito's Hideout: enable 300 so player can enter
@@ -2092,6 +2093,69 @@ local function rescue_progress()
     return rescued, (ok2 and next_up) or nil, "milestone"
 end
 
+--- Why the current scoop cannot be started yet, as a line for the player.
+---
+--- Answers in the order the player hits them: the item has not arrived, or it
+--- has and a door on the route is shut. Returns nil when nothing is in the
+--- way, so the caller can stay quiet.
+---
+--- The key names come from the shared data rather than a list here -- areas
+--- carry their own key_item, and split_areas carries one per door with the
+--- transitions it covers, so "which key opens the way into X" is a lookup
+--- rather than a table that can drift.
+local function current_scoop_blocker_text(name)
+    if not name then return nil end
+
+    if not (State.has_ap_received(name) or State.has_received(name)) then
+        return string.format("Waiting for '%s'", name)
+    end
+
+    local dsl = _G.AP and _G.AP.DoorSceneLock
+    if not (dsl and dsl.can_reach_area) then return nil end
+
+    for _, code in ipairs(State.region_requirements(name)) do
+        if dsl.can_reach_area(code) == false then
+            local area = nil
+            for _, a in ipairs(SharedData.areas()) do
+                if a.scene_code == code then area = a break end
+            end
+            local where = (area and area.name) or code
+
+            if State.is_split_keys() then
+                -- Any door into the area will do, so name them all.
+                local keys = {}
+                for _, door in ipairs(SharedData.split_areas()) do
+                    for _, tr in ipairs(door.transitions or {}) do
+                        if tr.destination == code and door.key_item then
+                            keys[door.key_item] = true
+                        end
+                    end
+                end
+                local list = {}
+                for k in pairs(keys) do list[#list + 1] = k end
+                table.sort(list)
+                if #list > 0 then
+                    return "Waiting for " .. table.concat(list, " or ")
+                end
+            end
+
+            if area and area.key_item then
+                return "Waiting for " .. area.key_item
+            end
+            return "Cannot reach " .. where .. " yet"
+        end
+    end
+
+    if State.is_split_keys() then
+        for _, key in ipairs(State.split_key_doors(name)) do
+            if not State.has_item(key) then
+                return "Waiting for " .. key
+            end
+        end
+    end
+    return nil
+end
+
 function M.draw_tab_content(debug)
     if debug then
         local efm = efm_mgr:get()
@@ -2142,19 +2206,26 @@ function M.draw_tab_content(debug)
 
         if current_chain_name then
             local info = SCOOP_DESCRIPTIONS[current_chain_name]
-            imgui.text_colored("Current Quest: " .. current_chain_name, 0xFF00FF00)
+            local waiting = current_scoop_blocker_text(current_chain_name)
+            -- Green only when it can actually be started; cyan while it is
+            -- still waiting on something, matching the list below.
+            imgui.text_colored("Current Quest: " .. current_chain_name,
+                waiting and COLOR_READY or COLOR_GO)
+            if waiting then
+                imgui.text_colored("  " .. waiting, COLOR_READY)
+            end
             if info then
-                imgui.text_colored("  Location:    " .. info.location, 0xFFFFFF00)
-                imgui.text_colored("  Trigger:     " .. info.trigger, 0xFFFFFF00)
-                imgui.text_colored("  Description: " .. info.description, 0xFFFFFF00)
+                imgui.text_colored("  Location:    " .. info.location, COLOR_INFO)
+                imgui.text_colored("  Trigger:     " .. info.trigger, COLOR_INFO)
+                imgui.text_colored("  Description: " .. info.description, COLOR_INFO)
             end
         elseif received_scoops["The Facts"] and not completed_scoops["The Facts"] then
             local info = SCOOP_DESCRIPTIONS["The Facts"]
             imgui.text_colored("Current Quest: The Facts", 0xFF00FF00)
             if info then
-                imgui.text_colored("  Location:    " .. info.location, 0xFFFFFF00)
-                imgui.text_colored("  Trigger:     " .. info.trigger, 0xFFFFFF00)
-                imgui.text_colored("  Description: " .. info.description, 0xFFFFFF00)
+                imgui.text_colored("  Location:    " .. info.location, COLOR_INFO)
+                imgui.text_colored("  Trigger:     " .. info.trigger, COLOR_INFO)
+                imgui.text_colored("  Description: " .. info.description, COLOR_INFO)
             end
         else
             imgui.text_colored("All main scoops complete!", 0xFF00FF00)
@@ -2178,18 +2249,14 @@ function M.draw_tab_content(debug)
                     color = COLOR_NO_ITEM
                 elseif name == highlight then
                     color = COLOR_GO            -- the one you are doing
-                elseif any_order then
-                    if State.main_scoop_blocker(name) == nil then
-                        color = COLOR_GO        -- startable right now
-                    elseif State.main_scoop_reachable(name) then
-                        -- Everything but the queue: you could start this the
-                        -- moment the running one finishes.
-                        color = COLOR_READY
-                    else
-                        color = COLOR_BLOCKED
-                    end
+                elseif any_order and State.main_scoop_blocker(name) == nil then
+                    color = COLOR_GO            -- startable right now
+                elseif State.main_scoop_reachable(name) then
+                    -- Have it and can get there; only the queue or a running
+                    -- scoop is in the way.
+                    color = COLOR_READY
                 else
-                    color = COLOR_BLOCKED       -- chain: not its turn yet
+                    color = COLOR_BLOCKED       -- cannot get there yet
                 end
 
                 local label = string.format("  %d. %s", i, name)
@@ -2357,10 +2424,13 @@ function M.draw_tab_content(debug)
                 color = COLOR_READY
             elseif s.received then
                 -- Unlocked and out in the world: go do it. A main in a chain
-                -- that is not the current one is waiting its turn instead.
+                -- that is not the current one is waiting its turn instead --
+                -- same split as the Main Story list, because the debug tab
+                -- draws mains here and the two must not disagree.
                 if s.category == "Main" and not is_current_chain then
                     status_str = " [RECV]"
-                    color = COLOR_BLOCKED
+                    color = State.main_scoop_reachable(s.name)
+                            and COLOR_READY or COLOR_BLOCKED
                 else
                     if debug then status_str = " [RECV]" end
                     color = COLOR_GO
@@ -2368,7 +2438,8 @@ function M.draw_tab_content(debug)
             else
                 -- Item arrived, not unlocked yet.
                 if is_current_chain then status_str = " [CURRENT]" end
-                color = COLOR_BLOCKED
+                color = State.main_scoop_reachable(s.name)
+                        and COLOR_READY or COLOR_BLOCKED
             end
 
             -- The one color that is not about what you can act on: amber
@@ -2733,6 +2804,84 @@ _G.drap_ep270_force_retry = function()
     _ep_270_fired_at_clock = 0
     M.log("EP270: cleared gate flags 765 and 2280 -- next EP entry will re-fire")
 end
+--- Stage the scoop list so every color is on screen at once, for checking
+--- them in a vanilla debug session where no slot is connected.
+---
+--- Mint is the one that cannot be produced by hand: it needs Any Order on, AP
+--- activated, two mains received, and one of them running -- and there is no
+--- console route to Any Order otherwise. Everything here is state the debug
+--- buttons already set, gathered into one call.
+---
+--- Read it on the normal Scoops tab, not the debug one: the debug view prints
+--- the chain position instead of the colored list.
+---
+--- Mutates scoop state. Meant for a throwaway save; scoop_newgame_reset()
+--- puts it back.
+--- Why each main-story row is the color it is.
+---
+--- Prints the same inputs the cascade reads, in the same order it reads them,
+--- so a surprising color can be traced to the state that produced it rather
+--- than guessed at.
+---
+--- This describes the Main Story list on the normal Scoops tab. The debug tab
+--- does not draw that list -- mains fall through to the scoop list below it,
+--- which is a separate cascade. If what you see disagrees with this, check
+--- which tab you are on first.
+_G.scoop_color_why = function()
+    local any_order = State.is_any_order()
+    local running = any_order and State.active_main_scoop() or nil
+    local highlight = any_order and running or M.get_current_chain_scoop()
+
+    M.log(string.format("any_order=%s  activated=%s  running=%s  current=%s",
+        tostring(any_order), tostring(State.is_activated()),
+        tostring(running), tostring(M.get_current_chain_scoop())))
+
+    -- scoop_order, not get_main_scoops_in_order(): the window walks the
+    -- shuffled order, and a diagnostic listing a different one is misleading.
+    for i, name in ipairs(scoop_order) do
+        local has_item = State.has_ap_received(name) or State.has_received(name)
+        local verdict, why
+        if State.is_completed(name) then
+            verdict, why = "grey", "completed"
+        elseif not has_item then
+            verdict, why = "dim grey", "no item yet"
+        elseif name == highlight then
+            verdict, why = "green", "this is the current one"
+        elseif any_order and State.main_scoop_blocker(name) == nil then
+            verdict, why = "green", "startable now"
+        elseif State.main_scoop_reachable(name) then
+            verdict, why = "mint",
+                any_order and ("reachable, blocked by: "
+                    .. tostring(State.main_scoop_blocker(name)))
+                or "reachable, waiting its turn"
+        else
+            verdict, why = "blue", "cannot get there yet"
+        end
+        M.log(string.format("  %2d. %-26s %-9s %s", i, name, verdict, why))
+    end
+end
+
+_G.scoop_color_demo = function()
+    M.set_any_order_enabled(true)
+    M.force_activate()
+
+    local order = scoop_order
+    if not order or #order < 2 then
+        M.log("color demo: no scoop order set -- load a save first")
+        return false
+    end
+
+    -- Two received so one can run and the other show as held up by it.
+    State.mark_ap_received(order[1])
+    State.mark_ap_received(order[2])
+    M.activate_main_scoop(order[1])
+
+    M.log(string.format(
+        "color demo: '%s' running (green), '%s' should be mint if reachable "
+        .. "or blue if not. Anything unreceived is grey.", order[1], order[2]))
+    return true
+end
+
 _G.scoop_gui = function()
     local gui = require("DRAP/GUI")
     if gui then gui.show_window() end
