@@ -483,6 +483,7 @@ specialty_items = {
     # the mall is open instead. Handgun/Shotgun/Submachine Gun are above.
     "Katana",
     "Hunting Knife",
+    "Sledgehammer",
     "Machete",
     "Baseball Bat",
     "Fire Ax",

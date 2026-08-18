@@ -149,7 +149,10 @@ CAR_HOME = {
 KILL_WEAPONS = {
     "Paradise Plaza":        [["Katana"], ["Submachine Gun"],
                               ["Hunting Knife"], ["Handgun"]],
-    "Al Fresca Plaza":       [["Katana"], ["Submachine Gun"],
+    # No Katana in Al Fresca, so the Sledgehammer stands in. It had to join
+    # specialty_items first: those are what get the progression
+    # classification here, and Has() sees nothing else.
+    "Al Fresca Plaza":       [["Sledgehammer"], ["Submachine Gun"],
                               ["Hunting Knife"], ["Handgun"]],
     "Entrance Plaza":        [["Submachine Gun"], ["Hunting Knife"], ["Katana"]],
     "Food Court":            [["Submachine Gun"]],
@@ -391,6 +394,13 @@ def set_rules(world) -> None:
     # --------------------------------------------------------------------
     # Region access: doors and entrances
     # --------------------------------------------------------------------
+    # The Leisure Park <-> Maintenance Tunnel ramp, named because the Car Keys
+    # rules need the same door: it is the only route a vehicle can take
+    # between those two, so reaching either by another door proves nothing.
+    # Free until the door rules below say otherwise.
+    _ramp_to_tunnel = True_()
+    _ramp_to_park = True_()
+
     if not world.options.door_randomizer:
         # Normal key-based entrance rules. Split Keys gives each door its
         # own key as an alternative to the area key; the two systems use
@@ -416,8 +426,9 @@ def set_rules(world) -> None:
                       _door("North Plaza Key", "Leisure Park - North Plaza Key"))
         world.set_rule(world.multiworld.get_entrance("Maintenance Tunnel -> Meat Processing Area", world.player),
                       _door("Meat Processing Area Key", "Maintenance Tunnel - Meat Processing Area Key"))
+        _ramp_to_tunnel = _door("Maintenance Tunnel Key", "Leisure Park - Maintenance Tunnel Key")
         world.set_rule(world.multiworld.get_entrance("Leisure Park -> Maintenance Tunnel", world.player),
-                      _door("Maintenance Tunnel Key", "Leisure Park - Maintenance Tunnel Key"))
+                      _ramp_to_tunnel)
         world.set_rule(world.multiworld.get_entrance("Leisure Park -> Paradise Plaza", world.player),
                       _door("Paradise Plaza Key", "Leisure Park - Paradise Plaza Key"))
         world.set_rule(world.multiworld.get_entrance("Food Court -> Al Fresca Plaza", world.player),
@@ -457,8 +468,9 @@ def set_rules(world) -> None:
             _greg = And(_greg, Has("Paradise Plaza - Wonderland Plaza Key"))
         world.set_rule(world.multiworld.get_entrance("Paradise Plaza -> Wonderland Plaza", world.player), _greg)
         world.set_rule(world.multiworld.get_entrance("Wonderland Plaza -> Paradise Plaza", world.player), _greg)
+        _ramp_to_park = _door("Leisure Park Key", "Leisure Park - Maintenance Tunnel Key")
         world.set_rule(world.multiworld.get_entrance("Maintenance Tunnel -> Leisure Park", world.player),
-                      _door("Leisure Park Key", "Leisure Park - Maintenance Tunnel Key"))
+                      _ramp_to_park)
 
         # Maintenance Tunnel doors: every mall<->tunnel door needs the
         # Maintenance Tunnel Key plus the Access Key -- either the AP
@@ -1110,14 +1122,25 @@ def set_rules(world) -> None:
     # and collect it, so it needs both.
     _restricted = bool(world.options.restricted_item_mode)
 
-    def _obtainable(item_name, region):
+    # Every area a fire extinguisher is confirmed to stay in. NOT the
+    # Warehouse: the one Frank drops in the Jessie cutscene despawns early in
+    # the run, so a rule leaning on it promises something that is not there.
+    FIRE_EXTINGUISHER_AREAS = ("Al Fresca Plaza", "Food Court",
+                               "Crislip's Home Saloon",
+                               "Seon's Food and Stuff", "Wonderland Plaza")
+
+    def _obtainable(item_name, *regions):
+        if len(regions) > 1:
+            somewhere = Or(*[CanReachRegion(r) for r in regions])
+        else:
+            somewhere = CanReachRegion(regions[0])
         if _restricted:
-            return And(Has(item_name), CanReachRegion(region))
-        return Or(Has(item_name), CanReachRegion(region))
+            return And(Has(item_name), somewhere)
+        return Or(Has(item_name), somewhere)
 
     _rpg_blend = [
         _obtainable("Mega Buster", "Colby's Movieland"),
-        _obtainable("Fire Extinguisher", "Warehouse"),
+        _obtainable("Fire Extinguisher", *FIRE_EXTINGUISHER_AREAS),
         Has("Book [Blender]"),
     ]
     # Restricted cannot pick the blender's output up either.
@@ -1148,22 +1171,32 @@ def set_rules(world) -> None:
         # is only usable where it is parked. Without it they can be driven
         # anywhere, and only collecting them is region-bound.
         _cars_travel = not world.options.door_randomizer
-        _usable = [And(Has(_k), CanReachRegion(_r)) for _k, _r in CAR_HOME.items()]
+
+        # A car crossing between the two areas has to take the ramp, so the
+        # ramp's own door is required on top of reaching the far side. Region
+        # access alone is not enough: Leisure Park also opens from North Plaza
+        # and Paradise, and neither of those is drivable.
+        def _drive_from(key_name):
+            home = CAR_HOME[key_name]
+            if home == "Maintenance Tunnel":
+                return And(Has(key_name), CanReachRegion(home), _ramp_to_park)
+            return And(Has(key_name), CanReachRegion(home), _ramp_to_tunnel)
 
         # The ramp is in Leisure Park and only these two can take it.
         _jump_alts = [And(Has("Sports Car Key"), CanReachRegion("Leisure Park"))]
         if _cars_travel:
             # The sedan lives in the Tunnel, so this route means fetching it
-            # and driving it over -- which needs doors where they belong.
-            _jump_alts.append(And(Has("Sedan Key"),
-                                  CanReachRegion(CAR_HOME["Sedan Key"]),
-                                  CanReachRegion("Leisure Park")))
+            # and driving it over the ramp.
+            _jump_alts.append(_drive_from("Sedan Key"))
         _jump_rule = Or(*_jump_alts) if len(_jump_alts) > 1 else _jump_alts[0]
 
         # Counts this high are only practical in the Tunnel, so it stays
         # required either way. What can satisfy it is what differs: any car
         # when they can be driven over, only a Tunnel one when they cannot.
         if _cars_travel:
+            _usable = [And(Has(_k), CanReachRegion(_r))
+                       if _r == "Maintenance Tunnel" else _drive_from(_k)
+                       for _k, _r in CAR_HOME.items()]
             _kill_rule = And(CanReachRegion("Maintenance Tunnel"), Or(*_usable))
         else:
             _kill_rule = And(CanReachRegion("Maintenance Tunnel"),
