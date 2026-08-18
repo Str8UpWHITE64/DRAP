@@ -182,10 +182,6 @@ def _kill_weapon_rule(region):
     return alternatives[0] if len(alternatives) == 1 else Or(*alternatives)
 
 
-# Entrance Plaza kills at or below this need no key: the prologue puts
-# the player there before one exists.
-PROLOGUE_FREE_KILLS = 25
-
 # Determines the value of the region towards levels
 REGION_LEVEL_VALUES = {
     "Security Room": 1,
@@ -626,18 +622,18 @@ def set_rules(world) -> None:
                       RegionPointsAtLeast(25))
 
     # Zombie kill checks. They sit in their own region, so every one needs its
-    # rule spelled out -- see the note in Locations.py. The Entrance Plaza's
-    # smallest ask for nothing: the prologue puts the player there without a
-    # key, so they are sphere 0 and give the fill somewhere early.
+    # rule spelled out -- see the note in Locations.py.
+    #
+    # Every one asks for its area, Entrance Plaza's smallest included. Those
+    # two used to be free, on the grounds that the prologue puts the player
+    # there without a key -- but that made them sphere 0, so a new player
+    # cleared them in the opening without ever knowing the checks existed.
     for _kill_name, _kill_region in ZOMBIE_KILL_REGION_OF.items():
         try:
             _kill_loc = world.multiworld.get_location(_kill_name, world.player)
         except KeyError:
             continue        # not created at this tier
         _threshold = int(re.match(r"Kill (\d+) ", _kill_name).group(1))
-        if _kill_region == "Entrance Plaza" and _threshold <= PROLOGUE_FREE_KILLS:
-            world.set_rule(_kill_loc, True_())
-            continue
 
         _parts = [CanReachRegion(_kill_region)]
 

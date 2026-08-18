@@ -225,6 +225,10 @@ class ZombieKillTiers(Choice):
     These spread the killing across the mall.
 
     none:      no area kill checks at all.
+    easy:      the default. Stops at 100 in the plazas, 50 in the small
+               stores, 500 in Leisure Park and 1000 in the Maintenance
+               Tunnel -- enough to get you fighting around the mall without
+               becoming a grind.
     normal:    one for each main plaza, two in Leisure Park, three in the
                Maintenance Tunnel. The small stores get none.
     nightmare: two per main plaza, one per small store, and more outdoors.
@@ -233,10 +237,11 @@ class ZombieKillTiers(Choice):
     """
     display_name = "Zombie Kill Tiers"
     option_none = 0
-    option_normal = 1
-    option_nightmare = 2
-    option_genocide = 3
-    default = 0
+    option_easy = 1
+    option_normal = 2
+    option_nightmare = 3
+    option_genocide = 4
+    default = 1
 
 
 class EnableSkillItems(DefaultOnToggle):

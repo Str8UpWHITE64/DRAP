@@ -712,7 +712,8 @@ for location_table in location_tables.values():
 # 53594, the Zombie Genocider number.
 # ----------------------------------------------------------------------------
 
-ZOMBIE_KILL_TIER_NAMES = ["none", "normal", "nightmare", "genocide"]
+# Indexed by ZombieKillTiers.value, so the order is the option order.
+ZOMBIE_KILL_TIER_NAMES = ["none", "easy", "normal", "nightmare", "genocide"]
 
 # region -> {tier: [thresholds]}, from drdr_shared.json so the runtime can
 # read the same numbers. A tier lists every threshold active at it, not just
@@ -734,9 +735,8 @@ def zombie_kill_locations(tier: str) -> List[str]:
 
 
 # Kill locations live in their own table rather than in each area's, because
-# their rules are not just "can you reach this area" -- the Entrance Plaza's
-# smallest are reachable during the prologue before any key, and the rest
-# carry mall-progress and weapon requirements. A location cannot escape its
+# their rules are not just "can you reach this area" -- they also carry
+# mall-progress, car and weapon requirements. A location cannot escape its
 # region's reachability, so the region is a neutral one and Rules.py writes
 # out every rule.
 #
