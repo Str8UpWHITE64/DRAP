@@ -722,21 +722,18 @@ def set_rules(world) -> None:
             match = re.match(r"Reach Level (\d+)", name)
 
             if match:
-                level_number = int(match.group(1))
-                if level_number > threshold:
+                # re.match ignores the suffix, so this covers the plain
+                # "Reach Level 12" and the "Reach Level 20!" achievement
+                # milestones in one pass.
+                if int(match.group(1)) > threshold:
                     location.progress_type = LocationProgressType.EXCLUDED
 
-                elif name == "Reach Level 30!":
-                    if 30 > threshold:
-                        location.progress_type = LocationProgressType.EXCLUDED
-
-                elif name == "Reach Level 40!":
-                    if 40 > threshold:
-                        location.progress_type = LocationProgressType.EXCLUDED
-
-                elif name == "Reach max level":
-                    if 50 > threshold:
-                        location.progress_type = LocationProgressType.EXCLUDED
+            elif name == "Reach max level":
+                # Level 50 under a name with no digits in it, so it never
+                # matched the regex. It used to sit inside the branch above
+                # and could not be reached at all, which left it collectable
+                # at every threshold. The outer guard is already threshold<50.
+                location.progress_type = LocationProgressType.EXCLUDED
 
 
     # --------------------------------------------------------------------
@@ -1044,7 +1041,7 @@ def set_rules(world) -> None:
     world.set_rule(world.multiworld.get_location("Rescue Ray Mathison", world.player), And(CanReachRegion("Colby's Movieland"), (Has("A Strange Group") if world.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM"), CanReachLocation("Kill Sean")))))
     world.set_rule(world.multiworld.get_location("Rescue Cheryl Jones", world.player), And(CanReachRegion("Colby's Movieland"), (Has("A Strange Group") if world.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM"), CanReachLocation("Kill Sean")))))
 
-    # These five survivor-count milestones are gated behind nearly every
+    # These survivor-count milestones are gated behind nearly every
     # late-game scoop, so they only become reachable once most of the
     # progression chain is already solved -- a poor place for progression
     # or useful items, since they'd effectively be locked behind the rest
