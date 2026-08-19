@@ -67,6 +67,11 @@ local cfg = {
     now = function() return 0 end,
     check_flag = function(_) return nil end,   -- true/false/nil(unreadable)
     has_item = function(_) return false end,
+    scoop_survivors = {},      -- name -> { survivor stypes the scoop is about }
+    -- Observed alive->dead only. Deliberately NOT the census KILLED verdict:
+    -- that has a half-initialised branch, and a survivor wrongly called dead
+    -- loses their mission box with no way back.
+    survivor_dead = function(_) return false end,
     on_unlock = function(_, _) end,            -- engine flag writes
     on_state_changed = function() end,         -- persistence trigger
 }
@@ -118,9 +123,39 @@ function M.is_scoop_order_set() return scoop_order_set end
 function M.conflict_info(name) return scoop_to_conflict[name] end
 function M.blocked_by_mains(name) return side_blocked_by[name] end
 
--- A scoop is "active" for blocking purposes when unlocked but not done.
+-- A scoop can end without being completed: every survivor it is about is
+-- dead, so there is nobody left to rescue. Derived each call rather than
+-- latched, because the census un-sets death_seen when a survivor is seen
+-- alive again -- loading a save from before the death has to undo this too.
+--
+-- The multi-survivor scoops (Lovers, Twin Sisters, Gun Shop Standoff and the
+-- rest) share one END flag across everyone in them, so one death is not
+-- enough -- anybody still breathing keeps the mission worth running.
+--
+-- PSYCHO MODE will invert this: killing is the objective, so a rescue fails
+-- the scoop and a zombie death fails it too. Only which event resolves the
+-- scoop changes -- everything downstream of is_failed stays as it is.
+function M.is_failed(name)
+    -- Survivor scoops only. A Psychopath scoop completes by killing the
+    -- psycho ("Kill Cliff"), so its hostages all dying leaves the check
+    -- perfectly winnable and must not resolve it.
+    local d = cfg.scoop_data[name]
+    if not d or d.category ~= "Survivor" then return false end
+    local roster = cfg.scoop_survivors[name]
+    if not roster or #roster == 0 then return false end
+    if M.completed[name] then return false end
+    for _, stype in ipairs(roster) do
+        if not cfg.survivor_dead(stype) then return false end
+    end
+    return true
+end
+
+-- A scoop is "active" for blocking purposes when unlocked and unresolved.
+-- A failed scoop must stop asserting everything a live one does: its
+-- direction box, its flags, and the hold it has on its conflict siblings.
 local function is_active(name)
     return M.received[name] == true and not M.completed[name]
+        and not M.is_failed(name)
 end
 M.is_active = is_active
 

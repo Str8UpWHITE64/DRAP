@@ -28,6 +28,7 @@ local COLOR_NO_ITEM = 0xFF555555   -- dim grey
 local COLOR_GO      = 0xFF00FF00   -- green
 local COLOR_READY   = 0xFFCCFF66   -- mint: green over blue
 local COLOR_BLOCKED = 0xFFFF8800   -- blue
+local COLOR_FAILED  = 0xFF4444AA   -- muted red: over, and not by winning
 local COLOR_INFO    = 0xFFFFFFFF   -- white: quest detail, not a state
 
 local FLAG_TRIGGERS = {
@@ -1552,6 +1553,20 @@ State.init({
     end,
     on_unlock = apply_unlock_writes,
     on_state_changed = function() save_state() end,
+    scoop_survivors = SharedData.scoop_survivors(),
+    -- NpcTracker owns liveness: it already walks NpcInfoList every half
+    -- second and knows the name<->SurvivorType mapping. It only reports a
+    -- death for someone it saw alive first, and retracts one if they turn up
+    -- alive again, which covers loading a save from before the kill.
+    --
+    -- Deliberately NOT the survivor census: that belongs to SurvivorRecovery,
+    -- which is switched off, so a scoop must not depend on it.
+    survivor_dead = function(name)
+        local nt = AP and AP.NpcTracker
+        if not (nt and nt.is_survivor_dead) then return false end
+        local ok, dead = pcall(nt.is_survivor_dead, name)
+        return ok and dead == true
+    end,
     region_requirements = build_region_requirements(),
     split_key_doors = build_split_key_doors(),
     can_reach_area = function(code)
@@ -1712,6 +1727,7 @@ function M.get_all_status()
             flags_active = M.is_scoop_active(name),
             received = M.has_received_scoop(name),
             ap_item_received = ap_received[name] == true,
+            failed = State.is_failed(name),
             completed = M.is_scoop_completed(name),
             conflict_blocked = blocked,
             conflict_blocker = blocker,
@@ -2411,6 +2427,9 @@ function M.draw_tab_content(debug)
             local status_str = ""
             if s.completed then
                 color = COLOR_DONE
+            elseif s.failed then
+                status_str = " [FAILED - everyone died]"
+                color = COLOR_FAILED
             elseif not s.ap_item_received then
                 color = COLOR_NO_ITEM
             elseif is_current_chain and s.received then
