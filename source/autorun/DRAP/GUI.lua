@@ -4,6 +4,7 @@
 
 local Shared = require("DRAP/Shared")
 local Logger = require("DRAP/Logger")
+local Activation = require("DRAP/Activation")
 
 local M = Shared.create_module("GUI")
 
@@ -175,6 +176,11 @@ re.on_draw_ui(function()
         -- DEBUG records always reach the file; this decides whether they also
         -- appear in the script console while debugging live.
         Logger.set_console_level(debug_mode and "DEBUG" or "INFO")
+        -- Arm the mod so the frame loop actually runs its modules. Without
+        -- this, offline testing sees a dormant mod: no trackers, no deaths
+        -- observed, no checks. Deliberately not undone when debug goes back
+        -- off -- see Activation.
+        if debug_mode then Activation.activate("debug mode") end
     end
 end)
 

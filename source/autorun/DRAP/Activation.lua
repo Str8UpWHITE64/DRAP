@@ -7,6 +7,10 @@
 --
 -- One way per session. A dropped server leaves the run as it is; reverting
 -- would unlock the whole mall on a network blip.
+--
+-- Debug Mode arms it too, so the mod can be exercised offline without
+-- standing up a server. Same one-way rule: switching debug back off does not
+-- disarm, for the reason above.
 
 local Shared = require("DRAP/Shared")
 
@@ -45,6 +49,16 @@ end
 _G.drap_active = function()
     M.log(active and "active -- connected to a slot"
                   or "dormant -- vanilla, no slot connected")
+end
+
+-- Arm without a server, for offline testing. Same call the Debug Mode
+-- checkbox makes, so the console works with the GUI closed.
+_G.drap_activate_debug = function()
+    if M.activate("debug mode") then
+        M.log("armed by console -- offline testing")
+    else
+        M.log("already active")
+    end
 end
 
 return M
