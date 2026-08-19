@@ -58,6 +58,17 @@ local function get_player_position()
     return nil
 end
 
+-- A corpse keeps the mLiveState it died with: a killed escort still reads
+-- JOIN, measured on a real kill (hp 3500 -> 0, isDead true, state stayed 2).
+-- So "is this a party member" has to ask isDead/hp, never the live state.
+local function record_is_dead(info)
+    local dead, hp = nil, nil
+    pcall(function() dead = info:call("isDead") end)
+    if dead == true then return true end
+    pcall(function() hp = Shared.to_int(info:get_field("mVitalNew")) end)
+    return hp ~= nil and hp <= 0
+end
+
 local function is_npc_near_player(npc_pos, player_pos)
     if not npc_pos or not player_pos then return true end
     local dx = math.abs((npc_pos.x or 0) - (player_pos.x or 0))
@@ -114,6 +125,7 @@ local function rewrite_npc_list(npc_list, dest, player_area, player_pos)
             pcall(function() npc_pos = extract_vec3(item:get_field("mPos")) end)
 
             local include = live_state == 2
+                and not record_is_dead(item)
                 and (not player_area or not npc_area or npc_area == player_area)
                 and (not player_pos or not npc_pos or is_npc_near_player(npc_pos, player_pos))
 
@@ -283,7 +295,7 @@ function M.park_party(keep_n, park_area)
             pcall(function() state = Shared.to_int(info:get_field("mLiveState")) end)
             pcall(function() area = Shared.to_int(info:get_field("mAreaNo")) end)
             pcall(function() pos = extract_vec3(info:get_field("mPos")) end)
-            if state == 2 then  -- JOIN: party member
+            if state == 2 and not record_is_dead(info) then  -- JOIN: party member
                 local d = math.huge
                 if pos and player_pos then
                     local dx = (pos.x or 0) - (player_pos.x or 0)
