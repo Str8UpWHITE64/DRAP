@@ -73,6 +73,7 @@ local rescued_survivors = {}  -- key: npc_id -> true once rescued
 ------------------------------------------------------------
 
 M.on_survivor_rescued = nil
+M.on_survivor_killed_by_player = nil
 
 ------------------------------------------------------------
 -- JSON Loading
@@ -214,6 +215,80 @@ end
 
 local seen_alive = {}   -- npc_id -> true once observed alive
 local dead_now = {}     -- npc_id -> true, was alive and is now dead
+local killed_by_player = {}  -- npc_id -> true, WE did it
+
+------------------------------------------------------------
+-- Kill attribution
+------------------------------------------------------------
+-- Psycho Mode only counts survivors the player killed, so a death is not
+-- enough -- one the zombies got to is a target lost, not a check earned.
+--
+-- NpcManager keeps a short list of recent damage events reachable through
+-- getDamageEmotionNpcNum/getDamageEmotionNpcInfo. A kill is mAttackerType
+-- PLAYER with mStatus DEAD or JUST_DIE. Deduped by mNpcName: a survivor
+-- passes through both states and the record lingers for frames afterwards.
+-- Zombie and psychopath kills read ENEMY/NPC and drop out; WEEP records are
+-- other survivors reacting to it.
+--
+-- Verified in a debug run: two survivors killed by hand counted, one left to
+-- the zombies did not.
+local DAMAGE_STATUS_DEAD = 3
+local DAMAGE_STATUS_JUST_DIE = 4
+local ATTACKER_PLAYER = 1
+
+local function poll_kill_attribution(mgr)
+    local n = tonumber(Shared.safe(function()
+        return mgr:call("getDamageEmotionNpcNum")
+    end)) or 0
+    for i = 0, n - 1 do
+        local rec = Shared.safe(function()
+            return mgr:call("getDamageEmotionNpcInfo", i)
+        end)
+        if rec then
+            local ok_s, status = pcall(function() return rec:get_field("mStatus") end)
+            local ok_a, attacker = pcall(function() return rec:get_field("mAttackerType") end)
+            local ok_w, who = pcall(function() return rec:get_field("mNpcName") end)
+            status = ok_s and tonumber(status) or nil
+            attacker = ok_a and tonumber(attacker) or nil
+            who = ok_w and tonumber(who) or nil
+            if who and attacker == ATTACKER_PLAYER
+                and (status == DAMAGE_STATUS_DEAD
+                     or status == DAMAGE_STATUS_JUST_DIE)
+                and not killed_by_player[who] then
+                killed_by_player[who] = true
+                M.log(string.format("%s was killed by the player",
+                    survivor_id_to_friendly_name(who)))
+                if M.on_survivor_killed_by_player then
+                    pcall(M.on_survivor_killed_by_player, who,
+                          survivor_id_to_friendly_name(who))
+                end
+            end
+        end
+    end
+end
+
+--- Accepts a friendly name or a numeric survivor type. True only for a death
+--- the player caused, which is the whole point in Psycho Mode.
+function M.is_killed_by_player(name_or_id)
+    local id = tonumber(name_or_id) or friendly_name_to_survivor_id(name_or_id)
+    if not id then return false end
+    return killed_by_player[id] == true
+end
+
+function M.get_player_kills()
+    local out = {}
+    for id in pairs(killed_by_player) do
+        table.insert(out, survivor_id_to_friendly_name(id))
+    end
+    table.sort(out)
+    return out
+end
+
+function M.player_kill_count()
+    local n = 0
+    for _ in pairs(killed_by_player) do n = n + 1 end
+    return n
+end
 
 local function record_is_alive(npc_info)
     local dead = nil
@@ -330,6 +405,8 @@ function M.on_frame()
     for npc_id, any_alive in pairs(alive_this_tick) do
         fold_liveness(npc_id, any_alive)
     end
+
+    poll_kill_attribution(mgr)
 end
 
 return M

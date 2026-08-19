@@ -22,7 +22,8 @@ class DRLocationCategory(IntEnum):
     PSYCHO_SCOOP = 7,
     CHALLENGE = 8,
     PP_BONUS = 9,
-    ZOMBIE_KILL = 10
+    ZOMBIE_KILL = 10,
+    KILL_SURVIVOR = 11
 
 
 class DRLocationData(NamedTuple):
@@ -761,6 +762,39 @@ ZOMBIE_KILL_REGION_OF = {
     for _region, _tiers in ZOMBIE_KILL_TIERS.items()
     for _threshold in _tiers["genocide"]
 }
+
+# ---------------------------------------------------------------------------
+# Psycho goal
+# ---------------------------------------------------------------------------
+# One "Kill <name>" per rescuable survivor, derived from the SURVIVOR entries
+# so the region mapping and the roster cannot drift from the rescues. Appended
+# after every hand-written entry in each region, because ids are position-based
+# within a region and inserting anywhere else would renumber the lot.
+KILL_LOCATION_OF: dict = {}
+
+for _region in list(location_tables.keys()):
+    for _loc in list(location_tables[_region]):
+        if _loc.category != DRLocationCategory.SURVIVOR:
+            continue
+        if not _loc.name.startswith("Rescue "):
+            continue
+        _who = _loc.name[len("Rescue "):]
+        _kill_name = "Kill " + _who
+        location_tables[_region].append(
+            DRLocationData(_kill_name, "Milk", DRLocationCategory.KILL_SURVIVOR))
+        KILL_LOCATION_OF[_who] = _kill_name
+
+# Kill milestones, mirroring the "Rescue N survivors" ladder.
+PSYCHO_KILL_MILESTONES = [5, 10, 15, 20, 25, 30, 35, 40, 45, 48]
+for _n in PSYCHO_KILL_MILESTONES:
+    location_tables["Challenges"].append(DRLocationData(
+        "Kill {} survivors".format(_n), "Milk",
+        DRLocationCategory.KILL_SURVIVOR))
+
+# The goal itself, beside the Savior goal it mirrors.
+location_tables["Security Room"].append(DRLocationData(
+    "Psycho: Kill enough survivors to escape", "Victory",
+    DRLocationCategory.EVENT))
 
 location_dictionary.update({
     location_data.name: location_data

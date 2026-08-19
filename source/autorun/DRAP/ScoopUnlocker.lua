@@ -318,6 +318,7 @@ local _last_cascade_signature = nil
 local _logged_completion_events = {}   -- event_name -> true
 local _logged_suppressions = {}        -- event_name -> true (see the hook)
 local scoop_sanity_enabled = false
+local psycho_mode_enabled = false
 local cult_limited_enabled = false
 local door_randomizer_enabled = false
 local goal_mode = 0   -- 0 = Ending S, 1 = Ending A, 2 = Savior
@@ -1567,6 +1568,21 @@ State.init({
         local ok, dead = pcall(nt.is_survivor_dead, name)
         return ok and dead == true
     end,
+    -- Psycho Mode reads the same tracker from the other side: a kill the
+    -- player landed is the objective, a rescue is the failure.
+    psycho_mode = false,   -- set from slot data once the goal is known
+    survivor_killed_by_player = function(name)
+        local nt = AP and AP.NpcTracker
+        if not (nt and nt.is_killed_by_player) then return false end
+        local ok, killed = pcall(nt.is_killed_by_player, name)
+        return ok and killed == true
+    end,
+    survivor_rescued = function(name)
+        local bridge = AP and AP.AP_BRIDGE
+        if not (bridge and bridge.has_completed_check) then return false end
+        local ok, done = pcall(bridge.has_completed_check, "Rescue " .. name)
+        return ok and done == true
+    end,
     region_requirements = build_region_requirements(),
     split_key_doors = build_split_key_doors(),
     can_reach_area = function(code)
@@ -1952,6 +1968,31 @@ function M.is_time_frozen()
     return State.is_time_frozen()
 end
 
+--- Psycho Mode: the objective inverts, so the scoop state machine has to be
+--- told before it resolves anything. Set from slot data on connect.
+function M.set_psycho_mode(enabled)
+    psycho_mode_enabled = enabled == true
+    State.set_psycho_mode(psycho_mode_enabled)
+    M.log("Psycho Mode " .. (psycho_mode_enabled and "ENABLED" or "DISABLED"))
+end
+
+function M.is_psycho_mode() return psycho_mode_enabled end
+
+--- A kill the player landed. Completes the scoop once every target in it is
+--- down, which is what stops the direction flags being held on over a corpse.
+function M.on_survivor_killed(friendly_name)
+    if not psycho_mode_enabled then return end
+    for scoop_name in pairs(SharedData.scoop_survivors()) do
+        if not M.is_scoop_completed(scoop_name)
+            and State.is_psycho_complete(scoop_name) then
+            M.log(string.format(
+                "All targets down for '%s' (last was %s) -- marking complete",
+                scoop_name, tostring(friendly_name)))
+            M.complete_scoop(scoop_name)
+        end
+    end
+end
+
 function M.set_scoop_sanity_enabled(enabled)
     scoop_sanity_enabled = enabled
     M.log("ScoopSanity " .. (enabled and "ENABLED" or "DISABLED"))
@@ -2097,6 +2138,17 @@ local hide_completed = false
 --- survivors" cannot disagree. The target is the Savior goal when that is the
 --- goal and the next milestone otherwise -- milestones exist in every mode.
 --- nil when SaviorGoalEffects is absent, rather than a guess.
+-- Psycho counts kills where every other mode counts rescues. Same slot in
+-- the header, opposite meaning, so the label has to change with it.
+local function psycho_progress()
+    if not psycho_mode_enabled then return nil end
+    local pg = _G.AP and _G.AP.effects and _G.AP.effects.PsychoGoalEffects
+    if not (pg and pg.progress) then return nil end
+    local ok, killed, goal_target = pcall(pg.progress)
+    if not ok or type(killed) ~= "number" then return nil end
+    return killed, goal_target
+end
+
 local function rescue_progress()
     local sg = _G.AP and _G.AP.effects and _G.AP.effects.SaviorGoalEffects
     if not (sg and sg.progress) then return nil end
@@ -2527,8 +2579,15 @@ function M.draw_tab_content(debug)
                 if not side_header_shown and s.category ~= "Main" then
                     side_header_shown = true
                     imgui.text("Side Quests:")
+                    local killed, kill_aim = psycho_progress()
+                    if killed then
+                        imgui.same_line()
+                        imgui.text_colored(
+                            string.format("   Killed: %d / %d", killed, kill_aim),
+                            killed >= kill_aim and COLOR_GO or COLOR_READY)
+                    end
                     local rescued, aim, kind = rescue_progress()
-                    if rescued then
+                    if rescued and not killed then
                         imgui.same_line()
                         local text, tint
                         if aim and kind == "goal" then

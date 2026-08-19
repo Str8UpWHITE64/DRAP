@@ -120,6 +120,19 @@ _validate_shared_scoops()
 
 # Locations that require waiting for in-game time to pass.
 # When ScoopSanity is enabled, time is frozen, so these are unobtainable.
+# Locations that need a survivor alive and friendly, which Psycho does not
+# allow: the rescue ladder is uncollectable once rescuing fails a scoop, and
+# the escort challenges are impossible once survivors turn hostile.
+PSYCHO_EXCLUDED_LOCATIONS = {
+    "Rescue 5 survivors", "Rescue 10 survivors", "Rescue 15 survivors",
+    "Rescue 20 survivors", "Rescue 25 survivors", "Rescue 30 survivors",
+    "Rescue 35 survivors", "Rescue 40 survivors", "Rescue 45 survivors",
+    "Rescue 48 survivors",
+    "Escort 8 survivors at once",
+    "Frank the pimp",
+    "Get 50 survivors to join",
+}
+
 SCOOP_SANITY_EXCLUDED_LOCATIONS = {
     "Survive until 7pm on day 1",
     "Meet back at the Security Room at 6am day 2",
@@ -178,10 +191,18 @@ class DRWorld(World):
         # Savior+ScoopSanity drops main scoops entirely — the player wins by
         # rescuing survivors, so main scoops would only advance unused state.
         self.main_scoops_enabled = not (
-            self.options.goal.value in (2, 3) and self.options.scoop_sanity
+            self.options.goal.value in (2, 3, 4) and self.options.scoop_sanity
         )
 
-        self.enabled_location_categories.add(DRLocationCategory.SURVIVOR)
+        # Psycho turns every rescue into a kill. Rescuing FAILS a scoop in this
+        # mode, so the Rescue checks could never be collected -- they are
+        # dropped and the Kill checks take their place.
+        self.psycho_mode = self.options.goal.value == 4
+
+        if self.psycho_mode:
+            self.enabled_location_categories.add(DRLocationCategory.KILL_SURVIVOR)
+        else:
+            self.enabled_location_categories.add(DRLocationCategory.SURVIVOR)
         self.enabled_location_categories.add(DRLocationCategory.LEVEL_UP)
         self.enabled_location_categories.add(DRLocationCategory.PP_STICKER)
         if self.main_scoops_enabled:
@@ -501,11 +522,30 @@ class DRWorld(World):
         1: "Ending A: Solve all of the cases and be on the helipad at 12pm",  # Ending A
         2: "Savior: Rescue enough survivors to escape",        # Savior (count-based)
         3: "Zombie Genocider: Kill 53,594 zombies across the mall",
+        4: "Psycho: Kill enough survivors to escape",
     }
 
     # Name of the goal location used by the Savior goal. Must match the entry
     # added at the end of location_tables["Security Room"] in Locations.py.
     SAVIOR_GOAL_LOCATION = "Savior: Rescue enough survivors to escape"
+
+    # Name of the goal location used by the Psycho goal.
+    PSYCHO_GOAL_LOCATION = "Psycho: Kill enough survivors to escape"
+
+    # Consulted by Rules.py, which must not reach for a location this mode
+    # never created.
+    PSYCHO_EXCLUDED_LOCATIONS = PSYCHO_EXCLUDED_LOCATIONS
+
+    # All "Kill <name>" survivor locations, for the Psycho goal's access rule
+    # and its milestones. Taken from the KILL_SURVIVOR category rather than a
+    # name prefix -- "Kill Adam", "Kill 1000 zombies" and the rest share it.
+    ALL_KILL_LOCATIONS = [
+        loc.name
+        for region_locs in location_tables.values()
+        for loc in region_locs
+        if loc.category == DRLocationCategory.KILL_SURVIVOR
+        and not re.fullmatch(r"Kill \d+ survivors", loc.name)
+    ]
 
     # All "Rescue <name>" location names. Used by the Savior goal's access
     # rule and by the "Rescue N survivors" milestones to count reachable
@@ -530,6 +570,7 @@ class DRWorld(World):
         "Ending S: Beat up Brock with your bare fists!",
         "Savior: Rescue enough survivors to escape",
         "Zombie Genocider: Kill 53,594 zombies across the mall",
+        "Psycho: Kill enough survivors to escape",
     }
 
     # MAIN_SCOOP-category locations that fire automatically during the forced
@@ -550,6 +591,13 @@ class DRWorld(World):
         for location in location_table:
             # Skip time-wait locations when ScoopSanity is enabled (time is frozen)
             if self.options.scoop_sanity and location.name in SCOOP_SANITY_EXCLUDED_LOCATIONS:
+                continue
+
+            # Psycho drops everything that needs a survivor alive and willing.
+            # The rescue milestones are CHALLENGE, so dropping the SURVIVOR
+            # category does not take them with it, and the escort challenges
+            # cannot be done at all once survivors turn hostile.
+            if self.psycho_mode and location.name in PSYCHO_EXCLUDED_LOCATIONS:
                 continue
 
             # Skip goal-only EVENT locations that aren't the active goal.
@@ -856,6 +904,7 @@ class DRWorld(World):
 
         goal = self.options.goal.value  # 0 = Ending S, 1 = Ending A, 2 = Savior
         number_of_survivors = self.options.number_of_survivors.value
+        number_of_kills = self.options.number_of_kills.value
         death_link_enabled = bool(self.options.death_link.value)
         restricted_item_mode_enabled = bool(self.options.restricted_item_mode.value)
         door_randomizer_enabled = bool(self.options.door_randomizer.value)
@@ -951,6 +1000,8 @@ class DRWorld(World):
             "options": {
                 "goal": goal,
                 "number_of_survivors": number_of_survivors,
+                "number_of_kills": number_of_kills,
+                "psycho_mode": self.psycho_mode,
                 "guaranteed_items": self.options.guaranteed_items.value,
                 "death_link": death_link_enabled,
                 "restricted_item_mode": restricted_item_mode_enabled,
@@ -987,6 +1038,8 @@ class DRWorld(World):
             },
             "goal": goal,
             "number_of_survivors": number_of_survivors,
+            "number_of_kills": number_of_kills,
+            "psycho_mode": self.psycho_mode,
             "death_link": death_link_enabled,
             "restricted_item_mode": restricted_item_mode_enabled,
             "door_randomizer": door_randomizer_enabled,

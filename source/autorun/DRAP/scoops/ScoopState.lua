@@ -72,6 +72,11 @@ local cfg = {
     -- that has a half-initialised branch, and a survivor wrongly called dead
     -- loses their mission box with no way back.
     survivor_dead = function(_) return false end,
+    -- Psycho Mode: the objective inverts. Only a kill the PLAYER landed
+    -- resolves a scoop; a rescue or a death by anything else fails it.
+    psycho_mode = false,
+    survivor_killed_by_player = function(_) return false end,
+    survivor_rescued = function(_) return false end,
     on_unlock = function(_, _) end,            -- engine flag writes
     on_state_changed = function() end,         -- persistence trigger
 }
@@ -112,6 +117,9 @@ end
 
 function M.data(name) return cfg.scoop_data[name] end
 
+function M.set_psycho_mode(on) cfg.psycho_mode = on == true end
+function M.is_psycho_mode() return cfg.psycho_mode == true end
+
 function M.is_activated() return ap_activated end
 function M.is_time_frozen() return time_frozen end
 function M.is_endgame_reached() return endgame_reached end
@@ -138,14 +146,45 @@ function M.blocked_by_mains(name) return side_blocked_by[name] end
 function M.is_failed(name)
     -- Survivor scoops only. A Psychopath scoop completes by killing the
     -- psycho ("Kill Cliff"), so its hostages all dying leaves the check
-    -- perfectly winnable and must not resolve it.
+    -- perfectly winnable and must not resolve it. That holds in Psycho Mode
+    -- too -- the psycho is still the objective there.
     local d = cfg.scoop_data[name]
     if not d or d.category ~= "Survivor" then return false end
     local roster = cfg.scoop_survivors[name]
     if not roster or #roster == 0 then return false end
     if M.completed[name] then return false end
+
+    if cfg.psycho_mode then
+        -- Inverted: the scoop is lost the moment ANY target stops being
+        -- killable, because every one of them is a check. A rescue puts them
+        -- out of reach in the Security Room; a death by zombie or psychopath
+        -- is a kill that will never be credited.
+        for _, stype in ipairs(roster) do
+            if cfg.survivor_rescued(stype) then return true end
+            if cfg.survivor_dead(stype)
+                and not cfg.survivor_killed_by_player(stype) then
+                return true
+            end
+        end
+        return false
+    end
+
     for _, stype in ipairs(roster) do
         if not cfg.survivor_dead(stype) then return false end
+    end
+    return true
+end
+
+--- Psycho Mode's completion test: every target dead by the player's hand.
+--- Returns false outside Psycho Mode, where rescues complete scoops instead.
+function M.is_psycho_complete(name)
+    if not cfg.psycho_mode then return false end
+    local d = cfg.scoop_data[name]
+    if not d or d.category ~= "Survivor" then return false end
+    local roster = cfg.scoop_survivors[name]
+    if not roster or #roster == 0 then return false end
+    for _, stype in ipairs(roster) do
+        if not cfg.survivor_killed_by_player(stype) then return false end
     end
     return true
 end

@@ -104,12 +104,20 @@ class Goal(Choice):
               "Zombie Kill Tiers" to genocide whatever it is set to. Like
               Savior, ScoopSanity drops the Main Scoop locations; without
               ScoopSanity they stay as ordinary checks.
+
+    Psycho:   Savior turned inside out. Every survivor becomes a target: their
+              "Rescue" checks are replaced by "Kill" checks, and you win by
+              killing the number set in "Number of Kills" below. Survivors turn
+              hostile once their scoop starts, and only kills you land yourself
+              count -- one lost to the zombies is a target gone for good, so
+              set the number well under the 48 in the mall.
     """
     display_name = "Goal"
     option_ending_s = 0
     option_ending_a = 1
     option_savior = 2
     option_zombie_genocider = 3
+    option_psycho = 4
     default = 0
 
 
@@ -360,6 +368,21 @@ class CultLimited(Toggle):
     """
     display_name = "Cult Limited"
     default = False
+
+
+class NumberOfKills(Range):
+    """
+    The number of survivors that must be killed for the Psycho goal. Only has
+    an effect when Goal is set to Psycho.
+
+    All 48 survivors in the mall are targets, but only kills you land yourself
+    count. A survivor the zombies get to first is gone, so a number close to
+    48 leaves very little room for accidents.
+    """
+    display_name = "Number of Kills"
+    range_start = 5
+    range_end = 48
+    default = 25
 
 
 class SurvivorRespawn(DefaultOnToggle):
@@ -666,6 +689,7 @@ class DROption(PerGameCommonOptions):
     start_inventory_from_pool: StartInventoryPool
     goal: Goal
     number_of_survivors: NumberOfSurvivors
+    number_of_kills: NumberOfKills
     guaranteed_items: GuaranteedItemsOption
     death_link: DeathLink
     restricted_item_mode: RestrictedItemMode
@@ -707,6 +731,7 @@ dr_option_groups = [
         [
             Goal,
             NumberOfSurvivors,
+            NumberOfKills,
             ScoopSanity,
             RandomizeScoopOrder,
             MainScoopsAnyOrder,

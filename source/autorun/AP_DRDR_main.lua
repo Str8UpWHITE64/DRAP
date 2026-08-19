@@ -128,6 +128,8 @@ AP.effects.TimeLockEffects            = require("DRAP/effects/TimeLockEffects")
 AP.effects.VictoryEffects             = require("DRAP/effects/VictoryEffects")
 AP.effects.SurvivorScoopCompletion    = require("DRAP/effects/SurvivorScoopCompletion")
 AP.effects.SaviorGoalEffects          = require("DRAP/effects/SaviorGoalEffects")
+AP.effects.PsychoGoalEffects          = require("DRAP/effects/PsychoGoalEffects")
+AP.effects.PsychoHostility            = require("DRAP/effects/PsychoHostility")
 AP.effects.BookSkills                 = require("DRAP/effects/BookSkills")
 AP.effects.BookGuards                 = require("DRAP/effects/BookGuards")
 AP.effects.NpcInfoSweeper             = require("DRAP/effects/NpcInfoSweeper")
@@ -153,6 +155,7 @@ AP.effects.TimeLockEffects.register_all()
 AP.effects.VictoryEffects.register_all()
 AP.effects.SurvivorScoopCompletion.register_all()
 AP.effects.SaviorGoalEffects.register_all()
+AP.effects.PsychoGoalEffects.register_all()
 AP.effects.BookSkills.register_all()
 AP.effects.BookGuards.register_all()
 AP.effects.PlayerStats.register()
@@ -228,6 +231,27 @@ end
 ------------------------------------------------------------
 -- Hook Wiring: Survivor Tracker
 ------------------------------------------------------------
+
+-- Psycho Mode: only kills the player landed count, so this fires from the
+-- damage-attribution poll rather than from a death.
+AP.NpcTracker.on_survivor_killed_by_player = function(npc_id, friendly_name)
+    if not AP.PsychoMode then return end
+    -- The tracker reports every player kill. Only the 48 targets count: the
+    -- Hostile NPC Trap's spawns and the story NPCs are not checks, and must
+    -- not send one.
+    if not (AP.effects.PsychoGoalEffects
+            and AP.effects.PsychoGoalEffects.is_target(friendly_name)) then
+        return
+    end
+    log(string.format("Survivor killed: %s", tostring(friendly_name)))
+    AP_BRIDGE.check(string.format("Kill %s", friendly_name))
+    if AP.effects.PsychoGoalEffects then
+        AP.effects.PsychoGoalEffects.on_survivor_killed(friendly_name)
+    end
+    if AP.ScoopUnlocker and AP.ScoopUnlocker.on_survivor_killed then
+        AP.ScoopUnlocker.on_survivor_killed(friendly_name)
+    end
+end
 
 AP.NpcTracker.on_survivor_rescued = function(npc_id, state_index, friendly_name, game_id)
     log(string.format("Survivor rescued: %s", tostring(friendly_name)))
@@ -439,6 +463,14 @@ local function run_slot_connect(slot_data)
     if goal == 2 then
         log("Savior target: " .. tostring(AP.NumberOfSurvivors) .. " survivors")
     end
+
+    -- Number of kills (only meaningful when goal == 4, Psycho)
+    AP.NumberOfKills = (type(slot_data) == "table" and tonumber(slot_data.number_of_kills)) or 25
+    AP.PsychoMode = goal == 4
+    if AP.PsychoMode then
+        log("Psycho target: " .. tostring(AP.NumberOfKills) .. " kills")
+    end
+    AP.ScoopUnlocker.set_psycho_mode(AP.PsychoMode)
 
     -- ScoopSanity option
     local scoop_sanity_enabled = (type(slot_data) == "table" and slot_data.scoop_sanity == true)
@@ -676,6 +708,7 @@ local function try_reapply_if_ready()
     AP.effects.TimeLockEffects.reapply()
     AP.effects.SurvivorScoopCompletion.reapply()
     AP.effects.SaviorGoalEffects.reapply()
+    AP.effects.PsychoGoalEffects.reapply()
     AP.effects.BookSkills.reapply()
     AP.effects.UnlockItemSpawns.reapply()
     -- After the grants, so the player's per-book off switches apply to the
@@ -759,6 +792,7 @@ re.on_frame(function()
     safe_on_frame(AP.effects.NpcSaveGuard, "NpcSaveGuard")
     safe_on_frame(AP.TrapBank, "TrapBank")
     safe_on_frame(AP.effects.SurvivorRecovery, "SurvivorRecovery")
+    safe_on_frame(AP.effects.PsychoHostility, "PsychoHostility")
     safe_on_frame(AP.effects.PartyHudGuard, "PartyHudGuard")
 
     -- Debug modules
