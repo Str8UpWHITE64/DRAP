@@ -65,9 +65,17 @@ function M.on_frame()
         return
     end
 
-    -- Arm using GAME time (much more reliable than waiting real time)
+    -- Arm using GAME time (much more reliable than waiting real time).
+    --
+    -- Night Mode parks the clock at midnight for the whole run, so mDate never
+    -- climbs past the gate and this would never arm -- no level checks at all.
+    -- Being past Jessie proves the world is up just as well.
     if not armed then
-        if AP and AP.TimeGate and AP.TimeGate.get_current_mdate then
+        if Shared.past_prologue() then
+            armed = true
+            last_level = nil
+            M.log("Armed past the prologue; caches reset.")
+        elseif AP and AP.TimeGate and AP.TimeGate.get_current_mdate then
             local ok, t = pcall(AP.TimeGate.get_current_mdate)
             if not ok or not t or t <= ARMED_AFTER_GAME_TIME then
                 return

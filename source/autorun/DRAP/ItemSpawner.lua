@@ -379,11 +379,21 @@ local function precheck_spawn(item_entry)
         return nil, "Inventory not available"
     end
 
-    -- Optional "don't spawn before time loads" gate
-    if AP and AP.TimeGate and AP.TimeGate.get_current_mdate then
-        local ok_tg, mdate = pcall(AP.TimeGate.get_current_mdate)
-        if ok_tg and mdate and mdate < 11200 then
-            return nil, "Game time not ready"
+    -- "Don't spawn before time loads" gate. mDate is only a proxy for "the
+    -- world is up", and it is the wrong one under Night Mode: that parks the
+    -- clock at midnight on purpose, so mDate reads near zero for the whole
+    -- run and this blocked every spawn.
+    --
+    -- Jessie's flag answers the real question. Past her the prologue is over
+    -- and the world is loaded, whatever the clock says. Her flag is tri-state
+    -- and reads nil inside the load window, which is exactly when the gate
+    -- should still apply, so only an explicit true skips it.
+    if not Shared.past_prologue() then
+        if AP and AP.TimeGate and AP.TimeGate.get_current_mdate then
+            local ok_tg, mdate = pcall(AP.TimeGate.get_current_mdate)
+            if ok_tg and mdate and mdate < 11200 then
+                return nil, "Game time not ready"
+            end
         end
     end
 

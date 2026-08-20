@@ -698,6 +698,21 @@ end
 --- Checks if we're currently in gameplay (not title screen/loading)
 --- Uses PlayerStatusManager.PlayerLevel as indicator
 --- @return boolean True if in game
+--- Is the prologue over? Jessie's flag is the reliable "the world is really
+--- up" signal, and unlike game time it survives Night Mode, which parks the
+--- clock at midnight on purpose and makes mDate read near zero all run.
+---
+--- Her flag is tri-state: nil means unreadable, which is normal inside the
+--- load window and is exactly when a readiness gate should still apply. Only
+--- an explicit true counts.
+--- @return boolean
+function Shared.past_prologue()
+    local ok, SU = pcall(require, "DRAP/ScoopUnlocker")
+    if not (ok and SU and SU.has_met_jessie) then return false end
+    local ok2, met = pcall(SU.has_met_jessie)
+    return ok2 and met == true
+end
+
 function Shared.is_in_game()
     local ps = sdk.get_managed_singleton("app.solid.PlayerStatusManager")
     if not ps then return false end
