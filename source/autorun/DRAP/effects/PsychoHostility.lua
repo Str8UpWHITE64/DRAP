@@ -29,6 +29,18 @@ local npc_mgr = M:add_singleton("npc", NPC_MANAGER_TYPE)
 -- disagrees and has never been exercised for this value.
 local LIVE_STATE_RAGE = 12
 
+-- Targets who must stay friendly, because something other than their own
+-- rescue depends on them cooperating.
+--
+-- Greg opens the Paradise <-> Wonderland passage by being escorted to it, and
+-- a hostile Greg can never be escorted anywhere. "Find Greg's secret passage"
+-- would become uncollectable while logic still believed it reachable, and
+-- progression can be placed there. He is still a kill target -- walk him to
+-- the passage first, then do it.
+local HOSTILITY_EXEMPT = {
+    ["Greg Simpson"] = true,
+}
+
 local raged = {}   -- stype -> true, so the log stays quiet after the first
 
 local _name_to_stype = nil
@@ -81,6 +93,7 @@ local function current_targets()
     local owner = scoop_of_survivor()
     for _, name in ipairs(pg.all_targets()) do
         local scoop_name = owner[name]
+        if HOSTILITY_EXEMPT[name] then goto continue end
         local active
         if not scoop_name then
             -- No scoop to unlock, so they are a target from the moment they
@@ -97,6 +110,7 @@ local function current_targets()
             local stype = name_to_stype(name)
             if stype then out[stype] = name end
         end
+        ::continue::
     end
     return out
 end
