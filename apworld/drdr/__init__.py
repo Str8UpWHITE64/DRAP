@@ -902,7 +902,8 @@ class DRWorld(World):
                 else:
                     locations_target.append(0)
 
-        goal = self.options.goal.value  # 0 = Ending S, 1 = Ending A, 2 = Savior
+        # 0 Ending S, 1 Ending A, 2 Savior, 3 Zombie Genocider, 4 Psycho
+        goal = self.options.goal.value
         number_of_survivors = self.options.number_of_survivors.value
         number_of_kills = self.options.number_of_kills.value
         death_link_enabled = bool(self.options.death_link.value)

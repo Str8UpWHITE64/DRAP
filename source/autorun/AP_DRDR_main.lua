@@ -442,7 +442,8 @@ local function run_slot_connect(slot_data)
     -- Goal option
     local goal = (type(slot_data) == "table" and slot_data.goal) or 0
     AP.Goal = goal
-    local goal_names = { [0] = "Ending S", [1] = "Ending A", [2] = "Savior" }
+    local goal_names = { [0] = "Ending S", [1] = "Ending A", [2] = "Savior",
+                         [3] = "Zombie Genocider", [4] = "Psycho" }
     log("Goal: " .. (goal_names[goal] or tostring(goal)))
 
     -- Overtime suppressant gating. Ending S only, because that is the only
