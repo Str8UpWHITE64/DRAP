@@ -45,15 +45,6 @@ local NORTH_PLAZA_AREA_INDEX = 1024
 local PARADISE_PLAZA_AREA_INDEX = 512
 local ENTRANCE_PLAZA_AREA_INDEX = 256   -- AreaManager mAreaIndex for s100
 
--- ScoopSanity-only EP-shutter trigger box: entering this AABB in Entrance
--- Plaza fires flag 270 once (plays the "Backup for Brad" cutscene that opens
--- the EP shutter). Tune via _G.drap_ep270_set_box / _G.drap_ep270_show_pos.
-local EP270_TRIGGER_BOX = {
-    min_x = 120.0, max_x = 130.0,
-    min_y = 0.0,   max_y = 3.0,
-    min_z = 130.0, max_z = 140.0,
-}
-
 -- Simone Ravendark's corner of Paradise Plaza. Flag 295 tells the game Isabela
 -- is back in the Security Room, which Simone checks before agreeing to follow.
 -- 295 is also a Santa Cabeza byproduct, so once that mission completes the
@@ -70,13 +61,6 @@ local SIMONE_BOX = {
     min_y = -6.0,  max_y = 8.0,
     min_z = 11.5,  max_z = 27.5,
 }
-
--- Engine's "EP-shutter cutscene played" markers, set only by that cutscene's
--- tail (in no CASCADE/COMPLETION table). They live in save state, so a save
--- reload resets them and our trigger refires -- no DRAP-side persistence.
---   765  = EV_RADIO_MES_FLAG_S100  (radio message after the cutscene)
---   2280 = EV_MESSAGE_68           (post-cutscene message banner)
-local EP270_GATE_FLAGS = { 765, 2280 }
 
 local time_skips_fired = {}
 local active_time_skip = nil
@@ -200,13 +184,14 @@ local SCOOP_PREREQUISITES = {
 -- Engine-flag prerequisites: unlock parks (poll-deferred, retried each frame)
 -- until ANY listed flag is on. Distinct from SCOOP_PREREQUISITES, which gates
 -- on other scoop completions.
--- Mark of the Sniper: gated on the EP-shutter cutscene (765/2280, same set as
--- ep270_gates_open). Activating it earlier makes the engine reconfigure s100
--- around the sniper flags (798, 808) so the shutter never opens even when
--- flag 270 fires. Deferring lets the cutscene play first, then MOTS unlocks.
-local SCOOP_FLAG_PREREQUISITES = {
-    ["Mark of the Sniper"] = { 765, 2280 },
-}
+--
+-- Empty since the EP shutters moved to a game-flow band. Mark of the Sniper
+-- used to wait here on 765/2280, because activating it early made the engine
+-- reconfigure s100 around the sniper flags and flag 270 could then never open
+-- the shutter. The shutters no longer depend on that cutscene, so the scoop can
+-- unlock from the start. MAIN_BLOCKS_SIDE still suppresses it while Backup for
+-- Brad is live, which is the part that always mattered.
+local SCOOP_FLAG_PREREQUISITES = {}
 
 -- Flag-id -> AP event mapping, loaded from drdr_shared.json "completion_flags".
 -- Event strings are validated against apworld location names at generation
@@ -443,7 +428,7 @@ local function has_prerequisites_met(scoop_name)
 end
 
 -- Any completed main-category scoop, or nil. Used by the EP-shutter
--- special cases (try_fire_ep270_in_scoop_sanity, Backup for Brad's
+-- special cases (the EP-shutter flow floor, Backup for Brad's
 -- conditional shutter reset) and State's Mark-of-the-Sniper flag-prereq
 -- bypass.
 local function find_completed_main_scoop()
@@ -468,127 +453,80 @@ local function get_player_pos_xyz()
     return x, y, z
 end
 
-local function in_ep270_box(x, y, z)
-    return x >= EP270_TRIGGER_BOX.min_x and x <= EP270_TRIGGER_BOX.max_x
-       and y >= EP270_TRIGGER_BOX.min_y and y <= EP270_TRIGGER_BOX.max_y
-       and z >= EP270_TRIGGER_BOX.min_z and z <= EP270_TRIGGER_BOX.max_z
-end
-
--- True iff the EP-shutter cutscene has already played in the currently
--- loaded save. Reads the engine's own post-cutscene markers, so this
--- automatically tracks across save/load and resets on rollback or new game.
-local function ep270_gates_open()
-    for _, fid in ipairs(EP270_GATE_FLAGS) do
-        if raw_check_flag(fid) then return true end
-    end
-    return false
-end
-
--- Session-only timestamp of our last flag-270 fire. The cutscene takes a
--- few seconds to land 765/2280; this grace window prevents a refire while
--- the cutscene is mid-playback.
-local _ep_270_fired_at_clock = 0
-
 -- Pending flag clears scheduled from inside the evFlagOn pre-hook (e.g.
 -- after ss_block suppresses a pre-fired completion). Processed at the top
 -- of M.on_frame so the engine's evFlagOn implementation has already run
 -- and we're not racing it.
 local pending_flag_clears = {}
 
--- A run started over on a slot that has already played. The ledger is keyed
--- per slot and survives a new game, so its completed mains describe the
--- previous run while this save is back at the beginning. JESSIE_FLAG is the
--- save's own answer -- off until the player talks to Jessie -- so the two
--- disagreeing is what a restart looks like.
+-- ScoopSanity-only: hold the EP shutters open by flooring GAME FLOW.
 --
--- Latched, because once Jessie is met in the new run there is nothing left to
--- tell the two apart. The window it has to answer in is pre-Jessie only, so
--- on_frame polls it directly rather than the EP-shutter code -- that runs
--- behind is_activated(), which is false for exactly that window.
-local restarted_run = false
-local restarted_decided = false
+-- The shutters are a function of game flow, the number cutscenes advance to
+-- describe the mall's state. Measured: flow 130 opens them, and flow 150 keeps
+-- them open while leaving Entrance Plaza's zombie density alone -- 130..140
+-- selects a sparse enemy set, 140..159 matches no flow-specific row so the
+-- normal day/night ladder applies.
+--
+-- This replaces a position-triggered flag-270 fire: an AABB in Entrance Plaza
+-- that played the Backup for Brad cutscene to open the shutters. That approach
+-- needed a hand-tuned box, the 765/2280 cutscene markers, a re-fire grace
+-- window, a restarted-run latch, and it set a COMPLETION flag the player had
+-- not earned. None of that is needed now.
+--
+-- Raise to 150 whenever flow is below it, EXCEPT while Backup for Brad is
+-- running:
+--
+--   after Jessie   flow sits around 80; raise to 150 and the shutters open
+--   100..129       Backup for Brad's own progression. Its cutscene drops flow
+--                  to 100 and the mission walks up from there; forcing 150
+--                  over the top means Carlito never spawns. Hands off.
+--   130            where the mission leaves it, and where Odd Old Man puts it
+--                  back. Raise again -- 130..140 selects Entrance Plaza's
+--                  SPARSE enemy set, which is the thing worth correcting.
+--   150+           later scoops legitimately advance past this; never drag back.
+--
+-- 150 specifically because 140..159 matches no flow-specific enemy row, so
+-- Entrance Plaza falls through to the normal day/night ladder.
+local EP_SHUTTER_FLOW = 150
+local EP_MISSION_FLOW_LO = 100    -- Backup for Brad, hands off
+local EP_MISSION_FLOW_HI = 129
 
-local function forget_run_shape()
-    restarted_run = false
-    restarted_decided = false
+local function flow_manager()
+    local td = Shared.safe(function()
+        return sdk.find_type_definition("app.solid.gamemastering.InGameFlowManagerBase")
+    end)
+    if not td then return nil end
+    -- get_BaseInstance is STATIC -- there is no singleton to look up.
+    local m = td:get_method("get_BaseInstance")
+    if not m then return nil end
+    return Shared.safe(function() return m:call(nil) end)
 end
 
-local function note_run_shape()
-    if restarted_decided then return end
-    -- An Overtime save has Jessie off with the slot's mains done, which is the
-    -- same shape as a restarted run and is not one. Measured in a vanilla
-    -- Overtime save: 769 off, 2052/514 on.
-    if State.is_endgame_reached() then return end
-    local decided, restarted = State.restart_decision(
-        false, Shared.is_in_game(), raw_check_flag(JESSIE_FLAG),
-        find_completed_main_scoop() ~= nil)
-    if not decided then return end
-    restarted_decided = true
-    restarted_run = restarted == true
-    if restarted_run then
-        M.log("Restarted run: this slot has mains done but this save is "
-            .. "pre-Jessie -- the EP shutter cutscene will fire again")
-    end
-end
+local _flow_logged = nil
 
--- ScoopSanity-only: fire flag 270 (EP-shutter cutscene) the first time the
--- player walks into the configured AABB in Entrance Plaza after AP activates.
--- Persisted via engine flags 765/2280 so save reload/new game come for free.
--- Skipped while a first-in-chain Backup for Brad is pending -- its natural
--- flow fires 270 itself, so pre-firing would race its completion.
-local function try_fire_ep270_in_scoop_sanity()
+local function hold_ep_shutter_flow()
     if not scoop_sanity_enabled then return end
     if not State.is_activated() then return end
-    -- The 72-hour shutter cutscene has no business firing in Overtime. The
-    -- completed-main guard used to block this as a side effect; nothing should
-    -- depend on that.
+    -- The 72-hour shutter state has no business being forced in Overtime.
     if State.is_endgame_reached() then return end
-    if ep270_gates_open() then return end
 
     -- Nothing before Jessie, exactly as in a new game -- she is what opens the
     -- way into the mall.
     if not raw_check_flag(JESSIE_FLAG) then return end
 
-    -- A later completed main already opened the shutters, so the cutscene is
-    -- redundant. Not on a restarted run: those completions belong to the run
-    -- before, and this save's shutters are still shut.
-    if not restarted_run then
-        local later_main = find_completed_main_scoop()
-        if later_main then return end
+    local mgr = flow_manager()
+    if not mgr then return end
+    local cur = tonumber(Shared.safe(function() return mgr:call("getGameFlow") end))
+    if not cur or cur >= EP_SHUTTER_FLOW then return end
+    -- Backup for Brad is mid-flight; let it run its own progression.
+    if cur >= EP_MISSION_FLOW_LO and cur <= EP_MISSION_FLOW_HI then return end
+
+    local ok = pcall(function() mgr:call("setGameFlow", EP_SHUTTER_FLOW) end)
+    if ok and _flow_logged ~= cur then
+        _flow_logged = cur
+        M.log(string.format("EP shutters: game flow %d -> %d", cur,
+            EP_SHUTTER_FLOW))
     end
-
-    -- Don't pre-fire while a first-in-chain Backup for Brad is pending -- its
-    -- mission flow fires 270 itself. received/completed, NOT
-    -- get_current_chain_scoop() (which reads the next uncompleted main before
-    -- its AP item arrives, so a late-randomized Backup would block forever).
-    if scoop_order[1] == "Backup for Brad"
-        and received_scoops["Backup for Brad"]
-        and not completed_scoops["Backup for Brad"] then
-        return
-    end
-
-    -- Grace window: 765/2280 land near the cutscene's end, so gates_open()
-    -- stays false for a few seconds after firing. Don't refire meanwhile.
-    if (os.clock() - _ep_270_fired_at_clock) < 8.0 then return end
-
-    local am = am_mgr:get()
-    if not am then return end
-    local af = am_mgr:get_field("mAreaIndex", false)
-    if not af then return end
-    local area = Shared.to_int(Shared.safe_get_field(am, af))
-    if area ~= ENTRANCE_PLAZA_AREA_INDEX then return end
-    local x, y, z = get_player_pos_xyz()
-    if not x then return end
-    if not in_ep270_box(x, y, z) then return end
-
-    -- Suppress the evFlagOn -> COMPLETION_FLAGS[270] handler while we set it
-    -- (270 = "Complete Backup for Brad"; don't send that check pre-earn).
-    currently_unlocking = true
-    raw_set_flag_on(270)
-    currently_unlocking = false
-    _ep_270_fired_at_clock = os.clock()
-    M.log(string.format("ScoopSanity: fired flag 270 (EP shutter cutscene) at (%.2f, %.2f, %.2f)",
-        x, y, z))
 end
 
 local function get_current_area_index()
@@ -756,8 +694,8 @@ local function enforce_flags_legacy()
         local post_jessie_flags = { table.unpack(POST_JESSIE_FLAGS) }
         -- Savior mode (without ScoopSanity): force flag 270 always-on so the
         -- EP-shutter cutscene plays naturally when the player walks into EP.
-        -- Under ScoopSanity, use the position-gated single-fire path
-        -- (try_fire_ep270_in_scoop_sanity) so the cutscene plays once and
+        -- Under ScoopSanity the shutters are held open by flooring game
+        -- flow (hold_ep_shutter_flow) so the cutscene plays once and
         -- doesn't loop after CASCADE_FLAGS clears 270.
         if goal_mode == 2 and not scoop_sanity_enabled then
             table.insert(post_jessie_flags, 270)
@@ -1218,7 +1156,7 @@ local function install_hooks()
                     -- ScoopSanity guard: a main scoop counts as completed only
                     -- once its AP item is received AND the mission is finished.
                     -- Suppress the check when the item isn't received yet --
-                    -- e.g. the position-gated EP-shutter trigger plays the
+                    -- e.g. the EP-shutter flow floor opens the
                     -- cutscene early and fires 2308 before Backup for Brad has
                     -- arrived. We don't mark _logged_completion_events, so the
                     -- legitimate completion can still fire later.
@@ -1345,7 +1283,7 @@ local function activate_ap(reason)
     local post_jessie_flags = { 265, 267, 514 }
     -- Savior mode (without ScoopSanity): fire flag 270 immediately so the
     -- EP-shutter cutscene plays naturally on EP entry. Under ScoopSanity,
-    -- the position-gated path (try_fire_ep270_in_scoop_sanity) handles it
+    -- the flow floor (hold_ep_shutter_flow) handles it
     -- so it fires once and doesn't loop after the cascade clears the flag.
     if goal_mode == 2 and not scoop_sanity_enabled then
         table.insert(post_jessie_flags, 270)
@@ -1539,7 +1477,7 @@ State.init({
     main_blocks_side = MAIN_BLOCKS_SIDE,
     prerequisites = SCOOP_PREREQUISITES,
     flag_prerequisites = SCOOP_FLAG_PREREQUISITES,
-    flag_prereq_bypass = { ["Mark of the Sniper"] = "any_main_completed" },
+    flag_prereq_bypass = {},
     -- Hideout used to wait on "Carlito's Hideout Key" by name, which does not
     -- exist under Split Keys. Its required_regions already include Carlito's
     -- Hideout, and reaching that asks the right question in every mode.
@@ -1827,7 +1765,6 @@ function M.reset_for_new_game()
     _last_cascade_signature = nil
     _logged_completion_events = {}
     _logged_suppressions = {}
-    forget_run_shape()
 
     State.reset_for_new_game()
 end
@@ -2655,13 +2592,6 @@ function M.on_frame()
         jessie_false_since = nil
     end
 
-    -- Is this save a fresh run on a slot that has already played? Only
-    -- answerable before Jessie, which is also the only stretch where AP is
-    -- deactivated -- so ask here, not from the EP-shutter code.
-    if in_game and scoop_sanity_enabled then
-        note_run_shape()
-    end
-
     if in_game and State.is_activated() then
         local jessie_on = raw_check_flag(JESSIE_FLAG)
         if jessie_on == false then
@@ -2669,9 +2599,6 @@ function M.on_frame()
             if os.clock() - jessie_false_since >= RELOAD_CONFIRM_SECONDS then
                 jessie_false_since = nil
                 M.log("RELOAD DETECTED: Flag 769 off -- deactivating until Meet Jessie replays")
-                -- A different save is loaded now, so the previous answer
-                -- describes a run that is no longer on screen.
-                forget_run_shape()
                 State.deactivate_for_reload()
             end
         else
@@ -2745,9 +2672,9 @@ function M.on_frame()
         end
     end
 
-    -- ScoopSanity EP-shutter trigger: position-gated, single-fire,
+    -- ScoopSanity EP shutters: game-flow floor,
     -- persisted via in-game flags 765/2280.
-    try_fire_ep270_in_scoop_sanity()
+    hold_ep_shutter_flow()
 
     -- Manage Entrance Plaza door (flag 276) for Rescue the Professor.
     -- Uses raw flag checks so it works with or without ScoopSanity.
@@ -2815,22 +2742,6 @@ _G.scoop_newgame_reset = function() M.reset_for_new_game() end
 _G.scoop_blacklist     = function(flag_id, reason) M.blacklist_flag(flag_id, reason) end
 _G.scoop_unblacklist   = function(flag_id) M.unblacklist_flag(flag_id) end
 
--- ScoopSanity EP-shutter (flag 270) tuning helpers. Use these to identify the
--- right trigger area while standing in Entrance Plaza, then tighten the box.
-_G.drap_ep270_show_pos = function()
-    local x, y, z = get_player_pos_xyz()
-    if not x then
-        M.log("EP270: player not spawned (no position available)")
-        return
-    end
-    local area = get_current_area_index()
-    local f765 = raw_check_flag(765)
-    local f2280 = raw_check_flag(2280)
-    M.log(string.format(
-        "EP270: pos=(%.2f, %.2f, %.2f) area=%s in_box=%s gates_open=%s (765=%s 2280=%s)",
-        x, y, z, tostring(area), tostring(in_ep270_box(x, y, z)),
-        tostring(ep270_gates_open()), tostring(f765), tostring(f2280)))
-end
 -- Simone's box was sized from her bundled spawn point, not measured in game.
 -- Stand next to her and call this to see whether she is covered; widen with
 -- drap_simone_set_box if the flag is not being held.
@@ -2859,29 +2770,6 @@ _G.drap_simone_set_box = function(min_x, max_x, min_y, max_y, min_z, max_z)
         SIMONE_BOX.max_y, SIMONE_BOX.min_z, SIMONE_BOX.max_z))
 end
 
-_G.drap_ep270_set_box = function(min_x, max_x, min_y, max_y, min_z, max_z)
-    EP270_TRIGGER_BOX = {
-        min_x = tonumber(min_x), max_x = tonumber(max_x),
-        min_y = tonumber(min_y), max_y = tonumber(max_y),
-        min_z = tonumber(min_z), max_z = tonumber(max_z),
-    }
-    M.log(string.format(
-        "EP270: trigger box -> x=[%.2f, %.2f] y=[%.2f, %.2f] z=[%.2f, %.2f]",
-        EP270_TRIGGER_BOX.min_x, EP270_TRIGGER_BOX.max_x,
-        EP270_TRIGGER_BOX.min_y, EP270_TRIGGER_BOX.max_y,
-        EP270_TRIGGER_BOX.min_z, EP270_TRIGGER_BOX.max_z))
-end
--- Force-clear the engine's gate flags (765 and 2280). Use only for testing
--- when you want to re-trigger the cutscene without rolling back the save.
--- In normal play, just load an earlier save; the gate flags reset naturally.
-_G.drap_ep270_force_retry = function()
-    currently_unlocking = true
-    raw_set_flag_off(765)
-    raw_set_flag_off(2280)
-    currently_unlocking = false
-    _ep_270_fired_at_clock = 0
-    M.log("EP270: cleared gate flags 765 and 2280 -- next EP entry will re-fire")
-end
 --- Stage the scoop list so every color is on screen at once, for checking
 --- them in a vanilla debug session where no slot is connected.
 ---
