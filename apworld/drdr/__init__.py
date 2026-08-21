@@ -262,6 +262,13 @@ class DRWorld(World):
                     for _n in expand_trigger_location_names(_entry):
                         self._pp_bonus_excluded_names.add(_n)
 
+        # The Space Rider does not run at night, so its PP bonus cannot be
+        # earned in a seed that forces night. Hardcore implies night, same as
+        # in fill_slot_data.
+        if bool(self.options.night_mode_enabled.value) or bool(
+                self.options.hardcore_zombies_enabled.value):
+            self._pp_bonus_excluded_names.add("Ride the Space Rider")
+
         # Door Locks needs the shuffled layout in the region graph and a
         # two-way guarantee, so it is paired mode only.
         self.door_locks_active = bool(
