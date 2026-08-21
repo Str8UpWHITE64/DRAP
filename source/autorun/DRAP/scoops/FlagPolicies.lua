@@ -328,6 +328,13 @@ function M.build(deps)
         -- END wins over DISP, so an active box must also hold END off.
         -- Covers Survivor + Psychopath (the 3 cutscene psychopaths --
         -- Cletus/Convicts/Cult -- have no disp_flag and are skipped).
+        --
+        -- `engine_owns_box` marks a scoop whose box the ENGINE drives -- the
+        -- Kent chain, where completing one day hands over by setting the next
+        -- day's entry flag and SCQManager re-asserts it every tick. For those,
+        -- DRAP may turn a box ON but must never force the entry flag off, and
+        -- must not override the engine's END flag either. Both rules were
+        -- measured in game; see docs/Kent_flag_tests.md.
         name = "side-display", priority = 45,
         collect = function(ctx, claim)
             if ctx.endgame or not ctx.activated then return end
@@ -350,8 +357,38 @@ function M.build(deps)
                     end
                     if show then
                         for _, f in ipairs(boxes) do claim(f, "on") end
-                        if data.disp_end_flag then
+                        -- Holding END off keeps a shown box alive, but on an
+                        -- engine-owned box it overrides the engine's own end
+                        -- for the display. Measured on Kent day 1: the engine
+                        -- sets DISP_END20 about a minute before the player
+                        -- finishes, DRAP cleared it 0.25s later, and the scoop
+                        -- then closed through the TIMEOUT path -- FINISH and
+                        -- NPC21_FIRST_TIMEOUT set together, SUCCESS never set,
+                        -- "Scoop Chance Lost" on screen.
+                        if data.disp_end_flag and not data.engine_owns_box then
                             claim(data.disp_end_flag, "off")
+                        end
+                    elseif data.engine_owns_box
+                            and not ctx.is_active(scoop_name)
+                            and not ctx.is_completed(scoop_name) then
+                        -- Retire it with its END flag, never by clearing the
+                        -- ENTRY flag: the engine re-asserts a cleared entry
+                        -- flag within a frame and every rising edge enqueues
+                        -- ANOTHER display entry, filling the side panel.
+                        --
+                        -- ONLY while the scoop has never been received. Once
+                        -- it is ours the END flag belongs to the engine again:
+                        -- disable_on_unlock clears it once at unlock, and a
+                        -- scoop can sit unlocked-but-not-shown for a long time
+                        -- (prerequisites, conflict group), so re-asserting
+                        -- here would undo that one-shot clear and the box
+                        -- could never come back.
+                        --
+                        -- Getting the box back is not this policy's job. A
+                        -- per-tick "END off" while shown is what overrode the
+                        -- engine's own ending and made day 1 time out.
+                        if data.disp_end_flag then
+                            claim(data.disp_end_flag, "on")
                         end
                     else
                         for _, f in ipairs(boxes) do claim(f, "off") end

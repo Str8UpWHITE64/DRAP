@@ -3884,6 +3884,10 @@
       "completion_event": "Complete Kent's day 1 photoshoot",
       "disp_flag": 2507,
       "disp_end_flag": 2541,
+      "engine_owns_box": true,
+      "disable_on_unlock": [
+        2541
+      ],
       "guide": {
         "scq_no": 32,
         "pos_tbl": 0,
@@ -3982,6 +3986,10 @@
       "completion_event": "Complete Kent's day 2 photoshoot",
       "disp_flag": 2508,
       "disp_end_flag": 2542,
+      "engine_owns_box": true,
+      "disable_on_unlock": [
+        2542
+      ],
       "guide": {
         "scq_no": 33,
         "pos_tbl": 1,
@@ -4000,8 +4008,7 @@
         389,
         844,
         2183,
-        2444,
-        2509
+        2444
       ],
       "flags": [
         781,
@@ -4013,6 +4020,11 @@
       ],
       "completion_event": "Kill Kent on day 3",
       "disp_flag": 2509,
+      "disp_end_flag": 1155,
+      "engine_owns_box": true,
+      "disable_on_unlock": [
+        1155
+      ],
       "guide": {
         "scq_no": 34,
         "pos_tbl": 2,

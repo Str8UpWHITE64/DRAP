@@ -91,6 +91,7 @@ local function build_scoop_data()
                 clear_on_complete = e.clear_on_complete,
                 disp_flag = e.disp_flag,
                 disp_end_flag = e.disp_end_flag,
+                engine_owns_box = e.engine_owns_box,  -- see side-display
                 extra_disp_flags = e.extra_disp_flags,  -- 2nd box for pairs
                 description = e.description,   -- MissionTruth box text
                 guide = e.guide,              -- MissionTruth pin redirect
