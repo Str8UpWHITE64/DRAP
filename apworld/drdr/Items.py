@@ -657,6 +657,13 @@ def BuildItemPool(multiworld, count, options, excluded_scoop_names=(),
     if not options.scoop_sanity:
         trapList = [item for item in trapList
                     if item.name != "Convicts Respawn Trap"]
+    # Player's own list. An empty set means no traps at all, which is the same
+    # as a trap percentage of zero -- honoured rather than treated as "unset",
+    # because emptying the list is a deliberate thing to do.
+    _enabled_traps = getattr(options, "enabled_traps", None)
+    if _enabled_traps is not None:
+        _keep = set(_enabled_traps.value)
+        trapList = [item for item in trapList if item.name in _keep]
     nonTrapFiller = [item for item in itemList if item.category in (
         DRItemCategory.MISC, DRItemCategory.WEAPON, DRItemCategory.CONSUMABLE,
         DRItemCategory.BUFF

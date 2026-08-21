@@ -1,6 +1,6 @@
 import typing
 from dataclasses import dataclass
-from Options import Toggle, DefaultOnToggle, Option, Range, Choice, ItemDict, DeathLink, PerGameCommonOptions, StartInventoryPool, OptionGroup
+from Options import Toggle, DefaultOnToggle, Option, Range, Choice, ItemDict, DeathLink, PerGameCommonOptions, StartInventoryPool, OptionGroup, OptionSet
 
 
 class GuaranteedItemsOption(ItemDict):
@@ -250,6 +250,48 @@ class ZombieKillTiers(Choice):
     option_nightmare = 3
     option_genocide = 4
     default = 1
+
+
+class EnabledTraps(OptionSet):
+    """
+    Which traps can appear in the pool. Remove any you would rather not get.
+
+    Defaults to all of them. Emptying the list is the same as setting the trap
+    percentage to zero.
+
+    Inventory:  Butterfingers (drops everything on the floor), Last Shot
+                (everything one hit from breaking), Where'd Your Inventory Go?
+                (it all shatters).
+    Costume:    Bald, Boxers, Goddamnit, Donut! (heart boxers and bare feet).
+    Effects:    Stomach Ache, Zombait, Slow, Damage Player, Skipped Arm Day
+                (no strength for 30s), Oops More Zombies (double spawns for a
+                minute), Potty Mouth (Frank swears at you).
+    NPC:        Hostile NPC, Special Forces, Convicts Respawn.
+
+    Some traps drop out on their own regardless of this list: Convicts Respawn
+    is ScoopSanity-only, since it waits on a scoop item that does not otherwise
+    exist.
+    """
+    display_name = "Enabled Traps"
+    valid_keys = {
+        "Stomach Ache Trap",
+        "Zombait Trap",
+        "Slow Trap",
+        "Damage Player Trap",
+        "Hostile NPC Trap",
+        "Special Forces Trap",
+        "Convicts Respawn Trap",
+        "Butterfingers Trap",
+        "Last Shot Trap",
+        "Where'd Your Inventory Go? Trap",
+        "Bald Trap",
+        "Goddamnit, Donut! Trap",
+        "Boxers Trap",
+        "Skipped Arm Day Trap",
+        "Oops More Zombies Trap",
+        "Potty Mouth Trap",
+    }
+    default = frozenset(valid_keys)
 
 
 class SpecialForcesMode(Choice):
@@ -730,6 +772,7 @@ class DROption(PerGameCommonOptions):
     exclude_rescues_above: ExcludeRescuesAbove
     zombie_kill_tiers: ZombieKillTiers
     special_forces_mode: SpecialForcesMode
+    enabled_traps: EnabledTraps
     enable_skill_items: EnableSkillItems
     enable_stat_items: EnableStatItems
     enable_extra_stat_buffs: EnableExtraStatBuffs
@@ -800,6 +843,7 @@ dr_option_groups = [
     OptionGroup(
         "Trap Settings",
         [
+            EnabledTraps,
             TrapPercentage,
             HostileSurvivorCountMin,
             HostileSurvivorCountMax,
