@@ -415,6 +415,23 @@ _all_items = [DRItemData(row[0], row[1], row[2]) for row in [
     # exists in that mode. BuildItemPool drops it otherwise.
     ("Convicts Respawn Trap", 4076, DRItemCategory.TRAP),
 
+    # Inventory traps (DRAP/effects/InventoryTraps.lua). Each declines and is
+    # re-banked when the inventory is empty, so none is ever wasted.
+    ("Butterfingers Trap",  4077, DRItemCategory.TRAP),
+    ("Last Shot Trap",      4078, DRItemCategory.TRAP),
+    ("Where'd Your Inventory Go? Trap", 4079, DRItemCategory.TRAP),
+
+    # Costume traps (DRAP/effects/CostumeTraps.lua). Not reverted -- the
+    # changing rooms are the way out, same as any other outfit.
+    ("Bald Trap",           4080, DRItemCategory.TRAP),
+    ("Goddamnit, Donut! Trap", 4081, DRItemCategory.TRAP),
+    ("Boxers Trap",         4082, DRItemCategory.TRAP),
+
+    # Timed traps (DRAP/effects/PlayerBuffs.lua), alongside Slow Trap.
+    ("Skipped Arm Day Trap", 4083, DRItemCategory.TRAP),
+    ("Oops More Zombies Trap", 4084, DRItemCategory.TRAP),
+    ("Potty Mouth Trap",    4085, DRItemCategory.TRAP),
+
     # Overtime suppressant ingredients. No longer items -- the checks come
     # from the pickup flags instead, so nothing holds them. Kept here so the
     # IDs stay put for anything already reading the table.

@@ -47,6 +47,27 @@ local DAMAGE_HP_FLOOR = 1000
 local BERSERKER_ATTACK_PCT = 1000
 -- Slow Trap multiplier on LevelSpeedMax
 local SLOW_TRAP_MULT = 0.5
+
+-- Skipped Arm Day: attack percent while the trap runs. 1 is the floor rather
+-- than 0 -- zero attack risks a divide in the damage maths, and 1% already
+-- means nothing dies.
+local ARM_DAY_ATTACK_PCT = 1
+local ARM_DAY_DURATION   = 30.0
+
+-- Oops More Zombies: multiplies whatever the run is ALREADY using, so it
+-- stacks on a slot-data multiplier instead of overwriting it.
+local ZOMBIE_TRAP_FACTOR   = 2
+local ZOMBIE_TRAP_DURATION = 60.0
+
+-- Potty Mouth: Frank's frustration bark. The id is a Wwise EVENT backed by a
+-- random container, so repeats give different lines rather than one on a loop.
+-- seCallTankVoice is the safe overload -- its siblings take a Nullable vec3
+-- and passing nil for that crashed the game.
+local FRANK_BARK_SE_ID   = 226669665
+local POTTY_DURATION     = 30.0
+-- Spacing is deliberate. Breaking an inventory quickly took the game down
+-- inside Wwise, and a bark every frame is the same mistake with a nicer name.
+local POTTY_INTERVAL     = 1.0
 -- Vanilla LevelSpeedMax baseline (captured from PlayerLvUpUserData)
 local VANILLA_SPEED_TABLE = { 1.2, 1.3, 1.4 }
 
@@ -262,6 +283,25 @@ end
 
 function M.is_god_mode() return god_mode end
 
+-- Potty Mouth state. Kept out of _timed_effects because it has nothing to
+-- restore -- it just stops.
+local _potty = { until_at = 0, next_at = 0 }
+
+--- One frustration bark from Frank, on the frame thread.
+--- Sound MUST be played from a frame: the same call from the console reports
+--- success and is silent, which cost a long stretch of the audio work.
+local function _fire_bark()
+    local sm = sdk.get_managed_singleton("app.solid.SoundManager")
+    if not sm then return false end
+    local pm = sdk.get_managed_singleton(PM_TYPE)
+    local go = pm and select(2, pcall(function() return pm:call("get_CurrentPlayer") end))
+    if not go then return false end
+    return pcall(function()
+        sm:call("seCallTankVoice(System.UInt32, via.GameObject)",
+            FRANK_BARK_SE_ID, go)
+    end)
+end
+
 re.on_frame(function()
     if god_mode then
         local now = os.clock()
@@ -273,6 +313,18 @@ re.on_frame(function()
             _set_god_run(GOD_RUN_LEVEL)                  -- ditto run level
         end
     end
+    -- Potty Mouth: one bark every POTTY_INTERVAL until the window closes.
+    if _potty.until_at > 0 then
+        local now = os.clock()
+        if now >= _potty.until_at then
+            _potty.until_at = 0
+            log("'Potty Mouth Trap' expired")
+        elseif now >= _potty.next_at then
+            _potty.next_at = now + POTTY_INTERVAL
+            _fire_bark()
+        end
+    end
+
     if next(_timed_effects) == nil then return end
     local now = os.clock()
     for name, entry in pairs(_timed_effects) do
@@ -460,6 +512,85 @@ function M.berserker_mode(sec)
 end
 
 -- 30s @ 0.5x speed (multiplies the LevelSpeedMax table). Auto-restores.
+--- Skipped Arm Day: Frank hits like a wet paper bag for 30 seconds.
+---
+--- The override lives in PlayerStats rather than being written straight to the
+--- engine, because PlayerStats.apply() is idempotent and hook-driven -- a save,
+--- load or level-up during the window would otherwise restore full attack and
+--- silently cancel the trap. Routing it through PlayerStats also means the
+--- restore is "clear the override and re-apply", which recomputes the correct
+--- value from baseline plus upgrades instead of a remembered number that may
+--- be stale by then.
+function M.arm_day_trap(sec)
+    sec = tonumber(sec) or ARM_DAY_DURATION
+    local PlayerStats = package.loaded["DRAP/effects/PlayerStats"]
+        or require("DRAP/effects/PlayerStats")
+    if not (PlayerStats and PlayerStats.set_attack_override) then
+        log("Skipped Arm Day Trap: PlayerStats override unavailable")
+        return
+    end
+    _start_timed("Skipped Arm Day Trap", sec,
+        function() return true end,
+        function()
+            PlayerStats.set_attack_override(ARM_DAY_ATTACK_PCT)
+            _notify_trap("You skipped arm day.")
+            log(string.format("Skipped Arm Day Trap: attack %d%% for %.0fs",
+                ARM_DAY_ATTACK_PCT, sec))
+        end,
+        function()
+            PlayerStats.clear_attack_override()
+        end)
+end
+
+--- Oops More Zombies: double the spawn multiplier for a minute.
+---
+--- Doubles whatever the run is ALREADY using, so it stacks on a slot-data
+--- multiplier rather than replacing it. The target is computed from the SAVED
+--- value every time apply runs, so a second copy landing mid-window extends
+--- the timer without doubling again -- _start_timed keeps the original capture
+--- and re-runs apply.
+function M.zombie_swarm_trap(sec)
+    sec = tonumber(sec) or ZOMBIE_TRAP_DURATION
+    local Zombies = package.loaded["DRAP/effects/ZombieEffects"]
+        or require("DRAP/effects/ZombieEffects")
+    if not (Zombies and Zombies.set_spawn_multiplier) then
+        log("Oops More Zombies Trap: ZombieEffects unavailable")
+        return
+    end
+    local NAME = "Oops More Zombies Trap"
+    _start_timed(NAME, sec,
+        function()
+            local cur = Zombies.get_spawn_multiplier and Zombies.get_spawn_multiplier()
+            return tonumber(cur) or 1
+        end,
+        function()
+            local entry = _timed_effects[NAME]
+            local base = (entry and tonumber(entry.saved)) or 1
+            Zombies.set_spawn_multiplier(base * ZOMBIE_TRAP_FACTOR)
+            _notify_trap("Oops, more zombies.")
+            log(string.format("%s: %dx -> %dx for %.0fs", NAME, base,
+                base * ZOMBIE_TRAP_FACTOR, sec))
+        end,
+        function(saved)
+            -- Back to what the run was using, not to vanilla.
+            Zombies.set_spawn_multiplier(tonumber(saved) or 1)
+        end)
+end
+
+--- Potty Mouth: Frank swears every couple of seconds for half a minute.
+---
+--- Not a _timed_effect: there is nothing to capture or restore, the barks
+--- simply stop. The id is a Wwise event backed by a random container, so the
+--- lines vary on their own.
+function M.potty_mouth_trap(sec)
+    sec = tonumber(sec) or POTTY_DURATION
+    local now = os.clock()
+    _potty.until_at = now + sec
+    _potty.next_at = now          -- first one immediately
+    _notify_trap("Frank has some choice words.")
+    log(string.format("Potty Mouth Trap: barking for %.0fs", sec))
+end
+
 function M.slow_trap(sec, multiplier)
     sec = tonumber(sec) or DEFAULT_TIMED_DURATION
     multiplier = tonumber(multiplier) or SLOW_TRAP_MULT
@@ -548,6 +679,9 @@ function M.register()
         -- Custom traps
         { name = "Slow Trap",          fn = M.slow_trap },
         { name = "Damage Player Trap", fn = M.player_damage },
+        { name = "Skipped Arm Day Trap", fn = M.arm_day_trap },
+        { name = "Oops More Zombies Trap", fn = M.zombie_swarm_trap },
+        { name = "Potty Mouth Trap",   fn = M.potty_mouth_trap },
     }
     -- Traps go through TrapBank instead of firing on arrival: one that lands
     -- at the title screen or mid-load used to be lost outright. Banked ones
@@ -560,6 +694,9 @@ function M.register()
         ["Zombait Trap"]       = true,
         ["Slow Trap"]          = true,
         ["Damage Player Trap"] = true,
+        ["Skipped Arm Day Trap"] = true,
+        ["Oops More Zombies Trap"] = true,
+        ["Potty Mouth Trap"]   = true,
     }
     local trap_n = 0
     for _, item in ipairs(items) do
@@ -602,5 +739,9 @@ _G.drap_buff_berserker    = function(s) M.berserker_mode(s) end
 _G.drap_buff_pp_boost     = function(a) M.pp_boost(a) end
 _G.drap_trap_slow         = function(s, m) M.slow_trap(s, m) end
 _G.drap_trap_damage       = function(a) M.player_damage(a) end
+
+_G.drap_trap_armday  = function(sec) M.arm_day_trap(sec) end
+_G.drap_trap_zombies = function(sec) M.zombie_swarm_trap(sec) end
+_G.drap_trap_potty   = function(sec) M.potty_mouth_trap(sec) end
 
 return M

@@ -598,6 +598,11 @@ _G.drap_zomb_night    = function(s) M.night_mode(s)    end
 _G.drap_zomb_hardcore = function(s) M.hardcore_zombies(s) end
 _G.drap_zomb_active   = function() return M.get_active_effects() end
 _G.drap_zomb_spawn    = function(n) return M.set_spawn_multiplier(n) end
+-- Read-only, so the Oops More Zombies trap can be checked without changing it.
+_G.drap_zomb_mult     = function()
+    log(string.format("spawn multiplier: %sx", tostring(M.get_spawn_multiplier())))
+    return M.get_spawn_multiplier()
+end
 -- drap_zomb_frame is gone with the WorldDayNight controller it tuned. The
 -- night point is not a setting any more -- it is midnight on the game clock.
 

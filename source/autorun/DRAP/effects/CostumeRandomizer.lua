@@ -68,6 +68,32 @@ end
 -- Public API
 -- ---------------------------------------------------------------------------
 
+-- Apply one costume part. Exposed so CostumeTraps can dress Frank without a
+-- second copy of the changer lookup.
+-- CostumePart: 0=Body 1=Foot 2=Hat 3=Glasses 4=Watch 5=Camera 7=Outfit.
+-- @return boolean false if the player isn't spawned or the swap was rejected
+function M.set_part(part, id)
+    return fire_change(part, id)
+end
+
+-- True when Frank exists and can be dressed. Traps use this to decline and be
+-- re-banked rather than firing into a title screen.
+function M.player_ready()
+    return get_changer() ~= nil
+end
+
+-- Strip Frank to his boxers. The engine's own call, so it handles every slot
+-- at once rather than needing a body/foot/hat combination.
+-- @return boolean false if the player isn't spawned
+function M.set_naked()
+    local changer = get_changer()
+    if not changer then return false end
+    return pcall(function()
+        changer:call("change2Naked(app.solid.CharacterDefine.CharacterType)",
+            FRANK_CHAR)
+    end)
+end
+
 -- Pick + apply a random outfit. Returns true if attempted, false if the
 -- player isn't spawned yet.
 function M.do_random_swap()
