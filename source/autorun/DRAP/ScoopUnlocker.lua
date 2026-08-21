@@ -2314,8 +2314,19 @@ function M.draw_tab_content(debug)
                 local color
                 local has_item = ap_received[name] or received_scoops[name]
                 -- In any-order there is no "current" scoop, so the highlight
-                -- follows whichever one the player started.
-                local highlight = any_order and running or current_chain_name
+                -- follows whichever one the player started -- and nothing at
+                -- all until they start one.
+                --
+                -- NOT `any_order and running or current_chain_name`: with
+                -- nothing running that is nil, so it fell through to the chain
+                -- name and painted the first scoop green even when the player
+                -- could not reach it.
+                local highlight
+                if any_order then
+                    highlight = running
+                else
+                    highlight = current_chain_name
+                end
                 if completed_scoops[name] then
                     color = COLOR_DONE
                 elseif not has_item then
