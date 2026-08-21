@@ -67,7 +67,43 @@ def main() -> int:
     print(f"  {n_lua} script(s) -> reframework/autorun")
     print(f"  {n_data} data file(s) -> reframework/data")
     print(f"  deployed to {game}")
+
+    deploy_apworld()
     return 0
+
+
+# Archipelago's real install -- the one that generates seeds. NOT the source
+# checkout, which the test harness rebuilds on every run.
+AP_INSTALL = r"C:\ProgramData\Archipelago"
+
+
+def deploy_apworld():
+    """Zip apworld/drdr into the AP install so new options are testable.
+
+    Same shape gen_test.py builds, but aimed at the real install rather than
+    the source checkout. Skipped quietly if Archipelago is not installed here.
+    """
+    import zipfile
+
+    src = os.path.join(REPO, "apworld", "drdr")
+    out_dir = os.path.join(AP_INSTALL, "custom_worlds")
+    if not os.path.isdir(src):
+        return
+    if not os.path.isdir(AP_INSTALL):
+        print(f"  apworld skipped -- {AP_INSTALL} not found")
+        return
+
+    os.makedirs(out_dir, exist_ok=True)
+    dst = os.path.join(out_dir, "drdr.apworld")
+    with zipfile.ZipFile(dst, "w", zipfile.ZIP_DEFLATED) as z:
+        for root, dirs, files in os.walk(src):
+            dirs[:] = [d for d in dirs if d != "__pycache__"]
+            for f in files:
+                full = os.path.join(root, f)
+                arc = os.path.relpath(
+                    full, os.path.join(REPO, "apworld")).replace(os.sep, "/")
+                z.write(full, arc)
+    print(f"  apworld -> {dst}")
 
 
 if __name__ == "__main__":
