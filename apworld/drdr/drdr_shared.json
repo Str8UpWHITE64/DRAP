@@ -4079,6 +4079,24 @@
       "flags": [
         2082
       ]
+    },
+    {
+      "name": "Special Forces",
+      "category": "Psychopath",
+      "flags": [
+        309
+      ],
+      "clear_on_complete": true,
+      "npcs": [],
+      "completion_events": [
+        "Kill 10 Special Forces",
+        "Hella Copter - Shoot down the Special Forces Helicopter"
+      ],
+      "description": {
+        "location": "Anywhere",
+        "trigger": "Receive the Special Forces item",
+        "description": "The Overtime soldiers are loose in the mall. Kill 10 of them and shoot down their helicopter in Leisure Park to send them home."
+      }
     }
   ],
   "completion_flags": [

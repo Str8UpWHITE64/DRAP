@@ -209,6 +209,14 @@ class DRWorld(World):
             self.enabled_location_categories.add(DRLocationCategory.MAIN_SCOOP)
         if self.options.goal.value == 0:  # Ending S
             self.enabled_location_categories.add(DRLocationCategory.OVERTIME_SCOOP)
+        # The two Special Forces checks are reachable either in Overtime (Ending
+        # S) or during the 72 hours when the soldiers are in the mall. Enabled by
+        # either; Rules decides which way they are actually reached.
+        if (self.options.goal.value == 0
+                or (self.options.special_forces_mode.value
+                    and self.options.scoop_sanity.value)):
+            self.enabled_location_categories.add(
+                DRLocationCategory.SPECIAL_FORCES_SCOOP)
         self.enabled_location_categories.add(DRLocationCategory.PSYCHO_SCOOP)
         self.enabled_location_categories.add(DRLocationCategory.CHALLENGE)
         # Every kill location exists in the tables so IDs stay stable; the
@@ -1014,6 +1022,13 @@ class DRWorld(World):
                 "exclude_rescues": exclude_rescues_enabled,
                 "exclude_rescues_above": self.options.exclude_rescues_above.value,
                 "zombie_kill_tiers": self.zombie_kill_tier,
+                # ScoopSanity only. item mode rides on a scoop item, which
+                # only enters the pool under ScoopSanity, and the soldiers are
+                # a scoop-shaped feature either way -- so the whole option
+                # falls back to none without it.
+                "special_forces_mode": (
+                    self.options.special_forces_mode.value
+                    if self.options.scoop_sanity.value else 0),
                 "enable_skill_items": enable_skill_items,
                 "enable_stat_items": enable_stat_items,
                 "enable_extra_stat_buffs": enable_extra_stat_buffs,

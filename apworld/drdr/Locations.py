@@ -23,7 +23,13 @@ class DRLocationCategory(IntEnum):
     CHALLENGE = 8,
     PP_BONUS = 9,
     ZOMBIE_KILL = 10,
-    KILL_SURVIVOR = 11
+    KILL_SURVIVOR = 11,
+    # The two Special Forces checks. Their own category because
+    # they are reachable two different ways: in Overtime on the
+    # Ending S goal, or during the 72 hours when
+    # special_forces_mode puts the soldiers in the mall. Either
+    # condition enables them; the access rule decides which.
+    SPECIAL_FORCES_SCOOP = 12
 
 
 class DRLocationData(NamedTuple):
@@ -275,7 +281,7 @@ location_tables = {
 
         # Events in Leisure Park
         DRLocationData("See the crashed helicopter", "Milk", DRLocationCategory.OVERTIME_SCOOP),
-        DRLocationData("Hella Copter - Shoot down the Special Forces Helicopter", "Milk", DRLocationCategory.OVERTIME_SCOOP),
+        DRLocationData("Hella Copter - Shoot down the Special Forces Helicopter", "Milk", DRLocationCategory.SPECIAL_FORCES_SCOOP),
         # DRLocationData("Ending D: Be a prisoner when time runs out", "Milk", DRLocationCategory.MAIN_SCOOP),
 
         # PP Stickers in Leisure Park
@@ -590,7 +596,7 @@ location_tables = {
         DRLocationData("Kill 2000 zombies", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Kill 5000 zombies", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Kill 10000 zombies", "Milk", DRLocationCategory.CHALLENGE),
-        DRLocationData("Kill 10 Special Forces", "Milk", DRLocationCategory.OVERTIME_SCOOP),
+        DRLocationData("Kill 10 Special Forces", "Milk", DRLocationCategory.SPECIAL_FORCES_SCOOP),
         DRLocationData("Destroy all of the wall plates in the Food Court", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Fire 30 bullets", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Fire 300 bullets", "Milk", DRLocationCategory.CHALLENGE),

@@ -432,6 +432,12 @@ _all_items = [DRItemData(row[0], row[1], row[2]) for row in [
     ("Oops More Zombies Trap", 4084, DRItemCategory.TRAP),
     ("Potty Mouth Trap",    4085, DRItemCategory.TRAP),
 
+    # special_forces_mode = item. A scoop so it shows in the scoop list with
+    # hover text; unlocking it sets flag 309 and the Overtime soldiers arrive.
+    # It completes on BOTH of its checks, so the checks send them home.
+    # Added to the pool ONLY in that mode -- see BuildItemPool.
+    ("Special Forces", 4086, DRItemCategory.SCOOP),
+
     # Overtime suppressant ingredients. No longer items -- the checks come
     # from the pickup flags instead, so nothing holds them. Kept here so the
     # IDs stay put for anything already reading the table.
@@ -631,6 +637,12 @@ def BuildItemPool(multiworld, count, options, excluded_scoop_names=(),
     itemList = [item for item in _all_items]
     lockList = [item for item in _all_items if item.category == DRItemCategory.LOCK]
     scoopList = [item for item in _all_items if item.category == DRItemCategory.SCOOP]
+    # "Special Forces" is a scoop only in special_forces_mode = item. In none
+    # and permanent it must not reach the pool at all -- in permanent the mode
+    # turns the soldiers on directly, so an item that also turns them on would
+    # be a no-op the player still has to find.
+    if int(getattr(options.special_forces_mode, "value", 0)) != 1:
+        scoopList = [item for item in scoopList if item.name != "Special Forces"]
     consumableList = [item for item in _all_items if item.category == DRItemCategory.CONSUMABLE]
     weaponList = [item for item in _all_items if item.category == DRItemCategory.WEAPON]
     skillList = [item for item in _all_items if item.category == DRItemCategory.SKILL]

@@ -1313,6 +1313,74 @@ def set_rules(world) -> None:
     world.set_rule(world.multiworld.get_location("Change into 5 new outfits", world.player), Or(CanReachRegion("Paradise Plaza"), CanReachRegion("Entrance Plaza"), CanReachRegion("Wonderland Plaza")))
 
     # --------------------------------------------------------------------
+    # --------------------------------------------------------------------
+    # Special Forces in the mall
+    # --------------------------------------------------------------------
+    # The two Special Forces checks are normally Overtime-only. When
+    # special_forces_mode puts the soldiers in the mall during the 72 hours
+    # they are reached there instead, so these rules REPLACE the Overtime ones
+    # set above (same location, different way in -- the check itself is the
+    # same accomplishment either way).
+    #
+    # Set after the Ending S block deliberately: set_rule overwrites, so with
+    # the mode on the mall rule wins, and with it off the Overtime rule stands.
+    if world.options.special_forces_mode.value and world.options.scoop_sanity:
+        _sf_item_mode = world.options.special_forces_mode.value == 1
+
+        # Killing them needs nothing but the soldiers being present. In item
+        # mode that is the scoop; in permanent they are there from Jessie on.
+        _kill_reqs = []
+        if _sf_item_mode:
+            _kill_reqs.append(Has("Special Forces"))
+        world.set_rule(
+            world.multiworld.get_location("Kill 10 Special Forces", world.player),
+            And(*_kill_reqs) if _kill_reqs else CanReachRegion("Paradise Plaza"))
+
+        # The helicopter is over Leisure Park and has to be SHOT down, so
+        # reaching the park is not enough on its own -- under door
+        # randomization the first door can open onto Leisure Park with no gun
+        # anywhere behind the player.
+        #
+        # Any of three guns will do it (the Handgun turns out to be plenty),
+        # and each is found in its own set of regions:
+        _PISTOL_REGIONS = ("Paradise Plaza", "Al Fresca Plaza",
+                           "Wonderland Plaza", "North Plaza")
+        _SNIPER_REGIONS = ("North Plaza",)
+        _SMG_REGIONS = ("Al Fresca Plaza", "Entrance Plaza",
+                        "Paradise Plaza", "Food Court")
+
+        if world.options.restricted_item_mode:
+            # Restricted: a gun only exists once its item has arrived, and it
+            # still has to be picked up where it spawns -- so both halves are
+            # required, per gun.
+            _armed = Or(
+                And(Has("Handgun"),
+                    Or(*[CanReachRegion(r) for r in _PISTOL_REGIONS])),
+                And(Has("Sniper Rifle"),
+                    Or(*[CanReachRegion(r) for r in _SNIPER_REGIONS])),
+                And(Has("Submachine Gun"),
+                    Or(*[CanReachRegion(r) for r in _SMG_REGIONS])),
+            )
+        else:
+            # Otherwise guns lie around the mall, so reaching any region that
+            # has one is enough -- or simply being sent one as an item.
+            _gun_regions = sorted(set(_PISTOL_REGIONS + _SNIPER_REGIONS
+                                      + _SMG_REGIONS))
+            _armed = Or(
+                Or(*[CanReachRegion(r) for r in _gun_regions]),
+                Or(*[Has(g) for g in
+                     ("Handgun", "Sniper Rifle", "Submachine Gun")]),
+            )
+
+        _heli_reqs = [CanReachRegion("Leisure Park"), _armed]
+        if _sf_item_mode:
+            _heli_reqs.append(Has("Special Forces"))
+        world.set_rule(
+            world.multiworld.get_location(
+                "Hella Copter - Shoot down the Special Forces Helicopter",
+                world.player),
+            And(*_heli_reqs))
+
     # Overtime checks as filler
     # --------------------------------------------------------------------
     # Keyed off the category rather than the names: Overtime picks up checks
@@ -1327,6 +1395,8 @@ def set_rules(world) -> None:
             for _table in location_tables.values()
             for _d in _table
             if _d.category == DRLocationCategory.OVERTIME_SCOOP
+            or (_d.category == DRLocationCategory.SPECIAL_FORCES_SCOOP
+                and not world.options.special_forces_mode.value)
         }
         for location in world.multiworld.get_locations(world.player):
             if location.name in _overtime_names:

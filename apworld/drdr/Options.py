@@ -252,6 +252,32 @@ class ZombieKillTiers(Choice):
     default = 1
 
 
+class SpecialForcesMode(Choice):
+    """
+    Puts the Overtime Special Forces in the mall during the 72 hours.
+
+    They are the soldiers who normally only show up after the story ends.
+    Zombies stay where they are -- the soldiers are added on top, not swapped
+    in -- and the mall's background music is silenced while they are around.
+
+    Requires ScoopSanity -- without it this does nothing.
+
+    Nothing happens until you have talked to Jessie, the same as every scoop.
+
+    none:      the default. Vanilla -- no Special Forces before Overtime.
+    item:      an AP item turns them on. They leave once you have both
+               "Kill 10 Special Forces" and "Hella Copter - Shoot down the
+               Special Forces Helicopter", so the checks are what sends them
+               home. Those two move into the main pool for this mode.
+    permanent: on for the whole run, from Jessie onward.
+    """
+    display_name = "Special Forces Mode"
+    option_none = 0
+    option_item = 1
+    option_permanent = 2
+    default = 0
+
+
 class EnableSkillItems(DefaultOnToggle):
     """
     When enabled, Frank's 21 combat skills (Jump Kick, Suplex, etc.) become AP
@@ -703,6 +729,7 @@ class DROption(PerGameCommonOptions):
     exclude_levels_above: ExcludeLevelsAbove
     exclude_rescues_above: ExcludeRescuesAbove
     zombie_kill_tiers: ZombieKillTiers
+    special_forces_mode: SpecialForcesMode
     enable_skill_items: EnableSkillItems
     enable_stat_items: EnableStatItems
     enable_extra_stat_buffs: EnableExtraStatBuffs
@@ -739,6 +766,7 @@ dr_option_groups = [
             ExcludeLevelsAbove,
             ExcludeRescuesAbove,
             ZombieKillTiers,
+            SpecialForcesMode,
             PPStickersFiller,
             OvertimeProgressionGating,
             OvertimeChecksFiller,

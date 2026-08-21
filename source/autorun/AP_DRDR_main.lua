@@ -137,6 +137,7 @@ AP.effects.NpcSaveGuard               = require("DRAP/effects/NpcSaveGuard")
 AP.effects.ConvictRespawnTrap         = require("DRAP/effects/ConvictRespawnTrap")
 AP.effects.InventoryTraps             = require("DRAP/effects/InventoryTraps")
 AP.effects.CostumeTraps               = require("DRAP/effects/CostumeTraps")
+AP.effects.SpecialForces              = require("DRAP/effects/SpecialForces")
 AP.TrapBank                           = require("DRAP/TrapBank")
 AP.effects.SurvivorRecovery           = require("DRAP/effects/SurvivorRecovery")
 AP.effects.PartyHudGuard              = require("DRAP/effects/PartyHudGuard")
@@ -479,6 +480,8 @@ local function run_slot_connect(slot_data)
 
     -- ScoopSanity option
     local scoop_sanity_enabled = (type(slot_data) == "table" and slot_data.scoop_sanity == true)
+    local sf_mode = (type(slot_data) == "table" and tonumber(slot_data.special_forces_mode)) or 0
+    AP.effects.SpecialForces.set_mode(sf_mode)
     AP.ScoopSanityEnabled = scoop_sanity_enabled
     AP.ScoopUnlocker.set_scoop_sanity_enabled(scoop_sanity_enabled)
     log("ScoopSanity enabled=" .. tostring(scoop_sanity_enabled))
@@ -799,6 +802,7 @@ re.on_frame(function()
     safe_on_frame(AP.effects.InventoryTraps, "InventoryTraps")
     safe_on_frame(AP.effects.SurvivorRecovery, "SurvivorRecovery")
     safe_on_frame(AP.effects.PsychoHostility, "PsychoHostility")
+    safe_on_frame(AP.effects.SpecialForces, "SpecialForces")
     safe_on_frame(AP.effects.PartyHudGuard, "PartyHudGuard")
 
     -- Debug modules

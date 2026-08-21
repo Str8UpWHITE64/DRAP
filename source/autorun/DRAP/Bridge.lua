@@ -733,6 +733,19 @@ function M.has_completed_check(loc_name)
     return Ledger.is_checked(loc_name)
 end
 
+--- Has this check been recorded AT ALL this session, ledger or not?
+---
+--- has_completed_check reads only the ledger, which does not exist until a
+--- slot connects -- so offline (debug mode, no server) a check that was very
+--- much made reads as missing. Callers deciding whether the player has DONE
+--- something want this one; callers deciding what to re-send on reconnect want
+--- the ledger.
+function M.is_check_recorded(loc_name)
+    if not loc_name then return false end
+    if Ledger.is_checked(loc_name) then return true end
+    return PENDING_CHECKS[loc_name] == true
+end
+
 -- Returns a fresh array of all completed-check location names. Used for
 -- diagnostics ("what's actually in here?") rather than per-name queries.
 function M.get_completed_checks()

@@ -99,6 +99,13 @@ local function build_scoop_data()
             if e.completion_event and e.lua_event_tracking ~= false then
                 d.completion_event = e.completion_event
             end
+            -- completion_eventS (plural): ALL of them must fire before the
+            -- scoop completes. Survivor scoops with several NPCs still use the
+            -- singular form and complete on the first rescue; this is for the
+            -- ones that genuinely need more than one thing done.
+            if e.completion_events and e.lua_event_tracking ~= false then
+                d.completion_events = e.completion_events
+            end
             SCOOP_DATA[e.name] = d
             if e.description then
                 SCOOP_DESCRIPTIONS[e.name] = e.description
@@ -131,6 +138,11 @@ local function build_lookup_tables()
     for scoop_name, data in pairs(SCOOP_DATA) do
         if data.completion_event then
             COMPLETION_EVENT_TO_SCOOP[data.completion_event] = scoop_name
+        end
+        if data.completion_events then
+            for _, ev in ipairs(data.completion_events) do
+                COMPLETION_EVENT_TO_SCOOP[ev] = scoop_name
+            end
         end
         if data.primary_flag then
             PRIMARY_FLAG_TO_SCOOP[data.primary_flag] = scoop_name
@@ -526,6 +538,40 @@ local function hold_ep_shutter_flow()
         _flow_logged = cur
         M.log(string.format("EP shutters: game flow %d -> %d", cur,
             EP_SHUTTER_FLOW))
+    end
+end
+
+--- Complete any scoop whose completion_events have all been sent.
+---
+--- Polled rather than event-driven. on_event_tracked only sees the flag and
+--- message event stream; these two checks are sent straight to Bridge by
+--- ChallengeTracker and AchievementTracker and never pass through it, so a
+--- handler there is never called. Watching what has actually been recorded
+--- works regardless of which tracker sent it, and survives a reload.
+local _multi_poll_at = 0
+
+local function poll_multi_event_completions()
+    if os.clock() - _multi_poll_at < 1.0 then return end
+    _multi_poll_at = os.clock()
+
+    local bridge = AP and AP.AP_BRIDGE
+    local recorded = bridge and (bridge.is_check_recorded or bridge.has_completed_check)
+    if not recorded then return end
+
+    for scoop_name, data in pairs(SCOOP_DATA) do
+        local needed = data.completion_events
+        if needed and received_scoops[scoop_name]
+            and not completed_scoops[scoop_name] then
+            local all_done = true
+            for _, ev in ipairs(needed) do
+                if not recorded(ev) then all_done = false; break end
+            end
+            if all_done then
+                M.log(string.format("%s: all %d completion check(s) sent",
+                    scoop_name, #needed))
+                M.complete_scoop(scoop_name)
+            end
+        end
     end
 end
 
@@ -1608,6 +1654,27 @@ function M.on_event_tracked(event_desc)
 
     local scoop_name = COMPLETION_EVENT_TO_SCOOP[event_desc]
     if scoop_name then
+        local data = SCOOP_DATA[scoop_name]
+        local needed = data and data.completion_events
+        if needed then
+            -- ALL-of: record this one and wait for the rest. Bridge is the
+            -- authority on what has been sent, so a reload does not lose
+            -- progress and the order they arrive in does not matter.
+            local missing = {}
+            for _, ev in ipairs(needed) do
+                local bridge = AP and AP.AP_BRIDGE
+                local sent = bridge and bridge.has_completed_check
+                    and bridge.has_completed_check(ev)
+                if ev ~= event_desc and not sent then
+                    missing[#missing + 1] = ev
+                end
+            end
+            if #missing > 0 then
+                M.log(string.format("%s: '%s' done, still waiting on %s",
+                    scoop_name, event_desc, table.concat(missing, ", ")))
+                return true
+            end
+        end
         M.complete_scoop(scoop_name)
         return true
     end
@@ -1691,6 +1758,7 @@ function M.get_all_status()
             npcs = data.npcs,
             category = data.category,
             completion_event = data.completion_event,
+            completion_events = data.completion_events,
             primary_flag = data.primary_flag,
             flags = data.flags,
             order = data.order,
@@ -2504,6 +2572,14 @@ function M.draw_tab_content(debug)
                         tip = tip .. (tip ~= "" and "\n" or "") .. "Flags: " .. table.concat(s.flags, ", ")
                     end
                     if s.completion_event then tip = tip .. "\nCompletes: " .. s.completion_event end
+                    -- ALL-of, so say so: a scoop with two of these is not
+                    -- done until both have been sent.
+                    if s.completion_events and #s.completion_events > 0 then
+                        tip = tip .. "\nCompletes when ALL of:"
+                        for _, ev in ipairs(s.completion_events) do
+                            tip = tip .. "\n  - " .. tostring(ev)
+                        end
+                    end
                     if s.conflict_group then
                         tip = tip .. "\nConflict group: " .. s.conflict_group
                     end
@@ -2675,6 +2751,7 @@ function M.on_frame()
     -- ScoopSanity EP shutters: game-flow floor,
     -- persisted via in-game flags 765/2280.
     hold_ep_shutter_flow()
+    poll_multi_event_completions()
 
     -- Manage Entrance Plaza door (flag 276) for Rescue the Professor.
     -- Uses raw flag checks so it works with or without ScoopSanity.
