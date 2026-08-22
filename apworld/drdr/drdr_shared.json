@@ -3875,8 +3875,10 @@
     {
       "name": "Cut from the Same Cloth",
       "category": "Psychopath",
+      "chain_managed": true,
       "flags": [
-        779
+        779,
+        2507
       ],
       "npcs": [
         "Kent Day 1"
@@ -3967,14 +3969,7 @@
     {
       "name": "Photo Challenge",
       "category": "Psychopath",
-      "disable_flags": [
-        342,
-        344,
-        385,
-        843,
-        1224,
-        1277
-      ],
+      "chain_managed": true,
       "flags": [
         779,
         780,
@@ -4001,18 +3996,15 @@
     {
       "name": "Photographer's Pride",
       "category": "Psychopath",
-      "disable_flags": [
-        352,
-        386,
-        387,
-        389,
-        844,
-        2183,
-        2444
-      ],
+      "chain_managed": true,
       "flags": [
+        779,
+        780,
         781,
-        2710
+        2710,
+        843,
+        844,
+        2509
       ],
       "npcs": [
         "Kent Day 3",

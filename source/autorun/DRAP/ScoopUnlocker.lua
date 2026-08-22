@@ -92,6 +92,7 @@ local function build_scoop_data()
                 disp_flag = e.disp_flag,
                 disp_end_flag = e.disp_end_flag,
                 engine_owns_box = e.engine_owns_box,  -- see side-display
+                chain_managed = e.chain_managed,  -- KentChain owns the flags
                 extra_disp_flags = e.extra_disp_flags,  -- 2nd box for pairs
                 description = e.description,   -- MissionTruth box text
                 guide = e.guide,              -- MissionTruth pin redirect
@@ -158,7 +159,12 @@ local function build_lookup_tables()
                 end
             end
         end
-        if data.category ~= "Main" and data.category ~= "Special" and data.flags then
+        -- chain_managed scoops (the Kent days) are excluded: KentChain owns
+        -- their engine state end to end, including the quiet-state
+        -- suppression this set drives pre-activation. Reconciler policies
+        -- skip them by the same marker.
+        if data.category ~= "Main" and data.category ~= "Special"
+            and data.flags and not data.chain_managed then
             for _, flag_id in ipairs(data.flags) do
                 if flag_id and flag_id ~= 0 then
                     ALL_SIDE_SCOOP_FLAGS[flag_id] = scoop_name
@@ -188,11 +194,12 @@ local MAIN_BLOCKS_SIDE = {
     ["Backup for Brad"] = { "Mark of the Sniper" },
 }
 
--- Prerequisite scoops that must be completed before a scoop can be unlocked (ordering enforcement)
-local SCOOP_PREREQUISITES = {
-    ["Photo Challenge"]      = { "Cut from the Same Cloth" },                          -- Kent Day 2 needs Day 1 done
-    ["Photographer's Pride"] = { "Cut from the Same Cloth", "Photo Challenge" },       -- Kent Day 3 needs Day 1+2 done
-}
+-- Prerequisite scoops that must be completed before a scoop can be unlocked
+-- (ordering enforcement). The Kent entries are GONE: any-order Kent shipped
+-- with KentChain, which arms each day with its measured standalone start set
+-- and cleans the day-3 residue (343/EmSaveParam) that used to make replays
+-- impossible. The conflict group still serializes the days to one at a time.
+local SCOOP_PREREQUISITES = {}
 
 -- Engine-flag prerequisites: unlock parks (poll-deferred, retried each frame)
 -- until ANY listed flag is on. Distinct from SCOOP_PREREQUISITES, which gates
@@ -1449,6 +1456,25 @@ local function apply_unlock_writes(scoop_name, scoop)
             local where = desc and desc.location and (" -- " .. desc.location) or ""
             pcall(notify.info, "Current Mission: " .. scoop_name .. where,
                 { channel = "drap_mission" })
+        end
+    elseif scoop.chain_managed then
+        -- KentChain is the ONLY flag writer for the Kent days. Writing the
+        -- start set here started the day instantly (player in the area),
+        -- and KentChain's debounced arm then wiped the freshly started
+        -- sequence and replayed the meet cutscene (measured 2026-08-21).
+        -- Delegate the whole arm -- residue cleanup + start set -- so the
+        -- day starts exactly once, at unlock.
+        local kc = _G.AP and _G.AP.effects and _G.AP.effects.KentChain
+        local ok, armed = false, false
+        if kc and kc.arm_for_unlock then
+            ok, armed = pcall(kc.arm_for_unlock, scoop_name)
+        end
+        if ok and armed then
+            M.log(string.format("Unlocked %s '%s' (chain-managed, armed via KentChain)",
+                scoop.category, scoop_name))
+        else
+            M.log(string.format("Unlocked %s '%s' (chain-managed; KentChain will arm on tick)",
+                scoop.category, scoop_name))
         end
     else
         if scoop.flags then

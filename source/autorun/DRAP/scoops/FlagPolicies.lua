@@ -168,7 +168,13 @@ function M.build(deps)
         collect = function(ctx, claim)
             if ctx.endgame or not ctx.activated then return end
             for scoop_name, data in pairs(D.scoop_data) do
-                if data.flags and not ctx.is_completed(scoop_name)
+                -- chain_managed (Kent): the days' start sets are CUMULATIVE
+                -- and share flags (day 3's set contains day 1/2's STARTs),
+                -- so suppressing a blocked sibling's list here clears the
+                -- ACTIVE day's own flags out from under KentChain. The
+                -- chain module is the only writer for these.
+                if data.flags and not data.chain_managed
+                    and not ctx.is_completed(scoop_name)
                     and ctx.is_conflict_blocked(scoop_name) then
                     for _, flag_id in ipairs(data.flags) do
                         if flag_id and flag_id ~= 0 then
@@ -189,7 +195,7 @@ function M.build(deps)
                 for _, side_name in ipairs(side_list) do
                     if ctx.is_blocked_by_active_main(side_name) then
                         local data = D.scoop_data[side_name]
-                        if data and data.flags then
+                        if data and data.flags and not data.chain_managed then
                             for _, flag_id in ipairs(data.flags) do
                                 if flag_id and flag_id ~= 0 then
                                     claim(flag_id, "off")
@@ -208,7 +214,8 @@ function M.build(deps)
         collect = function(ctx, claim)
             if ctx.endgame or not ctx.activated then return end
             for scoop_name, data in pairs(D.scoop_data) do
-                if data.disable_flags and ctx.is_active(scoop_name) then
+                if data.disable_flags and not data.chain_managed
+                    and ctx.is_active(scoop_name) then
                     for _, flag_id in ipairs(data.disable_flags) do
                         claim(flag_id, "off")
                     end
@@ -243,7 +250,12 @@ function M.build(deps)
         collect = function(ctx, claim)
             if ctx.endgame or not ctx.activated then return end
             for scoop_name, data in pairs(D.scoop_data) do
+                -- chain_managed (the Kent days): KentChain arms these ONCE
+                -- per transition and the engine drives from there. Holding
+                -- them per tick is what respawned day-2 Kent (1225
+                -- re-asserted in the retire window). Never claim them here.
                 if data.category ~= "Main" and data.flags
+                    and not data.chain_managed
                     and ctx.is_active(scoop_name)
                     and not ctx.is_conflict_blocked(scoop_name)
                     and not ctx.is_blocked_by_active_main(scoop_name)
@@ -356,7 +368,20 @@ function M.build(deps)
                         end
                     end
                     if show then
-                        for _, f in ipairs(boxes) do claim(f, "on") end
+                        -- Engine-owned boxes get NO show claim either: the
+                        -- engine sets their entry flags itself (2507 on its
+                        -- schedule, 2508/2509 in the completion handoff
+                        -- cluster), and DRAP setting one EARLY pre-empts
+                        -- that handoff -- the queue enqueues the entry as
+                        -- StateSub NONE before the engine can create-and-
+                        -- activate it, and the day never becomes ready
+                        -- (vanilla-order day-2 no-spawn, measured via
+                        -- drap_kent_scq 2026-08-22).
+                        if data.engine_owns_box then
+                            -- no claim in either direction
+                        else
+                            for _, f in ipairs(boxes) do claim(f, "on") end
+                        end
                         -- Holding END off keeps a shown box alive, but on an
                         -- engine-owned box it overrides the engine's own end
                         -- for the display. Measured on Kent day 1: the engine
@@ -368,9 +393,7 @@ function M.build(deps)
                         if data.disp_end_flag and not data.engine_owns_box then
                             claim(data.disp_end_flag, "off")
                         end
-                    elseif data.engine_owns_box
-                            and not ctx.is_active(scoop_name)
-                            and not ctx.is_completed(scoop_name) then
+                    elseif data.engine_owns_box then
                         -- Retire it with its END flag, never by clearing the
                         -- ENTRY flag: the engine re-asserts a cleared entry
                         -- flag within a frame and every rising edge enqueues
@@ -387,7 +410,31 @@ function M.build(deps)
                         -- Getting the box back is not this policy's job. A
                         -- per-tick "END off" while shown is what overrode the
                         -- engine's own ending and made day 1 time out.
-                        if data.disp_end_flag then
+                        --
+                        -- The END claim itself is ONLY for a scoop we have
+                        -- never been given. A received-but-not-shown day
+                        -- (conflict-blocked, prerequisites pending) and a
+                        -- completed one both keep their box state: their END
+                        -- flag is the engine's, and disable_on_unlock already
+                        -- cleared it once at unlock.
+                        --
+                        -- The invariant is that an engine-owned box NEVER
+                        -- reaches the entry-clearing branch below, whatever
+                        -- its state.
+                        --
+                        -- And NEVER assert a box-end living in the psycho
+                        -- appear/timeout block (1153..1182): those are
+                        -- engine spawn-state records, and holding one on
+                        -- suppresses spawns. Pride's box-end is 1155
+                        -- (EM45_THIRD_APPEAR); asserting it stopped day-2
+                        -- Kent's set from placing in vanilla order
+                        -- (measured 2026-08-22). Cost: that box may show
+                        -- early -- one early box beats a broken spawn.
+                        if data.disp_end_flag
+                                and not (data.disp_end_flag >= 1153
+                                         and data.disp_end_flag <= 1182)
+                                and not ctx.is_active(scoop_name)
+                                and not ctx.is_completed(scoop_name) then
                             claim(data.disp_end_flag, "on")
                         end
                     else

@@ -42,6 +42,12 @@ local endgame_reached = false
 -- Poll-class parking: { [name] = "flag_prereq" | "item" }
 local poll_deferred = {}
 
+-- AP receipt order: name -> ordinal of FIRST receipt. Conflict-group
+-- ADVANCE follows this rather than the group's list order, so a chain like
+-- Kent's plays its pending days in the order the multiworld granted them.
+local ap_receipt_seq = {}
+local ap_receipt_counter = 0
+
 ------------------------------------------------------------
 -- Config (data + injected adapters)
 ------------------------------------------------------------
@@ -632,15 +638,24 @@ local function try_advance_conflict_group(completed_name)
     local info = scoop_to_conflict[completed_name]
     if not info then return end
 
-    for _, member in ipairs(info.members) do
+    -- Pick the pending member the multiworld granted FIRST, not the first
+    -- in the group's list order -- an unlock order of day 2, day 3, day 1
+    -- should play day 3 after day 2 completes (field report 2026-08-21).
+    -- Members without a recorded ordinal (restored older state) fall back
+    -- behind ordered ones, keeping relative list order among themselves.
+    local best, best_seq
+    for i, member in ipairs(info.members) do
         if member ~= completed_name and M.ap_received[member] and not M.completed[member] then
-            if not M.received[member] then
-                cfg.log(string.format("Conflict group '%s': '%s' completed -> unlocking '%s'",
-                    info.group, completed_name, member))
-                M.request_unlock(member)
+            local seq = ap_receipt_seq[member] or (1e9 + i)
+            if not best or seq < best_seq then
+                best, best_seq = member, seq
             end
-            return
         end
+    end
+    if best and not M.received[best] then
+        cfg.log(string.format("Conflict group '%s': '%s' completed -> unlocking '%s' (receipt order)",
+            info.group, completed_name, best))
+        M.request_unlock(best)
     end
 end
 
@@ -685,6 +700,10 @@ end
 ------------------------------------------------------------
 
 function M.mark_ap_received(scoop_name)
+    if not ap_receipt_seq[scoop_name] then
+        ap_receipt_counter = ap_receipt_counter + 1
+        ap_receipt_seq[scoop_name] = ap_receipt_counter
+    end
     M.ap_received[scoop_name] = true
 end
 
@@ -766,6 +785,8 @@ end
 ------------------------------------------------------------
 
 function M.reset_all()
+    clear_table(ap_receipt_seq)
+    ap_receipt_counter = 0
     clear_table(M.ap_received)
     clear_table(M.received)
     clear_table(M.completed)
