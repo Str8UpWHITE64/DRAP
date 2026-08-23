@@ -35,6 +35,11 @@ local config = {
 -- an area load and has never crashed, so traps now go through the same path.
 -- A queued trap REPLACES that load's random pick rather than fighting it.
 local pending_trap = nil
+local last_load_at = 0
+-- A trap queued this soon after a load is treated as having arrived DURING
+-- that transition, and waits for the next one. Dressing Frank while the game
+-- is still bringing an area up is the state the traps used to crash in.
+local LOAD_SETTLE_SECONDS = 5.0
 
 local state = {
     chaos_hook_installed = false,
@@ -146,6 +151,16 @@ local function install_chaos_hook()
             -- A queued trap wins and consumes the load: dressing Frank in
             -- the trap costume IS this load's costume change, so a random
             -- pick would immediately undo it.
+            last_load_at = os.clock()
+            if pending_trap and pending_trap.defer_one then
+                -- Queued mid-transition: let this load finish untouched and
+                -- dress him on the next one.
+                pending_trap.defer_one = false
+                log(string.format(
+                    "costume trap '%s' arrived mid-transition -- holding for the next area load",
+                    pending_trap.name))
+                return retval
+            end
             if pending_trap then
                 local trap = pending_trap
                 pending_trap = nil
@@ -177,10 +192,15 @@ function M.queue_trap(name, apply)
         log(string.format("costume trap '%s' replaces queued '%s'",
             name, pending_trap.name))
     end
-    pending_trap = { name = name, apply = apply }
+    pending_trap = {
+        name = name,
+        apply = apply,
+        defer_one = (os.clock() - last_load_at) < LOAD_SETTLE_SECONDS,
+    }
     -- Traps must work with chaos mode off, so make sure the hook exists.
     install_chaos_hook()
-    log(string.format("costume trap '%s' queued for the next area load", name))
+    log(string.format("costume trap '%s' queued for the next area load%s", name,
+        pending_trap.defer_one and " (arrived mid-transition -- skipping one)" or ""))
     return true
 end
 

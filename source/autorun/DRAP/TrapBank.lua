@@ -22,14 +22,28 @@ M:set_throttle(1.0)
 
 local SECTION = "trap_bank"
 
--- One trap at a time, and not instantly on top of each other.
-local FIRE_INTERVAL_SECONDS = 8.0
+-- One trap at a time, and well clear of each other. Raised from 8s after a
+-- server !collect delivered nine items at once: two traps landed together, the
+-- second fired 8s behind the first and the game went down. Traps do heavy
+-- things -- emptying an inventory, breaking every item, re-dressing the player
+-- -- and the engine needs room to settle between them.
+local FIRE_INTERVAL_SECONDS = 30.0
 
 local registry = {}      -- item_name -> { can_fire = fn|nil, fire = fn, label }
 local order = {}         -- registration order, so draining is deterministic
 local consumed = {}      -- item_name -> count already paid out
 local loaded = false
 local last_fire_at = 0
+-- Nothing fires until the world has been settled this long after an area
+-- change. Butterfingers emptied an inventory and nothing landed: the trap went
+-- off about a second after the player walked into s136 with an escort, while
+-- SceneFixups was still patching that scene (it rewrites mAreaIndex on the way
+-- in). removeItem DROPS rather than deletes, so the items had to be PLACED,
+-- and placing into a scene mid-fixup is where they went.
+local WORLD_SETTLE_SECONDS = 8.0
+local last_area_index = nil
+local world_ready_at = nil
+local was_in_game = false
 
 ------------------------------------------------------------
 -- Registration
@@ -118,9 +132,32 @@ function M.on_frame()
     if not M:should_run() then return end
     if not Ledger.is_init() then return end
     if not loaded then M.load() end
-    if not Shared.is_in_game() then return end
+    if not Shared.is_in_game() then
+        -- Out of gameplay: the next entry restarts the settle clock.
+        was_in_game = false
+        return
+    end
 
     local now = os.clock()
+
+    -- Restart the settle clock whenever the world changes underfoot: a new
+    -- area, or the player being (re)spawned.
+    local area_index = Shared.safe(function()
+        local am = sdk.get_managed_singleton("app.solid.gamemastering.AreaManager")
+        return am and am:get_field("mAreaIndex")
+    end)
+    if area_index ~= nil and area_index ~= last_area_index then
+        last_area_index = area_index
+        world_ready_at = now
+    end
+    if not was_in_game then
+        was_in_game = true
+        world_ready_at = now
+    end
+
+    if world_ready_at and (now - world_ready_at) < WORLD_SETTLE_SECONDS then
+        return
+    end
     if (now - last_fire_at) < FIRE_INTERVAL_SECONDS then return end
 
     for _, name in ipairs(order) do
