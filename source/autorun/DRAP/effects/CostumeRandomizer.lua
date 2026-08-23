@@ -29,6 +29,13 @@ local config = {
     dlc_enabled      = false,
 }
 
+-- A costume trap waiting for the next area load: { name, apply }.
+-- Costume traps used to dress Frank the moment they fired, and testers saw
+-- random crashes from all three. The randomizer only ever changes costume on
+-- an area load and has never crashed, so traps now go through the same path.
+-- A queued trap REPLACES that load's random pick rather than fighting it.
+local pending_trap = nil
+
 local state = {
     chaos_hook_installed = false,
     starting_pending     = false,
@@ -124,7 +131,9 @@ function M.do_random_swap()
     return true
 end
 
--- Install the chaos-mode hook on AreaManager.onLoadMapEvent. Idempotent.
+-- Install the area-load hook on AreaManager.onLoadMapEvent. Idempotent.
+-- Serves BOTH chaos mode and costume traps, so it is installed whenever
+-- either needs it -- a trap has to work with chaos mode off.
 local function install_chaos_hook()
     if state.chaos_hook_installed then return true end
     local td = sdk.find_type_definition(AM_TYPE)
@@ -134,6 +143,17 @@ local function install_chaos_hook()
     sdk.hook(m,
         function(args) end,
         function(retval)
+            -- A queued trap wins and consumes the load: dressing Frank in
+            -- the trap costume IS this load's costume change, so a random
+            -- pick would immediately undo it.
+            if pending_trap then
+                local trap = pending_trap
+                pending_trap = nil
+                local ok, applied = pcall(trap.apply)
+                log(string.format("costume trap '%s' applied on area load: %s",
+                    trap.name, (ok and applied ~= false) and "ok" or "FAILED"))
+                return retval
+            end
             -- Gate on the live config flag so toggling chaos off via reload
             -- (or setup re-run) silences the hook without an unhook primitive.
             if not config.chaos_mode then return retval end
@@ -143,8 +163,29 @@ local function install_chaos_hook()
             return retval
         end)
     state.chaos_hook_installed = true
-    log("chaos-mode hook installed (AreaManager.onLoadMapEvent)")
+    log("area-load hook installed (AreaManager.onLoadMapEvent)")
     return true
+end
+
+--- Queue a costume trap for the next area load.
+--- @param name string trap name, for the log
+--- @param apply function dresses Frank; return false if it could not
+--- @return boolean always true -- queuing cannot fail, so a trap is never
+---         wasted for firing while Frank is between areas or on a menu
+function M.queue_trap(name, apply)
+    if pending_trap then
+        log(string.format("costume trap '%s' replaces queued '%s'",
+            name, pending_trap.name))
+    end
+    pending_trap = { name = name, apply = apply }
+    -- Traps must work with chaos mode off, so make sure the hook exists.
+    install_chaos_hook()
+    log(string.format("costume trap '%s' queued for the next area load", name))
+    return true
+end
+
+function M.has_pending_trap()
+    return pending_trap ~= nil
 end
 
 -- Cycle-tester state for the diagnostic stepper. cycle.active gates the

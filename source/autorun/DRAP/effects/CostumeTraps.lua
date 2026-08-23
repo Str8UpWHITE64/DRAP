@@ -19,6 +19,13 @@
 -- These are deliberately NOT reverted on a timer. Frank changes clothes at the
 -- changing rooms in vanilla, so the player already has a way out -- and being
 -- stuck in boxers until you find one is the joke.
+--
+-- APPLIED ON AREA LOAD, NEVER IMMEDIATELY. Dressing Frank the moment a trap
+-- fired crashed the game at random for every tester, on all three traps. The
+-- costume randomizer only ever changes costume from the AreaManager load hook
+-- and has never crashed, so traps hand themselves to that same path via
+-- CostumeRandomizer.queue_trap. With Costume Chaos on, the queued trap
+-- REPLACES that load's random outfit instead of racing it.
 
 local Shared = require("DRAP/Shared")
 local ItemEffects = require("DRAP/ItemEffects")
@@ -44,14 +51,14 @@ local function notify(text)
     end
 end
 
-local function fire_bald()
+local function dress_bald()
     if not CostumeRandomizer.set_part(PART_HAT, BALD_HAT) then return false end
     M.log("bald trap applied")
     notify("Your hair is gone.")
     return true
 end
 
-local function fire_donut()
+local function dress_donut()
     -- Body first: a body swap can reset the other slots, so feet go after.
     if not CostumeRandomizer.set_part(PART_BODY, HEART_BOXERS) then return false end
     CostumeRandomizer.set_part(PART_FOOT, BAREFOOT)
@@ -62,27 +69,26 @@ end
 
 -- change2Naked strips every slot in one call, so this needs no ids at all --
 -- unlike the Donut trap, which is a hand-picked body and foot.
-local function fire_boxers()
+local function dress_boxers()
     if not CostumeRandomizer.set_naked() then return false end
     M.log("boxers trap applied")
     notify("You have been stripped to your boxers.")
     return true
 end
 
---- Declines while Frank is not spawned, so a trap landing on the title screen
---- is re-banked by TrapBank instead of being wasted.
-local function guarded(fn)
+--- Hand the trap to the costume randomizer's area-load hook. Queuing always
+--- succeeds, so a trap that lands on a menu or between areas is not wasted and
+--- does not need re-banking -- it simply dresses Frank on the next load.
+local function queued(name, dress)
     return function()
-        if not Shared.is_in_game() then return false end
-        if not CostumeRandomizer.player_ready() then return false end
-        return fn() ~= false
+        return CostumeRandomizer.queue_trap(name, dress)
     end
 end
 
 function M.register()
-    TrapBank.register(BALD,    { fire = guarded(fire_bald) })
-    TrapBank.register(DONUT,   { fire = guarded(fire_donut) })
-    TrapBank.register(BOXERS,  { fire = guarded(fire_boxers) })
+    TrapBank.register(BALD,   { fire = queued(BALD,   dress_bald) })
+    TrapBank.register(DONUT,  { fire = queued(DONUT,  dress_donut) })
+    TrapBank.register(BOXERS, { fire = queued(BOXERS, dress_boxers) })
 
     for _, name in ipairs({ BALD, DONUT, BOXERS }) do
         ItemEffects.register(name, {
@@ -95,16 +101,20 @@ function M.register()
     end
 end
 
-_G.drap_trap_bald = function()
-    if not fire_bald() then M.log("player not ready") end
-end
+-- Console helpers queue the same way the real traps do, so what is tested is
+-- what ships. Walk through a door to see the result.
+_G.drap_trap_bald   = function() CostumeRandomizer.queue_trap(BALD,   dress_bald) end
+_G.drap_trap_donut  = function() CostumeRandomizer.queue_trap(DONUT,  dress_donut) end
+_G.drap_trap_boxers = function() CostumeRandomizer.queue_trap(BOXERS, dress_boxers) end
 
-_G.drap_trap_donut = function()
-    if not fire_donut() then M.log("player not ready") end
-end
-
-_G.drap_trap_boxers = function()
-    if not fire_boxers() then M.log("player not ready") end
+--- Dress Frank immediately, bypassing the queue. For diagnosing the original
+--- crash only -- this is the path that crashed testers.
+_G.drap_trap_costume_now = function(which)
+    local map = { bald = dress_bald, donut = dress_donut, boxers = dress_boxers }
+    local fn = map[tostring(which or "bald"):lower()]
+    if not fn then M.log("usage: drap_trap_costume_now('bald'|'donut'|'boxers')"); return end
+    M.log("applying immediately -- this is the path that crashed")
+    fn()
 end
 
 return M
