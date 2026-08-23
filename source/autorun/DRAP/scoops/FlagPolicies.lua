@@ -48,6 +48,13 @@ function M.build(deps)
         local entry = D.protected_primary_flags[flag_id]
         if not entry then return false end
         if entry.scoop ~= scoop_name then return false end
+        -- until_transition: also protected for one area load after
+        -- while_active lapses. ScoopUnlocker owns the latch (it needs state
+        -- across ticks); this stays a pure ctx read.
+        if entry.until_transition and ctx.in_transition_grace
+                and ctx.in_transition_grace(flag_id) then
+            return true
+        end
         if entry.while_active then
             return ctx.is_active(entry.while_active)
         end

@@ -511,6 +511,13 @@ local EP_SHUTTER_FLOW = 150
 local EP_MISSION_FLOW_LO = 100    -- Backup for Brad, hands off
 local EP_MISSION_FLOW_HI = 129
 
+-- Diagnostic switch for issue #32 (Brad sticks around after Odd Old Man).
+-- Odd Old Man leaves flow at 130 and this raises it to 150 within a tick; if
+-- Brad's despawn is driven by that state we are overwriting it before the
+-- engine acts on it. drap_ep_flow_hold(false) suspends the raise so that can
+-- be tested without turning ScoopSanity off.
+local ep_flow_hold_enabled = true
+
 local function flow_manager()
     local td = Shared.safe(function()
         return sdk.find_type_definition("app.solid.gamemastering.InGameFlowManagerBase")
@@ -525,6 +532,7 @@ end
 local _flow_logged = nil
 
 local function hold_ep_shutter_flow()
+    if not ep_flow_hold_enabled then return end
     if not scoop_sanity_enabled then return end
     if not State.is_activated() then return end
     -- The 72-hour shutter state has no business being forced in Overtime.
@@ -696,15 +704,66 @@ local CULT_OFF = {
 -- 292: Isabela despawn; Santa Cabeza needs 292 AND 774, so leaving it is safe.
 -- 272: game sets it during Backup for Brad's ending; don't touch until 2280
 --      (Backup complete), then manage normally for A Temporary Agreement.
+-- until_transition: keep protecting for ONE area load after `while_active`
+-- lapses. Brad's despawn is a PLACEMENT decision -- the engine reads 272 when
+-- an area loads and declines to place him -- so clearing it a second after the
+-- engine sets it (measured: engine set at t=24601.5, we cleared at t=24602.6)
+-- means no load ever sees it and Brad stays in the world. Measured in game:
+-- 272 on plus one area transition despawns him; 272 on for any length of time
+-- without a transition does not.
 local PROTECTED_PRIMARY_FLAGS = {
     [292] = { scoop = "Santa Cabeza" },
-    [272] = { scoop = "A Temporary Agreement", while_active = "Backup for Brad" },
+    [272] = { scoop = "A Temporary Agreement", while_active = "Backup for Brad",
+              until_transition = true },
 }
+
+-- flag -> the area index the grace was armed in; cleared once it changes.
+local transition_grace = {}
+
+--- Arm/expire the one-transition grace. Called from the ctx build each tick.
+local function update_transition_grace()
+    local area = get_current_area_index()
+    for flag_id, entry in pairs(PROTECTED_PRIMARY_FLAGS) do
+        if entry.until_transition then
+            local armed = transition_grace[flag_id]
+            if armed == nil then
+                -- Arm only once the flag is actually ON and its own scoop has
+                -- not been received -- i.e. the engine set it and enforcement
+                -- is about to take it away.
+                if raw_check_flag(flag_id) and not received_scoops[entry.scoop] then
+                    transition_grace[flag_id] = area
+                    M.log(string.format(
+                        "flag %d: holding through one area load (area %s)",
+                        flag_id, tostring(area)))
+                end
+            elseif area ~= nil and armed ~= nil and area ~= armed then
+                transition_grace[flag_id] = nil
+                M.log(string.format(
+                    "flag %d: area load done -- resuming enforcement", flag_id))
+            end
+        end
+    end
+end
+
+local function in_transition_grace(flag_id)
+    return transition_grace[flag_id] ~= nil
+end
+
+--- Is ANY protected flag currently being held through an area load? The HUD
+--- uses this: while a story flag stands, the engine repaints the mission box
+--- with that mission's text, and MissionTruth must re-assert its placeholder
+--- over it.
+function M.transition_grace_active()
+    return next(transition_grace) ~= nil
+end
 
 local function is_protected_primary(flag_id, scoop_name)
     local entry = PROTECTED_PRIMARY_FLAGS[flag_id]
     if not entry then return false end
     if entry.scoop ~= scoop_name then return false end
+    if entry.until_transition and in_transition_grace(flag_id) then
+        return true
+    end
     if entry.while_active then
         -- Only protected while the guarding scoop is active (received + not completed)
         return received_scoops[entry.while_active] == true
@@ -1091,6 +1150,7 @@ local function reconciler_log(msg)
 end
 
 local function build_reconciler_ctx()
+    update_transition_grace()
     return {
         activated = State.is_activated(),
         queens_unlocked = queens_unlocked(),
@@ -1110,6 +1170,7 @@ local function build_reconciler_ctx()
         is_conflict_blocked = State.is_conflict_blocked,
         is_blocked_by_active_main = State.is_blocked_by_active_main,
         has_prerequisites_met = State.has_prerequisites_met,
+        in_transition_grace = in_transition_grace,
         chain_disp_flag = (function()
             local cur = State.get_current_chain_scoop()
             local data = cur and SCOOP_DATA[cur]
@@ -2980,6 +3041,21 @@ _G.drap_reconciler = function(mode)
     end
     print("Reconciler mode=" .. M.get_reconciler_mode() .. detail)
 end
+--- Suspend or restore the EP-shutter flow raise (issue #32 diagnostic).
+---   drap_ep_flow_hold(false)  stop raising -- the shutters will close again
+---   drap_ep_flow_hold(true)   restore
+---   drap_ep_flow_hold()       report
+_G.drap_ep_flow_hold = function(on)
+    if on ~= nil then ep_flow_hold_enabled = (on == true) end
+    local mgr = flow_manager()
+    local cur = mgr and tonumber(Shared.safe(function()
+        return mgr:call("getGameFlow")
+    end))
+    M.log(string.format("EP flow hold: %s | current game flow = %s",
+        ep_flow_hold_enabled and "ON (raising to 150)" or "SUSPENDED",
+        tostring(cur)))
+end
+
 _G.scoop_verbose = function(on)
     if on == nil then on = not verbose_logging end
     M.set_verbose_logging(on)

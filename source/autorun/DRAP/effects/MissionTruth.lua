@@ -414,8 +414,26 @@ end
 -- Recompute the target; reset learn/swap state only when it actually
 -- changed (avoids thrashing). Called from the frame loop, so no wiring
 -- into every state mutation is needed.
+local last_grace = false
+
 function M.refresh()
     if not enabled then return end
+    -- While a story flag is held through an area load (see
+    -- PROTECTED_PRIMARY_FLAGS.until_transition -- 272 is held so Brad
+    -- despawns), the ENGINE repaints the mission box with that mission's
+    -- text. The computed target has not changed, so the dedupe below would
+    -- skip the re-assert and the HUD would name a mission that is not
+    -- running. Force a re-learn on each edge of that window.
+    local grace = false
+    if scoop_unlocker and scoop_unlocker.transition_grace_active then
+        local ok, v = pcall(scoop_unlocker.transition_grace_active)
+        grace = ok and v == true
+    end
+    if grace ~= last_grace then
+        last_grace = grace
+        target = nil
+    end
+
     local t = compute_target()
     if target_key(t) == target_key(target) then return end
     target = t
