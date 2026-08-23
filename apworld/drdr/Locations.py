@@ -469,6 +469,15 @@ location_tables = {
         DRLocationData("Photograph PP Sticker 92", "Pie", DRLocationCategory.PP_STICKER),
         DRLocationData("Photograph PP Sticker 93", "Baguette", DRLocationCategory.PP_STICKER),
         DRLocationData("Photograph PP Sticker 94", "Orange Juice", DRLocationCategory.PP_STICKER),
+
+        # The five Bomb Collector trucks, named for the plaza each sits under.
+        # Flags EV_TIMER_BOM00..04 (2066-2070), set on COLLECTING each bomb.
+        # Appended last: location IDs are position-based per region.
+        DRLocationData("Bomb Collector - Entrance Plaza Truck", "Milk", DRLocationCategory.MAIN_SCOOP),
+        DRLocationData("Bomb Collector - North Plaza Truck", "Coffee Creamer", DRLocationCategory.MAIN_SCOOP),
+        DRLocationData("Bomb Collector - Al Fresca Plaza Truck", "Yogurt", DRLocationCategory.MAIN_SCOOP),
+        DRLocationData("Bomb Collector - Wonderland Plaza Truck", "Apple", DRLocationCategory.MAIN_SCOOP),
+        DRLocationData("Bomb Collector - Seon's Food and Stuff Truck", "Orange Juice", DRLocationCategory.MAIN_SCOOP),
     ],
 
     # Off the Maintenance Tunnel and nothing else, so its key gates all four.

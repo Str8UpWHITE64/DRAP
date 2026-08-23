@@ -3265,6 +3265,11 @@
       "completion_event": "Complete Bomb Collector",
       "chain_eligible": true,
       "events": [
+        "Bomb Collector - Entrance Plaza Truck",
+        "Bomb Collector - North Plaza Truck",
+        "Bomb Collector - Al Fresca Plaza Truck",
+        "Bomb Collector - Wonderland Plaza Truck",
+        "Bomb Collector - Seon's Food and Stuff Truck",
         "Complete Bomb Collector",
         "Beat Drivin Carlito"
       ],
@@ -4202,6 +4207,31 @@
     {
       "flag": 2356,
       "event": "Complete Memories"
+    },
+    {
+      "flag": 2066,
+      "event": "Bomb Collector - Entrance Plaza Truck",
+      "scoop": "The Last Resort"
+    },
+    {
+      "flag": 2067,
+      "event": "Bomb Collector - North Plaza Truck",
+      "scoop": "The Last Resort"
+    },
+    {
+      "flag": 2068,
+      "event": "Bomb Collector - Al Fresca Plaza Truck",
+      "scoop": "The Last Resort"
+    },
+    {
+      "flag": 2069,
+      "event": "Bomb Collector - Wonderland Plaza Truck",
+      "scoop": "The Last Resort"
+    },
+    {
+      "flag": 2070,
+      "event": "Bomb Collector - Seon's Food and Stuff Truck",
+      "scoop": "The Last Resort"
     }
   ],
   "overtime_items": [

@@ -822,6 +822,16 @@ def set_rules(world) -> None:
 
             world.set_rule(world.multiworld.get_location("Complete Bomb Collector", world.player), And(CanReachLocation("Meet back at the Security Room at 11am day 3"), CanReachRegion("Maintenance Tunnel")))
 
+            # The five bombs are collected during the same run through the
+            # tunnel, so they share Bomb Collector's own prerequisite rather
+            # than chaining off it -- gating them behind its completion would
+            # put them a sphere later than they are actually reachable.
+            world.set_rule(world.multiworld.get_location("Bomb Collector - Entrance Plaza Truck", world.player), And(CanReachLocation("Meet back at the Security Room at 11am day 3"), CanReachRegion("Maintenance Tunnel")))
+            world.set_rule(world.multiworld.get_location("Bomb Collector - North Plaza Truck", world.player), And(CanReachLocation("Meet back at the Security Room at 11am day 3"), CanReachRegion("Maintenance Tunnel")))
+            world.set_rule(world.multiworld.get_location("Bomb Collector - Al Fresca Plaza Truck", world.player), And(CanReachLocation("Meet back at the Security Room at 11am day 3"), CanReachRegion("Maintenance Tunnel")))
+            world.set_rule(world.multiworld.get_location("Bomb Collector - Wonderland Plaza Truck", world.player), And(CanReachLocation("Meet back at the Security Room at 11am day 3"), CanReachRegion("Maintenance Tunnel")))
+            world.set_rule(world.multiworld.get_location("Bomb Collector - Seon's Food and Stuff Truck", world.player), And(CanReachLocation("Meet back at the Security Room at 11am day 3"), CanReachRegion("Maintenance Tunnel")))
+
             world.set_rule(world.multiworld.get_location("Beat Drivin Carlito", world.player), And(CanReachLocation("Complete Bomb Collector"), CanReachRegion("Maintenance Tunnel")))
 
             world.set_rule(world.multiworld.get_location("Meet back at the Security Room at 5pm day 3", world.player), Or(CanReachLocation("Complete Bomb Collector"), CanReachLocation("Beat Drivin Carlito")))
