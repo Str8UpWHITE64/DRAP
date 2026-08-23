@@ -35,6 +35,28 @@ local npc_manager_td = nil
 local carry_over_counter = 0
 local CARRY_OVER_OFFSET_STEP = 0.40
 
+-- Per-area arrival marks for carried-over escorts.
+--
+-- dest.pos is the PLAYER's arrival point. The engine does not put an arriving
+-- escort there; it puts them on their own mark beside the door. Measured from
+-- three working vent arrivals -- Jeff (154.4, 9.2, 217.9), Natalie and Bill
+-- (154.5, 9.2, 217.9) -- against the same survivor arriving broken through the
+-- redirected Entrance Plaza door at (153.6, 9.2, 216.9).
+--
+-- Every other field of the NPC record is identical between the two routes
+-- (situation, attribute, carry-over flag, area, live state), so the mark is
+-- the only measured difference.
+--
+-- This only fixes WHERE they stand. The survivor speaks their line from their
+-- own mouth, so being in the wrong place made the delivery wrong even once the
+-- line played -- EscortVoice handles the line itself.
+--
+-- drap_carryover_pos(x, y, z) overrides area 288's mark live,
+-- drap_carryover_pos() reports it, drap_carryover_pos(false) clears it.
+local ARRIVAL_MARK = {
+    [288] = { x = 154.5, y = 9.2, z = 217.9 },   -- s136 Security Room
+}
+
 ------------------------------------------------------------
 -- Helpers
 ------------------------------------------------------------
@@ -89,9 +111,11 @@ local function rewrite_single_npc(npc_obj, dest, index)
     local offset = CARRY_OVER_OFFSET_STEP * (carry_over_counter % 6)
 
     local new_area = dest.area_no
-    local new_x = (dest.pos and dest.pos.x or 0) + offset
-    local new_y = dest.pos and dest.pos.y or 0
-    local new_z = dest.pos and dest.pos.z or 0
+    -- The area's own escort mark when one is known, else the player's point.
+    local base = ARRIVAL_MARK[new_area] or dest.pos
+    local new_x = (base and base.x or 0) + offset
+    local new_y = base and base.y or 0
+    local new_z = base and base.z or 0
 
     pcall(function() npc_obj:set_field("mAreaNo", new_area) end)
 
@@ -103,6 +127,24 @@ local function rewrite_single_npc(npc_obj, dest, index)
     pcall(function() npc_obj:set_field("mCarryOverFlag", true) end)
 
     return true
+end
+
+--- Override or report the s136 arrival mark, for testing the escort-delivery
+--- scene. drap_carryover_pos() to read, drap_carryover_pos(x, y, z) to set,
+--- drap_carryover_pos(false) to fall back to the player's arrival point.
+_G.drap_carryover_pos = function(x, y, z)
+    if x == false then
+        ARRIVAL_MARK[288] = nil
+        M.log("s136 arrival mark cleared -- escorts use the player's point")
+        return
+    end
+    if x and y and z then
+        ARRIVAL_MARK[288] = { x = tonumber(x), y = tonumber(y), z = tonumber(z) }
+    end
+    local m = ARRIVAL_MARK[288]
+    M.log(string.format("s136 arrival mark: %s",
+        m and string.format("(%.2f, %.2f, %.2f)", m.x, m.y, m.z)
+          or "none (player's arrival point)"))
 end
 
 local function rewrite_npc_list(npc_list, dest, player_area, player_pos)

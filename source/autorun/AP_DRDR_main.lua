@@ -128,6 +128,7 @@ AP.effects.TimeLockEffects            = require("DRAP/effects/TimeLockEffects")
 AP.effects.VictoryEffects             = require("DRAP/effects/VictoryEffects")
 AP.effects.SurvivorScoopCompletion    = require("DRAP/effects/SurvivorScoopCompletion")
 AP.effects.SaviorGoalEffects          = require("DRAP/effects/SaviorGoalEffects")
+AP.effects.EscortVoice                = require("DRAP/effects/EscortVoice")
 AP.effects.PsychoGoalEffects          = require("DRAP/effects/PsychoGoalEffects")
 AP.effects.PsychoHostility            = require("DRAP/effects/PsychoHostility")
 AP.effects.BookSkills                 = require("DRAP/effects/BookSkills")
@@ -267,6 +268,12 @@ AP.NpcTracker.on_survivor_rescued = function(npc_id, state_index, friendly_name,
     end
     if AP.effects.SaviorGoalEffects then
         AP.effects.SaviorGoalEffects.on_survivor_rescued(friendly_name)
+    end
+    -- Delivered through a redirected door the engine stays silent, so this
+    -- speaks the line it skips. Takes npc_id: the line is named for the
+    -- SurvivorType, not the friendly name.
+    if AP.effects.EscortVoice then
+        AP.effects.EscortVoice.on_survivor_rescued(npc_id)
     end
 end
 
@@ -785,6 +792,7 @@ re.on_frame(function()
     safe_on_frame(AP.DoorSceneLock,    "DoorSceneLock")
     safe_on_frame(AP.DoorRandomizer,   "DoorRandomizer")
     safe_on_frame(AP.NpcCarryover,     "NpcCarryover")
+    safe_on_frame(AP.effects.EscortVoice, "EscortVoice")
     safe_on_frame(AP.ChallengeTracker, "ChallengeTracker")
     safe_on_frame(AP.LevelTracker,     "LevelTracker")
     safe_on_frame(AP.AchievementTracker, "AchievementTracker")
