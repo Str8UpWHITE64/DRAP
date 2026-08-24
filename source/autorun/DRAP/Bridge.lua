@@ -225,6 +225,81 @@ function M.send_shared_damage(points)
     return false
 end
 
+------------------------------------------------------------
+-- KnockbackLink (protocol tag "KnockbackLink")
+------------------------------------------------------------
+-- Same shape as DamageLink: bounces echo back to the sender, so each carries
+-- a uuid and a client ignores its own. The payload's "value" is a change in
+-- velocity -- x, y, z floats, +x east, +y up, +z south.
+
+local KNOCKBACK_TAG = "KnockbackLink"
+
+M.knockbacklink_enabled = false
+
+--- Called with the received {x, y, z} and the sender's name. Set by
+--- KnockbackLink.lua.
+M.on_knockback = nil
+
+function M.set_knockbacklink_enabled(v)
+    M.knockbacklink_enabled = (v == true)
+    M.log("KnockbackLink enabled: " .. tostring(M.knockbacklink_enabled))
+end
+
+local function handle_knockback(data)
+    if not M.knockbacklink_enabled then return end
+    if damage_uuid and tostring(data["uuid"] or "") == damage_uuid then return end
+
+    local value = data["value"]
+    if type(value) ~= "table" then return end
+    local source = data["source"] or "someone"
+    M.log(string.format("KnockbackLink received from %s: (%s, %s, %s)",
+        tostring(source), tostring(value.x), tostring(value.y), tostring(value.z)))
+    if M.on_knockback then
+        pcall(M.on_knockback, value, tostring(source))
+    end
+end
+
+--- Broadcast a knockback, as a change in velocity.
+function M.send_knockback(x, y, z)
+    if not M.knockbacklink_enabled then return false end
+    if not AP_REF.APClient then return false end
+    if not is_connected() then return false end
+
+    local now = math.floor(os.time())
+    if AP_REF.APClient.get_server_time then
+        local ok, t = pcall(AP_REF.APClient.get_server_time, AP_REF.APClient)
+        if ok and t then now = math.floor(tonumber(t) or os.time()) end
+    end
+
+    local my_alias = "DRDR Player"
+    if AP_REF.APClient.get_player_alias and AP_REF.APClient.get_slot then
+        local ok_slot, slot = pcall(AP_REF.APClient.get_slot, AP_REF.APClient)
+        if ok_slot and slot then
+            local ok_alias, alias = pcall(AP_REF.APClient.get_player_alias,
+                                          AP_REF.APClient, slot)
+            if ok_alias and alias then my_alias = Shared.clean_string(alias) end
+        end
+    end
+
+    local payload = {
+        time = now,
+        uuid = get_damage_uuid(),
+        source = my_alias,
+        cause = my_alias .. " got knocked about.",
+        value = { x = x, y = y, z = z },
+    }
+
+    if type(AP_REF.APClient.Bounce) ~= "function" then return false end
+    local ok, err = pcall(AP_REF.APClient.Bounce, AP_REF.APClient, payload,
+                          nil, nil, { KNOCKBACK_TAG })
+    if ok then
+        M.log(string.format("Sent KnockbackLink: (%.2f, %.2f, %.2f)", x, y, z))
+        return true
+    end
+    M.log.error("KnockbackLink send failed: " .. tostring(err))
+    return false
+end
+
 local function has_tag(tags, needle)
     if not tags or type(tags) ~= "table" then return false end
     for _, v in pairs(tags) do
@@ -241,6 +316,11 @@ local function handle_bounced(json_rows)
     -- DeathLink one.
     if has_tag(json_rows["tags"], DAMAGE_TAG) then
         handle_shared_damage(json_rows["data"] or {})
+        return
+    end
+
+    if has_tag(json_rows["tags"], KNOCKBACK_TAG) then
+        handle_knockback(json_rows["data"] or {})
         return
     end
 

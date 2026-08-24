@@ -42,6 +42,7 @@ AP.TimeGate         = require("DRAP/TimeGate")
 AP.Scene            = require("DRAP/Scene")
 AP.DeathLink        = require("DRAP/trackers/DeathLink")
 AP.DamageLink       = require("DRAP/trackers/DamageLink")
+AP.KnockbackLink    = require("DRAP/trackers/KnockbackLink")
 AP.ScoopUnlocker     = require("DRAP/ScoopUnlocker")
 AP.MissionTruth      = require("DRAP/effects/MissionTruth")
 AP.MissionTruth.init({ scoop_unlocker = AP.ScoopUnlocker })
@@ -417,6 +418,17 @@ local function run_slot_connect(slot_data)
         AP.DamageLink.apply_received(points, source)
     end
     log("DamageLink enabled=" .. tostring(damage_link_enabled))
+
+    -- KnockbackLink. Shares being knocked about rather than being hurt, so
+    -- it stands on its own next to DamageLink.
+    local knockback_link_enabled = (type(slot_data) == "table" and slot_data.knockback_link == true)
+    AP.KnockbackLinkEnabled = knockback_link_enabled
+    AP.KnockbackLink.set_enabled(knockback_link_enabled)
+    AP_BRIDGE.set_knockbacklink_enabled(knockback_link_enabled)
+    AP_BRIDGE.on_knockback = function(value, source)
+        AP.KnockbackLink.apply_received(value, source)
+    end
+    log("KnockbackLink enabled=" .. tostring(knockback_link_enabled))
 
     -- Spitter Only. Arrives with restricted_item_mode already forced on by
     -- the apworld, so the pickup half above is what stops the player picking
@@ -820,6 +832,7 @@ re.on_frame(function()
     safe_on_frame(AP.effects.EscortVoice, "EscortVoice")
     safe_on_frame(AP.effects.SpitterMode, "SpitterMode")
     safe_on_frame(AP.DamageLink,       "DamageLink")
+    safe_on_frame(AP.KnockbackLink,    "KnockbackLink")
     safe_on_frame(AP.ChallengeTracker, "ChallengeTracker")
     safe_on_frame(AP.LevelTracker,     "LevelTracker")
     safe_on_frame(AP.AchievementTracker, "AchievementTracker")

@@ -37,6 +37,19 @@ class DamageLink(Toggle):
     default = False
 
 
+class KnockbackLink(Toggle):
+    """
+    Share being knocked about with the rest of the multiworld. Getting thrown
+    sends the knockback out; a knockback from another player staggers Frank,
+    knocks him down or sends him flying, picked at random.
+
+    It carries no damage of its own -- this shares being staggered, not being
+    hurt. Turn DamageLink on as well if you want both.
+    """
+    display_name = "KnockbackLink"
+    default = False
+
+
 class SpitterOnly(Toggle):
     """
     Spitter Only. No weapon ever reaches the item pool, so with Restricted
@@ -796,6 +809,7 @@ class DROption(PerGameCommonOptions):
     guaranteed_items: GuaranteedItemsOption
     death_link: DeathLink
     damage_link: DamageLink
+    knockback_link: KnockbackLink
     restricted_item_mode: RestrictedItemMode
     spitter_only: SpitterOnly
     door_randomizer: DoorRandomizer

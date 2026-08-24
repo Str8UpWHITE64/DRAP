@@ -277,6 +277,10 @@ local function set_slot_connected_handler(callback)
             table.insert(tags, "SharedDamage")
         end
 
+        if slot_data.knockback_link then
+            table.insert(tags, "KnockbackLink")
+        end
+
         AP_REF.APClient:ConnectUpdate(nil, tags) -- set deathlink tag if needed
 		callback(slot_data)
 	end
