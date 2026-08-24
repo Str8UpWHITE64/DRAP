@@ -1007,10 +1007,24 @@ class DRWorld(World):
                     # Per-count names: index N-1 -> name for count N
                     _max = int(_entry.get("max_count", 0))
                     # The first _max items in _names are the per-count names
-                    _d["count_names"] = _names[:_max]
+                    # Instance entries have no counted names any more, so
+                    # there is nothing for Lua to fall back to -- and sending
+                    # one would name a location this seed does not have.
+                    _d["count_names"] = ([] if _entry.get("instances")
+                                         else _names[:_max])
                     if _entry.get("all_msg_no") is not None:
                         _d["all_msg_no"]      = _entry["all_msg_no"]
                         _d["all_location_name"] = _entry.get("all_location_name")
+                    # Per-object positions, so Lua can name the one that was
+                    # actually used rather than counting. Passed through as-is;
+                    # the Lua side decides how to match on them.
+                    if _entry.get("instances"):
+                        _d["instances"] = _entry["instances"]
+                        _d["match"]     = _entry.get("match", "nearest")
+                        for _k in ("om_type", "method", "state_field",
+                                   "state_enum", "state_from"):
+                            if _entry.get(_k):
+                                _d[_k] = _entry[_k]
                 pp_bonus_trigger_data.append(_d)
 
         slot_data = {

@@ -697,6 +697,31 @@ for _entry in AP_TRIGGER_LOCATIONS:
             )
             PP_BONUS_LOCATION_NAMES.append(_name)
     elif _t == "counted":
+        _instances = _entry.get("instances") or []
+        if _instances:
+            # Each object in the region it actually stands in, so the default
+            # access rule gives it the right gating and region_counts is not
+            # needed to approximate one.
+            for _inst in _instances:
+                _region = _inst.get("region")
+                if not _region or _region not in location_tables:
+                    continue
+                location_tables[_region].append(
+                    DRLocationData(_inst["name"], "Milk",
+                                   DRLocationCategory.PP_BONUS)
+                )
+                PP_BONUS_LOCATION_NAMES.append(_inst["name"])
+            _all_name = _entry.get("all_location_name")
+            if _all_name:
+                _region = trigger_location_region(_entry, is_all_variant=True)
+                if _region and _region in location_tables:
+                    location_tables[_region].append(
+                        DRLocationData(_all_name, "Milk",
+                                       DRLocationCategory.PP_BONUS)
+                    )
+                    PP_BONUS_LOCATION_NAMES.append(_all_name)
+            continue
+
         _max = int(_entry.get("max_count", 0))
         # Per-count names placed in their tier's region
         for _i, _name in enumerate(_names[:_max]):

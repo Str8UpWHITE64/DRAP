@@ -151,6 +151,7 @@ AP.effects.VehicleGate                = require("DRAP/effects/VehicleGate")
 AP.effects.UnlockItemSpawns           = require("DRAP/effects/UnlockItemSpawns")
 AP.effects.CostumeRandomizer          = require("DRAP/effects/CostumeRandomizer")
 AP.effects.AP_LocationTriggers        = require("DRAP/effects/AP_LocationTriggers")
+AP.effects.PpBonusMatch               = require("DRAP/effects/PpBonusMatch")
 AP.effects.DoorPromptOverlay          = require("DRAP/effects/DoorPromptOverlay")
 AP.effects.OvertimeItemGate           = require("DRAP/effects/OvertimeItemGate")
 
@@ -617,6 +618,9 @@ local function run_slot_connect(slot_data)
     if AP.effects.AP_LocationTriggers then
         local trigger_data = (type(slot_data) == "table"
                               and slot_data.pp_bonus_trigger_data) or {}
+        if AP.effects.PpBonusMatch then
+            AP.effects.PpBonusMatch.setup(trigger_data, AP_BRIDGE)
+        end
         AP.effects.AP_LocationTriggers.setup(trigger_data, AP_BRIDGE)
         log(string.format("PP-bonus location triggers: %d entries",
             type(trigger_data) == "table" and #trigger_data or 0))

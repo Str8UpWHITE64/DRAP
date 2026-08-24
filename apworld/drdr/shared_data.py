@@ -120,6 +120,16 @@ def expand_trigger_location_names(entry: Dict[str, Any]) -> List[str]:
         return [n] if n else []
     if t == "counted":
         names: List[str] = []
+        # Entries with recorded objects name each one instead of counting
+        # them. "Use 3 Microwaves" said nothing about where it was and forced
+        # the logic to approximate regions; each instance carries its own.
+        instances = entry.get("instances")
+        if instances:
+            names = [i["name"] for i in instances if i.get("name")]
+            all_name = entry.get("all_location_name")
+            if all_name:
+                names.append(all_name)
+            return names
         max_count = int(entry.get("max_count", 0))
         sing = entry.get("location_template_singular", "")
         plur = entry.get("location_template_plural", "")

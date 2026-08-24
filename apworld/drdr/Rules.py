@@ -1695,6 +1695,64 @@ def set_rules(world) -> None:
             # locations live in Security Room so the parent region
             # never blocks a zone alternative -- the rule does all the
             # gating.
+            # Entries with recorded objects: each instance already sits in
+            # its own region, so the default access rule supplies the region
+            # gating. Only the conditions that are NOT about which region the
+            # object stands in still apply -- the food source for a microwave,
+            # the shutter for a storefront, a required predecessor.
+            _instances = _entry.get("instances") or []
+            if _t == "counted" and _instances:
+                _required = list(_entry.get("required_regions") or [])
+                _alts = _entry.get("alt_items_any") or []
+
+                def _instance_rule(required=_required, alts=_alts,
+                                   req_loc=_req_loc, items_any=_items_any,
+                                   restricted_on=restricted_mode_on):
+                    parts = []
+                    if required:
+                        req = And(*[CanReachRegion(r) for r in required])
+                        if not restricted_on and alts:
+                            req = Or(req, *[Has(it) for it in alts])
+                        parts.append(req)
+                    if req_loc:
+                        parts.append(CanReachLocation(req_loc))
+                    if restricted_on and items_any:
+                        parts.append(Or(*[Has(it) for it in items_any]))
+                    if not parts:
+                        return None
+                    return And(*parts) if len(parts) > 1 else parts[0]
+
+                _names_here = [i["name"] for i in _instances if i.get("name")]
+                _all_name = _entry.get("all_location_name")
+                if _all_name:
+                    _names_here.append(_all_name)
+                _region_of = {i["name"]: i.get("region")
+                              for i in _instances if i.get("name")}
+                for _name in _names_here:
+                    try:
+                        _loc = world.multiworld.get_location(_name, world.player)
+                    except KeyError:
+                        continue
+                    _rule = _instance_rule()
+                    # set_rule REPLACES the default region rule rather than
+                    # adding to it, so the region has to be part of this one.
+                    _own = _region_of.get(_name)
+                    if _own:
+                        _reach = CanReachRegion(_own)
+                        _rule = And(_rule, _reach) if _rule is not None else _reach
+                    # The all-X needs every region that holds one of them.
+                    if _all_name and _name == _all_name:
+                        _regions = sorted({i["region"] for i in _instances
+                                           if i.get("region")})
+                        _all_rule = And(*[CanReachRegion(r) for r in _regions])
+                        _rule = And(_rule, _all_rule) if _rule is not None else _all_rule
+                    if _rule is None:
+                        continue
+                    if _shuttered:
+                        _rule = _gate_on_shutter(_rule)
+                    world.set_rule(_loc, _rule)
+                continue
+
             _region_counts = _entry.get("region_counts")
             if _t == "counted" and _region_counts:
                 _required = list(_entry.get("required_regions") or [])

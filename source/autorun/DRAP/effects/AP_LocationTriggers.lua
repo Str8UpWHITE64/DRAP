@@ -8,6 +8,7 @@
 
 local M = {}
 local MsgEvents = require("DRAP/MsgEvents")
+local PpBonusMatch = require("DRAP/effects/PpBonusMatch")
 
 local Shared = require("DRAP/Shared")
 local log = Shared.create_logger("AP_LocTriggers")
@@ -107,7 +108,12 @@ local function _register_entry(entry)
     if entry.type == "counted" then
         local count_names = entry.count_names or {}
         local max_count   = #count_names
-        if max_count == 0 then return false end
+        -- An entry with recorded objects sends per-object names instead, and
+        -- PpBonusMatch owns it entirely. Its counted names no longer exist as
+        -- locations, so there is nothing to register here.
+        if max_count == 0 and not PpBonusMatch.owns(entry.id) then
+            return false
+        end
 
         -- Per-instance handler: bump counter, send Nth name if in range.
         local per_instance = function()
@@ -115,7 +121,19 @@ local function _register_entry(entry)
             _counters[entry.id] = cur
             log(string.format("FIRED counted %s/%d (entry=%s) cur=%d/%d",
                 tostring(list), msg_no, tostring(entry.id), cur, max_count))
-            if cur <= max_count then
+            -- Name the object this award came from when it can be worked out.
+            -- Falls through to the counted name when it cannot: sending the
+            -- wrong one of eighteen dishes is worse than sending "Break 3".
+            -- Destroy-type triggers are owned by PpBonusMatch, which sends
+            -- when the object breaks rather than when the award arrives -- so
+            -- a check lost to a disconnect can be retried by breaking another.
+            if PpBonusMatch.owns(entry.id) then
+                return
+            end
+            local named = PpBonusMatch.resolve(entry.id)
+            if named then
+                _send_check(named)
+            elseif cur <= max_count then
                 _send_check(count_names[cur])
             end
             -- If cur == max_count, the engine will also fire all_msg_no
