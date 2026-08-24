@@ -137,7 +137,27 @@ end
 -- carries a uuid and a client ignores its own. Without that the room would
 -- feed its own damage back to itself for ever.
 
-local DAMAGE_TAG = "SharedDamage"
+-- The tag is SharedDamage with the group appended, so two slots only hear
+-- each other when their groups match. Empty is the default group, and matches
+-- every game that has no group option at all.
+local DAMAGE_TAG_BASE = "SharedDamage"
+local damage_group = ""
+
+local function damage_tag()
+    return DAMAGE_TAG_BASE .. damage_group
+end
+
+--- The tag this client actually listens on, for the status command.
+function M.get_damage_tag()
+    return damage_tag()
+end
+
+--- Set before the link is enabled: the tag is registered at connect time.
+function M.set_damagelink_group(name)
+    damage_group = tostring(name or "")
+    M.log(damage_group == "" and "DamageLink group: (default)"
+          or ("DamageLink group: " .. damage_group))
+end
 
 M.damagelink_enabled = false
 
@@ -216,7 +236,7 @@ function M.send_shared_damage(points)
 
     if type(AP_REF.APClient.Bounce) ~= "function" then return false end
     local ok, err = pcall(AP_REF.APClient.Bounce, AP_REF.APClient, payload,
-                          nil, nil, { DAMAGE_TAG })
+                          nil, nil, { damage_tag() })
     if ok then
         M.log(string.format("Sent DamageLink: %d point(s)", points))
         return true
@@ -314,7 +334,7 @@ local function handle_bounced(json_rows)
     -- Two links share this handler, so neither may return early on the
     -- other's behalf. DamageLink first; a SharedDamage bounce is never also a
     -- DeathLink one.
-    if has_tag(json_rows["tags"], DAMAGE_TAG) then
+    if has_tag(json_rows["tags"], damage_tag()) then
         handle_shared_damage(json_rows["data"] or {})
         return
     end

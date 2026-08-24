@@ -412,6 +412,10 @@ local function run_slot_connect(slot_data)
     -- and the receiving end.
     local damage_link_enabled = (type(slot_data) == "table" and slot_data.damage_link == true)
     AP.DamageLinkEnabled = damage_link_enabled
+    -- The group has to be set BEFORE the link is armed: the tag it produces is
+    -- what both the send and the receive side match on.
+    AP_BRIDGE.set_damagelink_group(
+        type(slot_data) == "table" and slot_data.damage_link_group or "")
     AP.DamageLink.set_enabled(damage_link_enabled)
     AP_BRIDGE.set_damagelink_enabled(damage_link_enabled)
     AP_BRIDGE.on_shared_damage = function(points, source)

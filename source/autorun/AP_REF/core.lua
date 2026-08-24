@@ -273,8 +273,12 @@ local function set_slot_connected_handler(callback)
 
         -- DamageLink's protocol tag is SharedDamage. Without it the server
         -- does not route other players' damage bounces here.
+        -- DamageLink's tag carries the group on the end, so only slots in the
+        -- same group hear each other. An empty group leaves it as plain
+        -- SharedDamage, which is what a game without groups uses.
         if slot_data.damage_link then
-            table.insert(tags, "SharedDamage")
+            table.insert(tags, "SharedDamage"
+                .. tostring(slot_data.damage_link_group or ""))
         end
 
         if slot_data.knockback_link then

@@ -259,6 +259,10 @@ _G.drap_damagelink_watch = function(on)
 end
 
 _G.drap_damagelink_status = function()
+    local Bridge = _G.AP and _G.AP.AP_BRIDGE
+    if Bridge and Bridge.get_damage_tag then
+        M.log("bounce tag: " .. tostring(Bridge.get_damage_tag()))
+    end
     M.log(string.format(
         "enabled=%s hooked=%s watching=%s player hpc=%s  HP=%s  carry=%d/%d to a point",
         tostring(enabled), tostring(hook_installed), tostring(watching),

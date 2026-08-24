@@ -1,6 +1,6 @@
 import typing
 from dataclasses import dataclass
-from Options import Toggle, DefaultOnToggle, Option, Range, Choice, ItemDict, DeathLink, PerGameCommonOptions, StartInventoryPool, OptionGroup, OptionSet
+from Options import Toggle, DefaultOnToggle, FreeText, Option, Range, Choice, ItemDict, DeathLink, PerGameCommonOptions, StartInventoryPool, OptionGroup, OptionSet
 
 
 class GuaranteedItemsOption(ItemDict):
@@ -35,6 +35,18 @@ class DamageLink(Toggle):
     """
     display_name = "DamageLink"
     default = False
+
+
+class DamageLinkGroup(FreeText):
+    """
+    Damage Link only applies to players with an identical Group name.
+
+    Leave it empty to share damage with everyone, which is what games without
+    this option do. Games that do not support groups count as having an empty
+    group name.
+    """
+    display_name = "Damage Link Group"
+    rich_text_doc = True
 
 
 class KnockbackLink(Toggle):
@@ -810,6 +822,7 @@ class DROption(PerGameCommonOptions):
     guaranteed_items: GuaranteedItemsOption
     death_link: DeathLink
     damage_link: DamageLink
+    damage_link_group: DamageLinkGroup
     knockback_link: KnockbackLink
     restricted_item_mode: RestrictedItemMode
     spitter_only: SpitterOnly
