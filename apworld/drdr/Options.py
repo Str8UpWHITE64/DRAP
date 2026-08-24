@@ -118,7 +118,7 @@ class Goal(Choice):
     option_savior = 2
     option_zombie_genocider = 3
     option_psycho = 4
-    default = 0
+    default = 1
 
 
 class NumberOfSurvivors(Range):
