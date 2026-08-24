@@ -513,6 +513,29 @@ specialty_items = {
     "Small Chainsaw",
 }
 
+# DRItemCategory.WEAPON means "anything Frank can hold", not "weapon" -- the
+# frying pan, Kent's masks and Paul's fire extinguisher all sit in it. Spitter
+# Only drops the category, so anything in it that a check still needs has to be
+# named here. Everything else those items gated is dropped as a location
+# instead (SPITTER_EXCLUDED_LOCATIONS); the queen is the one kept, because
+# handing Isabela a bee is not swinging anything.
+spitter_kept_weapons = {
+    "Queen",
+}
+
+# Scoops with nothing left to open once Spitter Only drops their checks.
+spitter_dropped_scoops = {
+    "Photo Challenge",      # arms Kent's day 2, which needs a novelty mask
+}
+
+# Upgrades with nothing to improve once the weapons are gone. Melee is meant
+# to be barely worth swinging in this mode, and there is nothing left to
+# throw, so both would be dead slots in the pool.
+spitter_dropped_upgrades = {
+    "Progressive Attack Upgrade",
+    "Progressive Throw Upgrade",
+}
+
 # Food items that stand in for Seon's Food and Stuff access in the
 # microwave rules. Progression whenever PP-bonus locations exist, in any
 # item mode -- state.has() only sees progression items.
@@ -609,8 +632,15 @@ def BuildItemPool(multiworld, count, options, excluded_scoop_names=(),
             included_itemcount = included_itemcount + 1
     remaining_count = count - included_itemcount
 
+    spitter_only = bool(getattr(options, "spitter_only",
+                                type("X", (), {"value": False})()).value)
+
     if options.restricted_item_mode.value:
         for item_name in specialty_items:
+            # Spitter Only forces Restricted on, and most of the specialty
+            # list is there to satisfy checks it has just dropped.
+            if spitter_only and item_name not in spitter_kept_weapons and                     item_dictionary[item_name].category == DRItemCategory.WEAPON:
+                continue
             item = item_dictionary[item_name]
             item_pool.append(item)
             remaining_count = remaining_count - 1
@@ -644,7 +674,6 @@ def BuildItemPool(multiworld, count, options, excluded_scoop_names=(),
     if int(getattr(options.special_forces_mode, "value", 0)) != 1:
         scoopList = [item for item in scoopList if item.name != "Special Forces"]
     consumableList = [item for item in _all_items if item.category == DRItemCategory.CONSUMABLE]
-    weaponList = [item for item in _all_items if item.category == DRItemCategory.WEAPON]
     skillList = [item for item in _all_items if item.category == DRItemCategory.SKILL]
     upgradeList = [item for item in _all_items if item.category == DRItemCategory.UPGRADE]
     buffList = [item for item in _all_items if item.category == DRItemCategory.BUFF]
@@ -668,6 +697,14 @@ def BuildItemPool(multiworld, count, options, excluded_scoop_names=(),
         DRItemCategory.MISC, DRItemCategory.WEAPON, DRItemCategory.CONSUMABLE,
         DRItemCategory.BUFF
     )]
+
+    # Spitter Only: nothing to swing. Food and magazines are CONSUMABLE and
+    # survive, which leaves the filler shorter -- the fill loop reshuffles on
+    # wrap-around, so it just repeats sooner.
+    if spitter_only:
+        nonTrapFiller = [it for it in nonTrapFiller
+                         if it.category != DRItemCategory.WEAPON
+                         or it.name in spitter_kept_weapons]
 
     # Strip overpowered filler entries when the option is on. Guaranteed
     # Items (added unconditionally above) and Restricted-mode specialty items
@@ -744,6 +781,8 @@ def BuildItemPool(multiworld, count, options, excluded_scoop_names=(),
             # under the Savior goal).
             if scoop.name in excluded:
                 continue
+            if spitter_only and scoop.name in spitter_dropped_scoops:
+                continue
             item = item_dictionary[scoop.name]
             item_pool.append(item)
             remaining_count = remaining_count - 1
@@ -781,6 +820,8 @@ def BuildItemPool(multiworld, count, options, excluded_scoop_names=(),
     if getattr(options, "enable_stat_items",
                type("X", (), {"value": True})()).value and progression_mode != 0:
         for upg in upgradeList:
+            if spitter_only and upg.name in spitter_dropped_upgrades:
+                continue
             base, extra = UPGRADE_COUNTS.get(upg.name, (0, 0))
             count_to_add = 0
             if progression_mode == 1:   # replace

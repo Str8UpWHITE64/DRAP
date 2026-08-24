@@ -21,6 +21,25 @@ class RestrictedItemMode(Toggle):
     default = False
 
 
+class SpitterOnly(Toggle):
+    """
+    Spitter Only. No weapon ever reaches the item pool, so with Restricted
+    Item Mode there is nothing to pick up and swing -- the spit is the whole
+    arsenal. Melee is left barely able to scratch a zombie.
+
+    Turning this on forces Restricted Item Mode on, because without it the
+    mall is still full of weapons to grab.
+
+    The checks that are nothing but a weapon -- the bullet counts, bowling,
+    golf, the parasol and the RPG -- are dropped, since no amount of spitting
+    finishes them. A few things that happen to be weapons stay in: the fire
+    extinguisher Paul is waiting on, Kent's masks, the frying pan the stoves
+    need and Isabela's queen.
+    """
+    display_name = "Spitter Only"
+    default = False
+
+
 class DoorRandomizer(Toggle):
     """
     When enabled, door connections throughout the mall are randomized.
@@ -761,6 +780,7 @@ class DROption(PerGameCommonOptions):
     guaranteed_items: GuaranteedItemsOption
     death_link: DeathLink
     restricted_item_mode: RestrictedItemMode
+    spitter_only: SpitterOnly
     door_randomizer: DoorRandomizer
     door_randomizer_mode: DoorRandomizerMode
     door_locks: DoorLocks
@@ -828,6 +848,7 @@ dr_option_groups = [
         "Item Settings",
         [
             RestrictedItemMode,
+            SpitterOnly,
             ExcludeOverpoweredItems,
         ],
     ),

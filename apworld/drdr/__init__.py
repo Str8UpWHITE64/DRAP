@@ -133,6 +133,42 @@ PSYCHO_EXCLUDED_LOCATIONS = {
     "Get 50 survivors to join",
 }
 
+# Checks that need something in Frank's hands. Spitter Only takes every weapon
+# out of the pool, and Restricted Item Mode leaves no other way to pick one up,
+# so none of these can be finished however long the player spits.
+SPITTER_EXCLUDED_LOCATIONS = {
+    # Swinging or firing something.
+    "Fire 30 bullets",
+    "Fire 300 bullets",
+    "Bowl over 5 zombies",
+    "Hit a golf ball 100 feet",
+    "Hit 10 zombies with a parasol",
+    "Kill 100 zombies with an RPG",
+    # A pan has to go on the burner.
+    "Heat a pan on the Stove in Colombian Roastmasters - Paradise Plaza",
+    "Heat a pan on the Stove in Jill's Sandwiches",
+    "Heat a pan on the Stove in Chris's Fine Foods",
+    "Heat a pan on the Stove in That's a Spicy Meatball!",
+    "Heat a pan on the Stove in Colombian Roastmasters - Al Fresca Plaza",
+    "Heat a pan on all stoves",
+    # Kent's day 2 shoot wants Frank in a novelty mask. His day 1 and day 3
+    # are untouched -- ScoopSanity arms all three independently, so losing
+    # day 2 does not stall the chain or Tad behind it.
+    "Meet Kent on day 2",
+    "Complete Kent's day 2 photoshoot",
+    # Paul is on fire and only an extinguisher puts him out. Meeting and
+    # defeating him still work, and under Psycho so does killing him -- it is
+    # only the rescue that needs the extinguisher.
+    "Rescue Paul Carson",
+    # 48 rescues means every survivor in the game, and Paul is no longer one
+    # of them.
+    "Rescue 48 survivors",
+}
+
+# The most survivors still rescuable once Paul is out, which caps the Savior
+# goal so it cannot ask for a rescue that cannot happen.
+SPITTER_MAX_SURVIVORS = 47
+
 SCOOP_SANITY_EXCLUDED_LOCATIONS = {
     "Survive until 7pm on day 1",
     "Meet back at the Security Room at 6am day 2",
@@ -188,6 +224,22 @@ class DRWorld(World):
         self.scoop_order = []
 
     def generate_early(self):
+        # Spitter Only turns two other options on, and both are read below, so
+        # it has to come first.
+        self.spitter_only = bool(self.options.spitter_only.value)
+        if self.spitter_only:
+            # Restricted Item Mode does half the work: without it the mall is
+            # still full of weapons to pick up and an empty pool changes
+            # nothing.
+            self.options.restricted_item_mode.value = 1
+            # ScoopSanity keeps Kent's three days independent, so dropping his
+            # day 2 costs day 2 and nothing behind it.
+            self.options.scoop_sanity.value = 1
+            # Paul cannot be rescued without an extinguisher, so the Savior
+            # goal must not be able to ask for all 48.
+            if self.options.number_of_survivors.value > SPITTER_MAX_SURVIVORS:
+                self.options.number_of_survivors.value = SPITTER_MAX_SURVIVORS
+
         # Savior+ScoopSanity drops main scoops entirely — the player wins by
         # rescuing survivors, so main scoops would only advance unused state.
         self.main_scoops_enabled = not (
@@ -551,6 +603,7 @@ class DRWorld(World):
     # Consulted by Rules.py, which must not reach for a location this mode
     # never created.
     PSYCHO_EXCLUDED_LOCATIONS = PSYCHO_EXCLUDED_LOCATIONS
+    SPITTER_EXCLUDED_LOCATIONS = SPITTER_EXCLUDED_LOCATIONS
 
     # All "Kill <name>" survivor locations, for the Psycho goal's access rule
     # and its milestones. Taken from the KILL_SURVIVOR category rather than a
@@ -614,6 +667,10 @@ class DRWorld(World):
             # category does not take them with it, and the escort challenges
             # cannot be done at all once survivors turn hostile.
             if self.psycho_mode and location.name in PSYCHO_EXCLUDED_LOCATIONS:
+                continue
+
+            # Spitting cannot fire a gun or bowl a strike.
+            if self.spitter_only and location.name in SPITTER_EXCLUDED_LOCATIONS:
                 continue
 
             # Skip goal-only EVENT locations that aren't the active goal.
@@ -1036,6 +1093,7 @@ class DRWorld(World):
                 "guaranteed_items": self.options.guaranteed_items.value,
                 "death_link": death_link_enabled,
                 "restricted_item_mode": restricted_item_mode_enabled,
+                "spitter_only": self.spitter_only,
                 "door_randomizer": door_randomizer_enabled,
                 "door_randomizer_mode": door_randomizer_mode,
                 "scoop_sanity": scoop_sanity_enabled,
@@ -1080,6 +1138,7 @@ class DRWorld(World):
             "psycho_mode": self.psycho_mode,
             "death_link": death_link_enabled,
             "restricted_item_mode": restricted_item_mode_enabled,
+            "spitter_only": self.spitter_only,
             "door_randomizer": door_randomizer_enabled,
             "door_randomizer_mode": door_randomizer_mode,  # For Lua: 0 = chaos, 1 = paired
             "door_redirects": self.door_redirects if door_randomizer_enabled else {},

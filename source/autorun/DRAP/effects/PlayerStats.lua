@@ -158,11 +158,17 @@ local attack_override = nil
 -- running the show. Only used on that path -- see set_attack_override.
 local attack_override_saved = nil
 
+-- Spitter Only floors melee for the whole run. Kept separate from
+-- attack_override so the two compose: the Skipped Arm Day Trap can still
+-- override on top, and when that trap expires apply() recomputes back down to
+-- this floor instead of handing the player a working punch.
+local melee_floor = nil
+
 -- Compute target value for each stat (baseline + delta).
 local function _target_values()
     return {
         hp_max      = BASELINE.hp_max      + stat_deltas.hp_max,
-        attack_pct  = attack_override
+        attack_pct  = attack_override or melee_floor
                       or (BASELINE.attack_pct + stat_deltas.attack_pct),
         throw_power = BASELINE.throw_power + stat_deltas.throw_power,
         run_level   = god_run_level
@@ -192,8 +198,9 @@ _G.drap_stats_attack = function()
     end
     local t = _target_values()
     log(string.format(
-        "attack override=%s  target=%s  engine=%s  active=%s  mode=%s",
-        tostring(attack_override), tostring(t.attack_pct), tostring(engine),
+        "attack override=%s  floor=%s  target=%s  engine=%s  active=%s  mode=%s",
+        tostring(attack_override), tostring(melee_floor),
+        tostring(t.attack_pct), tostring(engine),
         tostring(Activation.is_active()), tostring(progression_mode)))
 end
 
@@ -239,6 +246,17 @@ function M.set_attack_override(pct)
     _write_attack(attack_override)
 end
 
+--- Floor melee for the rest of the run. Spitter Only, not a trap: there is
+--- no timer and nothing clears it.
+function M.set_melee_floor(pct)
+    melee_floor = tonumber(pct)
+    if _stats_managed() then
+        M.apply()
+        return
+    end
+    _write_attack(attack_override or melee_floor)
+end
+
 --- Drop the override and put attack back.
 ---
 --- On the managed path this recomputes from baseline plus upgrades rather than
@@ -252,6 +270,11 @@ function M.clear_attack_override()
         M.apply()
         return
     end
+    if melee_floor then
+        _write_attack(melee_floor)
+        attack_override_saved = nil
+        return
+    end
     if attack_override_saved then
         _write_attack(attack_override_saved)
         attack_override_saved = nil
@@ -263,7 +286,12 @@ function M.apply()
     -- Both callers are sdk.hooks, which fire whether or not the frame loop
     -- is gated, and load_save() can restore a mode from an earlier run.
     if not Activation.is_active() then return end
-    if progression_mode == "vanilla_only" then return end
+    if progression_mode == "vanilla_only" then
+        -- Nothing to manage, but the floor still has to hold: a save, load or
+        -- level-up would otherwise hand melee back.
+        if melee_floor then _write_attack(attack_override or melee_floor) end
+        return
+    end
 
     local psm = _psm()
     local hpc = _hpc()

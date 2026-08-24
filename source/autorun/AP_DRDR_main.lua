@@ -139,6 +139,7 @@ AP.effects.ConvictRespawnTrap         = require("DRAP/effects/ConvictRespawnTrap
 AP.effects.InventoryTraps             = require("DRAP/effects/InventoryTraps")
 AP.effects.CostumeTraps               = require("DRAP/effects/CostumeTraps")
 AP.effects.SpecialForces              = require("DRAP/effects/SpecialForces")
+AP.effects.SpitterMode                = require("DRAP/effects/SpitterMode")
 AP.TrapBank                           = require("DRAP/TrapBank")
 AP.effects.SurvivorRecovery           = require("DRAP/effects/SurvivorRecovery")
 AP.effects.KentChain                  = require("DRAP/effects/KentChain")
@@ -404,6 +405,14 @@ local function run_slot_connect(slot_data)
         AP.ItemSpawner.set_spawning_disabled(true)
         log("Item spawning disabled due to hard mode")
     end
+
+    -- Spitter Only. Arrives with restricted_item_mode already forced on by
+    -- the apworld, so the pickup half above is what stops the player picking
+    -- a weapon up; this is the melee floor and the permanent Spitfire.
+    local spitter_only_enabled = (type(slot_data) == "table" and slot_data.spitter_only == true)
+    AP.SpitterOnlyEnabled = spitter_only_enabled
+    AP.effects.SpitterMode.set_enabled(spitter_only_enabled)
+    log("Spitter Only enabled=" .. tostring(spitter_only_enabled))
 
     -- Door Randomizer option
     local door_randomizer_enabled = (type(slot_data) == "table" and slot_data.door_randomizer == true)
@@ -797,6 +806,7 @@ re.on_frame(function()
     safe_on_frame(AP.DoorRandomizer,   "DoorRandomizer")
     safe_on_frame(AP.NpcCarryover,     "NpcCarryover")
     safe_on_frame(AP.effects.EscortVoice, "EscortVoice")
+    safe_on_frame(AP.effects.SpitterMode, "SpitterMode")
     safe_on_frame(AP.ChallengeTracker, "ChallengeTracker")
     safe_on_frame(AP.LevelTracker,     "LevelTracker")
     safe_on_frame(AP.AchievementTracker, "AchievementTracker")
