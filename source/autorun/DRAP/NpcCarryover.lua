@@ -28,6 +28,17 @@ local hooks_installed = false
 local hook_install_attempted = false
 
 local check_carry_over_method = nil
+local is_carry_over_method = nil
+
+-- While this is in the future, isCarryOverNpc is answered TRUE.
+--
+-- Rewriting an NpcBaseInfo does NOT move the live NPC: measured, a warp that
+-- reported "moved 2" still left both behind. On a redirected door the rewrite
+-- works only because the ENGINE is carrying them at that moment and the edit
+-- just changes where they land. A warp is not a pair the engine accepts --
+-- isCarryOverNpc answers 0 for it -- so nothing carries them at all.
+local warp_carry_until = 0
+local WARP_CARRY_SECONDS = 3.0
 local npc_manager_td = nil
 
 -- Spread carried-over NPCs apart slightly so they don't all stack on the
@@ -196,6 +207,8 @@ local function discover_methods()
             local ok, name = pcall(method.get_name, method)
             if ok and name and name == "checkCarryOverNpc" then
                 check_carry_over_method = method
+            elseif ok and name and name == "isCarryOverNpc" then
+                is_carry_over_method = method
             end
         end
     end
@@ -302,6 +315,21 @@ local function install_hooks()
     if not hook1_ok then
         M.log("ERROR: Failed to hook checkCarryOverNpc")
         return
+    end
+
+    -- Answer the carry-over verdict TRUE for the moment of a warp, so the
+    -- engine moves the party itself. Its address is unique in the dump --
+    -- checked with investigation/sdk/check_fold.py, which is mandatory before
+    -- any hook here.
+    if is_carry_over_method then
+        pcall(function()
+            sdk.hook(is_carry_over_method, function() end, function(retval)
+                if os.clock() <= warp_carry_until then
+                    return sdk.to_ptr(1)
+                end
+                return retval
+            end)
+        end)
     end
 
     hooks_installed = true
@@ -496,6 +524,105 @@ end)
 ------------------------------------------------------------
 -- Public API
 ------------------------------------------------------------
+
+--- Move the party to another area, for warps that bypass the engine.
+---
+--- A debug warp never goes through the engine's door path, so
+--- checkCarryOverNpc never runs -- and that hook is the only place party
+--- members get moved. Escorts were simply left behind.
+---
+--- Call this BEFORE moving the player: members are matched against the area
+--- they are standing in right now, and the proximity filter is measured from
+--- the player's current position.
+---
+--- @param area string|number scene code ("s400") or engine area index
+--- @param pos table|nil destination position; the area's own arrival mark is
+---            preferred over this when one is known (see ARRIVAL_MARK)
+--- @return number how many were moved
+--- Open the window in which the engine will agree to carry the party.
+--- Call immediately before a warp; it lapses on its own.
+function M.begin_warp_carry()
+    install_hooks()
+    warp_carry_until = os.clock() + WARP_CARRY_SECONDS
+end
+
+function M.carry_party_to(area, pos)
+    local area_no = tonumber(area)
+    if not area_no and type(area) == "string" then
+        local info = Shared.SCENE_INFO and Shared.SCENE_INFO[area]
+        area_no = info and info.index or nil
+    end
+    if not area_no then
+        M.log("carry-over: unknown area " .. tostring(area))
+        return 0
+    end
+
+    -- With no destination and no mark for the area, rewrite_single_npc would
+    -- place them at the origin. Leaving them where they are is the better
+    -- failure -- an area-origin warp has nowhere sensible to put a follower.
+    if not pos and not ARRIVAL_MARK[area_no] then
+        M.log(string.format(
+            "carry-over: no position for area %d -- party left behind", area_no))
+        return 0
+    end
+
+    local mgr = npc_mgr:get()
+    if not mgr then
+        M.log("carry-over: NpcManager unavailable -- party not brought")
+        return 0
+    end
+    local npc_list
+    pcall(function() npc_list = mgr:get_field("NpcInfoList") end)
+    if not npc_list then
+        M.log("carry-over: NpcInfoList unreadable -- party not brought")
+        return 0
+    end
+
+    -- The area the player is leaving, so members standing elsewhere are not
+    -- swept up by a coincidental position match -- coordinates are per-area.
+    local player_area
+    pcall(function()
+        local am = sdk.get_managed_singleton("app.solid.gamemastering.AreaManager")
+        if am then player_area = Shared.to_int(am:get_field("mAreaIndex")) end
+    end)
+
+    -- Reported even when nothing moves. A silent zero is indistinguishable
+    -- from the call never happening, which is exactly what it looked like the
+    -- first time this ran.
+    local player_pos = get_player_position()
+    local moved = rewrite_npc_list(npc_list, { area_no = area_no, pos = pos },
+        player_area, player_pos)
+    if moved > 0 then
+        M.log(string.format("Warp carry-over: moved %d NPC(s) to area %d",
+            moved, area_no))
+    else
+        local total = Shared.get_collection_count(npc_list) or 0
+        local joined, in_area, near = 0, 0, 0
+        for i = 0, total - 1 do
+            local item = Shared.get_collection_item(npc_list, i)
+            if item then
+                local st, na, np
+                pcall(function() st = Shared.to_int(item:get_field("mLiveState")) end)
+                pcall(function() na = Shared.to_int(item:get_field("mAreaNo")) end)
+                pcall(function() np = extract_vec3(item:get_field("mPos")) end)
+                if st == 2 and not record_is_dead(item) then
+                    joined = joined + 1
+                    if not player_area or na == player_area then
+                        in_area = in_area + 1
+                        if is_npc_near_player(np, player_pos) then near = near + 1 end
+                    end
+                end
+            end
+        end
+        M.log(string.format(
+            "Warp carry-over: moved 0 to area %d -- %d record(s), %d joined, "
+            .. "%d in area %s, %d near player %s",
+            area_no, total, joined, in_area, tostring(player_area), near,
+            player_pos and string.format("(%.1f, %.1f, %.1f)",
+                player_pos.x, player_pos.y, player_pos.z) or "unknown"))
+    end
+    return moved
+end
 
 function M.get_hook_status()
     return hooks_installed

@@ -798,6 +798,30 @@ end
 function M.warp_to(area_name, pos, angle, label)
     if not ensure_area_jump_method() then return false end
 
+    -- Bring the party. A warp skips the engine's door path, so
+    -- checkCarryOverNpc never runs and NpcCarryover never sees the crossing --
+    -- escorts were left behind in the old area. Done BEFORE the player moves,
+    -- because members are matched against the area they are standing in.
+    local carryover = _G.AP and _G.AP.NpcCarryover
+    if not carryover then
+        M.log("carry-over: AP.NpcCarryover missing -- party not brought")
+    elseif type(carryover.carry_party_to) ~= "function" then
+        M.log("carry-over: carry_party_to missing -- party not brought")
+    else
+        -- Errors reported, not swallowed: a bare pcall here hid the failure
+        -- completely and looked identical to the call never happening.
+        -- Open the verdict window FIRST: the engine runs its own carry-over
+        -- pass during the jump and normally refuses a warp's area pair, and
+        -- rewriting the records alone does not move anyone.
+        if type(carryover.begin_warp_carry) == "function" then
+            pcall(carryover.begin_warp_carry)
+        end
+        local ok, err = pcall(carryover.carry_party_to, area_name, pos)
+        if not ok then
+            M.log("carry-over failed: " .. tostring(err))
+        end
+    end
+
     local ahlm = ahlm_mgr:get()
     if not ahlm then
         M.log("Cannot warp: AreaHitLayoutManager not available")
@@ -900,17 +924,41 @@ local function build_warp_targets()
         pair_count[key] = (pair_count[key] or 0) + 1
     end
 
+    -- A door record's `position` is where the player ARRIVES in `to`, so
+    -- warping with it walks them through the door. The picker groups doors
+    -- under `from` and labels them "<from> - <to>", which reads as "the door
+    -- in <from>" -- so it should land them in `from`, at that door.
+    --
+    -- Every door has a reverse record (all 54 checked), and the reverse of
+    -- A->B arrives in A beside the same doorway. That is the position to use.
+    local reverse = {}
+    for _, d in ipairs(loaded.doors) do
+        reverse[tostring(d.to) .. "|" .. tostring(d.from) .. "|"
+            .. tostring(d.door_no or 0)] = d
+    end
+
     warp_targets = {}
     for _, d in ipairs(loaded.doors) do
         local label = display_name(d.from) .. " - " .. display_name(d.to) .. " Door"
         if (pair_count[tostring(d.from) .. "|" .. tostring(d.to)] or 0) > 1 then
             label = label .. " " .. tostring((d.door_no or 0) + 1)
         end
+        local back = reverse[tostring(d.from) .. "|" .. tostring(d.to) .. "|"
+            .. tostring(d.door_no or 0)]
         local list = warp_targets[d.from]
         if not list then list = {}; warp_targets[d.from] = list end
         list[#list + 1] = {
-            label = label, to = d.to, door_no = d.door_no or 0,
-            pos = d.position, angle = d.angle,
+            label = label,
+            -- Where the warp actually goes: the selected area, near the door.
+            area = back and d.from or d.to,
+            pos = back and back.position or d.position,
+            angle = back and back.angle or d.angle,
+            -- Kept for callers that want the far side.
+            to = d.to,
+            door_no = d.door_no or 0,
+            -- False when no reverse record exists, so the UI can say the warp
+            -- falls through to the far side rather than silently doing it.
+            near_side = back ~= nil,
         }
     end
 
@@ -921,6 +969,8 @@ local function build_warp_targets()
         if not list then list = {}; warp_targets[code] = list end
         list[#list + 1] = {
             label = display_name(code) .. " - " .. name, to = code,
+            -- A spot, not a doorway: it already lands inside its own area.
+            area = code, near_side = true,
             door_no = 0, pos = entry[2], angle = nil,
         }
     end

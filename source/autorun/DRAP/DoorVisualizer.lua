@@ -1390,13 +1390,21 @@ local function draw_warp_picker(DoorRandomizer)
 
     local target = list[warp_door_idx]
     if target and target.pos then
+        -- Lands on the NEAR side: the area picked above, beside that door.
+        -- It used to warp through to the far side, which read as the picker
+        -- ignoring the area selection.
+        local area = target.area or target.to
         imgui.text(string.format("Lands at (%.2f, %.2f, %.2f) in %s",
             target.pos.x or 0, target.pos.y or 0, target.pos.z or 0,
-            tostring(target.to)))
+            DoorRandomizer.area_display_name(area)))
+        if target.near_side == false then
+            imgui.text("No reverse door recorded -- lands on the far side.")
+        end
     end
 
     if imgui.button("Warp Here") and target then
-        local ok = DoorRandomizer.warp_to(target.to, target.pos, target.angle,
+        local ok = DoorRandomizer.warp_to(target.area or target.to,
+                                          target.pos, target.angle,
                                           target.label)
         warp_status = ok and ("Warped to " .. target.label)
                         or "Warp failed -- see the log"
