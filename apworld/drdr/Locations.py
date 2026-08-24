@@ -30,6 +30,10 @@ class DRLocationCategory(IntEnum):
     # special_forces_mode puts the soldiers in the mall. Either
     # condition enables them; the access rule decides which.
     SPECIAL_FORCES_SCOOP = 12
+    # The three camera upgrades sitting in camera shops. Standalone pickups
+    # with no scoop behind them, so they get their own category rather than
+    # borrowing a scoop's and inheriting its gating.
+    CAMERA_PART = 13
 
 
 class DRLocationData(NamedTuple):
@@ -215,6 +219,7 @@ location_tables = {
         # which is also in Seon's.
         DRLocationData("Find the Developing Solution", "Milk", DRLocationCategory.OVERTIME_SCOOP),
         DRLocationData("Find the Cold Spray", "Milk", DRLocationCategory.OVERTIME_SCOOP),
+        DRLocationData("Camera Part [Flash]", "Milk", DRLocationCategory.CAMERA_PART),
     ],
 
     "Entrance Plaza": [
@@ -347,6 +352,7 @@ location_tables = {
         # Overtime First Aid Kit cannot be confused with the story one,
         # which is also in Seon's.
         DRLocationData("Find the Magnifying Glass", "Milk", DRLocationCategory.OVERTIME_SCOOP),
+        DRLocationData("Camera Part [Brightness]", "Milk", DRLocationCategory.CAMERA_PART),
     ],
 
     "North Plaza": [
@@ -380,6 +386,7 @@ location_tables = {
         DRLocationData("Photograph PP Sticker 81", "Apple", DRLocationCategory.PP_STICKER),
         DRLocationData("Photograph PP Sticker 82", "Pie", DRLocationCategory.PP_STICKER),
 
+        DRLocationData("Camera Part [Focus]", "Milk", DRLocationCategory.CAMERA_PART),
     ],
     "Seon's Food and Stuff": [
         # Events in Seon's Food and Stuff

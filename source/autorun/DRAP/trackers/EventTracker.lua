@@ -132,6 +132,15 @@ local TRACKED_EVENT_FLAGS = {
     [530]  = 'Open Gate 2',
     [1349] = 'Raise the final gate',
 
+    -- The three camera upgrades, picked up in camera shops. Contiguous
+    -- flags, confirmed by trace: Flash in Paradise Plaza set 3461 and Focus
+    -- in North Plaza set 3463, leaving Brightness (3462) in Wonderland.
+    -- These names must match Locations.py exactly -- a rename on one side
+    -- silently sends nothing.
+    [3461] = 'Camera Part [Flash]',
+    [3462] = 'Camera Part [Brightness]',
+    [3463] = 'Camera Part [Focus]',
+
     -- The suppressant hand-in. This used to be watched as event id 131, which
     -- was never confirmed and is not this mission.
     [135]  = 'Scramble for a Suppressant',
