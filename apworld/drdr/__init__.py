@@ -980,6 +980,7 @@ class DRWorld(World):
         number_of_survivors = self.options.number_of_survivors.value
         number_of_kills = self.options.number_of_kills.value
         death_link_enabled = bool(self.options.death_link.value)
+        damage_link_enabled = bool(self.options.damage_link.value)
         restricted_item_mode_enabled = bool(self.options.restricted_item_mode.value)
         door_randomizer_enabled = bool(self.options.door_randomizer.value)
         door_randomizer_mode = self.options.door_randomizer_mode.value
@@ -1092,6 +1093,7 @@ class DRWorld(World):
                 "psycho_mode": self.psycho_mode,
                 "guaranteed_items": self.options.guaranteed_items.value,
                 "death_link": death_link_enabled,
+                "damage_link": damage_link_enabled,
                 "restricted_item_mode": restricted_item_mode_enabled,
                 "spitter_only": self.spitter_only,
                 "door_randomizer": door_randomizer_enabled,
@@ -1137,6 +1139,7 @@ class DRWorld(World):
             "number_of_kills": number_of_kills,
             "psycho_mode": self.psycho_mode,
             "death_link": death_link_enabled,
+            "damage_link": damage_link_enabled,
             "restricted_item_mode": restricted_item_mode_enabled,
             "spitter_only": self.spitter_only,
             "door_randomizer": door_randomizer_enabled,

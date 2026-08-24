@@ -130,6 +130,101 @@ function M.set_deathlink_enabled(v)
     M.log("DeathLink enabled: " .. tostring(M.deathlink_enabled))
 end
 
+------------------------------------------------------------
+-- DamageLink (protocol tag "SharedDamage")
+------------------------------------------------------------
+-- Bounces come back to the sender as well as to everyone else, so each one
+-- carries a uuid and a client ignores its own. Without that the room would
+-- feed its own damage back to itself for ever.
+
+local DAMAGE_TAG = "SharedDamage"
+
+M.damagelink_enabled = false
+
+-- Identifies this client's own bounces. Not a real UUID -- it only has to be
+-- unlikely to collide with another player in the same room for one session.
+local damage_uuid = nil
+
+--- Called with the received damage in POINTS. Set by DamageLink.lua.
+M.on_shared_damage = nil
+
+function M.set_damagelink_enabled(v)
+    M.damagelink_enabled = (v == true)
+    M.log("DamageLink enabled: " .. tostring(M.damagelink_enabled))
+end
+
+local function get_damage_uuid()
+    if damage_uuid then return damage_uuid end
+    local slot = "?"
+    if AP_REF.APClient and AP_REF.APClient.get_slot then
+        local ok, v = pcall(AP_REF.APClient.get_slot, AP_REF.APClient)
+        if ok and v then slot = tostring(v) end
+    end
+    damage_uuid = string.format("drdr-%s-%d-%d", slot, os.time(),
+                                math.random(0, 999999))
+    return damage_uuid
+end
+
+local function handle_shared_damage(data)
+    if not M.damagelink_enabled then return end
+
+    -- This client's own bounce, echoed back.
+    if damage_uuid and tostring(data["uuid"] or "") == damage_uuid then return end
+
+    local points = tonumber(data["damage_points"])
+    if not points or points <= 0 then return end
+    local source = data["source"] or "someone"
+
+    M.log(string.format("DamageLink received: %s point(s) from %s",
+        tostring(points), tostring(source)))
+
+    if M.on_shared_damage then
+        pcall(M.on_shared_damage, points, tostring(source))
+    end
+end
+
+--- Broadcast damage taken, in POINTS.
+function M.send_shared_damage(points)
+    if not M.damagelink_enabled then return false end
+    if not AP_REF.APClient then return false end
+    if not is_connected() then return false end
+    points = tonumber(points)
+    if not points or points <= 0 then return false end
+
+    local now = math.floor(os.time())
+    if AP_REF.APClient.get_server_time then
+        local ok, t = pcall(AP_REF.APClient.get_server_time, AP_REF.APClient)
+        if ok and t then now = math.floor(tonumber(t) or os.time()) end
+    end
+
+    local my_alias = "DRDR Player"
+    if AP_REF.APClient.get_player_alias and AP_REF.APClient.get_slot then
+        local ok_slot, slot = pcall(AP_REF.APClient.get_slot, AP_REF.APClient)
+        if ok_slot and slot then
+            local ok_alias, alias = pcall(AP_REF.APClient.get_player_alias,
+                                          AP_REF.APClient, slot)
+            if ok_alias and alias then my_alias = Shared.clean_string(alias) end
+        end
+    end
+
+    local payload = {
+        time = now,
+        uuid = get_damage_uuid(),
+        source = my_alias,
+        damage_points = points,
+    }
+
+    if type(AP_REF.APClient.Bounce) ~= "function" then return false end
+    local ok, err = pcall(AP_REF.APClient.Bounce, AP_REF.APClient, payload,
+                          nil, nil, { DAMAGE_TAG })
+    if ok then
+        M.log(string.format("Sent DamageLink: %d point(s)", points))
+        return true
+    end
+    M.log.error("DamageLink send failed: " .. tostring(err))
+    return false
+end
+
 local function has_tag(tags, needle)
     if not tags or type(tags) ~= "table" then return false end
     for _, v in pairs(tags) do
@@ -139,9 +234,17 @@ local function has_tag(tags, needle)
 end
 
 local function handle_bounced(json_rows)
-    if not M.deathlink_enabled then return end
     if not json_rows or type(json_rows) ~= "table" then return end
 
+    -- Two links share this handler, so neither may return early on the
+    -- other's behalf. DamageLink first; a SharedDamage bounce is never also a
+    -- DeathLink one.
+    if has_tag(json_rows["tags"], DAMAGE_TAG) then
+        handle_shared_damage(json_rows["data"] or {})
+        return
+    end
+
+    if not M.deathlink_enabled then return end
     if not has_tag(json_rows["tags"], "DeathLink") then return end
 
     local data = json_rows["data"] or {}

@@ -41,6 +41,7 @@ AP.SaveDiagnostics  = require("DRAP/SaveDiagnostics")
 AP.TimeGate         = require("DRAP/TimeGate")
 AP.Scene            = require("DRAP/Scene")
 AP.DeathLink        = require("DRAP/trackers/DeathLink")
+AP.DamageLink       = require("DRAP/trackers/DamageLink")
 AP.ScoopUnlocker     = require("DRAP/ScoopUnlocker")
 AP.MissionTruth      = require("DRAP/effects/MissionTruth")
 AP.MissionTruth.init({ scoop_unlocker = AP.ScoopUnlocker })
@@ -405,6 +406,17 @@ local function run_slot_connect(slot_data)
         AP.ItemSpawner.set_spawning_disabled(true)
         log("Item spawning disabled due to hard mode")
     end
+
+    -- DamageLink. The tag went on at ConnectUpdate; this arms the detection
+    -- and the receiving end.
+    local damage_link_enabled = (type(slot_data) == "table" and slot_data.damage_link == true)
+    AP.DamageLinkEnabled = damage_link_enabled
+    AP.DamageLink.set_enabled(damage_link_enabled)
+    AP_BRIDGE.set_damagelink_enabled(damage_link_enabled)
+    AP_BRIDGE.on_shared_damage = function(points, source)
+        AP.DamageLink.apply_received(points, source)
+    end
+    log("DamageLink enabled=" .. tostring(damage_link_enabled))
 
     -- Spitter Only. Arrives with restricted_item_mode already forced on by
     -- the apworld, so the pickup half above is what stops the player picking
@@ -807,6 +819,7 @@ re.on_frame(function()
     safe_on_frame(AP.NpcCarryover,     "NpcCarryover")
     safe_on_frame(AP.effects.EscortVoice, "EscortVoice")
     safe_on_frame(AP.effects.SpitterMode, "SpitterMode")
+    safe_on_frame(AP.DamageLink,       "DamageLink")
     safe_on_frame(AP.ChallengeTracker, "ChallengeTracker")
     safe_on_frame(AP.LevelTracker,     "LevelTracker")
     safe_on_frame(AP.AchievementTracker, "AchievementTracker")

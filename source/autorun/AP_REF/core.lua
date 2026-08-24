@@ -271,6 +271,12 @@ local function set_slot_connected_handler(callback)
             table.insert(tags, "DeathLink")
         end
 
+        -- DamageLink's protocol tag is SharedDamage. Without it the server
+        -- does not route other players' damage bounces here.
+        if slot_data.damage_link then
+            table.insert(tags, "SharedDamage")
+        end
+
         AP_REF.APClient:ConnectUpdate(nil, tags) -- set deathlink tag if needed
 		callback(slot_data)
 	end

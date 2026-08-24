@@ -21,6 +21,22 @@ class RestrictedItemMode(Toggle):
     default = False
 
 
+class DamageLink(Toggle):
+    """
+    Share damage with the rest of the multiworld. Taking a hit sends damage
+    out; damage from another player takes health here.
+
+    One damage point is one of Frank's health blocks, so a point costs the
+    same fraction of his health however far he has levelled. Small hits are
+    added up rather than sent one at a time.
+
+    Damage arriving this way CAN kill, and death runs the game's own path, so
+    it behaves like any other death (including DeathLink, if that is on too).
+    """
+    display_name = "DamageLink"
+    default = False
+
+
 class SpitterOnly(Toggle):
     """
     Spitter Only. No weapon ever reaches the item pool, so with Restricted
@@ -779,6 +795,7 @@ class DROption(PerGameCommonOptions):
     number_of_kills: NumberOfKills
     guaranteed_items: GuaranteedItemsOption
     death_link: DeathLink
+    damage_link: DamageLink
     restricted_item_mode: RestrictedItemMode
     spitter_only: SpitterOnly
     door_randomizer: DoorRandomizer

@@ -454,6 +454,62 @@ function M.player_damage(amount)
     _notify_trap("Damage Player Trap", string.format("-%d HP", amount))
 end
 
+--- Damage that is allowed to finish the job.
+---
+--- The Damage Player Trap clamps at DAMAGE_HP_FLOOR because addDamage taking
+--- HP to 0 leaves the player undead -- HP<=0 with no death or respawn, which
+--- needs a restart. DamageLink is meant to be able to kill, so the last hit
+--- goes through the game's own death instead of through HP: damage down to
+--- the floor, then playerDead().
+---
+--- @param amount integer HP to remove
+--- @param reason string for the death log if it lands
+--- @return string "damaged", "killed", or "unavailable"
+function M.player_damage_or_kill(amount, reason)
+    amount = tonumber(amount) or DAMAGE_AMOUNT
+    local psm = _psm()
+    local hpc = _hpc()
+    if not psm or not hpc then return "unavailable" end
+
+    local cur
+    pcall(function() cur = psm:call("getVitalNew") end)
+    cur = tonumber(cur)
+
+    -- A failed HP read must not read as "lethal" -- that would kill on a bad
+    -- read rather than on real damage. Unknown HP takes the ordinary path.
+    if not cur then
+        pcall(function() hpc:call("addDamage", amount) end)
+        log(string.format("%s: -%d HP (current HP unknown)",
+            tostring(reason or "damage"), amount))
+        return "damaged"
+    end
+
+    -- Not lethal: ordinary damage, same as the trap.
+    if cur and (cur - amount) >= DAMAGE_HP_FLOOR then
+        pcall(function() hpc:call("addDamage", amount) end)
+        log(string.format("%s: -%d HP (%d -> %d)",
+            tostring(reason or "damage"), amount, cur, cur - amount))
+        return "damaged"
+    end
+
+    -- Lethal. Take what can safely be taken so the health bar shows the hit,
+    -- then let the game kill him.
+    if cur and cur > DAMAGE_HP_FLOOR then
+        pcall(function() hpc:call("addDamage", cur - DAMAGE_HP_FLOOR) end)
+    end
+
+    local DeathLink = require("DRAP/trackers/DeathLink")
+    if DeathLink and DeathLink.kill_player then
+        DeathLink.kill_player(reason or "damage")
+        log(string.format("%s: lethal -- killed rather than written to 0",
+            tostring(reason or "damage")))
+        return "killed"
+    end
+
+    log(string.format("%s: lethal but no death path available", tostring(reason or "damage")))
+    return "unavailable"
+end
+
 function M.pp_boost(amount)
     amount = tonumber(amount) or 5000
     local psm = _psm()
