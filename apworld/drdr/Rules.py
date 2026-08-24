@@ -17,13 +17,11 @@ from rule_builder.rules import (
 
 from .DoorRandomization import AREA_NAMES, EMBEDDED_DOOR_DATA
 from .Locations import (DRLocationCategory, location_tables,
-                        ZOMBIE_KILL_REGION_OF, ZOMBIE_KILL_TIERS, PSYCHO_KILL_MILESTONES)
+                        ZOMBIE_KILL_REGION_OF, ZOMBIE_KILL_TIERS, SURVIVOR_MILESTONES)
 from .shared_data import (
     AREA_KEY_NAMES,
     SCOOP_COMPLETION_MAP, SCOOP_EVENTS, SCOOP_REGION_REQUIREMENTS,
     SCOOP_SPLIT_KEY_DOORS as SPLIT_KEY_SCOOP_DOORS,
-    AP_TRIGGER_LOCATIONS, expand_trigger_location_names,
-    trigger_location_required_regions,
 )
 
 
@@ -1287,17 +1285,17 @@ def set_rules(world) -> None:
     world.set_rule(world.multiworld.get_location("Encounter 10 survivors", world.player), And(CanReachRegion("Paradise Plaza"), Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM"), Has("DAY3_11_AM"), CanReachLocation("Kill Kent on day 3"), CanReachLocation("Kill Cliff"), CanReachLocation("Kill Jo"), CanReachLocation("Kill Adam"), CanReachLocation("Kill Sean"), CanReachLocation("Kill Roger and Jack (and Thomas if you want) and chat with Wayne"), CanReachLocation("Defeat Paul")))
     world.set_rule(world.multiworld.get_location("Encounter 50 survivors", world.player), And(CanReachRegion("Paradise Plaza"), Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM"), Has("DAY3_11_AM"), CanReachLocation("Kill Kent on day 3"), CanReachLocation("Kill Cliff"), CanReachLocation("Kill Jo"), CanReachLocation("Kill Adam"), CanReachLocation("Kill Sean"), CanReachLocation("Kill Roger and Jack (and Thomas if you want) and chat with Wayne"), CanReachLocation("Defeat Paul"), (And(HasAll(*all_side_scoops), ending_a_rule) if world.options.scoop_sanity else True_())))
     # The rescue ladder, or the kill ladder in its place. Only one of the two
-    # sets of locations exists in a given seed.
+    # sets of locations exists in a seed, and both count to the same numbers.
     if world.psycho_mode:
         _kill_locs = [CanReachLocation(_l) for _l in world.ALL_KILL_LOCATIONS]
-        for _n in PSYCHO_KILL_MILESTONES:
+        for _n in SURVIVOR_MILESTONES:
             world.set_rule(
                 world.multiworld.get_location("Kill {} survivors".format(_n),
                                               world.player),
                 AtLeast(_n, *_kill_locs))
     else:
         _rescue_locs = [CanReachLocation(_l) for _l in world.ALL_RESCUE_LOCATIONS]
-        for _n in (5, 10, 15, 20, 25, 30, 35, 40, 45, 48):
+        for _n in SURVIVOR_MILESTONES:
             world.set_rule(
                 world.multiworld.get_location("Rescue {} survivors".format(_n),
                                               world.player),
@@ -1634,200 +1632,69 @@ def set_rules(world) -> None:
     # --------------------------------------------------------------------
     # PP bonus events
     # --------------------------------------------------------------------
-    # PP-bonus rules (per-count for "counted" entries). Per-location rule
-    # combines: required_regions (ALL reachable; first may be bypassed by
-    # alt_item), requires_location (extra location gate, e.g. First Aid
-    # Kit needs Steven), restricted_mode_items_any (in restricted
-    # mode, requires ANY one of the listed items), and ep_shutter (the
-    # entry sits behind Entrance Plaza's storefront shutters).
+    # Extra PP for using things around the mall. Most need only the region
+    # they sit in, which the default rule already gives, so only the ones
+    # asking for more are here -- treadmills, dishes and sandbags have no
+    # rule on purpose. set_rule REPLACES that default, so each line below
+    # names its own region.
     if world.options.pp_bonus_locations:
         restricted_mode_on = bool(world.options.restricted_item_mode.value)
 
-        def _make_rule(required_regions, alt_item, req_loc, items_any,
-                       restricted_on=restricted_mode_on):
-            parts = []
-            # Region gating: ALL required regions must be reachable,
-            # except the first can be bypassed by alt_item.
-            if required_regions:
-                first = CanReachRegion(required_regions[0])
-                if alt_item:
-                    first = Or(first, Has(alt_item))
-                parts.append(first)
-                parts.extend(CanReachRegion(r) for r in required_regions[1:])
-            if req_loc:
-                parts.append(CanReachLocation(req_loc))
-            if restricted_on and items_any:
-                parts.append(Or(*[Has(it) for it in items_any]))
-            return And(*parts) if parts else True_()
+        # A player sent the Access Key opens that door without going down.
+        world.set_rule(world.multiworld.get_location("Obtain Maintenance Tunnel Key", world.player), Or(CanReachRegion("Maintenance Tunnel"), Has("Maintenance Tunnel Access Key")))
 
-        # Entries flagged ep_shutter sit inside Entrance Plaza's
-        # storefronts, so reaching EP is not enough -- the shutter
-        # cutscene has to have played.
-        def _gate_on_shutter(inner):
-            return And(ep_shutter, inner)
+        # Behind the Seon's register scoop, so it is not created on a seed
+        # where main scoops are not checks.
+        try:
+            _first_aid = world.multiworld.get_location("Obtain First Aid Kit", world.player)
+        except KeyError:
+            _first_aid = None
+        if _first_aid is not None:
+            world.set_rule(_first_aid, And(CanReachRegion("Seon's Food and Stuff"), CanReachLocation("Clean up... Register 6!")))
 
-        for _entry in AP_TRIGGER_LOCATIONS:
-            _names = expand_trigger_location_names(_entry)
-            if not _names:
-                continue
-            _shuttered = bool(_entry.get("ep_shutter"))
-            _alt_item = _entry.get("alt_item")
-            _req_loc = _entry.get("requires_location")
-            _items_any = _entry.get("restricted_mode_items_any") or []
-            _t = _entry.get("type")
-            _max = int(_entry.get("max_count", 0))
+        # A microwave needs food. Seon's is where it comes from; being sent it
+        # is just as good, except in restricted mode which needs both.
+        if restricted_mode_on:
+            microwave_food = And(CanReachRegion("Seon's Food and Stuff"),
+                                 Or(Has("Uncooked Pizza"), Has("Raw Meat")))
+        else:
+            microwave_food = Or(CanReachRegion("Seon's Food and Stuff"),
+                                Has("Uncooked Pizza"), Has("Raw Meat"))
 
-            # A required-predecessor location may not exist this seed
-            # (e.g. Savior+ScoopSanity disables MAIN_SCOOP). Drop the gate
-            # gracefully when missing; region gating still applies.
-            if _req_loc:
-                try:
-                    world.multiworld.get_location(_req_loc, world.player)
-                except KeyError:
-                    _req_loc = None
+        world.set_rule(world.multiworld.get_location("Use the Microwave in Jill's Sandwiches", world.player), And(CanReachRegion("Paradise Plaza"), microwave_food))
+        world.set_rule(world.multiworld.get_location("Use the Microwave in Chris's Fine Foods", world.player), And(CanReachRegion("Food Court"), microwave_food))
+        world.set_rule(world.multiworld.get_location("Use the Microwave in That's a Spicy Meatball!", world.player), And(CanReachRegion("Food Court"), microwave_food))
+        world.set_rule(world.multiworld.get_location("Use the Microwave in Central Tacos", world.player), And(CanReachRegion("Food Court"), microwave_food))
+        world.set_rule(world.multiworld.get_location("Use the Microwave in Meaty's Burgers", world.player), And(CanReachRegion("Food Court"), microwave_food))
+        world.set_rule(world.multiworld.get_location("Use the Microwave in Jade Paradise", world.player), And(CanReachRegion("Food Court"), microwave_food))
+        world.set_rule(world.multiworld.get_location("Use the Microwave in Teresa's Oven", world.player), And(CanReachRegion("Food Court"), microwave_food))
+        world.set_rule(world.multiworld.get_location("Use the Microwave in Colombian Roastmasters - Al Fresca Plaza", world.player), And(CanReachRegion("Al Fresca Plaza"), microwave_food))
+        world.set_rule(world.multiworld.get_location("Use the Microwave in Hamburger Fiefdom", world.player), And(CanReachRegion("Al Fresca Plaza"), microwave_food))
 
-            # Zone-counted entries (region_counts): "Use n X" is
-            # reachable when the reachable zones' item counts sum to n.
-            # required_regions (e.g. Seon's as the microwave food
-            # source) are always needed, unless one of alt_items_any
-            # has been received in their place (e.g. Raw Meat /
-            # Uncooked Pizza stand in for the grocery store). These
-            # locations live in Security Room so the parent region
-            # never blocks a zone alternative -- the rule does all the
-            # gating.
-            # Entries with recorded objects: each instance already sits in
-            # its own region, so the default access rule supplies the region
-            # gating. Only the conditions that are NOT about which region the
-            # object stands in still apply -- the food source for a microwave,
-            # the shutter for a storefront, a required predecessor.
-            _instances = _entry.get("instances") or []
-            if _t == "counted" and _instances:
-                _required = list(_entry.get("required_regions") or [])
-                _alts = _entry.get("alt_items_any") or []
+        # Outside restricted mode a pan is always to hand.
+        if restricted_mode_on:
+            world.set_rule(world.multiworld.get_location("Heat a pan on the Stove in Colombian Roastmasters - Paradise Plaza", world.player), And(CanReachRegion("Paradise Plaza"), Has("Frying Pan")))
+            world.set_rule(world.multiworld.get_location("Heat a pan on the Stove in Jill's Sandwiches", world.player), And(CanReachRegion("Paradise Plaza"), Has("Frying Pan")))
+            world.set_rule(world.multiworld.get_location("Heat a pan on the Stove in Chris's Fine Foods", world.player), And(CanReachRegion("Food Court"), Has("Frying Pan")))
+            world.set_rule(world.multiworld.get_location("Heat a pan on the Stove in That's a Spicy Meatball!", world.player), And(CanReachRegion("Food Court"), Has("Frying Pan")))
+            world.set_rule(world.multiworld.get_location("Heat a pan on the Stove in Colombian Roastmasters - Al Fresca Plaza", world.player), And(CanReachRegion("Al Fresca Plaza"), Has("Frying Pan")))
 
-                def _instance_rule(required=_required, alts=_alts,
-                                   req_loc=_req_loc, items_any=_items_any,
-                                   restricted_on=restricted_mode_on):
-                    parts = []
-                    if required:
-                        req = And(*[CanReachRegion(r) for r in required])
-                        if not restricted_on and alts:
-                            req = Or(req, *[Has(it) for it in alts])
-                        parts.append(req)
-                    if req_loc:
-                        parts.append(CanReachLocation(req_loc))
-                    if restricted_on and items_any:
-                        parts.append(Or(*[Has(it) for it in items_any]))
-                    if not parts:
-                        return None
-                    return And(*parts) if len(parts) > 1 else parts[0]
+        # The racks are inside Entrance Plaza's storefronts. ep_shutter
+        # already carries CanReachRegion("Entrance Plaza").
+        world.set_rule(world.multiworld.get_location("Spin the Display Rack at Shootingstar Sporting Goods Right", world.player), ep_shutter)
+        world.set_rule(world.multiworld.get_location("Spin the Display Rack at Shootingstar Sporting Goods Left", world.player), ep_shutter)
+        world.set_rule(world.multiworld.get_location("Spin the Display Rack at Jason Wayne's Sporting Goods Front", world.player), ep_shutter)
+        world.set_rule(world.multiworld.get_location("Spin the Display Rack at Jason Wayne's Sporting Goods Back", world.player), ep_shutter)
 
-                _names_here = [i["name"] for i in _instances if i.get("name")]
-                _all_name = _entry.get("all_location_name")
-                if _all_name:
-                    _names_here.append(_all_name)
-                _region_of = {i["name"]: i.get("region")
-                              for i in _instances if i.get("name")}
-                for _name in _names_here:
-                    try:
-                        _loc = world.multiworld.get_location(_name, world.player)
-                    except KeyError:
-                        continue
-                    _rule = _instance_rule()
-                    # set_rule REPLACES the default region rule rather than
-                    # adding to it, so the region has to be part of this one.
-                    _own = _region_of.get(_name)
-                    if _own:
-                        _reach = CanReachRegion(_own)
-                        _rule = And(_rule, _reach) if _rule is not None else _reach
-                    # The all-X needs every region that holds one of them.
-                    if _all_name and _name == _all_name:
-                        _regions = sorted({i["region"] for i in _instances
-                                           if i.get("region")})
-                        _all_rule = And(*[CanReachRegion(r) for r in _regions])
-                        _rule = And(_rule, _all_rule) if _rule is not None else _all_rule
-                    if _rule is None:
-                        continue
-                    if _shuttered:
-                        _rule = _gate_on_shutter(_rule)
-                    world.set_rule(_loc, _rule)
-                continue
-
-            _region_counts = _entry.get("region_counts")
-            if _t == "counted" and _region_counts:
-                _required = list(_entry.get("required_regions") or [])
-                _required_alts = _entry.get("alt_items_any") or []
-
-                def _make_count_rule(n, counts=_region_counts,
-                                     required=_required,
-                                     alts=_required_alts,
-                                     req_loc=_req_loc,
-                                     items_any=_items_any,
-                                     restricted_on=restricted_mode_on):
-                    parts = []
-                    if required:
-                        req = And(*[CanReachRegion(r) for r in required])
-                        # Outside restricted mode an alt item substitutes
-                        # for the required regions entirely.
-                        if not restricted_on and alts:
-                            req = Or(req, *[Has(it) for it in alts])
-                        parts.append(req)
-                    if req_loc:
-                        parts.append(CanReachLocation(req_loc))
-                    if restricted_on and items_any:
-                        parts.append(Or(*[Has(it) for it in items_any]))
-                    # Each region carries a count toward the target, so it
-                    # is listed once per unit it is worth.
-                    parts.append(AtLeast(n, *[CanReachRegion(r)
-                                              for r, c in counts.items()
-                                              for _ in range(c)]))
-                    return And(*parts) if len(parts) > 1 else parts[0]
-
-                _targets = [(_names[_i], _i + 1)
-                            for _i in range(min(_max, len(_names)))]
-                if len(_names) > _max:
-                    _targets.append((_names[-1], sum(_region_counts.values())))
-                for _name, _n in _targets:
-                    try:
-                        _loc = world.multiworld.get_location(_name, world.player)
-                    except KeyError:
-                        continue
-                    _rule = _make_count_rule(_n)
-                    if _shuttered:
-                        _rule = _gate_on_shutter(_rule)
-                    world.set_rule(_loc, _rule)
-                continue
-
-            # Build a list of (location_name, required_regions) tuples
-            # so each location gets its own rule reflecting its tier.
-            _per_loc: List[Any] = []
-            if _t == "single":
-                _regions = trigger_location_required_regions(_entry)
-                for _name in _names:
-                    _per_loc.append((_name, _regions))
-            elif _t == "counted":
-                # Per-count entries
-                for _i, _name in enumerate(_names[:_max]):
-                    _count = _i + 1
-                    _regions = trigger_location_required_regions(
-                        _entry, count=_count)
-                    _per_loc.append((_name, _regions))
-                # all-X variant uses the highest-tier regions
-                if len(_names) > _max:
-                    _all_regions = trigger_location_required_regions(
-                        _entry, is_all_variant=True)
-                    _per_loc.append((_names[-1], _all_regions))
-
-            for _name, _regions in _per_loc:
-                try:
-                    _loc = world.multiworld.get_location(_name, world.player)
-                except KeyError:
-                    continue
-                _rule = _make_rule(_regions, _alt_item, _req_loc, _items_any)
-                if _shuttered:
-                    _rule = _gate_on_shutter(_rule)
-                world.set_rule(_loc, _rule)
-
+        # Microwaves and stoves are counted mall-wide, so these name every
+        # region holding one. Their own region is the Security Room, which is
+        # sphere 0 and adds nothing.
+        world.set_rule(world.multiworld.get_location("Use All Microwaves", world.player), And(CanReachRegion("Paradise Plaza"), CanReachRegion("Food Court"), CanReachRegion("Al Fresca Plaza"), microwave_food))
+        if restricted_mode_on:
+            world.set_rule(world.multiworld.get_location("Heat a pan on all stoves", world.player), And(CanReachRegion("Paradise Plaza"), CanReachRegion("Food Court"), CanReachRegion("Al Fresca Plaza"), Has("Frying Pan")))
+        else:
+            world.set_rule(world.multiworld.get_location("Heat a pan on all stoves", world.player), And(CanReachRegion("Paradise Plaza"), CanReachRegion("Food Court"), CanReachRegion("Al Fresca Plaza")))
+        world.set_rule(world.multiworld.get_location("Spin All Display Racks", world.player), ep_shutter)
 
     # --------------------------------------------------------------------
     # Goal and victory

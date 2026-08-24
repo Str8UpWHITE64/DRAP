@@ -3,12 +3,7 @@ from typing import Optional, NamedTuple, Dict, List
 
 from BaseClasses import Location, Region
 from .Items import DRItem
-from .shared_data import (
-    AP_TRIGGER_LOCATIONS,
-    ZOMBIE_KILL_TIERS as SHARED_ZOMBIE_KILL_TIERS,
-    expand_trigger_location_names,
-    trigger_location_region,
-)
+from .shared_data import ZOMBIE_KILL_TIERS as SHARED_ZOMBIE_KILL_TIERS
 
 
 class DRLocationCategory(IntEnum):
@@ -157,6 +152,10 @@ location_tables = {
         # Overtime First Aid Kit cannot be confused with the story one,
         # which is also in Seon's.
         DRLocationData("Find the Coffee Filters", "Milk", DRLocationCategory.OVERTIME_SCOOP),
+        DRLocationData("Obtain Mall Map and Transceiver", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Use All Microwaves", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Heat a pan on all stoves", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Psycho: Kill enough survivors to escape", "Victory", DRLocationCategory.EVENT),
     ],
 
     "Rooftop": [
@@ -167,6 +166,8 @@ location_tables = {
         # PP Stickers in Rooftop
         DRLocationData("Photograph PP Sticker 100", "Yogurt", DRLocationCategory.PP_STICKER),
 
+        DRLocationData("Kill Jeff Meyer", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        DRLocationData("Kill Natalie Meyer", "Milk", DRLocationCategory.KILL_SURVIVOR),
     ],
 
     "Warehouse": [
@@ -220,6 +221,16 @@ location_tables = {
         DRLocationData("Find the Developing Solution", "Milk", DRLocationCategory.OVERTIME_SCOOP),
         DRLocationData("Find the Cold Spray", "Milk", DRLocationCategory.OVERTIME_SCOOP),
         DRLocationData("Camera Part [Flash]", "Milk", DRLocationCategory.CAMERA_PART),
+        DRLocationData("Realign Servbot Head", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Use the Microwave in Jill's Sandwiches", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Heat a pan on the Stove in Colombian Roastmasters - Paradise Plaza", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Heat a pan on the Stove in Jill's Sandwiches", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Kill Heather Tompkins", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        DRLocationData("Kill Pamela Tompkins", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        DRLocationData("Kill Ronald Shiner", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        DRLocationData("Kill Jennifer Gorman", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        DRLocationData("Kill Tad Hawthorne", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        DRLocationData("Kill Simone Ravendark", "Milk", DRLocationCategory.KILL_SURVIVOR),
     ],
 
     "Entrance Plaza": [
@@ -254,6 +265,16 @@ location_tables = {
         # which is also in Seon's.
         DRLocationData("Find the Camp Stove", "Milk", DRLocationCategory.OVERTIME_SCOOP),
         DRLocationData("Find the Perfume Bottle", "Milk", DRLocationCategory.OVERTIME_SCOOP),
+        DRLocationData("Spin the Display Rack at Shootingstar Sporting Goods Right", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Spin the Display Rack at Shootingstar Sporting Goods Left", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Spin the Display Rack at Jason Wayne's Sporting Goods Front", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Spin the Display Rack at Jason Wayne's Sporting Goods Back", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Spin All Display Racks", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Kill Bill Brenton", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        DRLocationData("Kill Wayne Blackwell", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        DRLocationData("Kill Jolie Wu", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        DRLocationData("Kill Rachel Decker", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        DRLocationData("Kill Floyd Sanders", "Milk", DRLocationCategory.KILL_SURVIVOR),
     ],
 
     "Al Fresca Plaza": [
@@ -275,6 +296,25 @@ location_tables = {
         DRLocationData("Photograph PP Sticker 43", "Baguette", DRLocationCategory.PP_STICKER),
         DRLocationData("Photograph PP Sticker 44", "Orange Juice", DRLocationCategory.PP_STICKER),
         DRLocationData("Photograph PP Sticker 45", "Uncooked Pizza", DRLocationCategory.PP_STICKER),
+        DRLocationData("Walk on Treadmill 1", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Walk on Treadmill 2", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Walk on Treadmill 3", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Walk on Treadmill 4", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Walk on Treadmill 5", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Walk on Treadmill 6", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Walk on All Treadmills", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Destroy Sandbag 1", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Destroy Sandbag 2", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Destroy Sandbag 3", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Destroy Sandbag 4", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Destroy All Sandbags", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Use the Microwave in Colombian Roastmasters - Al Fresca Plaza", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Use the Microwave in Hamburger Fiefdom", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Heat a pan on the Stove in Colombian Roastmasters - Al Fresca Plaza", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Kill Aaron Swoop", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        DRLocationData("Kill Burt Thompson", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        DRLocationData("Kill Leah Stein", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        DRLocationData("Kill Gordon Stalworth", "Milk", DRLocationCategory.KILL_SURVIVOR),
     ],
 
     "Leisure Park": [
@@ -300,6 +340,7 @@ location_tables = {
         # Appended rather than filed with the other convict entry above, since
         # ids come from list position.
         DRLocationData("Kill the convicts", "Milk", DRLocationCategory.PSYCHO_SCOOP),
+        DRLocationData("Kill Sophie Richard", "Milk", DRLocationCategory.KILL_SURVIVOR),
     ],
 
     "Wonderland Plaza": [
@@ -353,6 +394,23 @@ location_tables = {
         # which is also in Seon's.
         DRLocationData("Find the Magnifying Glass", "Milk", DRLocationCategory.OVERTIME_SCOOP),
         DRLocationData("Camera Part [Brightness]", "Milk", DRLocationCategory.CAMERA_PART),
+        DRLocationData("Ride the Space Rider", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Kill Greg Simpson", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        DRLocationData("Kill Yuu Tanaka", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        DRLocationData("Kill Shinji Kitano", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        DRLocationData("Kill Tonya Waters", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        DRLocationData("Kill Ross Folk", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        DRLocationData("Kill Kay Nelson", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        DRLocationData("Kill Lilly Deacon", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        DRLocationData("Kill Kelly Carpenter", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        DRLocationData("Kill Janet Star", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        DRLocationData("Kill Sally Mills", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        DRLocationData("Kill Nick Evans", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        DRLocationData("Kill Mindy Baker", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        DRLocationData("Kill Debbie Willet", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        DRLocationData("Kill Paul Carson", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        DRLocationData("Kill Leroy McKenna", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        DRLocationData("Kill Susan Walsh", "Milk", DRLocationCategory.KILL_SURVIVOR),
     ],
 
     "North Plaza": [
@@ -387,6 +445,14 @@ location_tables = {
         DRLocationData("Photograph PP Sticker 82", "Pie", DRLocationCategory.PP_STICKER),
 
         DRLocationData("Camera Part [Focus]", "Milk", DRLocationCategory.CAMERA_PART),
+        DRLocationData("Kill David Bailey", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        DRLocationData("Kill Josh Manning", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        DRLocationData("Kill Barbara Patterson", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        DRLocationData("Kill Rich Atkins", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        DRLocationData("Kill Kindell Johnson", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        DRLocationData("Kill Brett Styles", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        DRLocationData("Kill Jonathan Picardson", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        DRLocationData("Kill Alyssa Laurent", "Milk", DRLocationCategory.KILL_SURVIVOR),
     ],
     "Seon's Food and Stuff": [
         # Events in Seon's Food and Stuff
@@ -403,6 +469,7 @@ location_tables = {
         # Overtime First Aid Kit cannot be confused with the story one,
         # which is also in Seon's.
         DRLocationData("Find the First Aid Kit", "Milk", DRLocationCategory.OVERTIME_SCOOP),
+        DRLocationData("Obtain First Aid Kit", "Milk", DRLocationCategory.PP_BONUS),
     ],
     "Food Court": [
         # Events in Food Court
@@ -429,6 +496,33 @@ location_tables = {
         # Overtime First Aid Kit cannot be confused with the story one,
         # which is also in Seon's.
         DRLocationData("Find the Blender", "Milk", DRLocationCategory.OVERTIME_SCOOP),
+        DRLocationData("Break Dish 1 in Row 1 in Chris's Fine Foods", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Break Dish 2 in Row 1 in Chris's Fine Foods", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Break Dish 3 in Row 1 in Chris's Fine Foods", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Break Dish 4 in Row 1 in Chris's Fine Foods", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Break Dish 5 in Row 1 in Chris's Fine Foods", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Break Dish 1 in Row 2 in Chris's Fine Foods", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Break Dish 2 in Row 2 in Chris's Fine Foods", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Break Dish 3 in Row 2 in Chris's Fine Foods", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Break Dish 4 in Row 2 in Chris's Fine Foods", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Break Dish 1 in Row 3 in Chris's Fine Foods", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Break Dish 2 in Row 3 in Chris's Fine Foods", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Break Dish 3 in Row 3 in Chris's Fine Foods", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Break Dish 4 in Row 3 in Chris's Fine Foods", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Break Dish 1 in Row 4 in Chris's Fine Foods", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Break Dish 2 in Row 4 in Chris's Fine Foods", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Break Dish 3 in Row 4 in Chris's Fine Foods", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Break Dish 4 in Row 4 in Chris's Fine Foods", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Break Dish 5 in Row 4 in Chris's Fine Foods", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Use the Microwave in Chris's Fine Foods", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Use the Microwave in That's a Spicy Meatball!", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Use the Microwave in Central Tacos", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Use the Microwave in Meaty's Burgers", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Use the Microwave in Jade Paradise", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Use the Microwave in Teresa's Oven", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Heat a pan on the Stove in Chris's Fine Foods", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Heat a pan on the Stove in That's a Spicy Meatball!", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Kill Gil Jiminez", "Milk", DRLocationCategory.KILL_SURVIVOR),
     ],
     "Crislip's Home Saloon": [
         # Events in Crislip's Home Saloon
@@ -463,6 +557,11 @@ location_tables = {
         DRLocationData("Photograph PP Sticker 22", "Pie", DRLocationCategory.PP_STICKER),
         DRLocationData("Photograph PP Sticker 23", "Baguette", DRLocationCategory.PP_STICKER),
         DRLocationData("Photograph PP Sticker 24", "Orange Juice", DRLocationCategory.PP_STICKER),
+        DRLocationData("Kill Beth Shrake", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        DRLocationData("Kill Michelle Feltz", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        DRLocationData("Kill Nathan Crabbe", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        DRLocationData("Kill Ray Mathison", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        DRLocationData("Kill Cheryl Jones", "Milk", DRLocationCategory.KILL_SURVIVOR),
     ],
 
     "Maintenance Tunnel": [
@@ -485,6 +584,7 @@ location_tables = {
         DRLocationData("Bomb Collector - Al Fresca Plaza Truck", "Yogurt", DRLocationCategory.MAIN_SCOOP),
         DRLocationData("Bomb Collector - Wonderland Plaza Truck", "Apple", DRLocationCategory.MAIN_SCOOP),
         DRLocationData("Bomb Collector - Seon's Food and Stuff Truck", "Orange Juice", DRLocationCategory.MAIN_SCOOP),
+        DRLocationData("Obtain Maintenance Tunnel Key", "Milk", DRLocationCategory.PP_BONUS),
     ],
 
     # Off the Maintenance Tunnel and nothing else, so its key gates all four.
@@ -660,88 +760,18 @@ location_tables = {
         DRLocationData("Welcome to Hell", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Photojournalist", "Milk", DRLocationCategory.CHALLENGE),
 
+        DRLocationData("Kill 5 survivors", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        DRLocationData("Kill 10 survivors", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        DRLocationData("Kill 15 survivors", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        DRLocationData("Kill 20 survivors", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        DRLocationData("Kill 25 survivors", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        DRLocationData("Kill 30 survivors", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        DRLocationData("Kill 35 survivors", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        DRLocationData("Kill 40 survivors", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        DRLocationData("Kill 45 survivors", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        DRLocationData("Kill 48 survivors", "Milk", DRLocationCategory.KILL_SURVIVOR),
     ]
 }
-
-# ----------------------------------------------------------------------------
-# AP-trigger locations (PP-bonus events + key-item ToDo banners).
-#
-# Sourced from drdr_shared.json's "ap_trigger_locations" section. Each entry
-# expands to one or more locations: "single" types produce one location, and
-# "counted" types produce per-count + an optional all_location_name.
-#
-# Locations are APPENDED to the existing region tables to preserve the
-# backwards-compat ID assignment (see DRLocation.get_name_to_id) -- since
-# get_name_to_id assigns IDs by enumerating each region's list, appending
-# at the end keeps existing IDs stable.
-#
-# These locations are conditionally REMOVED later in __init__.create_regions
-# when the PpBonusLocations toggle is off, so the shared_data list always
-# represents the maximum possible set.
-# ----------------------------------------------------------------------------
-
-PP_BONUS_LOCATION_NAMES: list = []  # populated below; consumed by __init__
-
-for _entry in AP_TRIGGER_LOCATIONS:
-    _names = expand_trigger_location_names(_entry)
-    if not _names:
-        continue
-    _t = _entry.get("type")
-    if _t == "single":
-        _region = trigger_location_region(_entry)
-        if not _region or _region not in location_tables:
-            continue
-        for _name in _names:
-            location_tables[_region].append(
-                DRLocationData(_name, "Milk", DRLocationCategory.PP_BONUS)
-            )
-            PP_BONUS_LOCATION_NAMES.append(_name)
-    elif _t == "counted":
-        _instances = _entry.get("instances") or []
-        if _instances:
-            # Each object in the region it actually stands in, so the default
-            # access rule gives it the right gating and region_counts is not
-            # needed to approximate one.
-            for _inst in _instances:
-                _region = _inst.get("region")
-                if not _region or _region not in location_tables:
-                    continue
-                location_tables[_region].append(
-                    DRLocationData(_inst["name"], "Milk",
-                                   DRLocationCategory.PP_BONUS)
-                )
-                PP_BONUS_LOCATION_NAMES.append(_inst["name"])
-            _all_name = _entry.get("all_location_name")
-            if _all_name:
-                _region = trigger_location_region(_entry, is_all_variant=True)
-                if _region and _region in location_tables:
-                    location_tables[_region].append(
-                        DRLocationData(_all_name, "Milk",
-                                       DRLocationCategory.PP_BONUS)
-                    )
-                    PP_BONUS_LOCATION_NAMES.append(_all_name)
-            continue
-
-        _max = int(_entry.get("max_count", 0))
-        # Per-count names placed in their tier's region
-        for _i, _name in enumerate(_names[:_max]):
-            _count = _i + 1
-            _region = trigger_location_region(_entry, count=_count)
-            if not _region or _region not in location_tables:
-                continue
-            location_tables[_region].append(
-                DRLocationData(_name, "Milk", DRLocationCategory.PP_BONUS)
-            )
-            PP_BONUS_LOCATION_NAMES.append(_name)
-        # all_location_name (if any) goes in the most-restrictive region
-        if len(_names) > _max:
-            _all_name = _names[-1]
-            _region = trigger_location_region(_entry, is_all_variant=True)
-            if _region and _region in location_tables:
-                location_tables[_region].append(
-                    DRLocationData(_all_name, "Milk", DRLocationCategory.PP_BONUS)
-                )
-                PP_BONUS_LOCATION_NAMES.append(_all_name)
 
 location_dictionary: Dict[str, DRLocationData] = {}
 for location_table in location_tables.values():
@@ -788,22 +818,107 @@ def zombie_kill_locations(tier: str) -> List[str]:
 # region's reachability, so the region is a neutral one and Rules.py writes
 # out every rule.
 #
-# The full genocide set always exists; the tier decides which are created.
+# Every threshold is listed; the ZombieKillTiers option decides which are
+# created, in __init__.create_regions.
 location_tables["Zombie Kills"] = [
-    DRLocationData(zombie_kill_location_name(_threshold, _region),
-                   "Milk", DRLocationCategory.ZOMBIE_KILL)
-    for _region, _tiers in ZOMBIE_KILL_TIERS.items()
-    for _threshold in _tiers["genocide"]
+    DRLocationData("Kill 10 zombies in Paradise Plaza", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 25 zombies in Paradise Plaza", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 50 zombies in Paradise Plaza", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 100 zombies in Paradise Plaza", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 250 zombies in Paradise Plaza", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 500 zombies in Paradise Plaza", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 1000 zombies in Paradise Plaza", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 2000 zombies in Paradise Plaza", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 10 zombies in Entrance Plaza", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 25 zombies in Entrance Plaza", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 50 zombies in Entrance Plaza", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 100 zombies in Entrance Plaza", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 250 zombies in Entrance Plaza", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 500 zombies in Entrance Plaza", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 1000 zombies in Entrance Plaza", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 2000 zombies in Entrance Plaza", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 10 zombies in Al Fresca Plaza", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 25 zombies in Al Fresca Plaza", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 50 zombies in Al Fresca Plaza", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 100 zombies in Al Fresca Plaza", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 250 zombies in Al Fresca Plaza", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 500 zombies in Al Fresca Plaza", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 1000 zombies in Al Fresca Plaza", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 2000 zombies in Al Fresca Plaza", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 10 zombies in Food Court", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 25 zombies in Food Court", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 50 zombies in Food Court", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 100 zombies in Food Court", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 250 zombies in Food Court", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 500 zombies in Food Court", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 1000 zombies in Food Court", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 2000 zombies in Food Court", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 10 zombies in Wonderland Plaza", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 25 zombies in Wonderland Plaza", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 50 zombies in Wonderland Plaza", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 100 zombies in Wonderland Plaza", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 250 zombies in Wonderland Plaza", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 500 zombies in Wonderland Plaza", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 1000 zombies in Wonderland Plaza", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 2000 zombies in Wonderland Plaza", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 10 zombies in North Plaza", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 25 zombies in North Plaza", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 50 zombies in North Plaza", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 100 zombies in North Plaza", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 250 zombies in North Plaza", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 500 zombies in North Plaza", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 1000 zombies in North Plaza", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 2000 zombies in North Plaza", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 10 zombies in Crislip's Home Saloon", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 25 zombies in Crislip's Home Saloon", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 50 zombies in Crislip's Home Saloon", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 100 zombies in Crislip's Home Saloon", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 250 zombies in Crislip's Home Saloon", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 500 zombies in Crislip's Home Saloon", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 1000 zombies in Crislip's Home Saloon", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 10 zombies in Seon's Food and Stuff", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 25 zombies in Seon's Food and Stuff", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 50 zombies in Seon's Food and Stuff", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 100 zombies in Seon's Food and Stuff", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 250 zombies in Seon's Food and Stuff", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 500 zombies in Seon's Food and Stuff", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 1000 zombies in Seon's Food and Stuff", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 10 zombies in Colby's Movieland", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 25 zombies in Colby's Movieland", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 50 zombies in Colby's Movieland", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 100 zombies in Colby's Movieland", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 250 zombies in Colby's Movieland", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 500 zombies in Colby's Movieland", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 1000 zombies in Colby's Movieland", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 10 zombies in Leisure Park", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 25 zombies in Leisure Park", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 50 zombies in Leisure Park", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 100 zombies in Leisure Park", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 250 zombies in Leisure Park", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 500 zombies in Leisure Park", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 1000 zombies in Leisure Park", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 2000 zombies in Leisure Park", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 5000 zombies in Leisure Park", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 10000 zombies in Leisure Park", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 10 zombies in Maintenance Tunnel", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 25 zombies in Maintenance Tunnel", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 50 zombies in Maintenance Tunnel", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 100 zombies in Maintenance Tunnel", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 250 zombies in Maintenance Tunnel", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 500 zombies in Maintenance Tunnel", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 1000 zombies in Maintenance Tunnel", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 2000 zombies in Maintenance Tunnel", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 5000 zombies in Maintenance Tunnel", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 10000 zombies in Maintenance Tunnel", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 15000 zombies in Maintenance Tunnel", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 20000 zombies in Maintenance Tunnel", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 28594 zombies in Maintenance Tunnel", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Zombie Genocider: Kill 53,594 zombies across the mall", "Victory", DRLocationCategory.EVENT),
 ]
 
-# The Zombie Genocider goal, in the region its checks live in. Appended after
-# the generated entries so their IDs keep their positions.
-location_tables["Zombie Kills"].append(DRLocationData(
-    "Zombie Genocider: Kill 53,594 zombies across the mall",
-    "Victory", DRLocationCategory.EVENT))
 
-# The area each kill location counts for, which its rule needs and its region
-# no longer says.
+# The area each kill location counts for. The region above is a neutral one,
+# so the name is the only place the area survives -- Rules.py needs it back.
 ZOMBIE_KILL_REGION_OF = {
     zombie_kill_location_name(_threshold, _region): _region
     for _region, _tiers in ZOMBIE_KILL_TIERS.items()
@@ -813,35 +928,22 @@ ZOMBIE_KILL_REGION_OF = {
 # ---------------------------------------------------------------------------
 # Psycho goal
 # ---------------------------------------------------------------------------
-# One "Kill <name>" per rescuable survivor, derived from the SURVIVOR entries
-# so the region mapping and the roster cannot drift from the rescues. Appended
-# after every hand-written entry in each region, because ids are position-based
-# within a region and inserting anywhere else would renumber the lot.
-KILL_LOCATION_OF: dict = {}
+# There is one "Kill <name>" beside every "Rescue <name>", in the same region.
+# This maps a survivor's name to their kill location so the rules can be built
+# from the rescue rules rather than written out twice.
+KILL_LOCATION_OF: dict = {
+    _d.name[len("Kill "):]: _d.name
+    for _table in location_tables.values()
+    for _d in _table
+    if _d.category == DRLocationCategory.KILL_SURVIVOR
+    and not _d.name.endswith(" survivors")
+}
 
-for _region in list(location_tables.keys()):
-    for _loc in list(location_tables[_region]):
-        if _loc.category != DRLocationCategory.SURVIVOR:
-            continue
-        if not _loc.name.startswith("Rescue "):
-            continue
-        _who = _loc.name[len("Rescue "):]
-        _kill_name = "Kill " + _who
-        location_tables[_region].append(
-            DRLocationData(_kill_name, "Milk", DRLocationCategory.KILL_SURVIVOR))
-        KILL_LOCATION_OF[_who] = _kill_name
+# The survivor ladder. Psycho counts kills where a normal seed counts
+# rescues, so both use these numbers -- 48 rather than 50 because Brad,
+# Barnaby and Isabela cannot be counted.
+SURVIVOR_MILESTONES = [5, 10, 15, 20, 25, 30, 35, 40, 45, 48]
 
-# Kill milestones, mirroring the "Rescue N survivors" ladder.
-PSYCHO_KILL_MILESTONES = [5, 10, 15, 20, 25, 30, 35, 40, 45, 48]
-for _n in PSYCHO_KILL_MILESTONES:
-    location_tables["Challenges"].append(DRLocationData(
-        "Kill {} survivors".format(_n), "Milk",
-        DRLocationCategory.KILL_SURVIVOR))
-
-# The goal itself, beside the Savior goal it mirrors.
-location_tables["Security Room"].append(DRLocationData(
-    "Psycho: Kill enough survivors to escape", "Victory",
-    DRLocationCategory.EVENT))
 
 location_dictionary.update({
     location_data.name: location_data
