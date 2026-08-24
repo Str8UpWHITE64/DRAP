@@ -1070,11 +1070,12 @@ class DRWorld(World):
             "door_randomizer_mode": door_randomizer_mode,  # For Lua: 0 = chaos, 1 = paired
             "door_redirects": self.door_redirects if door_randomizer_enabled else {},
             "door_locks": self.door_locks_active,
-            # Per-door positions so the overlay can name a destination the
-            # player cannot get a prompt for. Only needed under Door Locks.
-            "door_anchors": (
-                self._door_locks_anchors() if self.door_locks_active else {}
-            ),
+            # Per-door positions so the overlay can name a destination, and
+            # the key it wants, for a door the player cannot get a prompt for.
+            # A locked door raises no prompt in ANY key mode, not just Door
+            # Locks, so these are always sent -- with the randomizer off the
+            # builder simply reports each door's vanilla destination.
+            "door_anchors": self._door_locks_anchors(),
             # Where the doors actually lead. Only sent under Door Locks, where
             # the vanilla graph in shared data would answer the wrong question.
             "area_graph": (

@@ -3,7 +3,7 @@
 -- Survivors delivered to the Security Room through the redirected Entrance
 -- Plaza door complete the escort but never say their thank-you line. Measured
 -- against a working vent delivery, the whole escort machinery is IDENTICAL --
--- NpcManager, the behaviour-tree escort family, the completion camera, the
+-- NpcManager, the behavior-tree escort family, the completion camera, the
 -- flags, the autosave. The only difference is one call:
 --
 --   MessageManager.set(messageId, list, flag)

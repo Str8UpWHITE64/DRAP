@@ -295,6 +295,62 @@ local function nearest_anchor(scene, px, pz)
     return best
 end
 
+------------------------------------------------------------
+-- Key hints
+------------------------------------------------------------
+-- A locked door raises no prompt at all, so a new player walks up to the vent
+-- or the elevator, gets nothing, and reads it as a broken game. Naming the key
+-- it wants also tells them what to hint for.
+--
+-- Built from shared data rather than slot data: the area and split-key tables
+-- already carry key_item, and split_areas lists BOTH directions of every
+-- transition, which is what makes the hint appear on either side of a door.
+
+local key_for_scene, key_for_transition = nil, nil
+
+local function build_key_tables()
+    if key_for_scene then return end
+    key_for_scene, key_for_transition = {}, {}
+    local ok, SharedData = pcall(require, "DRAP/SharedData")
+    if not ok or not SharedData then return end
+    for _, a in ipairs((SharedData.areas and SharedData.areas()) or {}) do
+        if a.scene_code and a.key_item then
+            key_for_scene[a.scene_code] = a.key_item
+        end
+    end
+    for _, sa in ipairs((SharedData.split_areas and SharedData.split_areas()) or {}) do
+        for _, t in ipairs(sa.transitions or {}) do
+            if t.origin and t.destination and sa.key_item then
+                key_for_transition[t.origin .. "|" .. t.destination] = sa.key_item
+            end
+        end
+    end
+end
+
+--- The key a door is waiting on, or nil when it is already open.
+---
+--- Asks DoorSceneLock rather than tracking received items here, so the hint
+--- disappears exactly when the door starts working -- one source of truth.
+local function locked_key_for(origin_code, dest_code)
+    if not (origin_code and dest_code) then return nil end
+    local lock = _G.AP and _G.AP.DoorSceneLock
+    if not lock then return nil end
+    build_key_tables()
+
+    if lock.get_split_keys_enabled and lock.get_split_keys_enabled() then
+        if lock.is_transition_locked
+            and lock.is_transition_locked(origin_code, dest_code) then
+            return key_for_transition[origin_code .. "|" .. dest_code]
+        end
+        return nil
+    end
+
+    if lock.is_scene_locked and lock.is_scene_locked(dest_code) then
+        return key_for_scene[dest_code]
+    end
+    return nil
+end
+
 local function show_nearby_door()
     if next(_state.anchors_by_scene) == nil then return end
     local px, pz = get_player_xz()
@@ -306,14 +362,39 @@ local function show_nearby_door()
         return
     end
 
-    -- Unlike the prompt path there is no vanilla signboard to defer to, so an
-    -- unredirected door still gets named -- just its own destination.
+    local scene = get_current_scene_code()
+    local key = locked_key_for(scene, NAME_TO_SCENE_CODE[anchor.to])
+    local redirected = anchor.to ~= anchor.vanilla
+
+    -- Anchors are sent for every seed now, so this path runs even with the
+    -- randomizer off -- and naming the destination of an ordinary unlocked
+    -- door would be noise at every doorway in the mall. Speak only when there
+    -- is something the player cannot already see: a redirect, a key they are
+    -- waiting on, or Door Locks, where a locked door raises no prompt at all
+    -- and naming plain destinations is the point.
+    local lock = _G.AP and _G.AP.DoorSceneLock
+    local door_locks = (lock and lock.get_door_locks_enabled
+        and lock.get_door_locks_enabled()) or false
+    if not (redirected or key or door_locks) then
+        _state.last_shown_text = nil
+        return
+    end
+
     local text
-    if anchor.to ~= anchor.vanilla then
+    if redirected then
         text = build_overlay_text(anchor.vanilla, anchor.to)
     else
         text = Notify.span(anchor.to, "location", true)
     end
+
+    -- Say what it wants, not just where it goes.
+    if key then
+        -- Purple, not the green used for the destination in this same toast:
+        -- two bold greens read as one phrase. Purple is the AP progression
+        -- color, which is what a key is.
+        text = text .. "  --  needs " .. Notify.span(key, "progression", true)
+    end
+
     send_overlay(text)
 end
 
