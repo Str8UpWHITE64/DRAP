@@ -227,6 +227,121 @@ function get_escort_count()
     return n
 end
 
+-- Transporting Isabela: send the player to the Rooftop, not the Security Room.
+--
+-- The mission breaks when she is delivered through the Entrance Plaza door.
+-- Measured why: the Rooftop vent doorway is a PAIR of entries at one trigger,
+-- and the engine picks between them by condition -- a plain jump gated
+-- CHECK_NOT_EM_SET01=4096 and an evm32_a event gated CHECK_EM_SET01=4096
+-- (EM_SET01 bit 12 resolves to flag 428 PL_IZABERA_CARRYBACK). The Entrance
+-- Plaza door has six variants and NONE carries an event at all, so there is
+-- nothing there to trigger.
+--
+-- Writing EVENT_NAME onto those variants does not help: stamped after load the
+-- door still resolved as AreaHitJump, and stamped during registration (hooking
+-- addAreaHitData) it did not even stick. The field is not a reachable lever.
+--
+-- So route the player to the Rooftop instead and let them use the real vent
+-- door, which fires the real event with its own gating intact. Nothing is
+-- fabricated.
+--
+-- Placed BELOW the door-randomizer tier deliberately: with the randomizer on,
+-- sending the player somewhere else for this door is its job, and overriding
+-- that would contradict the seed's logic.
+local ISABELA_ROOFTOP_TARGET = {
+    target_area = "s231",
+    -- The vent doorway's own trigger, read from AHL_areahits200_UD[6]/[12].
+    -- Landing on the prompt means one press to continue rather than a walk.
+    target_pos = { x = 171.0, y = 9.5, z = 111.4 },
+    target_angle = { x = 0.0, y = 0.93, z = 0.0 },
+}
+
+--- Is Isabela in the party right now?
+---
+--- Flag 428 is NOT usable for this: it reads false while she is being carried,
+--- and the engine actively clears it within a frame if set by hand. Her NPC
+--- record is reliable -- measured stype 34 (Npc2B_Isabela), mLiveState 2
+--- (JOIN), while carried.
+---
+--- The stypes are resolved from the SurvivorType enum by NAME rather than
+--- hardcoded, because there are four Isabela entries (Npc2B/2C/2D/83) for
+--- different story contexts and the enum value does not track the name's hex.
+local isabela_stypes = nil
+
+local function get_isabela_stypes()
+    if isabela_stypes ~= nil then return isabela_stypes end
+    isabela_stypes = {}
+    local td
+    pcall(function()
+        td = sdk.find_type_definition("app.solid.SurvivorDefine.SurvivorType")
+    end)
+    if not td then
+        isabela_stypes = nil     -- retry later rather than caching a miss
+        return {}
+    end
+    local fields = {}
+    pcall(function() fields = td:get_fields() or {} end)
+    for _, f in ipairs(fields) do
+        local name, static, literal
+        pcall(function()
+            name = f:get_name()
+            static = f:is_static()
+            literal = f:is_literal()
+        end)
+        if static and literal and name and name:find("_Isabela", 1, true) then
+            local v
+            pcall(function() v = f:get_data(nil) end)
+            if v ~= nil then isabela_stypes[tonumber(v)] = name end
+        end
+    end
+    return isabela_stypes
+end
+
+local ISABELA_LIVE_STATE_JOIN = 2
+
+
+
+local function isabela_in_party()
+    local stypes = get_isabela_stypes()
+    if not next(stypes) then return false, nil end
+    local mgr = sdk.get_managed_singleton("app.solid.gamemastering.NpcManager")
+    if not mgr then return false, nil end
+    local list
+    pcall(function() list = mgr:get_field("NpcInfoList") end)
+    if not list then return false, nil end
+    local count = 0
+    pcall(function() count = tonumber(list:call("get_Count")) or 0 end)
+    for i = 0, count - 1 do
+        local info
+        pcall(function() info = list:call("get_Item", i) end)
+        if info then
+            local stype, state
+            pcall(function()
+                stype = tonumber(info:get_field("<Name>k__BackingField"))
+                state = tonumber(info:get_field("mLiveState"))
+            end)
+            if stype and stypes[stype] and state == ISABELA_LIVE_STATE_JOIN then
+                return true, stypes[stype]
+            end
+        end
+    end
+    return false, nil
+end
+
+--- Tune the Rooftop arrival spot in game, and report whether she is detected.
+---   drap_isabela_target()             -- read, plus the detection result
+---   drap_isabela_target(x, y, z)      -- move the arrival point
+_G.drap_isabela_target = function(x, y, z)
+    if x and y and z then
+        ISABELA_ROOFTOP_TARGET.target_pos =
+            { x = tonumber(x), y = tonumber(y), z = tonumber(z) }
+    end
+    local p = ISABELA_ROOFTOP_TARGET.target_pos
+    local has, who = isabela_in_party()
+    log(string.format("Isabela rooftop target (%.2f, %.2f, %.2f) -- in party: %s %s",
+        p.x, p.y, p.z, tostring(has), tostring(who or "")))
+end
+
 -- The canonical EP-to-SR door ID. When the door randomizer is active and
 -- ScoopSanity has unlocked this edge (see DoorRandomization.SR_EP_EDGES),
 -- this entry in DoorRandomizer.get_redirects() is the source of truth for
@@ -269,6 +384,19 @@ local function resolve_redirect_target()
                 target_angle = sr_redirect.target_angle,
             }
         end
+    end
+
+    -- Tier 1.5: carrying Isabela. Route to the Rooftop so the player uses the
+    -- vent door, which is the only one with the event her mission needs.
+    local has_isabela, who = isabela_in_party()
+    if has_isabela then
+        log(string.format("Redirect target: ROOFTOP for Isabela (%s)",
+            tostring(who)))
+        return {
+            target_area = ISABELA_ROOFTOP_TARGET.target_area,
+            target_pos = ISABELA_ROOFTOP_TARGET.target_pos,
+            target_angle = ISABELA_ROOFTOP_TARGET.target_angle,
+        }
     end
 
     local escort = get_escort_count()
