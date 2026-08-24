@@ -407,7 +407,7 @@ _all_items = [DRItemData(row[0], row[1], row[2]) for row in [
     # All trap items end with "Trap" so they're obviously traps in the AP UI.
     ("Stomach Ache Trap",   4070, DRItemCategory.TRAP),
     ("Zombait Trap",        4071, DRItemCategory.TRAP),
-    ("Slow Trap",           4072, DRItemCategory.TRAP),
+    ("Skipped Leg Day Trap", 4072, DRItemCategory.TRAP),
     ("Damage Player Trap",  4073, DRItemCategory.TRAP),
     ("Hostile NPC Trap",    4074, DRItemCategory.TRAP),
     ("Special Forces Trap", 4075, DRItemCategory.TRAP),
@@ -427,7 +427,7 @@ _all_items = [DRItemData(row[0], row[1], row[2]) for row in [
     ("Goddamnit, Donut! Trap", 4081, DRItemCategory.TRAP),
     ("Boxers Trap",         4082, DRItemCategory.TRAP),
 
-    # Timed traps (DRAP/effects/PlayerBuffs.lua), alongside Slow Trap.
+    # Timed traps (DRAP/effects/PlayerBuffs.lua), alongside Skipped Leg Day Trap.
     ("Skipped Arm Day Trap", 4083, DRItemCategory.TRAP),
     ("Oops More Zombies Trap", 4084, DRItemCategory.TRAP),
     ("Potty Mouth Trap",    4085, DRItemCategory.TRAP),

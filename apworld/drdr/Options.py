@@ -311,9 +311,10 @@ class EnabledTraps(OptionSet):
                 (everything one hit from breaking), Where'd Your Inventory Go?
                 (it all shatters).
     Costume:    Bald, Boxers, Goddamnit, Donut! (heart boxers and bare feet).
-    Effects:    Stomach Ache, Zombait, Slow, Damage Player, Skipped Arm Day
-                (no strength for 30s), Oops More Zombies (double spawns for a
-                minute), Potty Mouth (Frank swears at you).
+    Effects:    Stomach Ache, Zombait, Damage Player, Skipped Arm Day (no
+                strength for 30s), Skipped Leg Day (no speed for 30s), Oops
+                More Zombies (double spawns for a minute), Potty Mouth (Frank
+                swears at you).
     NPC:        Hostile NPC, Special Forces, Convicts Respawn.
 
     Some traps drop out on their own regardless of this list: Convicts Respawn
@@ -324,7 +325,7 @@ class EnabledTraps(OptionSet):
     valid_keys = {
         "Stomach Ache Trap",
         "Zombait Trap",
-        "Slow Trap",
+        "Skipped Leg Day Trap",
         "Damage Player Trap",
         "Hostile NPC Trap",
         "Special Forces Trap",
@@ -438,7 +439,7 @@ class TrapPercentage(Range):
     10 = default, 50 = aggressive, 100 = chaos. The selected
     fraction of filler slots is dedicated to traps and round-robin
     distributed across all six trap types (Stomach Ache Trap, Zombait
-    Trap, Slow Trap, Damage Player Trap, Hostile NPC Trap, Special
+    Trap, Skipped Leg Day Trap, Damage Player Trap, Hostile NPC Trap, Special
     Forces Trap) so every type appears at least once before any
     repeats.
     """

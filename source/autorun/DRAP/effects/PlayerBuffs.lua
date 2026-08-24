@@ -4,7 +4,7 @@
 --
 -- Three effect categories:
 --   * Juice-driven (5 buffs + 2 traps) -- engine-native, self-managing timers.
---   * Custom-timed (Berserker Mode, Slow Trap) -- save baseline, apply, restore.
+--   * Custom-timed (Berserker Mode, Skipped Leg Day Trap) -- save baseline, apply, restore.
 --   * Instant (Heal, Player Damage, PP Boost) -- single function call.
 
 local M = {}
@@ -45,7 +45,7 @@ local DAMAGE_AMOUNT = 2000
 local DAMAGE_HP_FLOOR = 1000
 -- Berserker Mode attack% target (and paired Buttobi computed from it)
 local BERSERKER_ATTACK_PCT = 1000
--- Slow Trap multiplier on LevelSpeedMax
+-- Skipped Leg Day Trap multiplier on LevelSpeedMax
 local SLOW_TRAP_MULT = 0.5
 
 -- Skipped Arm Day: attack percent while the trap runs. 1 is the floor rather
@@ -149,7 +149,7 @@ local function _trigger_juice(slot_idx, duration)
 end
 
 ------------------------------------------------------------
--- Custom-timed effect state (Berserker Mode + Slow Trap)
+-- Custom-timed effect state (Berserker Mode + Skipped Leg Day Trap)
 -- Each entry: { expires_at, saved_state, restore_fn }
 ------------------------------------------------------------
 
@@ -651,7 +651,7 @@ function M.slow_trap(sec, multiplier)
     sec = tonumber(sec) or DEFAULT_TIMED_DURATION
     multiplier = tonumber(multiplier) or SLOW_TRAP_MULT
 
-    _start_timed("Slow Trap", sec,
+    _start_timed("Skipped Leg Day Trap", sec,
         function()
             -- capture current LevelSpeedMax values
             local ms = _move_setting()
@@ -672,16 +672,16 @@ function M.slow_trap(sec, multiplier)
         end,
         function()
             -- apply: scale baseline by multiplier
-            local saved = _timed_effects["Slow Trap"]
-                          and _timed_effects["Slow Trap"].saved
+            local saved = _timed_effects["Skipped Leg Day Trap"]
+                          and _timed_effects["Skipped Leg Day Trap"].saved
             local base = saved or VANILLA_SPEED_TABLE
             local scaled = {}
             for i, v in ipairs(base) do scaled[i] = v * multiplier end
             _set_speed_table(scaled)
             local psm = _psm()
             if psm then pcall(function() psm:call("applyPlayerValue") end) end
-            log(string.format("Slow Trap: %gx speed for %.1fs", multiplier, sec))
-            _notify_trap("Slow Trap", string.format("%gx speed for %.0fs", multiplier, sec))
+            log(string.format("Skipped Leg Day Trap: %gx speed for %.1fs", multiplier, sec))
+            _notify_trap("Skipped Leg Day Trap", string.format("%gx speed for %.0fs", multiplier, sec))
         end,
         function(saved)
             -- restore
@@ -733,7 +733,7 @@ function M.register()
                 M.pp_boost(amt)
             end },
         -- Custom traps
-        { name = "Slow Trap",          fn = M.slow_trap },
+        { name = "Skipped Leg Day Trap",          fn = M.slow_trap },
         { name = "Damage Player Trap", fn = M.player_damage },
         { name = "Skipped Arm Day Trap", fn = M.arm_day_trap },
         { name = "Oops More Zombies Trap", fn = M.zombie_swarm_trap },
@@ -748,7 +748,7 @@ function M.register()
     local TRAPS = {
         ["Stomach Ache Trap"]  = true,
         ["Zombait Trap"]       = true,
-        ["Slow Trap"]          = true,
+        ["Skipped Leg Day Trap"]          = true,
         ["Damage Player Trap"] = true,
         ["Skipped Arm Day Trap"] = true,
         ["Oops More Zombies Trap"] = true,
