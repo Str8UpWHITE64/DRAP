@@ -327,6 +327,10 @@ local function poll_interaction()
     M.log(string.format("looking at %-24s (Type=%s)", tostring(name), tostring(itype)))
 end
 
+-- Declared above the frame loop that uses it: below, it was out of scope
+-- there and the closure read and wrote a global instead.
+local pop_pending = nil
+
 re.on_frame(function()
     pcall(poll_interaction)
     if pop_pending then
@@ -590,7 +594,6 @@ local pop_hooked = false
 -- conversation wedged until the area reloads. closePop takes a ForceCancel
 -- parameter -- it is a argument, not a field, which is why setting a field
 -- called ForceCancel did nothing.
-local pop_pending = nil
 -- Set while the box currently open is the one we mean to neutralise, so
 -- invokeCallbackOnClose can be skipped for that box only.
 local pop_is_target = false

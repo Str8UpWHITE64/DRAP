@@ -158,6 +158,30 @@ end
 -- it up.
 local om_index = {}      -- scene -> om_type -> { address -> instance }
 
+-- Everything M.reset_index clears has to be declared HERE, above it. These
+-- used to sit further down beside the code that reads them, which put them
+-- out of scope at the point reset_index assigns them -- so it silently wrote
+-- six globals and cleared none of the real state. Reloading an area did not
+-- let a missed check be earned again, which was the whole point of it.
+
+-- Objects already reported broken. A broken object STAYS in OmList in its
+-- broken state for a while, so without this the same one answers every later
+-- break -- measured: bags 2, 3 and 4 all came back as bag 2. It also settles
+-- the iteration order question, since pairs() has none to rely on.
+local broken_seen = {}   -- address -> true
+
+local last_state = {}    -- address -> last seen state value
+
+-- One report per instance until the area reloads. Without this the
+-- accumulator refills the moment it is cleared and fires again -- and while
+-- the game is PAUSED the speed stays frozen at a non-zero value, so it repeats
+-- every tick. Cleared with the index, so a reload still allows a retry.
+local reported = {}
+
+local rot_accum = {}      -- address -> degrees since the last send
+local dwell = {}          -- instance name -> seconds stood there
+local stat_progress = {}   -- instance name -> units accumulated nearby
+
 local function ensure_index(scene, om_type, items)
     om_index[scene] = om_index[scene] or {}
     if om_index[scene][om_type] then return om_index[scene][om_type] end
@@ -201,7 +225,6 @@ end
 -- state for a while, so without this the same one answers every later break --
 -- measured: bags 2, 3 and 4 all came back as bag 2. It also settles the
 -- iteration order question, since pairs() has none to rely on.
-local broken_seen = {}   -- address -> true
 
 --- The instance whose object has just started breaking, or nil.
 local function find_breaking(scene, om_type, items)
@@ -468,7 +491,6 @@ local function enum_value(enum_type, field_name)
     return nil
 end
 
-local last_state = {}    -- address -> last seen state value
 
 --- Anything that has just left the watched state, as a list of instances.
 local function poll_state(scene, t)
@@ -575,9 +597,7 @@ end
 -- accumulator refills the moment it is cleared and fires again -- and while
 -- the game is PAUSED the speed stays frozen at a non-zero value, so it repeats
 -- every tick. Cleared with the index, so a reload still allows a retry.
-local reported = {}
 
-local rot_accum = {}      -- address -> degrees since the last send
 local rot_clock = nil
 
 local function poll_rotation(scene, t)
@@ -620,11 +640,9 @@ end
 -- reach of a recorded position is the same event -- and unlike the award, it
 -- can be repeated.
 
-local dwell = {}          -- instance name -> seconds stood there
 local dwell_clock = nil
 
 local stat_last = nil
-local stat_progress = {}   -- instance name -> units accumulated nearby
 
 local function read_save_stat(field)
     local ss = safe(function()
