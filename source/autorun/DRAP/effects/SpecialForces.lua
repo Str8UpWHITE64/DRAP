@@ -4,7 +4,8 @@
 -- Driven by the slot-data option `special_forces_mode`:
 --   0 none       vanilla
 --   1 item       the "Special Forces" scoop turns them on; it completes once
---                both its checks are sent, and clear_on_complete drops the flag
+--                both its checks are sent, and clear_on_complete drops the
+--                flag ONCE -- see below
 --   2 permanent  on from Jessie onward, no item involved
 --
 -- ScoopSanity only -- the apworld already falls the mode back to none without
@@ -18,6 +19,12 @@
 -- In `item` mode this module sets nothing: the scoop carries flags = [309], so
 -- ScoopUnlocker turns it on at unlock and clears it on completion. All that is
 -- left is the music, which a flag row cannot express.
+--
+-- THE CLEAR IS ONE-SHOT, and it has to be. The story raises 309 again by
+-- itself at 10pm on day 3. The side-completed policy used to claim it off on
+-- every reconciler pass, so the game turned the soldiers on and DRAP turned
+-- them off a tick later, replaying the cutscene without end. It now clears
+-- once and leaves the flag alone -- see FlagPolicies.
 --
 -- THE MUSIC. Flag 309 also starts a loud track that plays continuously and is
 -- re-requested on every area load. Stopping it does not hold -- requestStopBGM

@@ -777,6 +777,16 @@ local function is_in_completion_grace(scoop_name)
     return t ~= nil and (os.clock() - t < COMPLETION_GRACE_SECONDS)
 end
 
+--- True when the scoop finished during THIS session.
+---
+--- A completed scoop restored from the ledger has no completion time -- the
+--- restore writes State.completed directly rather than going through
+--- State.complete -- so end-of-scoop cleanup, which belongs to the moment of
+--- finishing, does not run again on every load.
+local function completed_this_session(scoop_name)
+    return completion_times[scoop_name] ~= nil
+end
+
 local function enforce_blacklist()
     for flag_id, reason in pairs(FLAG_BLACKLIST) do
         -- Skip 300 while player is entering hideout (392 on, 355 not yet)
@@ -1165,6 +1175,7 @@ local function build_reconciler_ctx()
         north_plaza_area = NORTH_PLAZA_AREA_INDEX,
         check_flag = raw_check_flag,
         in_grace = is_in_completion_grace,
+        completed_this_session = completed_this_session,
         is_active = State.is_active,
         is_completed = State.is_completed,
         is_conflict_blocked = State.is_conflict_blocked,

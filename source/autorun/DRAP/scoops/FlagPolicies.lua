@@ -278,23 +278,44 @@ function M.build(deps)
     }
 
     ----------------------------------------------------------------
+    -- Flags this policy has already put back. It stands in for the engine's
+    -- end-of-scoop cleanup, which happens ONCE -- so once the flag is
+    -- observed off, the flag goes back to being the game's business.
+    --
+    -- Claiming it off on every pass instead was a bug with teeth: flag 309 is
+    -- the Special Forces, and the story raises it again at 10pm on day 3.
+    -- Holding it down meant the game turned the soldiers on, the reconciler
+    -- turned them off a tick later, and the cutscene replayed without end.
+    local cleanup_done = {}
+
     policy{
         -- Completed-scoop flag cleanup, OPT-IN via clear_on_complete.
         -- DRAP-forced scoops never run the engine's end-of-scoop cleanup
         -- (finishSCQ never fires), so e.g. Cletus's flag stayed on and
         -- suppressed Gun Shop Standoff's room. Must NOT be category-wide:
         -- most scoops have content living past their AP completion
-        -- (cutscene checks, extra survivors, hostages). Today: Cletus alone.
+        -- (cutscene checks, extra survivors, hostages).
         name = "side-completed", priority = 45,
         collect = function(ctx, claim)
             if ctx.endgame or not ctx.activated then return end
             for scoop_name, data in pairs(D.scoop_data) do
                 if data.clear_on_complete and data.flags
                     and ctx.is_completed(scoop_name)
+                    -- Only for a scoop that finished in this session. A
+                    -- completed scoop loaded from the ledger finished long
+                    -- ago, and re-running the tidy-up on every load would
+                    -- clear a flag the game has since raised for its own
+                    -- reasons.
+                    and ctx.completed_this_session(scoop_name)
                     and not ctx.in_grace(scoop_name) then
                     for _, flag_id in ipairs(data.flags) do
-                        if flag_id and flag_id ~= 0 then
-                            claim(flag_id, "off")
+                        if flag_id and flag_id ~= 0
+                            and not cleanup_done[flag_id] then
+                            if ctx.check_flag(flag_id) == false then
+                                cleanup_done[flag_id] = true
+                            else
+                                claim(flag_id, "off")
+                            end
                         end
                     end
                 end
