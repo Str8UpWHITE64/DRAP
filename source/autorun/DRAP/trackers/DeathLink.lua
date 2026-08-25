@@ -18,6 +18,15 @@ local gm_mgr  = M:add_singleton("gm", "app.solid.gamemastering.GameManager")
 -- Internal State
 ------------------------------------------------------------
 
+-- Last InGameFlowManagerBase seen, kept only to notice when it changes.
+--
+-- It is NOT a cache any more. get_MainInstance can hand back a different
+-- object without GameManager itself being replaced -- a log of two Psycho
+-- runs 40s apart showed no GameManager transition at all -- and a call on a
+-- stale one neither throws nor does anything: pcall returns true, the log
+-- says "playerDead() invoked", and nobody dies. Re-reading it costs one
+-- managed call, which is nothing next to a death that silently does not
+-- happen.
 local igfm_cached = nil
 local last_is_dead = nil
 local has_announced_death_this_life = false
@@ -60,8 +69,6 @@ local function vital_is_dead(vc)
 end
 
 local function get_ingame_flow_manager()
-    if igfm_cached then return igfm_cached end
-
     local gm = gm_mgr:get()
     if not gm then
         M.log("get_ingame_flow_manager: GameManager singleton is nil")
@@ -73,8 +80,12 @@ local function get_ingame_flow_manager()
     end)
 
     if ok and v then
+        if igfm_cached ~= nil and igfm_cached ~= v then
+            M.log("InGameFlowManagerBase replaced -- the old one would have"
+                .. " swallowed playerDead() silently")
+        end
         igfm_cached = v
-        return igfm_cached
+        return v
     end
 
     igfm_cached = nil

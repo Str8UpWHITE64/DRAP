@@ -83,6 +83,16 @@ local Shared = require("DRAP/Shared")
 local safe = Shared.safe
 
 local cached_dlg = nil
+-- The MessageManager the cache was built against.
+--
+-- cached_dlg used to be kept for the life of the process. Both routes below
+-- resolve against state a reload replaces -- MessageUIController hangs off
+-- MessageManager, and the scene walk finds a component in the live scene --
+-- so after title -> load the cache held a dead object. Calls on it neither
+-- throw nor do anything, which is how DeathLink's identical cache hid a
+-- broken playerDead() for a whole session. Re-anchor when the manager
+-- changes.
+local cached_mm = nil
 
 -- Walk the transform tree under a via.Scene root, calling fn(go, t) for
 -- every GameObject. Returns the first GameObject for which fn returns
@@ -128,10 +138,14 @@ end
 -- engine build (verified via drap_notify_check 2026-04-27 -- it returned
 -- nil). The transform-tree walk replaces it.
 local function get_dialog()
+    local mm = sdk.get_managed_singleton("app.solid.gamemastering.MessageManager")
+    if mm ~= cached_mm then
+        cached_dlg = nil
+        cached_mm = mm
+    end
     if cached_dlg ~= nil then return cached_dlg end
 
     -- Path 2: MessageManager.MessageUIController
-    local mm = sdk.get_managed_singleton("app.solid.gamemastering.MessageManager")
     if mm then
         local ctrl = safe(function() return mm:get_field("MessageUIController") end)
         if ctrl ~= nil then
