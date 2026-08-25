@@ -101,6 +101,19 @@ local function try_send_goal()
     local n = count_rescued()
     local t = target()
     if n >= t then
+        -- The check is held until an ending has played. It is what yields the
+        -- Victory item, so holding it holds the win -- the run finishes the
+        -- way the game finishes rather than just stopping here.
+        local ok, Ending = pcall(require, "DRAP/effects/EndingSequence")
+        if ok and Ending and Ending.request_ending then
+            log(string.format(
+                "Savior threshold reached (%d/%d). Holding the goal for the ending.",
+                n, t))
+            Ending.request_ending(GOAL_LOCATION_NAME)
+            goal_sent = true
+            return
+        end
+
         log(string.format("Savior threshold reached (%d/%d). Sending goal check.", n, t))
         if AP.AP_BRIDGE and AP.AP_BRIDGE.check then
             AP.AP_BRIDGE.check(GOAL_LOCATION_NAME)

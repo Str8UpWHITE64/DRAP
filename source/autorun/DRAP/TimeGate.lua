@@ -381,6 +381,71 @@ function M.set_mdate(new_mdate)
     return write_scq_mdate(new_mdate)
 end
 
+-- mClock ticks at 30 a second, so an hour is 108000 of them.
+local TICKS_PER_HOUR = 108000
+
+M.TICKS_PER_HOUR = TICKS_PER_HOUR
+
+--- Day/time -> mClock ticks. mClock counts from Day 0 00:00 and the run starts
+--- at 3888000, which is 36h -- Day 1 12:00 -- so the day number needs no
+--- offset of its own.
+local function clock_ticks(day, hour, minute)
+    return math.floor((day * 24 + hour + (minute / 60)) * TICKS_PER_HOUR)
+end
+
+--- Jump the clock straight to a day and time.
+---
+--- THIS is how time is set. set_mdate below writes SCQManager's mDate, which
+--- is DERIVED from mClock: the engine recomputes it within a frame and the
+--- write evaporates. Measured, three jumps to day 4 in a row each read back as
+--- day 1. Only mClock is the real clock, which is why night mode writes it.
+---
+--- Nothing is turboed, so no scheduled event between here and there runs. That
+--- is the point -- a turbo from day 1 fires every story event and every
+--- time-based check on the way past.
+---
+--- @return boolean held whether the clock reads back at the target
+function M.set_game_time(day, hour, minute)
+    day = tonumber(day) or 1
+    hour = tonumber(hour) or 12
+    minute = tonumber(minute) or 0
+
+    local gm = gm_mgr:get()
+    if not gm then
+        M.log("set_game_time: no GameManager")
+        return false
+    end
+
+    local target = clock_ticks(day, hour, minute)
+    local before = tonumber(gm.mClock)
+
+    -- A cap or a freeze would drag it straight back.
+    M.unlock_all_time()
+
+    local ok = pcall(function() gm.mClock = target end)
+    local after = tonumber(gm.mClock)
+    local held = (ok and after ~= nil and math.abs(after - target) < TICKS_PER_HOUR)
+
+    M.log(string.format(
+        "set_game_time: day %d %02d:%02d -- mClock %s -> %d, reads back %s%s",
+        day, hour, minute, tostring(before), target, tostring(after),
+        held and "" or "  DID NOT HOLD"))
+    return held
+end
+
+--- The clock as day/hour/minute, read off mClock rather than the derived mDate.
+--- @return integer|nil day, integer hour, integer minute, integer ticks
+function M.get_game_time()
+    local gm = gm_mgr:get()
+    if not gm then return nil end
+    local ticks = tonumber(gm.mClock)
+    if not ticks then return nil end
+    local total_minutes = math.floor(ticks / (TICKS_PER_HOUR / 60))
+    local day = math.floor(total_minutes / (24 * 60))
+    local rest = total_minutes % (24 * 60)
+    return day, math.floor(rest / 60), rest % 60, ticks
+end
+
 --- Turbo-advance time to a target mDate. Unfreezes time, sets turbo
 --- speed, then re-freezes on arrival.
 --- @param target_mdate number The target mDate value
@@ -541,5 +606,30 @@ re.on_draw_ui(function()
         imgui.tree_pop()
     end
 end)
+
+------------------------------------------------------------
+-- Console
+------------------------------------------------------------
+
+--- Jump the clock. drap_time_set(4, 11, 55) for five to noon on the last day.
+_G.drap_time_set = function(day, hour, minute)
+    local held = M.set_game_time(day, hour, minute)
+    if not held then
+        M.log("the clock did not take the write -- something is driving it back")
+    end
+    _G.drap_time_show()
+end
+
+--- What the clock reads, from mClock and from the derived mDate, so the two
+--- can be compared when one of them is lying.
+_G.drap_time_show = function()
+    local day, hour, minute, ticks = M.get_game_time()
+    if not day then
+        M.log("no GameManager -- cannot read the clock")
+        return
+    end
+    M.log(string.format("mClock %d = day %d %02d:%02d   (mDate reads %s)",
+        ticks, day, hour, minute, tostring(M.get_current_mdate())))
+end
 
 return M

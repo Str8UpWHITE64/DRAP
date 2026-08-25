@@ -98,8 +98,18 @@ local function try_send_goal()
     local n = count_killed()
     local t = target()
     if n >= t then
-        log(string.format("Psycho threshold reached (%d/%d). Sending goal check.",
-            n, t))
+        log(string.format("Psycho threshold reached (%d/%d).", n, t))
+        -- Held for the ending, the same as Savior and Genocider. The check is
+        -- what yields Victory, so sending it here would end the run before
+        -- the Special Forces ever turn up.
+        local ok, Ending = pcall(require, "DRAP/effects/EndingSequence")
+        if ok and Ending and Ending.request_ending then
+            goal_sent = true
+            log("holding the goal for the Special Forces ending")
+            Ending.request_ending(GOAL_LOCATION_NAME, { ending = "psycho" })
+            return
+        end
+        log("EndingSequence unavailable -- sending the goal without an ending")
         if AP.AP_BRIDGE and AP.AP_BRIDGE.check then
             AP.AP_BRIDGE.check(GOAL_LOCATION_NAME)
             goal_sent = true

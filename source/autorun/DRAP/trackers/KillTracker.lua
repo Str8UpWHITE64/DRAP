@@ -176,6 +176,57 @@ function M.pull_counts()
     return ok
 end
 
+local GOAL_GENOCIDE = 3
+local GENOCIDE_GOAL_LOCATION = "Zombie Genocider: Kill 53,594 zombies across the mall"
+
+local genocide_goal_sent = false
+
+--- Has every area been cleared to the top of its ladder?
+---
+--- The Genocider goal forces the top tier, so the thresholds the counter was
+--- configured with ARE the genocide ones and the last of each is what that
+--- area takes to clear. Reading them back beats re-deriving the numbers from
+--- shared data, which would be a second copy to keep in step.
+local function all_areas_cleared()
+    local any = false
+    for region, list in pairs(counter.thresholds or {}) do
+        local top = list[#list]
+        if top then
+            any = true
+            if counter.count(region) < top then return false end
+        end
+    end
+    return any
+end
+
+--- The Genocider goal, which nothing used to send.
+---
+--- The location exists, carries Victory and has a rule, but no runtime ever
+--- told the server it had been done -- so the goal could not be won. Savior
+--- and Psycho each had a module doing this; this is the missing one.
+---
+--- Held for the ending rather than sent here, the same as Savior.
+local function check_genocide_goal(force)
+    if genocide_goal_sent then return end
+    local AP = _G.AP
+    if not force and not (AP and tonumber(AP.Goal) == GOAL_GENOCIDE) then return end
+    if not force and not all_areas_cleared() then return end
+
+    genocide_goal_sent = true
+    local ok, Ending = pcall(require, "DRAP/effects/EndingSequence")
+    if ok and Ending and Ending.request_ending then
+        M.log("every area cleared -- holding the Genocider goal for the ending")
+        -- The mall empties as the reward: bodies everywhere on the walk back.
+        Ending.request_ending(GENOCIDE_GOAL_LOCATION, { clear_mall = true })
+        return
+    end
+
+    M.log("every area cleared -- sending the Genocider goal")
+    if AP.AP_BRIDGE and AP.AP_BRIDGE.check then
+        pcall(AP.AP_BRIDGE.check, GENOCIDE_GOAL_LOCATION)
+    end
+end
+
 --- Announce a threshold: send the check and toast it.
 local function announce(names)
     local AP = _G.AP
@@ -187,6 +238,9 @@ local function announce(names)
             pcall(AP.Notify.send, name)
         end
     end
+    -- Every path that moves a count comes through here, so this is the one
+    -- place the goal has to be tested from.
+    check_genocide_goal()
 end
 
 --- Apply the kills held during the read. Also runs on timeout, so a server
@@ -573,6 +627,51 @@ _G.drap_kills_add = function(region, n)
 end
 
 _G.drap_kills_clear = function() M.debug_clear_local() end
+
+--- Why the Genocider goal has or has not fired.
+---
+--- The goal is held until every area tops its ladder, so "nothing happened"
+--- has several causes that look identical from the game. Name them.
+_G.drap_genocide_status = function()
+    local AP = _G.AP
+    local goal = AP and tonumber(AP.Goal)
+    print(string.format("[Genocide] goal=%s (needs %d) sent=%s",
+        tostring(goal), GOAL_GENOCIDE, tostring(genocide_goal_sent)))
+    if goal ~= GOAL_GENOCIDE then
+        print("[Genocide] this seed is not a Genocider seed -- the goal will"
+            .. " NOT send. drap_genocide_force() runs the chain anyway.")
+    end
+    local any, short = false, 0
+    for region, list in pairs(counter.thresholds or {}) do
+        local top = list[#list]
+        if top then
+            any = true
+            local have = counter.count(region)
+            local done = have >= top
+            if not done then short = short + 1 end
+            print(string.format("[Genocide]   %-24s %6d / %-6d %s",
+                region, have, top, done and "CLEARED" or ""))
+        end
+    end
+    if not any then
+        print("[Genocide] no thresholds configured -- run"
+            .. " drap_kills_debug(\"genocide\") first")
+        return false
+    end
+    print(string.format("[Genocide] %s (%d area(s) short)",
+        short == 0 and "ALL AREAS CLEARED" or "not cleared", short))
+    return short == 0
+end
+
+--- Run the goal chain regardless of this seed's goal or the counts.
+---
+--- Exists so the Savior/Genocide ending hand-off can be exercised without
+--- regenerating a seed as Genocider. It takes the same path the real trigger
+--- does, including the hold for EndingSequence.
+_G.drap_genocide_force = function()
+    print("[Genocide] forcing the goal chain (ignoring goal and counts)")
+    check_genocide_goal(true)
+end
 
 --- What the server side of this is actually doing. The counts alone cannot
 --- show whether a write landed, so this reports the plumbing.

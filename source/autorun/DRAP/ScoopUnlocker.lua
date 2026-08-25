@@ -36,8 +36,14 @@ local FLAG_TRIGGERS = {
     [355] = { disable = { 300 } },  -- Carlito's Hideout: disable 300 once inside (kills NPCs if left on)
 }
 
-local TIME_SKIP_TRIGGERS = {
-    [1311] = { target_mdate = 41200, name = "Zombie Jessie to Get Bit!" },
+-- Zombie Jessie down means the story has nothing left to run, so the clock
+-- goes to the ending. This used to turbo to day 4 noon, which ran the rest of
+-- the story at speed and fired every scheduled event on the way. It now sets
+-- the flags that let a single clock write land and jumps straight there --
+-- see EndingSequence for the recipe and BACKLOG for why turbo was the only
+-- option before mClock was understood.
+local ENDING_JUMP_TRIGGERS = {
+    [1311] = { name = "Zombie Jessie to Get Bit!" },
 }
 
 local HIDEOUT_AREA_INDEX = 1025
@@ -63,7 +69,6 @@ local SIMONE_BOX = {
 }
 
 local time_skips_fired = {}
-local active_time_skip = nil
 
 -- Scoop definitions come from drdr_shared.json (schema v2), the same file the
 -- Python generation side derives its scoop tables from (names validated
@@ -1349,16 +1354,32 @@ local function install_hooks()
                         end
                     end
 
-                    local skip = TIME_SKIP_TRIGGERS[flag_id]
-                    if skip and not time_skips_fired[flag_id] and not active_time_skip then
-                        time_skips_fired[flag_id] = true
-                        active_time_skip = {
-                            flag = flag_id,
-                            target_mdate = skip.target_mdate,
-                            name = skip.name,
-                        }
-                        M.log(string.format("Time skip activated: flag %d -> advance to %d (%s)",
-                            flag_id, skip.target_mdate, skip.name))
+                    local skip = ENDING_JUMP_TRIGGERS[flag_id]
+                    if skip and not time_skips_fired[flag_id] then
+                        local ok_e, Ending = pcall(require, "DRAP/effects/EndingSequence")
+                        -- A goal ending already in flight owns the run's
+                        -- finish. The Psycho sequence SETS 1311 itself, and
+                        -- this hook fires on the write -- so without this
+                        -- check, asking for the Psycho ending immediately
+                        -- triggered Ending A instead, from inside the flag
+                        -- write, before the Psycho flags had all gone on.
+                        if ok_e and Ending and Ending.is_pending
+                                and Ending.is_pending() then
+                            time_skips_fired[flag_id] = true
+                            M.log(string.format(
+                                "Ending jump: flag %d (%s) ignored -- a goal"
+                                .. " ending is already pending",
+                                flag_id, skip.name))
+                        else
+                            time_skips_fired[flag_id] = true
+                            M.log(string.format("Ending jump: flag %d (%s)",
+                                flag_id, skip.name))
+                            if ok_e and Ending and Ending.jump_to_ending_a then
+                                Ending.jump_to_ending_a()
+                            else
+                                M.log("EndingSequence unavailable -- the run will not end itself")
+                            end
+                        end
                     end
 
                     if CONTROLLED_FLAGS[flag_id] then
@@ -1903,7 +1924,6 @@ end
 
 function M.reset_all()
     time_skips_fired = {}
-    active_time_skip = nil
     State.reset_all()
 end
 
@@ -1926,7 +1946,6 @@ end
 
 function M.reset_for_new_game()
     time_skips_fired = {}
-    active_time_skip = nil
 
     -- Reset log-spam dedup state so a fresh run logs anew.
     _last_cascade_signature = nil
@@ -2363,11 +2382,6 @@ function M.draw_tab_content(debug)
             rec_color = 0xFF00FFFF
         end
         imgui.text_colored(rec_str, rec_color)
-        if active_time_skip then
-            imgui.text_colored(string.format("TIME SKIP: %s -> %d",
-                active_time_skip.name, active_time_skip.target_mdate), 0xFF00FFFF)
-        end
-
         imgui.text(string.format("Recv: %d | Done: %d | Blacklist: %d | Triggers: %d",
             count_keys(received_scoops), count_keys(completed_scoops),
             count_keys(FLAG_BLACKLIST), count_keys(FLAG_TRIGGERS)))
@@ -2818,30 +2832,6 @@ function M.on_frame()
             State.set_time_frozen(false)
             M.log("ScoopSanity: pre-stairs -- clearing time freeze")
             if on_time_unfreeze_callback then pcall(on_time_unfreeze_callback) end
-        end
-    end
-
-    if active_time_skip then
-        local ok_tg, TimeGate = pcall(require, "DRAP/TimeGate")
-        if ok_tg and TimeGate then
-            -- Run TimeGate frame logic here so turbo is maintained even when
-            -- the main loop skips it (e.g. during cutscenes where isInGame() is false)
-            TimeGate.on_frame()
-
-            local md = TimeGate.get_current_mdate()
-            if md and tonumber(md) >= active_time_skip.target_mdate then
-                M.log(string.format("Time skip complete: %s (reached %s)",
-                    active_time_skip.name, tostring(md)))
-                active_time_skip = nil
-                if TimeGate.is_turbo_active() then
-                    TimeGate.cancel_turbo()
-                end
-                TimeGate.enable()
-            elseif not TimeGate.is_turbo_active() then
-                M.log(string.format("Time skip re-triggering turbo -> %d (%s)",
-                    active_time_skip.target_mdate, active_time_skip.name))
-                TimeGate.turbo_advance_to(active_time_skip.target_mdate)
-            end
         end
     end
 
