@@ -857,6 +857,9 @@ re.on_frame(function()
     safe_on_frame(AP.effects.KentChain, "KentChain")
     safe_on_frame(AP.effects.PsychoHostility, "PsychoHostility")
     safe_on_frame(AP.effects.SpecialForces, "SpecialForces")
+    -- Re-arms the spawn multiplier when a new area's layout appears; the
+    -- instantinateZombies pre-hook fires too early to catch it.
+    safe_on_frame(AP.effects.ZombieEffects, "ZombieEffects")
     safe_on_frame(AP.effects.PartyHudGuard, "PartyHudGuard")
 
     -- Debug modules
