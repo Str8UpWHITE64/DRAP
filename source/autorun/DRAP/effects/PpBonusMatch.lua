@@ -52,6 +52,8 @@ local OBJECT_LIMIT = 3.0
 -- and lua_use_before_decl.py does not look inside function bodies.
 local install_award_hook
 local most_active
+local match_report
+local match_award
 
 local instances_by_trigger = {}   -- id -> { match, om_type, items = {...} }
 local bridge = nil                -- set by setup(); object-driven sends go here
@@ -457,9 +459,27 @@ local function queue_send(id, t, name, how)
 end
 
 --- Send an instance's check, and the all-X if that completed the set.
+-- When each trigger last sent something, so the game-award fallback can tell
+-- "we missed it" from "we already got it". object_state triggers detect from
+-- the object's own state machine and never go through pending_sends, so the
+-- fallback used to fire after every successful send and log a failure for a
+-- check that had just gone out.
+local last_send_at = {}
+
+-- Game awards we could not match yet, kept so they can be retried.
+--
+-- The award arrives the moment the game grants the bonus, but our instance
+-- index is built per scene and is not ready straight after an area load --
+-- which is when a stove or microwave in a freshly entered area gets used, and
+-- the entry cutscene is playing. Giving up on the first attempt dropped the
+-- check entirely. Hold it and keep trying while the player is still there.
+local pending_awards = {}
+local AWARD_RETRY_SECONDS = 15.0
+
 local function send_instance(id, t, name, how)
     if reported[name] then return end
     reported[name] = true
+    last_send_at[id] = os.clock()
     log(string.format("%s -> %s (%s)", id, name, how))
     if dry_run then
         log("   dry run: not sending")
@@ -569,6 +589,45 @@ end
 ---
 --- So the AWARD still says when (it already knows about the full rotation),
 --- and the object only answers which: the spinning one.
+--- Why most_active found nothing.
+---
+--- "no instance could be matched" covers several different failures that look
+--- identical from the log: no objects of the type in this scene, objects
+--- present but their state field unreadable, or the most-active object not
+--- being one of the instances we index. They want different fixes, so say
+--- which.
+function match_report(scene, t)
+    local map = ensure_index(scene, t.om_type, t.items)
+    local mapped = 0
+    for _ in pairs(map or {}) do mapped = mapped + 1 end
+    local seen, readable, best_mag, best_mapped = 0, 0, 0.0, false
+    for addr, om in pairs(objects_of_type(t.om_type)) do
+        seen = seen + 1
+        local v = tonumber(safe(function() return om:get_field(t.state_field) end))
+        if v then
+            readable = readable + 1
+            if math.abs(v) > best_mag then
+                best_mag = math.abs(v)
+                best_mapped = map and map[addr] ~= nil
+            end
+        end
+    end
+    -- Was a cutscene up? The failures so far were all in areas just entered,
+    -- which is when an entry scene plays -- so record it rather than wonder.
+    local playing = "?"
+    local etm = sdk.get_managed_singleton(
+        "app.solid.gamemastering.EventTimelineManager")
+    if etm then
+        playing = tostring(safe(function() return etm:call("isEventPlaying") end))
+    end
+    return string.format(
+        "scene=%s type=%s items=%d indexed=%d live=%d readable(%s)=%d"
+        .. " best_mag=%.3f best_is_indexed=%s cutscene=%s",
+        tostring(scene), tostring(t.om_type), #(t.items or {}), mapped, seen,
+        tostring(t.state_field), readable, best_mag, tostring(best_mapped),
+        playing)
+end
+
 function most_active(scene, t)
     local map = ensure_index(scene, t.om_type, t.items)
     local best, best_mag = nil, 0.0
@@ -696,13 +755,28 @@ local function poll_dwell(scene, t)
         local mv = player_move_input()
         running = (mv == nil) or (mv >= move_min)   -- unreadable: do not block
     end
-    local out = {}
+    -- ONE instance can be occupied at a time: the nearest in range.
+    --
+    -- Every instance within radius used to accumulate at once. Treadmills
+    -- stand side by side, so ten seconds on the first also banked ten on its
+    -- neighbours, and stepping across fired them instantly -- the whole row
+    -- completed from one walk.
+    local best, best_d2 = nil, nil
     for _, inst in ipairs(t.items) do
         if inst.scene == scene then
             local d2 = dist2(p, inst.x, inst.y, inst.z)
-            if d2 <= radius * radius then
-                -- Counts total time on this treadmill, and is NOT reset when
-                -- it fires -- the reported guard stops repeats instead. Zeroing
+            if d2 <= radius * radius and (best_d2 == nil or d2 < best_d2) then
+                best, best_d2 = inst, d2
+            end
+        end
+    end
+
+    local out = {}
+    for _, inst in ipairs(t.items) do
+        if inst.scene == scene then
+            if inst == best then
+                -- Counts total time on this one, and is NOT reset when it
+                -- fires -- the reported guard stops repeats instead. Zeroing
                 -- here made the calibration line measure from the last fire
                 -- rather than from stepping on, reporting 2.1s for a 10s stay.
                 local held = (dwell[inst.name] or 0) + (running and dt or 0)
@@ -711,6 +785,7 @@ local function poll_dwell(scene, t)
                     out[#out + 1] = inst
                 end
             else
+                -- Not the one being used, including neighbours in range.
                 dwell[inst.name] = 0
             end
         end
@@ -778,6 +853,44 @@ end
 --- comes the first time, so a check lost to a disconnect could never be
 --- retried. Watching the object means reloading the area and breaking it again
 --- sends it once more.
+--- Best instance for an award, by the trigger's own match rule.
+function match_award(t)
+    if t.match == "player_dwell" or t.match == "nearest" then
+        local p = player_pos()
+        if not p then return nil end
+        return closest(t.items, current_scene(), p.x, p.y, p.z,
+            tonumber(t.radius) or NEAREST_LIMIT)
+    end
+    if t.match == "object_rotation" or t.match == "object_active"
+            or t.match == "object_state" then
+        -- object_state has no magnitude to rank on, but the index lookup is
+        -- the same and a single live instance is still a confident answer.
+        return (most_active(current_scene(), t))
+    end
+    return nil
+end
+
+--- Retry awards we could not place when they arrived.
+local function poll_pending_awards()
+    if next(pending_awards) == nil then return end
+    local now = os.clock()
+    for id, entry in pairs(pending_awards) do
+        local inst = match_award(entry.t)
+        if inst then
+            pending_awards[id] = nil
+            send_instance(id, entry.t, inst.name, "game awarded, matched late")
+        elseif now >= entry.until_at then
+            pending_awards[id] = nil
+            local why = "?"
+            local ok, r = pcall(match_report, current_scene(), entry.t)
+            if ok then why = r end
+            log(string.format(
+                "%s: game awarded but no instance could be matched -- %s",
+                id, why))
+        end
+    end
+end
+
 local function poll_broken()
     local scene = current_scene()
     if not scene then return end
@@ -852,6 +965,8 @@ re.on_frame(function()
     -- Every tick: rotation is integrated over time, and dwell is measured in
     -- seconds. Sampling these twice a second would lose most of the motion.
     if next(instances_by_trigger) ~= nil then poll_broken() end
+    -- Awards held because the index was not ready when they arrived.
+    poll_pending_awards()
 
     if #pending_sends > 0 then
         local now = os.clock()
@@ -886,24 +1001,27 @@ re.on_frame(function()
             pending_sends = keep
             local t = instances_by_trigger[id]
 
-            if t and not flushed and M.owns(id) then
+            -- Already sent for this trigger a moment ago: the award we are
+            -- reacting to is the one we just reported.
+            local just_sent = last_send_at[id]
+                and (os.clock() - last_send_at[id]) < 3.0
+
+            if t and not flushed and not just_sent and M.owns(id) then
                 -- Nothing was waiting, so our detection missed it. The game
                 -- says it happened, so send the best answer we have.
-                local inst
-                if t.match == "player_dwell" or t.match == "nearest" then
-                    local p = player_pos()
-                    if p then
-                        inst = closest(t.items, current_scene(), p.x, p.y, p.z,
-                            tonumber(t.radius) or NEAREST_LIMIT)
-                    end
-                elseif t.match == "object_rotation" or t.match == "object_active" then
-                    inst = most_active(current_scene(), t)
-                end
+                local inst = match_award(t)
                 if inst then
                     send_instance(id, t, inst.name, "game awarded")
                 else
-                    log(string.format(
-                        "%s: game awarded but no instance could be matched", id))
+                    -- Hold it: the index may just not be built yet.
+                    if not pending_awards[id] then
+                        pending_awards[id] = {
+                            t = t, until_at = os.clock() + AWARD_RETRY_SECONDS,
+                        }
+                        log(string.format(
+                            "%s: game awarded, no instance yet -- retrying for %ds",
+                            id, AWARD_RETRY_SECONDS))
+                    end
                 end
             end
             if t and t.match == "player_stat" then
