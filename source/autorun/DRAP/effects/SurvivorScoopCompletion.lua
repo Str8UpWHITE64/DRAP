@@ -92,14 +92,17 @@ end
 -- Reconstruct rescue state from the bridge's persisted completed-checks list
 -- and re-evaluate every scoop. Safe to call multiple times.
 function M.reapply()
-    if not AP or not AP.AP_BRIDGE or not AP.AP_BRIDGE.has_completed_check then
+    if not AP or not AP.AP_BRIDGE or not AP.AP_BRIDGE.has_local_check then
         return
     end
 
     rescued = {}
     for _, survivors in pairs(SharedData.scoop_survivors()) do
         for _, sname in ipairs(survivors) do
-            if AP.AP_BRIDGE.has_completed_check("Rescue " .. sname) then
+            -- What the PLAYER rescued. has_completed_check is also true for
+            -- rescues another world collected on our behalf, which would
+            -- complete scoops nobody finished.
+            if AP.AP_BRIDGE.has_local_check("Rescue " .. sname) then
                 rescued[sname] = true
             end
         end

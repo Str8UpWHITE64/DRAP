@@ -412,11 +412,14 @@ end
 
 local function send_all_if_complete(id, t)
     if not t.all_name then return end
-    if not (bridge and bridge.has_completed_check) then return end
+    if not (bridge and bridge.has_local_check and bridge.has_completed_check) then return end
+    -- Components: what the PLAYER photographed. Another world collecting them
+    -- must not earn the all-X on their behalf.
     for _, inst in ipairs(t.items) do
-        local ok, done = pcall(bridge.has_completed_check, inst.name)
+        local ok, done = pcall(bridge.has_local_check, inst.name)
         if not ok or done ~= true then return end
     end
+    -- Dedupe, though: if the server already has the all-X, do not resend it.
     local ok, already = pcall(bridge.has_completed_check, t.all_name)
     if ok and already == true then return end
     log(string.format("%s -> %s (all %d done)", id, t.all_name, #t.items))

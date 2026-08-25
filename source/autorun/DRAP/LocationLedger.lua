@@ -125,6 +125,30 @@ function M.is_checked(name)
     return L ~= nil and L.locations[name] ~= nil
 end
 
+--- Did THIS runtime detect it, rather than the server telling us about it?
+---
+--- The server's checked list includes locations collected on the player's
+--- behalf when another world finishes and releases its items. is_checked
+--- cannot tell those apart, so counting with it hands a player goal progress
+--- they never played -- 17 of 25 kills from two actual kills, in the run that
+--- found this.
+---
+--- Entries we recorded keep source "check" or "pre-connect"; mark_acked only
+--- stamps "server" on names we did not already know, and never rewrites the
+--- source of one we did.
+---
+--- Caveat: if the ledger file is lost, our own checks come back from the
+--- server as "server" and stop counting. The ledger is per slot and seed and
+--- is written on every new entry, so that is rare -- and it fails by
+--- understating progress, which the player can still earn back, rather than
+--- by handing them a win they did not.
+function M.is_checked_locally(name)
+    if not L then return false end
+    local entry = L.locations[name]
+    if not entry then return false end
+    return entry.source ~= "server"
+end
+
 --- Marks a location as server-confirmed. Batched: call flush() after.
 --- Creates the entry (source "server") if the server knows a check we
 --- don't -- self-heals a lost/deleted local file.

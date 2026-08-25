@@ -10,7 +10,7 @@
 -- target lost for the run, not a check earned, so the count comes from the
 -- "Kill X" checks the tracker sends rather than from deaths.
 --
--- Counting is based on AP_BRIDGE.has_completed_check, which persists across
+-- Counting is based on AP_BRIDGE.has_local_check, which persists across
 -- disconnects, so the running total survives reconnects and crashes without
 -- needing its own save file.
 
@@ -57,12 +57,15 @@ end
 -- other "Kill ..." locations -- the psychopath kills and the zombie tiers
 -- share that prefix and must never count toward this goal.
 local function count_killed()
-    if not AP or not AP.AP_BRIDGE or not AP.AP_BRIDGE.has_completed_check then
+    if not AP or not AP.AP_BRIDGE or not AP.AP_BRIDGE.has_local_check then
         return 0
     end
     local n = 0
     for _, name in ipairs(survivor_universe()) do
-        if AP.AP_BRIDGE.has_completed_check("Kill " .. name) then
+        -- has_local_check, NOT has_completed_check: the latter is true for
+        -- kills another world collected on our behalf, which used to hand
+        -- the goal most of its progress for free.
+        if AP.AP_BRIDGE.has_local_check("Kill " .. name) then
             n = n + 1
         end
     end
@@ -182,8 +185,8 @@ _G.drap_psycho_status = function()
         n, t, tostring(AP and AP.Goal), tostring(goal_sent)))
     local missing = {}
     for _, name in ipairs(survivor_universe()) do
-        if not (AP and AP.AP_BRIDGE and AP.AP_BRIDGE.has_completed_check
-                and AP.AP_BRIDGE.has_completed_check("Kill " .. name)) then
+        if not (AP and AP.AP_BRIDGE and AP.AP_BRIDGE.has_local_check
+                and AP.AP_BRIDGE.has_local_check("Kill " .. name)) then
             table.insert(missing, name)
         end
     end

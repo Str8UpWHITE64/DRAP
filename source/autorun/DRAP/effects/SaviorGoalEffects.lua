@@ -6,7 +6,7 @@
 --
 -- Only active when AP.Goal == 2. Otherwise the module is inert.
 --
--- Counting is based on AP_BRIDGE.has_completed_check, which persists across
+-- Counting is based on AP_BRIDGE.has_local_check, which persists across
 -- disconnects, so the running total survives reconnects and crashes without
 -- needing its own save file.
 
@@ -54,12 +54,14 @@ end
 -- Count rescue checks via the bridge. Iterates known survivors so the count
 -- is bounded and doesn't pick up unrelated location names.
 local function count_rescued()
-    if not AP or not AP.AP_BRIDGE or not AP.AP_BRIDGE.has_completed_check then
+    if not AP or not AP.AP_BRIDGE or not AP.AP_BRIDGE.has_local_check then
         return 0
     end
     local n = 0
     for _, name in ipairs(survivor_universe()) do
-        if AP.AP_BRIDGE.has_completed_check("Rescue " .. name) then
+        -- has_local_check, NOT has_completed_check: the latter counts
+        -- rescues another world collected on our behalf.
+        if AP.AP_BRIDGE.has_local_check("Rescue " .. name) then
             n = n + 1
         end
     end
@@ -186,8 +188,8 @@ function M.print_progress()
         log("Survivors NOT yet rescued (per bridge COMPLETED_CHECKS):")
         for _, name in ipairs(survivor_universe()) do
             local check_name = "Rescue " .. name
-            local rescued = AP and AP.AP_BRIDGE and AP.AP_BRIDGE.has_completed_check
-                          and AP.AP_BRIDGE.has_completed_check(check_name)
+            local rescued = AP and AP.AP_BRIDGE and AP.AP_BRIDGE.has_local_check
+                          and AP.AP_BRIDGE.has_local_check(check_name)
             if not rescued then
                 log("  " .. name)
             end

@@ -936,6 +936,18 @@ function M.has_completed_check(loc_name)
     return Ledger.is_checked(loc_name)
 end
 
+--- Did the PLAYER do this, as opposed to the server knowing about it?
+---
+--- For goal progress this is the question, not has_completed_check: that one
+--- is true for locations another world collected on the player's behalf.
+--- Includes this session's pending checks so it still works offline, where
+--- the ledger does not exist.
+function M.has_local_check(loc_name)
+    if not loc_name then return false end
+    if Ledger.is_checked_locally(loc_name) then return true end
+    return PENDING_CHECKS[loc_name] == true
+end
+
 --- Has this check been recorded AT ALL this session, ledger or not?
 ---
 --- has_completed_check reads only the ledger, which does not exist until a

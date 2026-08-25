@@ -576,7 +576,11 @@ local function poll_multi_event_completions()
     _multi_poll_at = os.clock()
 
     local bridge = AP and AP.AP_BRIDGE
-    local recorded = bridge and (bridge.is_check_recorded or bridge.has_completed_check)
+    -- What the PLAYER sent, not what the server holds. Completing a scoop
+    -- turns its content off, so counting another world's collected locations
+    -- here would disable scoops nobody played -- and with them the cases
+    -- Ending A and Ending S need.
+    local recorded = bridge and (bridge.has_local_check or bridge.is_check_recorded)
     if not recorded then return end
 
     for scoop_name, data in pairs(SCOOP_DATA) do
@@ -1683,8 +1687,11 @@ State.init({
     end,
     survivor_rescued = function(name)
         local bridge = AP and AP.AP_BRIDGE
-        if not (bridge and bridge.has_completed_check) then return false end
-        local ok, done = pcall(bridge.has_completed_check, "Rescue " .. name)
+        -- Did WE rescue them. A collected "Rescue X" from another world must
+        -- not stand in for the player having done it, or the survivor's own
+        -- spawn gets turned off before they ever appear.
+        if not (bridge and bridge.has_local_check) then return false end
+        local ok, done = pcall(bridge.has_local_check, "Rescue " .. name)
         return ok and done == true
     end,
     region_requirements = build_region_requirements(),
@@ -1777,14 +1784,16 @@ function M.on_event_tracked(event_desc)
         local data = SCOOP_DATA[scoop_name]
         local needed = data and data.completion_events
         if needed then
-            -- ALL-of: record this one and wait for the rest. Bridge is the
-            -- authority on what has been sent, so a reload does not lose
-            -- progress and the order they arrive in does not matter.
+            -- ALL-of: record this one and wait for the rest. The ledger is
+            -- the authority on what WE sent, so a reload does not lose
+            -- progress and the order they arrive in does not matter -- but a
+            -- location another world collected is not progress, and treating
+            -- it as such completes the scoop early and shuts its content off.
             local missing = {}
             for _, ev in ipairs(needed) do
                 local bridge = AP and AP.AP_BRIDGE
-                local sent = bridge and bridge.has_completed_check
-                    and bridge.has_completed_check(ev)
+                local sent = bridge and bridge.has_local_check
+                    and bridge.has_local_check(ev)
                 if ev ~= event_desc and not sent then
                     missing[#missing + 1] = ev
                 end
