@@ -19,6 +19,7 @@ if not AP then
     error("lua-apclientpp.dll load failed: " .. tostring(load_err))
 end
 Logger.info("AP_REF", "lua-apclientpp.dll loaded")
+
 AP = AP()
 local AP_REF = {}
 AP_REF.AP = AP
@@ -112,6 +113,32 @@ local connected = false
 local current_text = ""
 
 local disconnect_client = false
+-- Host to connect to on the next frame, or nil. See the Connect button.
+local connect_requested = nil
+
+-- The client is touched from ONE thread: the UpdateBehavior loop that builds
+-- and polls it. The window draws on the frame thread, so anything it wants to
+-- know is cached here and anything it wants to do is queued below.
+--
+-- It used to call APClient:get_state() straight from the frame thread -- three
+-- times a frame, since the connect-hang warning asked twice more -- while the
+-- update thread was constructing that same client and registering handlers on
+-- it. That is a race on a client the library does not promise is thread-safe,
+-- and it fits the connect freeze: intermittent, always in the moment the
+-- client goes from nil to live, with the game's update thread never reaching
+-- its next poll.
+local cached_state = nil
+
+-- Raised BEFORE the constructor runs and lowered after it returns.
+--
+-- Pressing Connect repeatedly while a connect is still in flight freezes the
+-- game -- reproduced deliberately. AP_REF.APClient is not assigned until the
+-- constructor returns, so a check on it alone still lets a second press
+-- through and overwrites a live client, leaving the GC to destruct one whose
+-- workers are mid-handshake. This latch is set in Lua first, so the second
+-- press sees it.
+local connect_in_progress = false
+local say_queue = {}
 
 -- DRAP change: this used to call REFramework's log.debug behind a DEBUG flag
 -- that is never on, so client chatter went nowhere a player could reach it.
@@ -400,13 +427,20 @@ local function prefer_ipv4_loopback(host)
 end
 
 function APConnect(host)
+    -- Never build a second client over a live one. The assignment below is
+    -- the only reference to the old one, so overwriting it hands a client
+    -- whose workers are still running to the GC. Disconnect is the way to
+    -- drop a client: it does it from the update loop, where nothing is
+    -- mid-call.
+    if AP_REF.APClient ~= nil or connect_in_progress then
+        Logger.warn("AP_REF", "connect ignored -- already connected or connecting")
+        return
+    end
+    connect_in_progress = true
+
     local uuid = ""
     host = prefer_ipv4_loopback(host)
     AP_REF.APClient = AP(uuid, AP_REF.APGameName, host)
-    table.insert(textLog, {{ text = "Connecting..." }})
-    Logger.info("AP_REF", "connecting to " .. tostring(host))
-    AP_REF._connect_started_at = os.clock()
-    AP_REF._connect_warned = false
     set_socket_connected_handler(AP_REF.on_socket_connected)
     set_socket_error_handler(AP_REF.on_socket_error)
     set_socket_disconnected_handler(AP_REF.on_socket_disconnected)
@@ -422,6 +456,12 @@ function APConnect(host)
     set_bounced_handler(AP_REF.on_bounced)
     set_retrieved_handler(AP_REF.on_retrieved)
     set_set_reply_handler(AP_REF.on_set_reply)
+
+    table.insert(textLog, {{ text = "Connecting..." }})
+    Logger.info("AP_REF", "connecting to " .. tostring(host))
+    AP_REF._connect_started_at = os.clock()
+    AP_REF._connect_warned = false
+    connect_in_progress = false
 end
 
 local function DisplayClientCommand(command)
@@ -455,7 +495,7 @@ local function main_menu()
                 status_text = "Disconnected"
                 status_color = 0xFF0000FF      -- red
             else
-                local state = AP_REF.APClient:get_state()
+                local state = cached_state
                 if state == AP.State.SLOT_CONNECTED then
                     status_text = "Connected"
                     status_color = 0xFF00FF00  -- green
@@ -510,9 +550,22 @@ local function main_menu()
                 disconnect_client = true
                 table.insert(textLog, {{ text = "Disconnected." }})
 			end
+		elseif AP_REF.APClient ~= nil or connect_requested or connect_in_progress then
+			-- Connecting: offer a way out rather than a button that builds a
+			-- second client over the one still coming up.
+			imgui.text("Connecting...")
+			imgui.same_line()
+			if imgui.button("Cancel") then
+				disconnect_client = true
+				table.insert(textLog, {{ text = "Connect cancelled." }})
+			end
 		else
 			if imgui.button("Connect") then
-				APConnect(AP_REF.APHost)
+				-- Deferred to the frame loop, the way Disconnect already is.
+				-- Building the client here builds it inside REFramework's UI
+				-- draw, with its locks held, and the client spawns worker
+				-- threads as it comes up.
+				connect_requested = AP_REF.APHost
 			end
 		end
 
@@ -570,9 +623,7 @@ local function main_menu()
 		-- Send Button
 		if imgui.button("Send") then
 			if current_text and current_text ~= "" then
-				if AP_REF.APClient then
-					AP_REF.APClient:Say(current_text)
-				end
+				table.insert(say_queue, current_text)
 				current_text = "" -- Clear input after sending
 			end
 		end
@@ -660,8 +711,7 @@ local CONNECT_WARN_SECONDS = 10.0
 
 local function warn_if_connect_is_hanging()
 	if not AP_REF._connect_started_at or AP_REF._connect_warned then return end
-	if AP_REF.APClient and AP_REF.APClient:get_state()
-		and AP_REF.APClient:get_state() > 0 then
+	if cached_state and cached_state > 0 then
 		AP_REF._connect_started_at = nil
 		return
 	end
@@ -691,6 +741,7 @@ end)
 
 re.on_script_reset(function()
 	AP_REF.APClient = nil
+	cached_state = nil
 	collectgarbage("collect")
 	disconnect_client = false
 end)
@@ -704,19 +755,27 @@ re.on_pre_application_entry("UpdateBehavior", function()
 	else
 		mainWindowVisible = false
 	end
+	if connect_requested then
+		local host = connect_requested
+		connect_requested = nil
+		APConnect(host)
+	end
 	if disconnect_client then
 		AP_REF.APClient = nil
+		cached_state = nil
 		collectgarbage("collect")
 		disconnect_client = false
 	elseif AP_REF.APClient ~= nil then
-		if AP_REF.APClient:get_state() == AP.State.DISCONNECTED then
-			connected = false
-		else
-			connected = true
+		cached_state = AP_REF.APClient:get_state()
+		connected = cached_state ~= AP.State.DISCONNECTED
+		for i = 1, #say_queue do
+			pcall(AP_REF.APClient.Say, AP_REF.APClient, say_queue[i])
+			say_queue[i] = nil
 		end
 		AP_REF.APClient:poll()
 	else
 		connected = false
+		cached_state = nil
 	end
 end)
 
