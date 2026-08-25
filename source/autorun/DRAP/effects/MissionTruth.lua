@@ -619,6 +619,87 @@ local function find_active_main()
     return nil
 end
 
+------------------------------------------------------------
+-- The goal, when there is no mission to show
+------------------------------------------------------------
+-- The count-based goals used to leave the box on "Waiting for Mission" for
+-- the whole run, which tells a player nothing about what they are meant to be
+-- doing. Show the goal and how far along it is instead, and once it is met,
+-- say where to go -- the run does not finish until the player is back in the
+-- Security Room, and nothing else on screen says so.
+
+local GOAL_SAVIOR, GOAL_GENOCIDE, GOAL_PSYCHO = 2, 3, 4
+
+local GOAL_DONE_TITLE = "Goal Complete"
+local GOAL_DONE_INFO =
+    "Return to the Security Room to finish the run."
+
+--- How many areas still owe kills, for the Genocider box.
+--- @return integer|nil left, integer|nil total
+local function genocide_areas_left()
+    local kt = AP and AP.KillTracker
+    if not (kt and kt.progress) then return nil, nil end
+    local ok, rows = pcall(kt.progress)
+    if not ok or type(rows) ~= "table" or #rows == 0 then return nil, nil end
+    local left, total = 0, 0
+    for _, row in ipairs(rows) do
+        total = total + 1
+        if not row.done then left = left + 1 end
+    end
+    return left, total
+end
+
+--- The box for a count-based goal, or nil if this seed has none.
+---
+--- Deliberately reads the same progress() the goals themselves use, so the
+--- box cannot drift from the thing it is reporting.
+local function goal_target()
+    local goal = AP and tonumber(AP.Goal)
+    if not goal then return nil end
+
+    -- Goal met: the box's job is now to point at the Security Room.
+    local ok_e, Ending = pcall(require, "DRAP/effects/EndingSequence")
+    if ok_e and Ending and Ending.is_pending and Ending.is_pending() then
+        return make_target(GOAL_DONE_TITLE, GOAL_DONE_INFO, "Security Room", nil)
+    end
+
+    if goal == GOAL_SAVIOR then
+        local sg = AP and AP.effects and AP.effects.SaviorGoalEffects
+        if not (sg and sg.progress) then return nil end
+        local ok, n, t = pcall(sg.progress)
+        if not ok or not n or not t then return nil end
+        return make_target("Savior",
+            string.format("Rescue %d survivors and escape. Rescued %d of %d.",
+                t, n, t),
+            "Anywhere in the mall", nil)
+    end
+
+    if goal == GOAL_PSYCHO then
+        local pg = AP and AP.effects and AP.effects.PsychoGoalEffects
+        if not (pg and pg.progress) then return nil end
+        local ok, n, t = pcall(pg.progress)
+        if not ok or not n or not t then return nil end
+        return make_target("Psycho",
+            string.format("Kill %d survivors and escape. Killed %d of %d.",
+                t, n, t),
+            "Anywhere in the mall", nil)
+    end
+
+    if goal == GOAL_GENOCIDE then
+        local left, total = genocide_areas_left()
+        if not left then return nil end
+        return make_target("Zombie Genocider",
+            left == 0
+                and "Every area is cleared."
+                or string.format(
+                    "Kill 53,594 zombies across the mall. %d of %d area%s"
+                    .. " still to clear.", left, total, left == 1 and "" or "s"),
+            "Anywhere in the mall", nil)
+    end
+
+    return nil
+end
+
 -- Under ScoopSanity the main box never shows the vanilla story objective:
 -- show the current mission, else a "Waiting for Mission" placeholder. Only
 -- the endgame leaves the box to the engine (the finale plays normally).
@@ -632,7 +713,8 @@ local function compute_target()
     if State.is_any_order() then
         local running = State.active_main_scoop()
         if running then return target_for_main(running) end
-        return make_target(WAITING_TITLE, WAITING_INFO, nil, nil)
+        return goal_target()
+            or make_target(WAITING_TITLE, WAITING_INFO, nil, nil)
     end
 
     -- current objective: chain order if set, else any manually-active main
@@ -643,8 +725,11 @@ local function compute_target()
     end
     local active_main = find_active_main()
     if active_main then return target_for_main(active_main) end
-    -- SS on, no active main -> override the vanilla box with a placeholder
-    return make_target(WAITING_TITLE, WAITING_INFO, nil, nil)
+    -- SS on, no active main -> the goal, if this seed has a counted one,
+    -- else the placeholder. This is the branch a run spends most of its time
+    -- in, so it is the one that matters.
+    return goal_target()
+        or make_target(WAITING_TITLE, WAITING_INFO, nil, nil)
 end
 
 local function target_key(t)
