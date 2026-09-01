@@ -1300,9 +1300,23 @@ local function install_hooks()
                     -- there tells the game a scene it already played has not
                     -- happened. This guard is separate from the enforcement
                     -- loop's because this runs from the evFlagOn hook.
+                    -- Is this the event that FINISHES the scoop, or one of
+                    -- its steps?
+                    --
+                    -- COMPLETION_FLAGS carries the owning scoop on every row,
+                    -- including the sub-events. The Last Resort has five bomb
+                    -- pickups and a completion, all six tagged "The Last
+                    -- Resort" -- so picking up the FIRST bomb completed the
+                    -- whole scoop, stopped the other four sending, and the
+                    -- cutscene never played. Only a declared completion event
+                    -- finishes a scoop.
+                    local finishes_scoop = completion.scoop
+                        and COMPLETION_EVENT_TO_SCOOP[completion.event]
+                            == completion.scoop
+
                     local ss_block = scoop_sanity_enabled
                                   and not State.is_endgame_reached()
-                                  and completion.scoop
+                                  and finishes_scoop
                                   and SCOOP_DATA[completion.scoop]
                                   and SCOOP_DATA[completion.scoop].category == "Main"
                                   and not received_scoops[completion.scoop]
@@ -1328,9 +1342,10 @@ local function install_hooks()
                         -- event-only flags every frame, which would otherwise
                         -- spam the log and resend the (idempotent) AP check.
                         _logged_completion_events[completion.event] = true
-                        M.log(string.format("COMPLETION: Flag %d -> '%s'",
+                        M.log(string.format("%s: Flag %d -> '%s'",
+                            finishes_scoop and "COMPLETION" or "STEP",
                             flag_id, completion.event))
-                        if completion.scoop then
+                        if finishes_scoop then
                             M.complete_scoop(completion.scoop)
                         end
                         if on_completion_detected_callback then
