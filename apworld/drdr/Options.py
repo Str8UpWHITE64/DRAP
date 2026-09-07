@@ -26,9 +26,11 @@ class DamageLink(Toggle):
     Share damage with the rest of the multiworld. Taking a hit sends damage
     out; damage from another player takes health here.
 
-    One damage point is one of Frank's health blocks, so a point costs the
-    same fraction of his health however far he has levelled. Small hits are
-    added up rather than sent one at a time.
+    Eighty damage points are one of Frank's health blocks, the same rate Ship
+    of Harkinian uses for a heart. A single packet is capped at one block, so
+    one hit from the room cannot kill Frank unless he is already on his last
+    block. Small hits are added up rather than sent one at a time. Type
+    /damagelink off in the client window to leave the link mid-session.
 
     Damage arriving this way CAN kill, and death runs the game's own path, so
     it behaves like any other death (including DeathLink, if that is on too).

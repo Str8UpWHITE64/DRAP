@@ -423,6 +423,13 @@ local function run_slot_connect(slot_data)
         AP.DamageLink.apply_received(points, source)
     end
     log("DamageLink enabled=" .. tostring(damage_link_enabled))
+    -- /damagelink in the client window flips the tag; this flips the rest.
+    AP_BRIDGE.AP_REF.on_damage_link_toggled = function(on)
+        AP.DamageLinkEnabled = on
+        AP.DamageLink.set_enabled(on)
+        AP_BRIDGE.set_damagelink_enabled(on)
+        log("DamageLink " .. (on and "on" or "off") .. " (client command)")
+    end
 
     -- KnockbackLink. Shares being knocked about rather than being hurt, so
     -- it stands on its own next to DamageLink.

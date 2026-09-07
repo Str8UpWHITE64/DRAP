@@ -280,10 +280,23 @@ local function set_room_info_handler(callback)
 	end
 	AP_REF.APClient:set_room_info_handler(room_info_handler)
 end
-local function set_slot_connected_handler(callback)
-	function slot_connected_handler(slot_data)
-		Logger.info("AP_REF", "slot connected: " .. tostring(AP_REF.APSlot))
+-- The slot's options, kept so the tags can be rebuilt later: /damagelink
+-- changes them mid-session, and the server only learns tags via
+-- ConnectUpdate.
+AP_REF.last_slot_data = nil
+-- nil follows the slot option; true/false is the player's in-session choice.
+AP_REF.damage_link_override = nil
+-- Set by the game side to arm or disarm its own DamageLink pieces.
+AP_REF.on_damage_link_toggled = nil
+local tag_update_pending = false
 
+function AP_REF.damage_link_active()
+    if AP_REF.damage_link_override ~= nil then return AP_REF.damage_link_override end
+    local sd = AP_REF.last_slot_data
+    return type(sd) == "table" and sd.damage_link == true
+end
+
+local function build_tags(slot_data)
         local tags = {"Lua-APClientPP"}
 
 		if AP_REF.APGameName == "" then
@@ -303,7 +316,7 @@ local function set_slot_connected_handler(callback)
         -- DamageLink's tag carries the group on the end, so only slots in the
         -- same group hear each other. An empty group leaves it as plain
         -- SharedDamage, which is what a game without groups uses.
-        if slot_data.damage_link then
+        if AP_REF.damage_link_active() then
             table.insert(tags, "SharedDamage"
                 .. tostring(slot_data.damage_link_group or ""))
         end
@@ -311,8 +324,25 @@ local function set_slot_connected_handler(callback)
         if slot_data.knockback_link then
             table.insert(tags, "KnockbackLink")
         end
+        return tags
+end
 
-        AP_REF.APClient:ConnectUpdate(nil, tags) -- set deathlink tag if needed
+--- Turn DamageLink on or off for this session. The tag change goes out on
+--- the next frame, from the same place Say is sent, not from the UI click.
+function AP_REF.set_damage_link(on)
+    AP_REF.damage_link_override = (on == true)
+    tag_update_pending = true
+    if AP_REF.on_damage_link_toggled then
+        pcall(AP_REF.on_damage_link_toggled, on == true)
+    end
+end
+
+local function set_slot_connected_handler(callback)
+	function slot_connected_handler(slot_data)
+		Logger.info("AP_REF", "slot connected: " .. tostring(AP_REF.APSlot))
+        AP_REF.last_slot_data = slot_data
+        AP_REF.damage_link_override = nil
+        AP_REF.APClient:ConnectUpdate(nil, build_tags(slot_data))
 		callback(slot_data)
 	end
 	AP_REF.APClient:set_slot_connected_handler(slot_connected_handler)
@@ -464,9 +494,25 @@ function APConnect(host)
     connect_in_progress = false
 end
 
-local function DisplayClientCommand(command)
+local function DisplayClientCommand(line)
+    local command, arg = tostring(line or ""):match("^%s*(%S*)%s*(.-)%s*$")
+    command = (command or ""):lower()
+    arg = (arg or ""):lower()
 	if command == "help" then
-		table.insert(textLog, {{text = "/help - Display useful information about the client. Currently no other commands exist."}})
+		table.insert(textLog, {{text = "/help - this list"}})
+		table.insert(textLog, {{text = "/damagelink [on|off] - share damage with the multiworld; no argument toggles"}})
+	elseif command == "damagelink" then
+        local on
+        if arg == "on" then on = true
+        elseif arg == "off" then on = false
+        elseif arg == "" then on = not AP_REF.damage_link_active()
+        else
+            table.insert(textLog, {{text = "Usage: /damagelink [on|off]"}})
+            return
+        end
+        AP_REF.set_damage_link(on)
+        table.insert(textLog, {{text = "DamageLink " .. (on and "on" or "off")
+            .. (AP_REF.APClient and " -- tags updated" or "")}})
 	else
 		table.insert(textLog, {{text = "Could not identify command "..command.."."}})
 	end
@@ -623,7 +669,12 @@ local function main_menu()
 		-- Send Button
 		if imgui.button("Send") then
 			if current_text and current_text ~= "" then
-				table.insert(say_queue, current_text)
+                -- A leading slash is a client command, not chat.
+                if current_text:sub(1, 1) == "/" then
+                    DisplayClientCommand(current_text:sub(2))
+                else
+				    table.insert(say_queue, current_text)
+                end
 				current_text = "" -- Clear input after sending
 			end
 		end
@@ -772,6 +823,13 @@ re.on_pre_application_entry("UpdateBehavior", function()
 			pcall(AP_REF.APClient.Say, AP_REF.APClient, say_queue[i])
 			say_queue[i] = nil
 		end
+        if tag_update_pending and cached_state == AP.State.SLOT_CONNECTED then
+            tag_update_pending = false
+            local tags = build_tags(AP_REF.last_slot_data or {})
+            local ok = pcall(AP_REF.APClient.ConnectUpdate, AP_REF.APClient, nil, tags)
+            Logger.info("AP_REF", "ConnectUpdate tags: " .. table.concat(tags, " ")
+                .. (ok and "" or " (failed)"))
+        end
 		AP_REF.APClient:poll()
 	else
 		connected = false

@@ -1,17 +1,25 @@
 -- DRAP/trackers/DamageLink.lua
 -- DamageLink: share "took a hit" with the rest of the multiworld.
 --
--- Protocol tag is SharedDamage, and the unit is damage_points. One point is
--- ONE HEALTH BLOCK here -- Frank has 4000 HP at level 1 and each Progressive
--- Health Upgrade adds 1000, so a block is 1000 HP. That keeps a point worth
--- roughly what a heart is worth in the games this links with, and it scales:
--- a late-game Frank with ten blocks shrugs off what would floor him on day 1.
+-- Protocol tag is SharedDamage, and the unit is damage_points. A point has
+-- NO agreed meaning across games: Mega Man X takes ten per blip of a
+-- sixteen-blip bar and caps a packet at 120, Ship of Harkinian counts 80 to
+-- a heart, DK64 counts 20 to a melon slice, Dead Cells 16 to a percent,
+-- Smash 64 ignores the number and takes a percent per packet. So every game
+-- picks one exchange rate and holds it. Ours is Ship of Harkinian's:
+-- EIGHTY POINTS ARE ONE HEALTH BLOCK (1000 HP), so a point is 12.5 HP and
+-- 20 points are 250 HP. Flat: health upgrades do not rescale the rate.
 --
--- SENDING is accumulated, not per hit. A zombie grab is a few hundred HP, and
--- broadcasting each one would flood the room with fractional points. Damage is
--- added up and one point leaves for every HP_PER_POINT taken, with the
--- remainder carried -- so four small hits still cost the room a point, and
--- nothing is lost to rounding.
+-- A packet is capped at one block, so no single hit from the room can kill
+-- Frank unless he is already down to his last block.
+--
+-- The first cut made a point a whole health block. That was off by eighty
+-- in both directions at once: a zombie grab was a third of a point, so
+-- nothing we sent ever reached another game's threshold, and another
+-- player's half-heart arrived as several blocks (tester report).
+--
+-- SENDING is accumulated, not per hit: damage is added up and whole points
+-- leave together, with the remainder carried, so nothing is lost to rounding.
 --
 -- DETECTION hooks HitPointController.addDamage. Its address is unique (checked
 -- with investigation/sdk/check_fold.py -- a folded stub here would take the
@@ -41,8 +49,10 @@ local PlayerBuffs = require("DRAP/effects/PlayerBuffs")
 local HPC_TYPE = "app.solid.HitPointController"
 local PSM_TYPE = "app.solid.PlayerStatusManager"
 
--- One damage point is one health block.
-local HP_PER_POINT = 1000
+-- Eighty points to a block: 1000 / 80.
+local HP_PER_POINT = 12.5
+-- One block per packet, whatever was sent.
+local MAX_POINTS_PER_PACKET = 80
 
 local psm_mgr = M:add_singleton("psm", PSM_TYPE)
 
@@ -139,6 +149,7 @@ end
 local function take_damage(points, source)
     points = tonumber(points)
     if not points or points <= 0 then return end
+    if points > MAX_POINTS_PER_PACKET then points = MAX_POINTS_PER_PACKET end
 
     local hp = math.floor(points * HP_PER_POINT)
     local reason = string.format("DamageLink from %s", tostring(source or "someone"))
@@ -155,7 +166,7 @@ local function take_damage(points, source)
 end
 
 --- Apply damage that arrived from the multiworld.
---- @param points number damage points, one block each
+--- @param points number damage points, 12.5 HP each, capped per packet
 --- @param source string who sent it, for the log
 function M.apply_received(points, source)
     if not enabled then
