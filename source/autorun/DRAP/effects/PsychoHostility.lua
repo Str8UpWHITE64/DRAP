@@ -8,7 +8,13 @@
 -- Applied on a poll rather than once at unlock, because a scoop usually
 -- unlocks before its survivors exist -- the engine creates their records
 -- lazily on area entry. Re-checking also covers a survivor the engine calms
--- down again.
+-- down again (JOIN, FOUND, any friendly state).
+--
+-- DEFECT counts as angry. The engine moves a raged survivor to DEFECT when
+-- they take a hit, and rewriting RAGE over that fired the engine's
+-- "turned hostile" notice on every poll, for as long as the fight lasted
+-- (tester report, Psycho Mode). Rage and Defect both attack the player, so
+-- either is left alone; only a friendly state gets corrected.
 --
 -- Covers all 48 targets, not just the ones in scoops: Bill Brenton and the
 -- two Meyers have no scoop of their own. Those three are targets from the
@@ -28,6 +34,28 @@ local npc_mgr = M:add_singleton("npc", NPC_MANAGER_TYPE)
 -- and what was measured making an NPC hostile; the enum in NpcTracker
 -- disagrees and has never been exercised for this value.
 local LIVE_STATE_RAGE = 12
+local LIVE_STATE_DEFECT = 7
+
+-- NpcBaseInfo hp field, read the way NpcTracker does. mLiveState is not a
+-- liveness signal (a corpse keeps the state it died with), and isDead alone
+-- let the poll keep writing RAGE onto a dead target.
+local vital_field = nil
+local vital_field_looked_up = false
+
+local function is_dead(info)
+    local dead = Shared.safe(function() return info:call("isDead") end)
+    if dead == true then return true end
+    if not vital_field_looked_up then
+        vital_field_looked_up = true
+        local td = info:get_type_definition()
+        vital_field = td and td:get_field("mVitalNew") or nil
+    end
+    if vital_field then
+        local ok, hp = pcall(vital_field.get_data, vital_field, info)
+        if ok and hp ~= nil and (tonumber(hp) or 1) <= 0 then return true end
+    end
+    return false
+end
 
 -- Targets who must stay friendly, because something other than their own
 -- rescue depends on them cooperating.
@@ -122,14 +150,15 @@ local function make_hostile(mgr, stype, name)
     if not info then return end
 
     -- Leave the dead alone: a corpse keeps the state it died with, so writing
-    -- RAGE onto one achieves nothing and muddies the log.
-    local dead = Shared.safe(function() return info:call("isDead") end)
-    if dead == true then return end
+    -- RAGE onto one achieves nothing and re-fires the hostile notice.
+    if is_dead(info) then return end
 
     local state = tonumber(Shared.safe(function()
         return info:get_field("mLiveState")
     end))
-    if state == LIVE_STATE_RAGE then return end
+    -- Angry either way: DEFECT is where the engine puts a raged survivor who
+    -- has been shot. Only a friendly state needs correcting.
+    if state == LIVE_STATE_RAGE or state == LIVE_STATE_DEFECT then return end
 
     local ok = pcall(function() info:call("setLiveState", LIVE_STATE_RAGE) end)
     if ok and not raged[stype] then
@@ -175,7 +204,8 @@ _G.drap_psycho_hostility = function()
         end))
         M.log(string.format("  %-24s stype=%-3d state=%s%s",
             tostring(name), stype, tostring(state),
-            state == LIVE_STATE_RAGE and "  (hostile)" or ""))
+            (state == LIVE_STATE_RAGE or state == LIVE_STATE_DEFECT)
+                and "  (hostile)" or ""))
     end
 end
 
