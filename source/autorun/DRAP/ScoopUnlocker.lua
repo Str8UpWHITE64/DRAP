@@ -1787,6 +1787,20 @@ local pending_world_unlocks = {}
 local pending_world_reapply = false
 local pending_brad_unlocks = {}
 
+-- Scoops whose set-piece is a vehicle the AREA TRANSITION places: the
+-- convicts' jeep in Leisure Park and Carlito's truck in the Maintenance
+-- Tunnel. Vanilla only ever raises their flags through the scheduler, on
+-- entry. A flag write while the player is already inside creates the
+-- vehicle with no placement, and it sits in the ground (tester report;
+-- ConvictRespawnTrap records the same: re-entry is what runs the spawn).
+-- Such an unlock waits until the player is out of that area, so the next
+-- entry places it the vanilla way.
+local VEHICLE_AREA = {
+    ["The Convicts"]    = 1792,   -- s700 Leisure Park
+    ["The Last Resort"] = 1536,   -- s600 Maintenance Tunnel
+}
+local pending_area_unlocks = {}   -- scoop -> area index to leave first
+
 local function world_stable()
     return world_stable_since ~= nil
         and (os.clock() - world_stable_since) >= WORLD_STABLE_SECONDS
@@ -1808,6 +1822,14 @@ function M.unlock_scoop(scoop_name)
             M.log(string.format("%s -- parking unlock of '%s'", why, scoop_name))
             return false, "brad"
         end
+    end
+    local vehicle_area = VEHICLE_AREA[scoop_name]
+    if vehicle_area and get_current_area_index() == vehicle_area then
+        pending_area_unlocks[scoop_name] = vehicle_area
+        M.log(string.format(
+            "Player is inside area %d -- parking unlock of '%s' until they leave, so the vehicle is placed on entry",
+            vehicle_area, scoop_name))
+        return false, "area"
     end
     return State.request_unlock(scoop_name)
 end
@@ -1843,6 +1865,19 @@ local function update_world_stability()
         pending_brad_unlocks = {}
         for _, n in ipairs(names) do
             M.log(string.format("Brad has left -- applying parked unlock '%s'", n))
+            State.request_unlock(n)
+        end
+    end
+    if next(pending_area_unlocks) then
+        local here = get_current_area_index()
+        local names = {}
+        for n, area in pairs(pending_area_unlocks) do
+            if here ~= nil and here ~= area then table.insert(names, n) end
+        end
+        table.sort(names)
+        for _, n in ipairs(names) do
+            pending_area_unlocks[n] = nil
+            M.log(string.format("Player left the vehicle's area -- applying parked unlock '%s'", n))
             State.request_unlock(n)
         end
     end
