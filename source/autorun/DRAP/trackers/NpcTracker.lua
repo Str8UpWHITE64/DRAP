@@ -148,6 +148,22 @@ function M.get_survivor_friendly_name(id)
     return survivor_id_to_friendly_name(id)
 end
 
+--- Forget every rescue seen this session.
+---
+--- rescued_survivors is the dedupe for the "was rescued" callback. It is
+--- session-local, so a second game on the same seed in the same session still
+--- had the first world's Simone in it: when she reached the Security Room
+--- again the callback was swallowed as a repeat, and neither her scoop nor
+--- anything listening for the rescue ever heard about it.
+function M.reset_rescued()
+    local n = 0
+    for _ in pairs(rescued_survivors) do n = n + 1 end
+    rescued_survivors = {}
+    if n > 0 then
+        M.log(string.format("new world -- forgot %d rescued survivor(s)", n))
+    end
+end
+
 --- Gets the map of rescued survivors
 --- @return table Map of npc_id -> true
 function M.get_rescued_survivors()

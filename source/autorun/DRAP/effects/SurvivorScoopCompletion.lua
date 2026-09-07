@@ -89,25 +89,31 @@ function M.on_survivor_rescued(friendly_name)
     check_scoops(friendly_name)
 end
 
--- Reconstruct rescue state from the bridge's persisted completed-checks list
--- and re-evaluate every scoop. Safe to call multiple times.
+-- Re-evaluate every scoop against what has been seen rescued. Safe to call
+-- multiple times.
+--
+-- This used to rebuild `rescued` from the ledger's "Rescue <name>" checks.
+-- That cannot tell one world from the next: a second game on the same seed
+-- found Simone's check already sent, marked her rescued, completed "A Woman
+-- in Despair" on the spot, and she could never be recruited again. The world
+-- is the authority instead -- NpcTracker's poll re-reports anyone actually
+-- standing in the Security Room after a reload, so a mid-run reload still
+-- completes correctly, and a fresh world reports nobody.
 function M.reapply()
-    if not AP or not AP.AP_BRIDGE or not AP.AP_BRIDGE.has_local_check then
-        return
-    end
-
-    rescued = {}
-    for _, survivors in pairs(SharedData.scoop_survivors()) do
-        for _, sname in ipairs(survivors) do
-            -- What the PLAYER rescued. has_completed_check is also true for
-            -- rescues another world collected on our behalf, which would
-            -- complete scoops nobody finished.
-            if AP.AP_BRIDGE.has_local_check("Rescue " .. sname) then
-                rescued[sname] = true
-            end
-        end
-    end
     check_scoops(nil)
+end
+
+--- A new world on the same seed: nobody has been rescued in it yet.
+--- Called from the reload path, not from reapply -- reapply also runs on
+--- ordinary activation, after the poll may already have reported survivors,
+--- and wiping there would lose them.
+function M.reset_world()
+    local n = 0
+    for _ in pairs(rescued) do n = n + 1 end
+    rescued = {}
+    if n > 0 then
+        log(string.format("new world -- forgot %d rescued survivor(s)", n))
+    end
 end
 
 -- Returns (rescued_count, total_count) for a scoop. total_count = 0 means the

@@ -1677,6 +1677,17 @@ State.init({
     end,
     on_unlock = apply_unlock_writes,
     on_state_changed = function() save_state() end,
+    -- A pre-Jessie world on the same seed is a new world. The state machine
+    -- reopens completed survivor scoops; the two modules that remember who
+    -- was rescued have to forget as well, or the first world's rescues keep
+    -- completing scoops (SurvivorScoopCompletion) and swallowing the second
+    -- world's rescue callbacks (NpcTracker's dedupe).
+    on_world_reset = function()
+        local ssc = AP and AP.effects and AP.effects.SurvivorScoopCompletion
+        if ssc and ssc.reset_world then pcall(ssc.reset_world) end
+        local nt = AP and AP.NpcTracker
+        if nt and nt.reset_rescued then pcall(nt.reset_rescued) end
+    end,
     scoop_survivors = SharedData.scoop_survivors(),
     -- NpcTracker owns liveness: it already walks NpcInfoList every half
     -- second and knows the name<->SurvivorType mapping. It only reports a

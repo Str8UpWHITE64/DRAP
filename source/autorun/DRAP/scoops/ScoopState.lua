@@ -831,6 +831,33 @@ function M.deactivate_for_reload()
     if cleared > 0 then
         cfg.log(string.format("Cleared %d side scoop unlocks for pre-Jessie state", cleared))
     end
+
+    -- A pre-Jessie world is a NEW world: every survivor is back where they
+    -- started. Their scoops' completion was persisted with the seed, so
+    -- without this a second game on the same seed restored "A Woman in
+    -- Despair" as done, the enforcement loop skipped re-enabling its flags
+    -- (801, and 295 which Simone checks before following), and she could
+    -- never be recruited again -- rescued once per seed, never after.
+    --
+    -- Survivor scoops only. The check itself stays sent in the ledger, so a
+    -- second rescue is harmless and sends nothing. Main scoops keep their
+    -- completion (the chain depends on it) and Psychopath scoops keep theirs
+    -- (clear_on_complete may have sent the Special Forces home, and a reload
+    -- must not bring them back).
+    local reopened = 0
+    for scoop_name in pairs(M.completed) do
+        local data = cfg.scoop_data[scoop_name]
+        if data and data.category == "Survivor" then
+            M.completed[scoop_name] = nil
+            M.completion_times[scoop_name] = nil
+            reopened = reopened + 1
+        end
+    end
+    if reopened > 0 then
+        cfg.log(string.format("Reopened %d completed survivor scoop(s) for the new world", reopened))
+    end
+    -- Let the modules that remember rescues know the world is new too.
+    if cfg.on_world_reset then pcall(cfg.on_world_reset) end
     cfg.on_state_changed()
     return cleared
 end
