@@ -441,6 +441,9 @@ local function run_slot_connect(slot_data)
     local spitter_only_enabled = (type(slot_data) == "table" and slot_data.spitter_only == true)
     AP.SpitterOnlyEnabled = spitter_only_enabled
     AP.effects.SpitterMode.set_enabled(spitter_only_enabled)
+    -- The Special Forces scoop cannot be completed by spit; trim its
+    -- helicopter requirement so the soldiers still leave.
+    AP.ScoopUnlocker.set_spitter_only_enabled(spitter_only_enabled)
     log("Spitter Only enabled=" .. tostring(spitter_only_enabled))
 
     -- Door Randomizer option

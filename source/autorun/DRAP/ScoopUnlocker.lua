@@ -2154,6 +2154,33 @@ function M.is_scoop_sanity_enabled()
     return scoop_sanity_enabled
 end
 
+--- Spitter Only: the Special Forces leave on the ten kills alone.
+---
+--- Their scoop completes on ALL of its completion_events, and one of them is
+--- shooting the helicopter down -- which spit cannot do. The apworld drops
+--- that location from the seed, so without this the second event never
+--- fires, the scoop never completes, and clear_on_complete never drops flag
+--- 309: the soldiers stay in the mall for the rest of the run.
+local SF_SCOOP = "Special Forces"
+local SF_HELI_EVENT = "Hella Copter - Shoot down the Special Forces Helicopter"
+
+function M.set_spitter_only_enabled(enabled)
+    if not enabled then return end
+    local d = SCOOP_DATA[SF_SCOOP]
+    if not (d and d.completion_events) then return end
+    local kept = {}
+    for _, ev in ipairs(d.completion_events) do
+        if ev ~= SF_HELI_EVENT then kept[#kept + 1] = ev end
+    end
+    if #kept == #d.completion_events then return end
+    d.completion_events = kept
+    -- COMPLETION_EVENT_TO_SCOOP is derived from this list; rebuild it so the
+    -- helicopter event no longer counts as a completion of anything.
+    build_lookup_tables()
+    M.log(string.format("Spitter Only: '%s' now completes on %s alone",
+        SF_SCOOP, table.concat(kept, ", ")))
+end
+
 --- Has the player talked to Jessie yet? Tri-state: true, false, or nil when
 --- the flag could not be read (common inside the load window). Callers must
 --- not treat nil as either answer -- DoorSceneLock keeps its last good read.

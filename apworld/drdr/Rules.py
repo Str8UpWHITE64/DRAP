@@ -915,7 +915,9 @@ def set_rules(world) -> None:
                              for _n in _where]))
 
         world.set_rule(world.multiworld.get_location("See the crashed helicopter", world.player), And(CanReachRegion("Leisure Park"), CanReachLocation("Get bit!")))
-        world.set_rule(world.multiworld.get_location("Hella Copter - Shoot down the Special Forces Helicopter", world.player), CanReachLocation("See the crashed helicopter"))
+        # Not in a Spitter Only seed -- spit cannot shoot a helicopter down.
+        if not world.spitter_only:
+            world.set_rule(world.multiworld.get_location("Hella Copter - Shoot down the Special Forces Helicopter", world.player), CanReachLocation("See the crashed helicopter"))
 
         world.set_rule(world.multiworld.get_location("Frank sees a sick-ass RC Drone", world.player), CanReachLocation("Get bit!"))
 
@@ -1414,14 +1416,18 @@ def set_rules(world) -> None:
                      ("Handgun", "Sniper Rifle", "Submachine Gun")]),
             )
 
-        _heli_reqs = [CanReachRegion("Leisure Park"), _armed]
-        if _sf_item_mode:
-            _heli_reqs.append(Has("Special Forces"))
-        world.set_rule(
-            world.multiworld.get_location(
-                "Hella Copter - Shoot down the Special Forces Helicopter",
-                world.player),
-            And(*_heli_reqs))
+        # Spitter Only has no helicopter check at all: the location is
+        # dropped in create_region, and the runtime completes the Special
+        # Forces scoop on the ten kills alone.
+        if not world.spitter_only:
+            _heli_reqs = [CanReachRegion("Leisure Park"), _armed]
+            if _sf_item_mode:
+                _heli_reqs.append(Has("Special Forces"))
+            world.set_rule(
+                world.multiworld.get_location(
+                    "Hella Copter - Shoot down the Special Forces Helicopter",
+                    world.player),
+                And(*_heli_reqs))
 
     # Overtime checks as filler
     # --------------------------------------------------------------------

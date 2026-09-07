@@ -156,6 +156,11 @@ SPITTER_EXCLUDED_LOCATIONS = {
     # day 2 does not stall the chain or Tad behind it.
     "Meet Kent on day 2",
     "Complete Kent's day 2 photoshoot",
+    # The helicopter has to be SHOT down, and spit does not reach it. The
+    # soldiers still leave: the runtime drops this from the Special Forces
+    # scoop's completion set under this mode, so killing ten of them is the
+    # whole scoop.
+    "Hella Copter - Shoot down the Special Forces Helicopter",
     # Paul is on fire and only an extinguisher puts him out. Meeting and
     # defeating him still work, and under Psycho so does killing him -- it is
     # only the rescue that needs the extinguisher.
