@@ -65,6 +65,18 @@ local DAYS = {
     "Photographer's Pride",      -- day 3
 }
 
+-- Only days 2 and 3 have a handoff token: their box entry flags (2508,
+-- 2509) are written by the PREVIOUS day's completion cluster. Day 1 has
+-- no predecessor, so 2507 being on never means a handoff. It was on in a
+-- tester's save from an earlier arm of day 1 (2026-08-29): on the reload
+-- the quiet-state sweep knocked 779 down before the ledger replayed the
+-- unlock, the replay then found 2507 on and gentle-armed onto a queue
+-- entry the load had never activated, and Kent stayed away -- with days
+-- 2 and 3 chained behind him.
+local function has_handoff_token(name)
+    return name ~= DAYS[1]
+end
+
 local KENT_STYPE = 32
 -- Debounce between the desired day changing and the arm, so the completing
 -- day's ceremony writes land first.
@@ -470,7 +482,7 @@ local function apply_day(name)
     -- handoff: only top up the day's input flags (e.g. 1225) and leave
     -- everything else exactly as the engine built it.
     local disp = disp_flags[name]
-    if disp and flag_check(disp) == true then
+    if disp and has_handoff_token(name) and flag_check(disp) == true then
         local ids = {}
         for _, fid in ipairs(start_set) do
             flag_set(fid, true)
@@ -669,8 +681,10 @@ end
 
 --- Is the target day's handoff token (its box entry flag, set by the
 --- previous day's completion cluster ~4s after the completion flag) on?
+--- Day 1 has no predecessor and therefore no token (see has_handoff_token).
 local function handoff_token_on(name)
     ensure_start_sets()
+    if not has_handoff_token(name) then return false end
     local disp = disp_flags[name]
     return disp ~= nil and flag_check(disp) == true
 end
