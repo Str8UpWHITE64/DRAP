@@ -1656,6 +1656,47 @@ local function build_region_requirements()
     return out
 end
 
+-- Backup for Brad ends with Brad walking himself out of Entrance Plaza.
+-- Starting the next main scoop before he is gone -- the any-order Start
+-- button, or the chain's next item landing -- rewrites the story flags
+-- under him and he stands there for good (tester report). Main-scoop
+-- unlocks are held until the player has left Entrance Plaza and no Brad
+-- record is still placed there. The record check is capped after the
+-- player leaves, so a lingering record cannot hold the story forever.
+local BRAD_STYPES = { 33, 37, 60, 68, 69, 70 }
+local BRAD_SETTLE_CAP_SECONDS = 90.0
+local brad_player_left_at = nil
+
+local function brad_still_leaving()
+    if not M.is_scoop_completed("Backup for Brad") then return nil end
+    -- Any later main done means Brad is long gone.
+    for name, data in pairs(SCOOP_DATA) do
+        if data.category == "Main" and name ~= "Backup for Brad"
+            and M.is_scoop_completed(name) then
+            return nil
+        end
+    end
+    if get_current_area_index() == ENTRANCE_PLAZA_AREA_INDEX then
+        brad_player_left_at = nil
+        return "Brad is still leaving Entrance Plaza"
+    end
+    brad_player_left_at = brad_player_left_at or os.clock()
+    if os.clock() - brad_player_left_at > BRAD_SETTLE_CAP_SECONDS then return nil end
+    local mgr = sdk.get_managed_singleton("app.solid.gamemastering.NpcManager")
+    if not mgr then return nil end
+    for _, stype in ipairs(BRAD_STYPES) do
+        local info = Shared.safe(function() return mgr:call("searchInformation", stype) end)
+        if info then
+            local dead = Shared.safe(function() return info:call("isDead") end)
+            local area = Shared.to_int(Shared.safe(function() return info:get_field("mAreaNo") end))
+            if dead ~= true and area == ENTRANCE_PLAZA_AREA_INDEX then
+                return "Brad has not left Entrance Plaza yet"
+            end
+        end
+    end
+    return nil
+end
+
 State.init({
     scoop_data = SCOOP_DATA,
     conflict_groups = CONFLICT_GROUPS,
@@ -1729,6 +1770,8 @@ State.init({
         if not (dsl and dsl.can_reach_area) then return true end
         return dsl.can_reach_area(code)
     end,
+    -- Why a main scoop must wait even though it could start (nil = go).
+    main_unlock_hold = function(name) return brad_still_leaving() end,
 })
 
 
@@ -1742,6 +1785,7 @@ local WORLD_STABLE_SECONDS = 2.0
 local world_stable_since = nil
 local pending_world_unlocks = {}
 local pending_world_reapply = false
+local pending_brad_unlocks = {}
 
 local function world_stable()
     return world_stable_since ~= nil
@@ -1755,6 +1799,15 @@ function M.unlock_scoop(scoop_name)
             "World not stable -- parking unlock of '%s' until gameplay settles",
             scoop_name))
         return false, "world"
+    end
+    local data = SCOOP_DATA[scoop_name]
+    if data and data.category == "Main" then
+        local why = brad_still_leaving()
+        if why then
+            pending_brad_unlocks[scoop_name] = true
+            M.log(string.format("%s -- parking unlock of '%s'", why, scoop_name))
+            return false, "brad"
+        end
     end
     return State.request_unlock(scoop_name)
 end
@@ -1780,6 +1833,16 @@ local function update_world_stability()
         pending_world_unlocks = {}
         for _, n in ipairs(names) do
             M.log(string.format("World stable -- applying parked unlock '%s'", n))
+            State.request_unlock(n)
+        end
+    end
+    if next(pending_brad_unlocks) and not brad_still_leaving() then
+        local names = {}
+        for n in pairs(pending_brad_unlocks) do table.insert(names, n) end
+        table.sort(names)
+        pending_brad_unlocks = {}
+        for _, n in ipairs(names) do
+            M.log(string.format("Brad has left -- applying parked unlock '%s'", n))
             State.request_unlock(n)
         end
     end

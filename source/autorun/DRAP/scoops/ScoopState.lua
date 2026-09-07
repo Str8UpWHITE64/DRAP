@@ -335,6 +335,11 @@ function M.main_scoop_blocker(scoop_name)
     local active = M.active_main_scoop()
     if active then return string.format("'%s' is still running", active) end
 
+    if cfg.main_unlock_hold then
+        local ok, why = pcall(cfg.main_unlock_hold, scoop_name)
+        if ok and why then return why end
+    end
+
     for _, code in ipairs(cfg.region_requirements[scoop_name] or {}) do
         if not cfg.can_reach_area(code) then
             return "cannot get there yet"
