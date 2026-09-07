@@ -131,6 +131,10 @@ PSYCHO_EXCLUDED_LOCATIONS = {
     "Escort 8 survivors at once",
     "Frank the pimp",
     "Get 50 survivors to join",
+    # The reliable 10,000 PP shot is Jeff and Natalie hugging on the rooftop,
+    # and under Psycho they are targets, not a couple. No other spot has been
+    # confirmed to give it consistently.
+    "Get 10000 PP in one photo",
 }
 
 # Checks that need something in Frank's hands. Spitter Only takes every weapon

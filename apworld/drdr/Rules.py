@@ -31,7 +31,7 @@ from .shared_data import (
 SCOOP_POSITION_LEVEL_GATES = [
     None,  # Position 0: no level gate (accessible ASAP)
     None,  # Position 1: no level gate
-    7,     # Position 2: Rooftop sphere
+    7,     # Position 2: Warehouse sphere
     10,    # Position 3: Paradise Plaza sphere
     12,    # Position 4: Leisure Park sphere
     15,    # Position 5: Food Court sphere
@@ -207,9 +207,15 @@ def _kill_weapon_rule(region):
 
 
 # Determines the value of the region towards levels
+# The point for the first tier past the Security Room belongs to the Warehouse,
+# not the Rooftop. Both are reached at the same moment, but the Warehouse has
+# zombies to level on and the Rooftop has none -- so logic used to consider
+# levels 7-9 reachable from a roof with nothing to kill. Under Psycho, where
+# the 10,000 PP rooftop photo is gone as well, that left the early spheres
+# short of any PP at all.
 REGION_LEVEL_VALUES = {
     "Security Room": 1,
-    "Rooftop": 1,
+    "Warehouse": 1,
     "Paradise Plaza": 3,
     "Entrance Plaza": 2,
     "Leisure Park": 3,
@@ -1650,7 +1656,8 @@ def set_rules(world) -> None:
     ]:
         world.set_rule(world.multiworld.get_location(_name, world.player),
                       AtLeast(_n, *_sticker_children))
-    world.set_rule(world.multiworld.get_location("Get 10000 PP in one photo", world.player), CanReachRegion("Rooftop"))
+    if not world.psycho_mode:  # dropped from Psycho seeds in create_region
+        world.set_rule(world.multiworld.get_location("Get 10000 PP in one photo", world.player), CanReachRegion("Rooftop"))
 
     world.set_rule(world.multiworld.get_location("Find Greg's secret passage", world.player), CanReachLocation("Kill Adam"))
     # Endings
