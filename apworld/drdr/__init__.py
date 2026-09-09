@@ -1,18 +1,19 @@
 # world/drdr/__init__.py
 import re
-from typing import Any, Dict, Set, List
+from typing import Any, ClassVar, Dict, Set, List
 
 from BaseClasses import MultiWorld, Region, Item, Entrance, Tutorial, ItemClassification
 from Options import OptionError
 
 from worlds.AutoWorld import World, WebWorld
 
-from .Items import DRItem, DRItemCategory, item_dictionary, key_item_names, item_descriptions, BuildItemPool, specialty_items, progression_skills, microwave_food_items, challenge_tool_items
+from .Items import DRItem, DRItemCategory, item_dictionary, key_item_names, item_descriptions, BuildItemPool, specialty_items, progression_skills, microwave_food_items, challenge_tool_items, kill_filler_items
 from .Locations import (DRLocation, DRLocationCategory, location_tables,
                         location_dictionary, ZOMBIE_KILL_TIERS,
                         ZOMBIE_KILL_TIER_NAMES, zombie_kill_locations,
-                        ZOMBIE_KILL_REGION_OF)
-from .Options import DROption, dr_option_groups
+                        ZOMBIE_KILL_REGION_OF, KILL_SANITY_TOPS,
+                        kill_sanity_location_name)
+from .Options import DROption, dr_option_groups, DRDRSettings
 
 
 from .DoorRandomization import (
@@ -205,6 +206,7 @@ class DRWeb(WebWorld):
 
 
 class DRWorld(World):
+    settings: ClassVar[DRDRSettings]
     """
     Dead Rising is a game about re-killing people and taking photos.
     """
@@ -301,6 +303,28 @@ class DRWorld(World):
         }
         if _kill_active:
             self.enabled_location_categories.add(DRLocationCategory.ZOMBIE_KILL)
+        # KillSanity: per area, kills 1..top-at-tier are locations; the
+        # rest of the table is skipped in create_region like the tiers.
+        self.kill_sanity_tops = {}
+        if (self.options.kill_sanity and self.zombie_kill_tier == "genocide"
+                and not bool(self.settings.killsanity_genocide_allowed)):
+            raise OptionError(
+                f"{self.player_name}: kill_sanity with zombie_kill_tiers: genocide "
+                "is 53,594 locations and takes minutes to generate. The host has "
+                "to allow it with killsanity_genocide_allowed: true under "
+                "drdr_options in host.yaml.")
+        if self.options.kill_sanity and _kill_active:
+            for _region, _tiers in ZOMBIE_KILL_TIERS.items():
+                _active = _tiers.get(self.zombie_kill_tier, [])
+                if _active:
+                    self.kill_sanity_tops[_region] = max(_active)
+        self._kill_sanity_excluded_names = {
+            kill_sanity_location_name(n, region)
+            for region, top in KILL_SANITY_TOPS.items()
+            for n in range(self.kill_sanity_tops.get(region, 0) + 1, top + 1)
+        }
+        if self.kill_sanity_tops:
+            self.enabled_location_categories.add(DRLocationCategory.KILL_SANITY)
         if self.options.pp_bonus_locations:
             self.enabled_location_categories.add(DRLocationCategory.PP_BONUS)
 
@@ -460,7 +484,8 @@ class DRWorld(World):
             "Clock Tower Tunnel",
             "Level Ups",
             "Challenges",
-            "Zombie Kills"
+            "Zombie Kills",
+            "Kill Sanity"
         ]})
 
         # Area pairs that a real door joins in the vanilla table. Under Door
@@ -592,6 +617,7 @@ class DRWorld(World):
         # Reached from Menu, not from the areas they name: their rules are
         # written out in Rules.py so the prologue ones can skip the area.
         create_connection("Menu", "Zombie Kills")
+        create_connection("Menu", "Kill Sanity")
 
 
     GOAL_LOCATIONS = {
@@ -708,6 +734,9 @@ class DRWorld(World):
                 if (location.category == DRLocationCategory.ZOMBIE_KILL
                         and location.name in self._zombie_kill_excluded_names):
                     continue
+                if (location.category == DRLocationCategory.KILL_SANITY
+                        and location.name in self._kill_sanity_excluded_names):
+                    continue
                 new_location = DRLocation(
                     self.player,
                     location.name,
@@ -748,12 +777,24 @@ class DRWorld(World):
         self.multiworld.regions.append(new_region)
         return new_region
 
+    # KillSanity fill: the share of kill locations that get their filler
+    # placed straight back onto them (pre_fill) rather than through the
+    # multiworld. Tunic's grass keeps 95% home for the same reason.
+    KILL_FILLER_LOCAL_PERCENT = 95
+
     def create_items(self):
         itempool: List[DRItem] = []
         itempoolSize = 0
+        kill_slots = 0
         goal_location_name = self.GOAL_LOCATIONS[self.options.goal.value]
 
         for location in self.multiworld.get_locations(self.player):
+                # KillSanity slots get their own filler, counted apart so the
+                # trap percentage and the ordinary filler ratios stay what
+                # they are without the option.
+                if location.category == DRLocationCategory.KILL_SANITY:
+                    kill_slots += 1
+                    continue
                 item_data = item_dictionary[location.default_item_name]
                 if item_data.category in [DRItemCategory.SKIP] or \
                         location.category in [DRLocationCategory.EVENT]:
@@ -785,6 +826,19 @@ class DRWorld(World):
 
         for item in foo:
             itempool.append(self.create_item(item.name))
+
+        # KillSanity filler: most goes home in pre_fill, the rest joins the
+        # multiworld pool. Round-robin over the three names so the spoiler
+        # reads evenly.
+        self.kill_filler_local = kill_slots * self.KILL_FILLER_LOCAL_PERCENT // 100
+        # The local share is held back for stage_pre_fill; the rest joins the
+        # multiworld pool.
+        self.kill_fill_items = [
+            self.create_item(kill_filler_items[i % len(kill_filler_items)])
+            for i in range(self.kill_filler_local)
+        ]
+        for i in range(kill_slots - self.kill_filler_local):
+            itempool.append(self.create_item(kill_filler_items[i % len(kill_filler_items)]))
 
         self.multiworld.itempool += itempool
 
@@ -866,6 +920,56 @@ class DRWorld(World):
         # scoop_order is empty for Savior+ScoopSanity (main scoops excluded).
         if self.options.scoop_sanity and self.scoop_order:
             self.multiworld.early_items[self.player][self.scoop_order[0]] = 1
+
+        # KillSanity: pick this world's kill slots for the local share. The
+        # placing happens in stage_pre_fill, pooled across every Dead Rising
+        # world in the seed, the way Tunic pools its grass.
+        self.kill_fill_locations = []
+        self.kill_backup_locations = []
+        local = getattr(self, "kill_filler_local", 0)
+        if local > 0:
+            slots = [loc for loc in self.multiworld.get_unfilled_locations(self.player)
+                     if loc.category == DRLocationCategory.KILL_SANITY]
+            self.random.shuffle(slots)
+            self.kill_fill_locations = slots[:local]
+            self.kill_backup_locations = slots[local:]
+
+    @classmethod
+    def stage_pre_fill(cls, multiworld: MultiWorld) -> None:
+        """Place every Dead Rising world's local kill filler across every
+        Dead Rising world's kill slots, pooled and shuffled together. One
+        Frank's Brains can sit on another Frank's kill and come home when it
+        is checked; the fill never handles any of it."""
+        worlds = [w for w in multiworld.get_game_worlds("Dead Rising Deluxe Remaster")
+                  if getattr(w, "kill_fill_items", None)]
+        if not worlds:
+            return
+        items, slots, backup = [], [], []
+        for w in worlds:
+            items.extend(w.kill_fill_items)
+            slots.extend(w.kill_fill_locations)
+            backup.extend(w.kill_backup_locations)
+        multiworld.random.shuffle(items)
+        multiworld.random.shuffle(slots)
+        multiworld.random.shuffle(backup)
+        for item in items:
+            placed = False
+            while slots and not placed:
+                loc = slots.pop()
+                if not loc.item:
+                    loc.place_locked_item(item)
+                    placed = True
+            # Another world filled this slot during its pre_fill: use a
+            # spare kill slot instead.
+            while backup and not placed:
+                loc = backup.pop()
+                if not loc.item:
+                    loc.place_locked_item(item)
+                    placed = True
+            if not placed:
+                raise OptionError(
+                    "Dead Rising Deluxe Remaster: ran out of kill slots for the "
+                    "local kill filler; another world filled them during pre_fill.")
 
     def set_rules(self) -> None:
         Rules.set_rules(self)
@@ -1181,6 +1285,7 @@ class DRWorld(World):
             "exclude_levels": exclude_levels_enabled,
             "exclude_rescues": exclude_rescues_enabled,
             "zombie_kill_tier": self.zombie_kill_tier,
+            "kill_sanity": self.kill_sanity_tops,
             "zombie_kill_thresholds": zombie_kill_thresholds,
             "scoop_order": self.scoop_order if scoop_sanity_enabled else {},
             # Player-stats slot data (read by Lua on slot connect)

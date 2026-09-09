@@ -29,6 +29,10 @@ class DRLocationCategory(IntEnum):
     # with no scoop behind them, so they get their own category rather than
     # borrowing a scoop's and inheriting its gating.
     CAMERA_PART = 13
+    # KillSanity: one location per zombie kill, per area. Its own table,
+    # far past the 1000-per-table slot, so it takes the ID range after
+    # every other table.
+    KILL_SANITY = 14
 
 
 class DRLocationData(NamedTuple):
@@ -93,6 +97,12 @@ class DRLocation(Location):
 
             output.update({location_data.name: id for id, location_data in
                            enumerate(location_tables[region_name], base_id + (table_offset * i))})
+
+        # KillSanity is 53,594 entries in one table, so it sits after the
+        # last ordinary slot and nothing may ever be appended behind it.
+        output.update({location_data.name: id for id, location_data in
+                       enumerate(location_tables["Kill Sanity"],
+                                 base_id + (table_offset * len(table_order)))})
 
         return output
 
@@ -916,6 +926,25 @@ location_tables["Zombie Kills"] = [
     DRLocationData("Zombie Genocider: Kill 53,594 zombies across the mall", "Victory", DRLocationCategory.EVENT),
 ]
 
+
+# KillSanity: every kill in an area up to its genocide threshold is a
+# location. Built in full so IDs are stable; the option and the tier decide
+# how many are created. The area tops sum to the Genocider count.
+KILL_SANITY_TOPS: Dict[str, int] = {
+    _region: max(_tiers["genocide"]) for _region, _tiers in ZOMBIE_KILL_TIERS.items()
+}
+KILL_SANITY_MAX = sum(KILL_SANITY_TOPS.values())
+
+
+def kill_sanity_location_name(n: int, region: str) -> str:
+    return f"Zombie Kill {n} in {region}"
+
+
+location_tables["Kill Sanity"] = [
+    DRLocationData(kill_sanity_location_name(_n, _region), "Milk", DRLocationCategory.KILL_SANITY)
+    for _region, _top in KILL_SANITY_TOPS.items()
+    for _n in range(1, _top + 1)
+]
 
 # The area each kill location counts for. The region above is a neutral one,
 # so the name is the only place the area survives -- Rules.py needs it back.

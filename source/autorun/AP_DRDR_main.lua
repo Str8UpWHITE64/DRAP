@@ -548,9 +548,18 @@ local function run_slot_connect(slot_data)
     local kill_thresholds = (type(slot_data) == "table"
         and type(slot_data.zombie_kill_thresholds) == "table"
         and slot_data.zombie_kill_thresholds) or {}
-    AP.KillTracker.configure(kill_thresholds)
+    -- KillSanity: per-region caps, every kill up to the cap is a location.
+    local kill_caps = (type(slot_data) == "table"
+        and type(slot_data.kill_sanity) == "table"
+        and slot_data.kill_sanity) or {}
+    AP.KillTracker.configure(kill_thresholds, kill_caps)
     log("Zombie Kill Tiers: " .. tostring((type(slot_data) == "table"
         and slot_data.zombie_kill_tier) or "none"))
+    if next(kill_caps) then
+        local total = 0
+        for _, cap in pairs(kill_caps) do total = total + (tonumber(cap) or 0) end
+        log(string.format("KillSanity: %d kill location(s) across the areas", total))
+    end
 
     -- Cult Limited option
     local cult_limited_enabled = (type(slot_data) == "table" and slot_data.cult_limited == true)

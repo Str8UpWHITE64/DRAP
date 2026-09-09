@@ -1,6 +1,20 @@
 import typing
 from dataclasses import dataclass
+import settings
 from Options import Toggle, DefaultOnToggle, FreeText, Option, Range, Choice, ItemDict, DeathLink, PerGameCommonOptions, StartInventoryPool, OptionGroup, OptionSet
+
+
+class DRDRSettings(settings.Group):
+    """host.yaml settings for the machine that generates. A player's YAML
+    cannot turn these on; only whoever runs generation can, because the cost
+    lands on the whole multiworld."""
+
+    class KillsanityGenocideAllowed(settings.Bool):
+        """Allow kill_sanity with zombie_kill_tiers: genocide. That is 53,594
+        locations for one player, about two minutes to generate on its own,
+        and it grows with the player count."""
+
+    killsanity_genocide_allowed: typing.Union[KillsanityGenocideAllowed, bool] = False
 
 
 class GuaranteedItemsOption(ItemDict):
@@ -18,6 +32,17 @@ class RestrictedItemMode(Toggle):
     can be picked up from the ground or dispensers in the game world.
     """
     display_name = "Restricted Item Mode"
+    default = False
+
+
+class KillSanity(Toggle):
+    """
+    Every zombie kill in an area is its own check, up to that area's top
+    threshold at your Zombie Kill Tiers setting. Easy is a few hundred
+    checks; genocide is all 53,594 of them. Does nothing with the tiers
+    set to none.
+    """
+    display_name = "KillSanity"
     default = False
 
 
@@ -838,6 +863,7 @@ class DROption(PerGameCommonOptions):
     exclude_levels_above: ExcludeLevelsAbove
     exclude_rescues_above: ExcludeRescuesAbove
     zombie_kill_tiers: ZombieKillTiers
+    kill_sanity: KillSanity
     special_forces_mode: SpecialForcesMode
     enabled_traps: EnabledTraps
     enable_skill_items: EnableSkillItems

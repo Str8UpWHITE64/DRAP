@@ -16,6 +16,7 @@ class DRItemCategory(IntEnum):
     SKILL = 8,         # 21 player-skill items (Useful)
     UPGRADE = 9,       # 6 progressive stat upgrades (Useful)
     BUFF = 10,         # 7 filler buff items (juice effects + Heal/Berserker/PP)
+    KILL_FILLER = 11,  # KillSanity's own filler; never in the ordinary pool
 
 
 class DRItemData(NamedTuple):
@@ -463,6 +464,13 @@ _all_items = [DRItemData(row[0], row[1], row[2]) for row in [
     # The convicts' vehicle. Shares its RIDE_CAR_TYPE with the Overtime
     # Humvee, so the runtime tells them apart by GameObject name.
     ("Convict Humvee Key", 5014, DRItemCategory.LOCK),
+
+    # KillSanity filler. One per kill location, most of them placed straight
+    # back onto kill locations so the multiworld pool is not flooded. They do
+    # nothing in the game beyond existing.
+    ("Zombie Guts", 5020, DRItemCategory.KILL_FILLER),
+    ("Brains", 5021, DRItemCategory.KILL_FILLER),
+    ("Rotten Flesh", 5022, DRItemCategory.KILL_FILLER),
     # Note: Night Mode + Hardcore Zombies are NOT items — they are YAML
     # options (`night_mode_enabled`, `hardcore_zombies_enabled` in Options.py)
     # applied at slot-connect by DRAP/effects/ZombieEffects.lua.
@@ -471,6 +479,9 @@ _all_items = [DRItemData(row[0], row[1], row[2]) for row in [
 item_descriptions = {}
 
 item_dictionary = {item_data.name: item_data for item_data in _all_items}
+
+kill_filler_items = [item.name for item in _all_items
+                     if item.category == DRItemCategory.KILL_FILLER]
 
 # Specialty items that must be included in the pool for Restricted mode
 # These are required for specific scoops/psychopaths and are progression when RestrictedItemMode is enabled

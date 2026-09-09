@@ -34,7 +34,10 @@ function M.new(opts)
         sent = {},
     }
 
-    function self.configure(thresholds, scenes)
+    --- @param kill_caps table|nil {region -> n}: KillSanity, every kill up
+    --- to n in that region is its own location. Only regions that have
+    --- tier thresholds count, which is also how the apworld builds it.
+    function self.configure(thresholds, scenes, kill_caps)
         self.thresholds = {}
         for region, list in pairs(thresholds or {}) do
             -- Ascending, so the first unmet threshold is the next one due.
@@ -45,6 +48,17 @@ function M.new(opts)
             self.counts[region] = self.counts[region] or 0
         end
         self.scenes = scenes or {}
+        self.kill_caps = {}
+        for region, cap in pairs(kill_caps or {}) do
+            cap = tonumber(cap) or 0
+            if cap > 0 and self.thresholds[region] then
+                self.kill_caps[region] = cap
+            end
+        end
+    end
+
+    function self.kill_name(k, region)
+        return string.format("Zombie Kill %d in %s", k, region)
     end
 
     --- The region a scene code belongs to. Whether that region has any checks
@@ -65,7 +79,7 @@ function M.new(opts)
     --- @return string|nil region, table newly-crossed location names
     function self.record_region(region, n)
         n = n or 1
-        if not region or not self.thresholds[region] then return nil, {} end
+        if not region or not self.thresholds[region] then return nil, {}, {} end
 
         local before = self.counts[region] or 0
         local after = before + n
@@ -82,7 +96,21 @@ function M.new(opts)
                 end
             end
         end
-        return region, due
+        -- KillSanity: the kills themselves, up to the cap. Returned apart
+        -- from the thresholds so the caller can batch them without a
+        -- toast each.
+        local kills = {}
+        local cap = self.kill_caps[region]
+        if cap then
+            for k = before + 1, math.min(after, cap) do
+                local name = self.kill_name(k, region)
+                if not self.sent[name] then
+                    self.sent[name] = true
+                    table.insert(kills, name)
+                end
+            end
+        end
+        return region, due, kills
     end
 
     --- Record kills in a scene.
@@ -121,6 +149,29 @@ function M.new(opts)
         end
         table.sort(out)
         return out
+    end
+
+    --- Every KillSanity kill at or below the current count that this
+    --- session has not sent. The count is the only record kept of them --
+    --- a kill at or below it is sent by definition, and the server dedupes
+    --- a resend -- so a reload yields them all once, in one batch.
+    function self.due_kills()
+        local out = {}
+        for region, cap in pairs(self.kill_caps) do
+            for k = 1, math.min(self.counts[region] or 0, cap) do
+                local name = self.kill_name(k, region)
+                if not self.sent[name] then
+                    self.sent[name] = true
+                    table.insert(out, name)
+                end
+            end
+        end
+        return out
+    end
+
+    --- A batch that failed to send goes back on the table.
+    function self.forget_sent(list)
+        for _, name in ipairs(list or {}) do self.sent[name] = nil end
     end
 
     function self.count(region) return self.counts[region] or 0 end
@@ -186,7 +237,7 @@ function M.new(opts)
         return n
     end
 
-    self.configure(opts.thresholds, opts.scenes)
+    self.configure(opts.thresholds, opts.scenes, opts.kill_caps)
     return self
 end
 

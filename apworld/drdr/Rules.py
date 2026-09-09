@@ -17,7 +17,8 @@ from rule_builder.rules import (
 
 from .DoorRandomization import AREA_NAMES, EMBEDDED_DOOR_DATA
 from .Locations import (DRLocationCategory, location_tables,
-                        ZOMBIE_KILL_REGION_OF, ZOMBIE_KILL_TIERS, SURVIVOR_MILESTONES)
+                        ZOMBIE_KILL_REGION_OF, ZOMBIE_KILL_TIERS, SURVIVOR_MILESTONES,
+                        kill_sanity_location_name)
 from .shared_data import (
     AREA_KEY_NAMES,
     SCOOP_COMPLETION_MAP, SCOOP_EVENTS, SCOOP_REGION_REQUIREMENTS,
@@ -685,13 +686,7 @@ def set_rules(world) -> None:
     # two used to be free, on the grounds that the prologue puts the player
     # there without a key -- but that made them sphere 0, so a new player
     # cleared them in the opening without ever knowing the checks existed.
-    for _kill_name, _kill_region in ZOMBIE_KILL_REGION_OF.items():
-        try:
-            _kill_loc = world.multiworld.get_location(_kill_name, world.player)
-        except KeyError:
-            continue        # not created at this tier
-        _threshold = int(re.match(r"Kill (\d+) ", _kill_name).group(1))
-
+    def _area_kill_rule(_kill_region, _threshold):
         _parts = [CanReachRegion(_kill_region)]
 
         # Applies in both item modes: it is about progress through the run,
@@ -722,8 +717,31 @@ def set_rules(world) -> None:
             if _threshold >= KILL_QUEEN_FROM:
                 _parts.append(Has("Queen"))
 
-        world.set_rule(_kill_loc,
-                       _parts[0] if len(_parts) == 1 else And(*_parts))
+        return _parts[0] if len(_parts) == 1 else And(*_parts)
+
+    for _kill_name, _kill_region in ZOMBIE_KILL_REGION_OF.items():
+        try:
+            _kill_loc = world.multiworld.get_location(_kill_name, world.player)
+        except KeyError:
+            continue        # not created at this tier
+        _threshold = int(re.match(r"Kill (\d+) ", _kill_name).group(1))
+        world.set_rule(_kill_loc, _area_kill_rule(_kill_region, _threshold))
+
+    # KillSanity: each kill takes the rule of the area check it is on the
+    # way to, so a band of kills shares one rule object.
+    for _region, _top in getattr(world, "kill_sanity_tops", {}).items():
+        _bands = sorted(ZOMBIE_KILL_TIERS[_region]["genocide"])
+        _band_rules = {}
+        for _n in range(1, _top + 1):
+            _band = next(_b for _b in _bands if _b >= _n)
+            _rule = _band_rules.get(_band)
+            if _rule is None:
+                _rule = _area_kill_rule(_region, _band)
+                _band_rules[_band] = _rule
+            world.set_rule(
+                world.multiworld.get_location(
+                    kill_sanity_location_name(_n, _region), world.player),
+                _rule)
 
     # Zombie Genocider: the top threshold in every area, which is the same
     # 53,594 kills as clearing all 92 checks and eleven rules instead of 92.

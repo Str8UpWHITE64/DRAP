@@ -676,6 +676,33 @@ function M.is_completed(loc_name)
     return Ledger.is_checked(loc_name)
 end
 
+--- Send a list of names as ONE LocationChecks, with no ledger entry.
+---
+--- For KillSanity, where a location per zombie would mean a ledger write
+--- per kill and a packet per kill. The kill count is the record instead
+--- (KillTracker), the server dedupes a resend, and the caller keeps the
+--- batch to retry when this returns false.
+--- @return boolean sent, number how many
+function M.check_batch(names)
+    if not Activation.is_active() then return false, 0 end
+    if not AP_REF.APClient or not is_connected() then return false, 0 end
+    local ids, unresolved = {}, 0
+    for _, name in ipairs(names or {}) do
+        local id = resolve_location_id(name)
+        if id then
+            table.insert(ids, tonumber(id) or id)
+        else
+            unresolved = unresolved + 1
+        end
+    end
+    if #ids == 0 then return false, 0 end
+    local ok = pcall(AP_REF.APClient.LocationChecks, AP_REF.APClient, ids)
+    M.log(string.format("Sent %d kill check(s) in one batch%s%s", #ids,
+        unresolved > 0 and string.format(" (%d unresolved)", unresolved) or "",
+        ok and "" or " -- FAILED"))
+    return ok == true, #ids
+end
+
 -- Arms the sync machine: on the next on_frame ticks, every unacked ledger
 -- name is resolved and sent as ONE batched LocationChecks (the server
 -- dedups). Names that can't resolve yet (data package still loading) keep
@@ -1171,6 +1198,17 @@ end
 -- Item Application
 ------------------------------------------------------------
 
+-- KillSanity filler: thousands per seed, and every one of them again on a
+-- reconnect -- 53,594 at the genocide tier. They exist to fill kill
+-- locations and do nothing, so they take a fast lane: no per-item log, no
+-- toast, no entry in the received-items file, just a count per name and
+-- one summary line per batch. They still advance last_item_index, so the
+-- server does not replay them on every connect.
+local KILL_FILLER = { ["Zombie Guts"] = true, ["Brains"] = true, ["Rotten Flesh"] = true }
+local kill_filler_counts = {}   -- name -> received, for the status command
+local kill_filler_batch = {}    -- name -> received this batch
+local received_dirty = false    -- received-items file needs writing
+
 local function handle_net_item(net_item, is_replay)
     local item_id = net_item.item
     local sender = net_item.player
@@ -1182,6 +1220,13 @@ local function handle_net_item(net_item, is_replay)
     -- Clean strings from AP client to remove any binary garbage
     local item_name = Shared.clean_string(item_name_raw)
     local sender_name = Shared.clean_string(sender_name_raw)
+
+    if KILL_FILLER[item_name] then
+        kill_filler_counts[item_name] = (kill_filler_counts[item_name] or 0) + 1
+        kill_filler_batch[item_name] = (kill_filler_batch[item_name] or 0) + 1
+        if not is_replay then received_dirty = true end
+        return
+    end
 
     M.log("Applying item index=" .. tostring(index) .. " id=" .. tostring(item_id) .. " (" .. item_name .. ") from " .. sender_name .. " (replay=" .. tostring(is_replay) .. ")")
 
@@ -1201,9 +1246,9 @@ local function handle_net_item(net_item, is_replay)
             RECEIVED_ITEMS_BY_NAME[item_name] = (RECEIVED_ITEMS_BY_NAME[item_name] or 0) + 1
         end
 
-        -- Persist immediately so a crash/reset doesn't lose the receipt.
-        -- Mirrors the per-check save in M.check above.
-        save_received_items()
+        -- Written once per batch (on_frame), not once per item: a burst of
+        -- received items rewrote the whole file for each one.
+        received_dirty = true
     end
 
     local handled = ItemEffects.dispatch(net_item, item_name, sender_name, is_replay)
@@ -1325,8 +1370,30 @@ function M.on_frame()
                     handle_net_item(queued, false)
                 end
             end
+            if next(kill_filler_batch) then
+                local parts, total = {}, 0
+                for name, n in pairs(kill_filler_batch) do
+                    table.insert(parts, string.format("%s x%d", name, n))
+                    total = total + n
+                end
+                table.sort(parts)
+                M.log(string.format("KillSanity filler: %s (%d this batch)",
+                    table.concat(parts, ", "), total))
+                kill_filler_batch = {}
+            end
+            if received_dirty then
+                received_dirty = false
+                save_received_items()
+            end
         end
     end
+end
+
+--- KillSanity filler received so far, by name.
+function M.kill_filler_received()
+    local out = {}
+    for name, n in pairs(kill_filler_counts) do out[name] = n end
+    return out
 end
 
 M.AP_REF = AP_REF

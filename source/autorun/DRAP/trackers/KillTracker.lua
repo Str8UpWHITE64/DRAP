@@ -246,12 +246,36 @@ end
 --- Apply the kills held during the read. Also runs on timeout, so a server
 --- that never answers does not strand them.
 --- @return table location names that came due
+-- KillSanity names waiting to go out as one packet. Never ledgered: the
+-- count is their record (see KillCounter.due_kills), and a ledger entry per
+-- zombie would rewrite the file on every kill.
+local kill_batch = {}
+
+local function queue_kills(kills)
+    for _, name in ipairs(kills or {}) do table.insert(kill_batch, name) end
+end
+
+local function send_kill_batch()
+    if #kill_batch == 0 then return end
+    local AP = _G.AP
+    if not (AP and AP.AP_BRIDGE and AP.AP_BRIDGE.check_batch) then return end
+    local batch = kill_batch
+    kill_batch = {}
+    local ok, sent = pcall(AP.AP_BRIDGE.check_batch, batch)
+    if not (ok and sent) then
+        -- Back on the table for the next flush.
+        counter.forget_sent(batch)
+        for _, name in ipairs(batch) do table.insert(kill_batch, name) end
+    end
+end
+
 local function drain_held()
     local due, total = {}, 0
     for region, n in pairs(held) do
         total = total + n
-        local _, names = counter.record_region(region, n)
+        local _, names, kills = counter.record_region(region, n)
         for _, name in ipairs(names) do table.insert(due, name) end
+        queue_kills(kills)
     end
     held = {}
     if total > 0 then
@@ -272,8 +296,9 @@ local function record_kills(region, n)
     -- The wait may have just timed out with kills still held; they go in
     -- first so the thresholds come out in the order they were reached.
     local due = drain_held()
-    local _, names = counter.record_region(region, n)
+    local _, names, kills = counter.record_region(region, n)
     for _, name in ipairs(names) do table.insert(due, name) end
+    queue_kills(kills)
     return due
 end
 
@@ -393,6 +418,8 @@ function M.send_due()
     for _, name in ipairs(due) do
         pcall(AP.AP_BRIDGE.check, name)
     end
+    queue_kills(counter.due_kills())
+    send_kill_batch()
     return #due
 end
 
@@ -414,6 +441,7 @@ function M.flush()
         end
     end
     if any then M.save() end
+    send_kill_batch()
     return any
 end
 
@@ -433,6 +461,9 @@ local function on_kill()
     local region = counter.region_for(scene)
     if not region then return end
     local due = record_kills(region, 1)
+    -- KillSanity names go out as they happen (kills in the same frame
+    -- share a packet); the count push and the ledger keep their cadence.
+    send_kill_batch()
 
     if #due > 0 then
         announce(due)
@@ -482,8 +513,9 @@ local function scene_map()
 end
 
 --- @param thresholds table {region -> {n,...}} from slot data
-function M.configure(thresholds)
-    counter.configure(thresholds or {}, scene_map())
+--- @param kill_caps table|nil {region -> n} KillSanity caps from slot data
+function M.configure(thresholds, kill_caps)
+    counter.configure(thresholds or {}, scene_map(), kill_caps)
     configured = true
     enabled = counter.is_enabled()
     if not enabled then
