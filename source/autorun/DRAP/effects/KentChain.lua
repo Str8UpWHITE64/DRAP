@@ -239,6 +239,7 @@ local want_seen = nil         -- last desired-day value observed
 local want_since = nil        -- os.clock() when it changed
 local verify_pending = false  -- re-check armed flags after a load edge
 local death_edge_at = nil     -- os.clock() when day-3 completion registered
+local death_clear_wanted = false -- another day is coming, so clear the records
 -- The engine's completion handoff cluster takes ~4s (843 at t+0, the 2508
 -- token at t+4, healthy trace). An arm inside that window must WAIT for
 -- the token (then gentle-arm) or for the window to lapse (then full-wipe,
@@ -828,6 +829,14 @@ function M.on_frame()
     -- Re-asserted for a short window -- the death event can write the
     -- record again mid-cutscene after the first clear. The clear itself is
     -- idempotent (only touches records with mBeflag set).
+    --
+    -- ONLY when another Kent day is still to come. Day 3's set stays
+    -- satisfied after the kill (1292 on, 1155 cleared by the box top-up),
+    -- so the death record is the one thing keeping the engine from placing
+    -- day-3 Kent again on the next Paradise entry. With no later day
+    -- received, clearing it brought him back alive (field report
+    -- 2026-09-09). A day that arrives later gets the clear from its own
+    -- full arm.
     if not death_edge_at then
         local su = unlocker()
         if su then
@@ -840,11 +849,24 @@ function M.on_frame()
                 -- would make a later 1<->2 arm remove a LIVE actor's
                 -- record (the orphan bug).
                 if armed_day == DAYS[3] then record_stale = true end
-                M.log("day-3 completion detected -- clearing death records")
+                death_clear_wanted = false
+                for _, day in ipairs(DAYS) do
+                    if day ~= DAYS[3] then
+                        local ok_d, done_d = pcall(su.is_scoop_completed, day)
+                        local ok_r, got = pcall(su.has_ap_received, day)
+                        if not (ok_d and done_d == true) and ok_r and got == true then
+                            death_clear_wanted = true
+                        end
+                    end
+                end
+                M.log(death_clear_wanted
+                    and "day-3 completion detected -- clearing death records (another day is coming)"
+                    or "day-3 completion detected -- death records kept (no other Kent day received)")
             end
         end
     end
-    if death_edge_at and os.clock() - death_edge_at < DEATH_CLEAR_WINDOW then
+    if death_edge_at and death_clear_wanted
+        and os.clock() - death_edge_at < DEATH_CLEAR_WINDOW then
         clear_enemy_records()
     end
 
