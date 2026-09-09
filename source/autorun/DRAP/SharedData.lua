@@ -150,7 +150,7 @@ function M.main_case_guides()
 end
 
 -- Bundled survivor spawn positions (stype-string -> {name, x, y, z, area,
--- state, hp}). SurvivorRecovery overlays locally-harvested positions on top.
+-- state, hp}).
 function M.survivor_positions()
     ensure_loaded()
     return (data and data.survivor_positions) or {}

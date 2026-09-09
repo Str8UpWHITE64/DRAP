@@ -136,7 +136,6 @@ AP.effects.PsychoGoalEffects          = require("DRAP/effects/PsychoGoalEffects"
 AP.effects.PsychoHostility            = require("DRAP/effects/PsychoHostility")
 AP.effects.BookSkills                 = require("DRAP/effects/BookSkills")
 AP.effects.BookGuards                 = require("DRAP/effects/BookGuards")
-AP.effects.NpcInfoSweeper             = require("DRAP/effects/NpcInfoSweeper")
 AP.effects.NpcSaveGuard               = require("DRAP/effects/NpcSaveGuard")
 AP.effects.ConvictRespawnTrap         = require("DRAP/effects/ConvictRespawnTrap")
 AP.effects.InventoryTraps             = require("DRAP/effects/InventoryTraps")
@@ -144,7 +143,6 @@ AP.effects.CostumeTraps               = require("DRAP/effects/CostumeTraps")
 AP.effects.SpecialForces              = require("DRAP/effects/SpecialForces")
 AP.effects.SpitterMode                = require("DRAP/effects/SpitterMode")
 AP.TrapBank                           = require("DRAP/TrapBank")
-AP.effects.SurvivorRecovery           = require("DRAP/effects/SurvivorRecovery")
 AP.effects.KentChain                  = require("DRAP/effects/KentChain")
 AP.effects.PartyHudGuard              = require("DRAP/effects/PartyHudGuard")
 AP.effects.PlayerStats                = require("DRAP/effects/PlayerStats")
@@ -217,12 +215,6 @@ AP.EventTracker.on_tracked_location = function(desc, source, raw_id, extra)
 
     log(string.format("Tracked location: %s", tostring(desc)))
     AP.AP_BRIDGE.check(desc)
-
-    -- Cutscene-staged survivors wait on their scoop's cutscene rather
-    -- than on a sibling being alive, so tell SurvivorRecovery it ran.
-    if AP.effects.SurvivorRecovery.note_tracked_location then
-        pcall(AP.effects.SurvivorRecovery.note_tracked_location, desc)
-    end
 
     -- Forward events to ScoopUnlocker for milestone/chain tracking
     if AP.ScoopUnlocker and AP.ScoopUnlocker.on_event_tracked then
@@ -379,11 +371,8 @@ local function run_slot_connect(slot_data)
     AP_BRIDGE.load_completed_checks()
     AP_BRIDGE.resend_all_checks()
 
-    -- Survivor observation history. Must follow load_completed_checks, which
-    -- is what initializes the ledger this reads its section from. Without it a
-    -- survivor killed in an earlier session looks like a broken spawn.
-    AP.effects.SurvivorRecovery.load_census()
-    -- Trap payout tallies, same ledger, same moment.
+    -- Trap payout tallies live in the ledger, so this must follow
+    -- load_completed_checks, which initializes it.
     AP.TrapBank.load()
 
     -- Set up sticker save file
@@ -566,25 +555,6 @@ local function run_slot_connect(slot_data)
     AP.CultLimitedEnabled = cult_limited_enabled
     AP.ScoopUnlocker.set_cult_limited_enabled(cult_limited_enabled)
     log("Cult Limited enabled=" .. tostring(cult_limited_enabled))
-
-    -- Survivor Respawn option. Defaults ON in the apworld, so treat a missing
-    -- key (older seed) as enabled rather than silently reverting to the
-    -- vanilla rule where a dead survivor loses their check for good.
-    local survivor_respawn_enabled = not (type(slot_data) == "table"
-        and slot_data.survivor_respawn == false)
-    AP.SurvivorRespawnEnabled = survivor_respawn_enabled
-    AP.effects.SurvivorRecovery.set_survivor_respawn_enabled(survivor_respawn_enabled)
-    -- The option only does anything while the repair paths are live, and they
-    -- ship disabled. A bare "enabled=true" in a field log reads as "respawns
-    -- are happening" and would send the next investigation the wrong way.
-    local respawn_note = ""
-    if survivor_respawn_enabled
-        and AP.effects.SurvivorRecovery.is_repair_enabled
-        and not AP.effects.SurvivorRecovery.is_repair_enabled() then
-        respawn_note = " (inert -- survivor repair is disabled in this build)"
-    end
-    log("Survivor Respawn enabled=" .. tostring(survivor_respawn_enabled)
-        .. respawn_note)
 
     -- Goal mode for ScoopUnlocker -- used to fire flag 270 (Backup for Brad
     -- cutscene that opens EP shutters) on Meet-Jessie when goal is Savior.
@@ -870,11 +840,9 @@ re.on_frame(function()
     safe_on_frame(AP.SaveSlot,         "SaveSlot")
     safe_on_frame(AP.SaveDiagnostics,  "SaveDiagnostics")
     safe_on_frame(AP.effects.BookGuards, "BookGuards")
-    safe_on_frame(AP.effects.NpcInfoSweeper, "NpcInfoSweeper")
     safe_on_frame(AP.effects.NpcSaveGuard, "NpcSaveGuard")
     safe_on_frame(AP.TrapBank, "TrapBank")
     safe_on_frame(AP.effects.InventoryTraps, "InventoryTraps")
-    safe_on_frame(AP.effects.SurvivorRecovery, "SurvivorRecovery")
     safe_on_frame(AP.effects.KentChain, "KentChain")
     safe_on_frame(AP.effects.PsychoHostility, "PsychoHostility")
     safe_on_frame(AP.effects.SpecialForces, "SpecialForces")

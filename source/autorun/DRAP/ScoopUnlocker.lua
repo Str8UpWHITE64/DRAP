@@ -1734,9 +1734,6 @@ State.init({
     -- second and knows the name<->SurvivorType mapping. It only reports a
     -- death for someone it saw alive first, and retracts one if they turn up
     -- alive again, which covers loading a save from before the kill.
-    --
-    -- Deliberately NOT the survivor census: that belongs to SurvivorRecovery,
-    -- which is switched off, so a scoop must not depend on it.
     survivor_dead = function(name)
         local nt = AP and AP.NpcTracker
         if not (nt and nt.is_survivor_dead) then return false end

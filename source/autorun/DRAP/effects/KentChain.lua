@@ -447,8 +447,8 @@ local function reset_npc_record(remove_mode, pos)
             -- Restore the AUTHORED spawn position: placement reuses the
             -- record's position, and the previous day's Kent wanders after
             -- his shoot -- the next day then spawned wherever he ended up
-            -- (downstairs, measured on 2->1 after 3->2). Same pattern as
-            -- SurvivorRecovery's setPos-with-field-fallback.
+            -- (downstairs, measured on 2->1 after 3->2). setPos, with the
+            -- field as the fallback.
             if pos then
                 pcall(function()
                     local v = Vector3f.new(pos.x, pos.y, pos.z)

@@ -541,25 +541,6 @@ class NumberOfKills(Range):
     default = 25
 
 
-class SurvivorRespawn(DefaultOnToggle):
-    """
-    A survivor's "Rescue" check can only be sent when they reach the Security
-    Room, so if a survivor dies that location cannot be collected unless the player
-    restarts the run and rescues the survivor again.
-
-    With this option enabled, a survivor who dies during a rescue reappears at
-    the spot they originally spawned, so you can go back and pick them up
-    again. They return already following you, because survivors who normally
-    spawn as part of a group can misbehave when spawned on their own.
-
-    Turn this off for the vanilla rule, where a dead survivor is gone for good
-    until a new run starts.
-
-    This option has no effect if ScoopSanity is off.
-    """
-    display_name = "Survivor Respawn"
-
-
 class OvertimeProgressionGating(Toggle):
     """
     Adds gates to Overtime so Ending S is a longer run than Ending A rather
@@ -876,7 +857,6 @@ class DROption(PerGameCommonOptions):
     hostile_survivor_count_min: HostileSurvivorCountMin
     hostile_survivor_count_max: HostileSurvivorCountMax
     cult_limited: CultLimited
-    survivor_respawn: SurvivorRespawn
     overtime_progression_gating: OvertimeProgressionGating
     night_mode_enabled: NightModeEnabled
     hardcore_zombies_enabled: HardcoreZombiesEnabled
@@ -947,7 +927,6 @@ dr_option_groups = [
         "Difficulty Settings",
         [
             CultLimited,
-            SurvivorRespawn,
             SplitKeys,
             NightModeEnabled,
             HardcoreZombiesEnabled,

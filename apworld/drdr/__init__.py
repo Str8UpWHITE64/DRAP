@@ -1128,7 +1128,6 @@ class DRWorld(World):
         cult_limited_enabled = bool(self.options.cult_limited.value)
         split_keys_enabled = bool(self.options.split_keys.value)
         any_order_enabled = bool(self.options.main_scoops_any_order.value)
-        survivor_respawn_enabled = bool(self.options.survivor_respawn.value)
         overtime_gating_enabled = bool(
             self.options.overtime_progression_gating.value)
         # Hardcore implies Night — auto-enable Night when Hardcore is on so
@@ -1238,7 +1237,6 @@ class DRWorld(World):
                 "cult_limited": cult_limited_enabled,
                 "split_keys": split_keys_enabled,
                 "main_scoops_any_order": any_order_enabled,
-                "survivor_respawn": survivor_respawn_enabled,
                 "overtime_progression_gating": overtime_gating_enabled,
                 "night_mode_enabled": night_mode_enabled,
                 "hardcore_zombies_enabled": hardcore_zombies_enabled,
@@ -1296,7 +1294,6 @@ class DRWorld(World):
             "cult_limited": cult_limited_enabled,
             "split_keys": split_keys_enabled,
             "main_scoops_any_order": any_order_enabled,
-            "survivor_respawn": survivor_respawn_enabled,
             "overtime_progression_gating": overtime_gating_enabled,
             "night_mode_enabled": night_mode_enabled,
             "hardcore_zombies_enabled": hardcore_zombies_enabled,
