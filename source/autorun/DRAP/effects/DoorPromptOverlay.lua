@@ -60,16 +60,16 @@ end
 -- Read player world position for door disambiguation. Returns (x, z) only
 -- since the ambiguous doorways are at the same elevation -- y is dropped to
 -- skip a needless coordinate. Returns nil if the player isn't spawned.
-local function get_player_xz()
+local function get_player_xyz()
     local pm = sdk.get_managed_singleton("app.solid.PlayerManager")
     if not pm then return nil end
     local cond = safe(function() return pm:call("get_CurrentPlayerCondition") end)
     if not cond then return nil end
     local pos = safe(function() return cond:get_field("LastPlayerPos") end)
     if not pos then return nil end
-    local x, z
-    pcall(function() x = pos.x; z = pos.z end)
-    return x, z
+    local x, y, z
+    pcall(function() x = pos.x; y = pos.y; z = pos.z end)
+    return x, y, z
 end
 
 ------------------------------------------------------------
@@ -117,7 +117,7 @@ local function resolve_door_no(scene_code, target_code)
     local candidates = AMBIGUOUS_DOOR_ANCHORS[key]
     if not candidates then return 0 end
 
-    local px, pz = get_player_xz()
+    local px, _, pz = get_player_xyz()
     if px == nil then return 0 end
 
     local best_d2, best_door = math.huge, 0
@@ -272,27 +272,82 @@ end
 -- prompt-driven toast and nothing fires twice.
 ------------------------------------------------------------
 
--- Radius around a door anchor, squared. Anchors sit within ~4.5 units of where
--- the player stands to use the door, so this triggers without having to be on
--- top of it.
+-- Where the hint speaks from. Eight metres around a landing-spot anchor
+-- with no height check fired it from a balcony a floor above the door
+-- (tester report). Now the door's own trigger is used when DoorSceneLock
+-- has recorded it: the engine's interaction point with its cylinder, the
+-- same volume the engine prompts from, plus a small margin. Anchors are
+-- only the fallback, at 2 metres on the plane and 1 metre of height.
 --
--- The Food Court's tunnel and Wonderland doorways are only 8.8 apart, closer
--- than any radius worth using, so the nearest anchor wins rather than the
--- first in range. Standing at either door that picks the right one; standing
--- exactly between them it may name the neighbour until the player steps
--- toward one.
-local ANCHOR_RADIUS_SQ = 8.0 * 8.0
+-- The Food Court's tunnel and Wonderland doorways are only 8.8 apart, so
+-- the nearest wins rather than the first in range.
+local TRIGGER_MARGIN = 0.5           -- metres beyond the door's own radius
+local TRIGGER_MIN_HEIGHT = 1.0       -- band when the cylinder has no height
+local ANCHOR_RADIUS_SQ = 2.0 * 2.0
+local ANCHOR_HEIGHT_BAND = 1.0
 
-local function nearest_anchor(scene, px, pz)
-    local list = scene and _state.anchors_by_scene[scene] or nil
-    if not list then return nil end
-    local best, best_d2 = nil, ANCHOR_RADIUS_SQ
-    for _, anchor in ipairs(list) do
-        local dx, dz = px - anchor.x, pz - anchor.z
-        local d2 = dx * dx + dz * dz
-        if d2 <= best_d2 then best, best_d2 = anchor, d2 end
+--- The recorded trigger for this anchor's vanilla door, nearest to the
+--- player if the destination has more than one door.
+local function trigger_for(scene, anchor, px, pz)
+    local lock = _G.AP and _G.AP.DoorSceneLock
+    if not (lock and lock.door_triggers) then return nil end
+    local to_code = NAME_TO_SCENE_CODE[anchor.vanilla]
+    if not to_code then return nil end
+    local best, best_d2 = nil, math.huge
+    for _, t in ipairs(lock.door_triggers(scene)) do
+        if t.to == to_code then
+            local dx, dz = px - t.x, pz - t.z
+            local d2 = dx * dx + dz * dz
+            if d2 < best_d2 then best, best_d2 = t, d2 end
+        end
     end
     return best
+end
+
+local function nearest_anchor(scene, px, py, pz)
+    local list = scene and _state.anchors_by_scene[scene] or nil
+    if not list then return nil end
+    local best, best_d2 = nil, math.huge
+    for _, anchor in ipairs(list) do
+        local t = trigger_for(scene, anchor, px, pz)
+        local d2, within
+        if t then
+            local dx, dz = px - t.x, pz - t.z
+            d2 = dx * dx + dz * dz
+            local reach = (t.radius or 0) + TRIGGER_MARGIN
+            local band = math.max(t.height or 0, TRIGGER_MIN_HEIGHT)
+            within = d2 <= reach * reach
+                and (py == nil or math.abs(py - t.y) <= band)
+        else
+            local dx, dz = px - anchor.x, pz - anchor.z
+            d2 = dx * dx + dz * dz
+            within = d2 <= ANCHOR_RADIUS_SQ
+                and (anchor.y == nil or py == nil
+                     or math.abs(py - anchor.y) <= ANCHOR_HEIGHT_BAND)
+        end
+        if within and d2 < best_d2 then best, best_d2 = anchor, d2 end
+    end
+    return best
+end
+
+-- The key hint waits for the first Entrance Plaza cutscene (event 2, which
+-- the engine records in EV_EVENT02_1 / EV_EVENT02_2). Before it the player
+-- is still in the opening and a "needs <key>" toast reads as a bug. Read
+-- from the flags, not the ledger: a new game on the same seed starts over.
+local EP_INTRO_FLAGS = { 259, 256 }
+local ep_intro_seen = false
+
+local function ep_intro_done()
+    if ep_intro_seen then return true end
+    local efm = sdk.get_managed_singleton("app.solid.gamemastering.EventFlagsManager")
+    if not efm then return false end
+    for _, id in ipairs(EP_INTRO_FLAGS) do
+        if safe(function() return efm:call("evFlagCheck", id) end) == true then
+            ep_intro_seen = true
+            return true
+        end
+    end
+    return false
 end
 
 ------------------------------------------------------------
@@ -353,10 +408,10 @@ end
 
 local function show_nearby_door()
     if next(_state.anchors_by_scene) == nil then return end
-    local px, pz = get_player_xz()
+    local px, py, pz = get_player_xyz()
     if px == nil then return end
 
-    local anchor = nearest_anchor(get_current_scene_code(), px, pz)
+    local anchor = nearest_anchor(get_current_scene_code(), px, py, pz)
     if not anchor then
         _state.last_shown_text = nil
         return
@@ -364,6 +419,7 @@ local function show_nearby_door()
 
     local scene = get_current_scene_code()
     local key = locked_key_for(scene, NAME_TO_SCENE_CODE[anchor.to])
+    if key and not ep_intro_done() then key = nil end
     local redirected = anchor.to ~= anchor.vanilla
 
     -- Anchors are sent for every seed now, so this path runs even with the

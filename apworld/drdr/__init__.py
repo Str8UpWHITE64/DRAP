@@ -1005,8 +1005,8 @@ class DRWorld(World):
         return {code: sorted(targets) for code, targets in sorted(graph.items()) if targets}
 
     def _door_locks_anchors(self) -> Dict[str, List[Dict[str, Any]]]:
-        """{scene_code: [{x, z, vanilla, to}]} -- where each door stands on the
-        side the player walks up to, and where it now leads.
+        """{scene_code: [{x, y, z, vanilla, to}]} -- where each door stands on
+        the side the player walks up to, and where it now leads.
 
         Door Locks disables a locked door's hit data, so the game shows no
         prompt and the overlay that names the real destination never fires --
@@ -1035,6 +1035,9 @@ class DRWorld(World):
             actual = (redirect or {}).get("target_area") or vanilla
             out.setdefault(src, []).append({
                 "x": round(position["x"], 2),
+                # Height too: the hint used to fire from a balcony over the
+                # door, eight metres out on the plane and a floor up.
+                "y": round(position.get("y", 0.0), 2),
                 "z": round(position["z"], 2),
                 "vanilla": AREA_NAMES.get(vanilla, vanilla),
                 "to": AREA_NAMES.get(actual, actual),

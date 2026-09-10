@@ -252,6 +252,36 @@ end
 -- Door Scanning
 ------------------------------------------------------------
 
+-- Each door's own trigger, as the engine has it: HIT_DATA carries the
+-- interaction point (mCursorWorldPos) and its cylinder (mRadius, mHeight).
+-- Recorded on every scan so DoorPromptOverlay can speak from the same
+-- volume the engine prompts from, instead of a landing-spot anchor.
+-- scene_code -> list of { to = jump_name, x, y, z, radius, height }
+local door_triggers = {}
+
+function M.door_triggers(scene_code)
+    return door_triggers[scene_code] or {}
+end
+
+local function record_trigger(origin_code, jump_name, hitdata, li)
+    if not origin_code then return end
+    local pos = Shared.safe(function() return hitdata:get_field("mCursorWorldPos") end)
+    local x, y, z
+    pcall(function() x = pos.x; y = pos.y; z = pos.z end)
+    if not x or (x == 0 and y == 0 and z == 0) then
+        pos = Shared.safe(function() return li:get_field("CHECK_MESSAGE_POS_") end)
+        pcall(function() x = pos.x; y = pos.y; z = pos.z end)
+    end
+    if not x then return end
+    local list = door_triggers[origin_code]
+    if not list then list = {}; door_triggers[origin_code] = list end
+    table.insert(list, {
+        to = jump_name, x = x, y = y, z = z,
+        radius = tonumber(Shared.safe(function() return hitdata:get_field("mRadius") end)) or 0,
+        height = tonumber(Shared.safe(function() return hitdata:get_field("mHeight") end)) or 0,
+    })
+end
+
 local function rescan_current_area_doors()
     local area_index, level_path = get_area_info()
     M.CurrentLevelPath = level_path
@@ -260,6 +290,7 @@ local function rescan_current_area_doors()
 
     -- Which side of the door the player is standing on ("SCN_s200" -> "s200")
     local origin_code = level_path and (tostring(level_path):gsub("^SCN_", "")) or nil
+    if origin_code then door_triggers[origin_code] = {} end
 
     local ahlm = ahlm_mgr:get()
     if not ahlm then return end
@@ -298,6 +329,7 @@ local function rescan_current_area_doors()
                                 end
 
                                 if mHitData_val and jump_name ~= "" then
+                                    record_trigger(origin_code, jump_name, mHitData_val, li)
                                     if M.should_disable_door(level_path, origin_code,
                                                              jump_name, mHitData_val, before_jessie) then
                                         disable_hitdata(li, mHitData_val)
@@ -313,6 +345,10 @@ local function rescan_current_area_doors()
                 end
             end
         end
+    end
+    if origin_code then
+        M.log(string.format("%s: %d door trigger(s) recorded for the key hint",
+            origin_code, #(door_triggers[origin_code] or {})))
     end
 end
 
