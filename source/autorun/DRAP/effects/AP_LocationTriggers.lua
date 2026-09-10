@@ -151,16 +151,16 @@ local function _register_entry(entry)
         local all_msg_no = tonumber(entry.all_msg_no)
         local all_loc   = entry.all_location_name
         if all_msg_no and all_loc then
-            local all_cb_status = function(score, mn, etc)
+            local function all_fired(mn)
                 log(string.format("FIRED all %s/%d -> %s",
                     tostring(list), mn or 0, tostring(all_loc)))
                 _send_check(all_loc)
+                -- The game says every one is done: send any instance that
+                -- was missed along the way.
+                pcall(PpBonusMatch.on_all_sent, all_loc)
             end
-            local all_cb_msg    = function(mn, list_b, lbl)
-                log(string.format("FIRED all %s/%d -> %s",
-                    tostring(list), mn or 0, tostring(all_loc)))
-                _send_check(all_loc)
-            end
+            local all_cb_status = function(score, mn, etc) all_fired(mn) end
+            local all_cb_msg    = function(mn, list_b, lbl) all_fired(mn) end
             if list == "Status" then
                 MsgEvents.watch(all_msg_no, all_cb_status)
             else

@@ -232,6 +232,10 @@ AP.ChallengeTracker.on_challenge_threshold = function(field_name, def, idx, targ
     local loc_name = threshold_id or string.format("%s_%d", field_name, target or -1)
     log(string.format("Challenge reached [%s] target #%d: %d", tostring(loc_name), idx or -1, target or -1))
     AP_BRIDGE.check(loc_name)
+    -- An all-X counter (the Food Court plates) covers per-object checks too.
+    if AP.effects.PpBonusMatch and AP.effects.PpBonusMatch.on_all_sent then
+        pcall(AP.effects.PpBonusMatch.on_all_sent, loc_name)
+    end
 end
 
 ------------------------------------------------------------

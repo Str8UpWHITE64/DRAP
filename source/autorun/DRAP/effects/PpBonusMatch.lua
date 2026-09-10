@@ -160,6 +160,16 @@ end
 -- it up.
 local om_index = {}      -- scene -> om_type -> { address -> instance }
 
+-- OmList fills in over the first seconds after an area loads, and the first
+-- non-empty scan used to be final: a tester's Food Court indexed 14, 17 and
+-- 16 of its 18 plates on three visits, and every plate missing from that
+-- first scan was "breaking but was not indexed" when hit. So an index that
+-- covers fewer objects than the trigger has instances keeps taking in new
+-- objects on the stride, for a while after it was first built.
+local om_index_count = {}   -- scene -> om_type -> objects mapped
+local om_index_since = {}   -- scene -> om_type -> os.clock() when first built
+local INDEX_GROW_SECONDS = 90
+
 -- Everything M.reset_index clears has to be declared HERE, above it. These
 -- used to sit further down beside the code that reads them, which put them
 -- out of scope at the point reset_index assigns them -- so it silently wrote
@@ -184,23 +194,30 @@ local rot_accum = {}      -- address -> degrees since the last send
 local dwell = {}          -- instance name -> seconds stood there
 local stat_progress = {}   -- instance name -> units accumulated nearby
 
+--- Add every object of the type that is not in map yet. Returns how many
+--- were added.
+local function take_in(scene, om_type, items, map)
+    local added = 0
+    for addr, om in pairs(objects_of_type(om_type)) do
+        -- Skip anything already breaking: it has moved, so its position no
+        -- longer identifies it and a guess here would be wrong for good.
+        if not map[addr] and not is_breaking(om) then
+            local p = om_position(om)
+            if p then
+                local inst = closest(items, scene, p.x, p.y, p.z, OBJECT_LIMIT)
+                if inst then map[addr] = inst; added = added + 1 end
+            end
+        end
+    end
+    return added
+end
+
 local function ensure_index(scene, om_type, items)
     om_index[scene] = om_index[scene] or {}
     if om_index[scene][om_type] then return om_index[scene][om_type] end
 
-    local objs = objects_of_type(om_type)
-    local map, n = {}, 0
-    for addr, om in pairs(objs) do
-        -- Skip anything already breaking: it has moved, so its position no
-        -- longer identifies it and a guess here would be wrong for good.
-        if not is_breaking(om) then
-            local p = om_position(om)
-            if p then
-                local inst = closest(items, scene, p.x, p.y, p.z, OBJECT_LIMIT)
-                if inst then map[addr] = inst; n = n + 1 end
-            end
-        end
-    end
+    local map = {}
+    local n = take_in(scene, om_type, items, map)
     if n == 0 then
         -- OmList is not populated the moment an area loads. Caching an empty
         -- map here would leave the area permanently unindexed, so leave it
@@ -208,13 +225,37 @@ local function ensure_index(scene, om_type, items)
         return map
     end
     om_index[scene][om_type] = map
+    om_index_count[scene] = om_index_count[scene] or {}
+    om_index_count[scene][om_type] = n
+    om_index_since[scene] = om_index_since[scene] or {}
+    om_index_since[scene][om_type] = os.clock()
     log(string.format("indexed %d %s object(s) in %s", n, om_type, tostring(scene)))
     return map
+end
+
+--- Take in objects that appeared after the index was built, until the
+--- index covers as many objects as the trigger has instances or the grow
+--- window has passed. Called on the stride, not every tick.
+local function grow_index(scene, om_type, items)
+    local map = om_index[scene] and om_index[scene][om_type]
+    if not map then return end
+    local n = om_index_count[scene][om_type]
+    if n >= #items then return end
+    if os.clock() - om_index_since[scene][om_type] > INDEX_GROW_SECONDS then return end
+    local added = take_in(scene, om_type, items, map)
+    if added > 0 then
+        n = n + added
+        om_index_count[scene][om_type] = n
+        log(string.format("indexed %d more %s object(s) in %s (%d of %d)",
+            added, om_type, tostring(scene), n, #items))
+    end
 end
 
 --- Forget the index, so it is rebuilt from the objects now in the area.
 function M.reset_index()
     om_index = {}
+    om_index_count = {}
+    om_index_since = {}
     broken_seen = {}
     reported = {}
     last_state = {}
@@ -487,6 +528,34 @@ local function send_instance(id, t, name, how)
     end
     if bridge and bridge.check then pcall(bridge.check, name) end
     send_all_if_complete(id, t)
+end
+
+--- The all-X for a trigger went out (the game's own award, or a challenge
+--- counter reaching its target): everything it counts is done, so send any
+--- instance still missing. A plate that broke before the index knew it, or
+--- a treadmill walked during a disconnect, is recovered here.
+function M.on_all_sent(all_name)
+    if not all_name then return end
+    for id, t in pairs(instances_by_trigger) do
+        if t.all_name == all_name then
+            local missing = 0
+            for _, inst in ipairs(t.items) do
+                local done = false
+                if bridge and bridge.has_local_check then
+                    local ok, v = pcall(bridge.has_local_check, inst.name)
+                    done = ok and v == true
+                end
+                if not done then
+                    missing = missing + 1
+                    reported[inst.name] = nil
+                    send_instance(id, t, inst.name, "all done: " .. all_name)
+                end
+            end
+            if missing > 0 then
+                log(string.format("%s: %s sent, %d instance(s) sent with it", id, all_name, missing))
+            end
+        end
+    end
 end
 
 ------------------------------------------------------------
@@ -939,6 +1008,7 @@ local function index_current_scene()
         -- one: a rack that is never catalogued cannot be named when it spins.
         if t.om_type and t.match ~= "nearest" then
             ensure_index(scene, t.om_type, t.items)
+            grow_index(scene, t.om_type, t.items)
         end
     end
 end

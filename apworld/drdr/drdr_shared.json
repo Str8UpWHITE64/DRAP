@@ -2968,6 +2968,7 @@
       "max_count": 18,
       "location_template_singular": "Break 1 Food Court Wall Plate",
       "location_template_plural": "Break {n} Food Court Wall Plates",
+      "all_location_name": "Destroy all of the wall plates in the Food Court",
       "region": "Food Court",
       "match": "object_broken",
       "om_type": "uOm13b",

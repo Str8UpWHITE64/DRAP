@@ -1187,9 +1187,13 @@ class DRWorld(World):
                     # one would name a location this seed does not have.
                     _d["count_names"] = ([] if _entry.get("instances")
                                          else _names[:_max])
+                    # The all-X name goes through whenever it is set: Lua
+                    # sends every instance once the all-X is out, whether the
+                    # game announced it (all_msg_no) or a challenge counter did.
                     if _entry.get("all_msg_no") is not None:
-                        _d["all_msg_no"]      = _entry["all_msg_no"]
-                        _d["all_location_name"] = _entry.get("all_location_name")
+                        _d["all_msg_no"] = _entry["all_msg_no"]
+                    if _entry.get("all_location_name"):
+                        _d["all_location_name"] = _entry["all_location_name"]
                     # Per-object positions, so Lua can name the one that was
                     # actually used rather than counting. Passed through as-is;
                     # the Lua side decides how to match on them.
