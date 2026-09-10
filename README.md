@@ -72,31 +72,27 @@ The main story scoops are in their normal order, but time-lock items are added t
 
 ## Save Data and the "Failed to Save" Error
 
-Steam limits this game's save data to roughly **200 MB total** — counted across *everything* in
-`C:\Program Files (x86)\Steam\userdata\{Your SteamID}\2527390\remote`, including your vanilla saves
-AND every AP seed's save folder (`win64_save_AP_*`). Each save slot is about 9 MB, so vanilla's 21
-slots alone nearly fill the limit, and every AP seed you play stacks on top of that. When you cross
-it, the game shows the generic "Failed to Save" error. Steam enforces this limit even if you have
-Steam Cloud disabled for the game.
+With **Redirect Saves** on, every seed saves to its own folder inside the game's install folder:
 
-**To fix it:**
+```
+C:\Program Files (x86)\Steam\steamapps\common\DEAD RISING DELUXE REMASTER\AP_Saves\{Slot}_s{Seed}
+```
 
-1. **Disable Steam Cloud for this game** (recommended for AP players): in your Steam Library,
-   right-click *Dead Rising Deluxe Remaster* → **Properties** → **General**, and uncheck
-   **"Keep games saves in the Steam Cloud"**. This stops Steam from re-syncing old save folders
-   you delete. (The ~200 MB limit still applies to new saves, so step 2 is still needed.)
-2. **Delete old save folders.** Close the game, then open File Explorer and go to:
-   ```
-   C:\Program Files (x86)\Steam\userdata\{Your SteamID}\2527390\remote
-   ```
-   (If you don't know your SteamID, there is usually only one folder inside `userdata`.)
-   Inside `remote` you will see:
-   - `win64_save` — your **vanilla** saves. Don't delete this unless you also want those gone.
-   - `win64_save_AP_YourName_s123...` — one folder per AP seed you've played.
+These saves never go through Steam, so they are not backed up to Steam Cloud, and they are not
+counted against Steam's limits. To clean up, delete the folders inside `AP_Saves` for seeds you are
+finished with. Your vanilla saves are untouched and stay in Steam's store as always.
 
-   Delete the `win64_save_AP_*` folders for seeds you are finished with. Each one frees up to
-   ~190 MB depending on how many slots you used. You can also delete individual old save slots
-   from inside the game's load menu to free ~9 MB each.
+Seeds you played on an older version of the mod kept their saves in Steam's store
+(`C:\Program Files (x86)\Steam\userdata\{Your SteamID}\2527390\remote\win64_save_AP_*`). To keep
+playing one of those, close the game and copy that seed's files into `AP_Saves\{Slot}_s{Seed}`
+(create the folder if it is not there yet; the name is the part after `win64_save_AP_`).
+
+**Why this changed.** Steam caps this game's save store at 30 files, whether or not Steam Cloud is
+enabled. Vanilla alone can use 23 of them, and every seed used to add its autosave plus one file per
+slot. Once the count reached 30, any save that had to create a new file was refused and the game
+showed the generic "Failed to Save" error, while saving over an existing slot still worked. If you
+ever see "Failed to Save" on a **vanilla** save, that cap is the reason: delete old slots from the
+load menu, or delete leftover `win64_save_AP_*` folders from Steam's store.
 
 ## Reporting a Bug
 

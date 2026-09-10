@@ -148,20 +148,81 @@ local function snapshot_lines()
     w(string.format("  GetSlotNeedSize=%s bytes", tostring(meth("getSlotNeedSize"))))
 
     -- The mount path is what DRAP redirects; mount-related failures show
-    -- up here.
-    local svc_td = tdef(SAVE_SERVICE)
-    if svc_td then
-        local svc = sdk.get_managed_singleton(SAVE_SERVICE)
-            or sdk.get_native_singleton(SAVE_SERVICE)
-        if svc then
-            local get_mount = svc_td:get_method("get_SaveMountPath")
-            if get_mount then
-                local mount = safe(function() return get_mount:call(svc) end)
-                w(string.format("  SaveMountPath=%s", tostring(mount)))
-            end
-        end
+    -- up here, and so does the storage layer's own view: its size figures,
+    -- and the last result it recorded. A capture without these could only
+    -- say that the write waited and failed. Steam's file count follows:
+    -- its 30-file cap is the failure seen so far (result 51), and it still
+    -- applies to vanilla saves.
+    for _, ln in ipairs(M.space_lines()) do w(ln) end
+    local store = AP and AP.SteamStore
+    if store and store.store_lines then
+        local ok, slines = pcall(store.store_lines)
+        if ok then for _, ln in ipairs(slines) do w(ln) end end
     end
     return lines
+end
+
+-- via.storage.saveService.SaveResult, the values a PC build can report.
+-- A static table: resolving the enum through the SDK at connect froze the
+-- game (2026-09-10).
+local SAVE_RESULT_NAMES = {
+    [0] = "Null", [1] = "Doing", [2] = "Success", [3] = "Cancel",
+    [15] = "Failed_MountError", [19] = "Failed_FileOpenError",
+    [20] = "Failed_FileWriteError", [25] = "Failed_SlotLimitOver",
+    [27] = "Failed_SaveDataSizeMaxOver", [29] = "Failed_OutOfDiskFreeSpace",
+    [51] = "Failed_Steam_SaveError", [52] = "Failed_Steam_LoadError",
+    [53] = "Failed_Steam_RemoveError", [54] = "Failed_Steam_NotFireCallback",
+    [55] = "Failed_Steam_OutOfDiskFreeSpace", [56] = "Failed_NoSteam",
+}
+
+local function save_result_text(v)
+    local n = tonumber(v)
+    local name = n and SAVE_RESULT_NAMES[n]
+    return name and string.format("%s (%s)", tostring(v), name) or tostring(v)
+end
+
+--- The save service's mount and space figures, one line each.
+function M.space_lines()
+    local out = {}
+    local svc_td = tdef(SAVE_SERVICE)
+    if not svc_td then return out end
+    local svc = sdk.get_managed_singleton(SAVE_SERVICE)
+        or sdk.get_native_singleton(SAVE_SERVICE)
+    if not svc then return out end
+    local function get(name)
+        local m = svc_td:get_method(name)
+        if not m then return "n/a" end
+        local v = safe(function() return m:call(svc) end)
+        return v == nil and "nil" or tostring(v)
+    end
+    table.insert(out, string.format("  SaveMountPath=%s", get("get_SaveMountPath")))
+    -- ForceWindows selects the plain-file backend SaveSlot uses under a
+    -- redirect; false means Steam remote storage.
+    table.insert(out, string.format("  ForceWindows=%s  SaveDirectoryPath=%s  FakeOwner=%s  OverrideAccountId=%s",
+        get("get_ForceWindows"), get("get_SaveDirectoryPath"),
+        get("get_FakeOwner"), get("get_OverrideSaveAccountId")))
+    table.insert(out, string.format("  SaveDataSize=%s  Max=%s  Min=%s  FreeSpace=%s",
+        get("get_SaveDataSize"), get("get_SaveDataMaxSize"),
+        get("get_SaveDataMinSize"), get("get_SaveDataFreeSpaceSize")))
+    table.insert(out, string.format("  LastErrorCode=%s  LastShortErrorCode=%s  LastCheckExisting=%s  LastSaveResult=%s",
+        get("get_LastErrorCode"), get("get_LastShortErrorCode"),
+        get("get_LastCheckExistingResult"), save_result_text(get("get_LastSaveResult"))))
+    -- The detail table is the service's view of the slots on the current
+    -- mount. The redirect asks for it to be rebuilt and never checks the
+    -- answer; a slot size of 16 bytes at failure says it never was.
+    table.insert(out, string.format("  Segment=%s  DetailTblEnabled=%s  DetailUpdateRequest=%s  LastDetailUpdate=%s  DetailTblCount=%s",
+        get("get_SaveServiceSegment"), get("get_SaveFileDetailTblEnabled"),
+        get("get_SaveFileDetailUpdateRequest"), get("get_LastUpdateSaveFileDetailResult"),
+        get("getSaveFileDetailTblCount")))
+    return out
+end
+
+_G.drap_save_space = function()
+    for _, ln in ipairs(M.space_lines()) do M.log(ln) end
+    local store = AP and AP.SteamStore
+    if store and store.store_lines then
+        for _, ln in ipairs(store.store_lines()) do M.log(ln) end
+    end
 end
 
 ------------------------------------------------------------
@@ -278,6 +339,38 @@ local function install_hooks()
     hook_pre_named("doErrorAutoSaveSuccess", function()
         ring_push("    doErrorAutoSaveSuccess (recovery ok)")
     end)
+
+    -- The storage service's side: the request the manager makes and the
+    -- answer it gets. A failing save whose ring shows flushSaveData then
+    -- doSaveWait with no saveSingle between never asked the service at all.
+    -- Both saveSingle overloads fold-checked unique (2026-09-10).
+    local svc_td = tdef(SAVE_SERVICE)
+    if svc_td then
+        local pending_slot = nil
+        local function hook_svc(sig, label, with_slot)
+            local m = svc_td:get_method(sig)
+            if not m then M.log("MISS hook: SaveService." .. sig); return end
+            local ok, err = pcall(sdk.hook, m,
+                function(args)
+                    if not C.enabled then return end
+                    pending_slot = with_slot and argint(args[3]) or nil
+                end,
+                function(retval)
+                    if not C.enabled then return retval end
+                    local accepted = false
+                    pcall(function() accepted = (sdk.to_int64(retval) & 0xFF) ~= 0 end)
+                    ring_push(string.format("  SaveService.%s(%s) -> %s", label,
+                        pending_slot == nil and "" or tostring(pending_slot),
+                        accepted and "accepted" or "REFUSED"))
+                    return retval
+                end)
+            if not ok then M.log("hook install failed SaveService." .. sig .. ": " .. tostring(err)) end
+        end
+        hook_svc("saveSingle()", "saveSingle", false)
+        hook_svc("saveSingle(System.Int32)", "saveSingle", true)
+        -- setSaveFileDetail is folded with set_SystemSaveFileDetail (2
+        -- aliases); not hookable.
+    end
 
     C.installed = true
     M.log("Save-failure hooks installed (passive capture active).")
