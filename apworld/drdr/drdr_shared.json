@@ -4177,6 +4177,7 @@
         309
       ],
       "clear_on_complete": true,
+      "keep_completed_on_new_game": true,
       "npcs": [],
       "completion_events": [
         "Kill 10 Special Forces",

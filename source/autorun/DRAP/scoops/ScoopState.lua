@@ -498,6 +498,22 @@ function M.request_unlock(scoop_name)
 
     if M.received[scoop_name] then return true, nil end
 
+    -- A completed scoop whose completion cleared its flag stays cleared for
+    -- the rest of that run. The connect replay re-requests every received
+    -- scoop after a launch, and running the unlock writes again here raised
+    -- flag 309 on every launch, so the Special Forces the player had already
+    -- cleared came back each time the game was started (tester report); the
+    -- same write would put Cletus's 810 back over Gun Shop Standoff. Counted
+    -- as received so the rest of the state machine sees it the same way,
+    -- with no flag written. A new run reopens Cletus (deactivate_for_reload)
+    -- so he comes back there like every other psychopath.
+    if M.completed[scoop_name] and scoop.clear_on_complete then
+        M.received[scoop_name] = true
+        cfg.log(string.format("'%s' is completed and clears on completion -- unlock not re-run",
+            scoop_name))
+        return true, nil
+    end
+
     if not ap_activated then
         cfg.log(string.format("Activation deferred: '%s' -- waiting for Meet Jessie", scoop_name))
         return false, "activation"
@@ -844,22 +860,27 @@ function M.deactivate_for_reload()
     -- (801, and 295 which Simone checks before following), and she could
     -- never be recruited again -- rescued once per seed, never after.
     --
-    -- Survivor scoops only. The check itself stays sent in the ledger, so a
-    -- second rescue is harmless and sends nothing. Main scoops keep their
-    -- completion (the chain depends on it) and Psychopath scoops keep theirs
-    -- (clear_on_complete may have sent the Special Forces home, and a reload
-    -- must not bring them back).
+    -- Survivor scoops, and the scoops whose completion clears their flag
+    -- (Cletus), since request_unlock will not re-run a completed one of
+    -- those and he is meant to come back in a new run like every other
+    -- psychopath. The check itself stays sent in the ledger, so a second
+    -- rescue or kill is harmless and sends nothing. Main scoops keep their
+    -- completion (the chain depends on it), the other psychopaths keep
+    -- theirs and are re-unlocked by the flush anyway, and a scoop marked
+    -- keep_completed_on_new_game stays done: the Special Forces, once sent
+    -- home, are not brought back by a new run.
     local reopened = 0
     for scoop_name in pairs(M.completed) do
         local data = cfg.scoop_data[scoop_name]
-        if data and data.category == "Survivor" then
+        if data and not data.keep_completed_on_new_game
+            and (data.category == "Survivor" or data.clear_on_complete) then
             M.completed[scoop_name] = nil
             M.completion_times[scoop_name] = nil
             reopened = reopened + 1
         end
     end
     if reopened > 0 then
-        cfg.log(string.format("Reopened %d completed survivor scoop(s) for the new world", reopened))
+        cfg.log(string.format("Reopened %d completed scoop(s) for the new world", reopened))
     end
     -- Let the modules that remember rescues know the world is new too.
     if cfg.on_world_reset then pcall(cfg.on_world_reset) end

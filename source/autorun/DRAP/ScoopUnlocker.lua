@@ -94,6 +94,7 @@ local function build_scoop_data()
                 flags = e.flags,
                 npcs = e.npcs,
                 clear_on_complete = e.clear_on_complete,
+                keep_completed_on_new_game = e.keep_completed_on_new_game,
                 disp_flag = e.disp_flag,
                 disp_end_flag = e.disp_end_flag,
                 engine_owns_box = e.engine_owns_box,  -- see side-display
