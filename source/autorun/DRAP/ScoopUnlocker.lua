@@ -106,6 +106,15 @@ local function build_scoop_data()
             }
             if e.completion_event and e.lua_event_tracking ~= false then
                 d.completion_event = e.completion_event
+            elseif e.completion_event then
+                -- Kept out of COMPLETION_EVENT_TO_SCOOP on purpose (the
+                -- tracker's event fires early), but the flag hook still has
+                -- to know this event finishes the scoop: the step/completion
+                -- split of 2026-09-07 read the missing map entry as "a
+                -- step", so flag 2322 logged as STEP and Hideout never
+                -- completed -- the escort cutscene replayed on every entry
+                -- and the chain stuck (two tester reports).
+                d.flag_completion_event = e.completion_event
             end
             -- completion_eventS (plural): ALL of them must fire before the
             -- scoop completes. Survivor scoops with several NPCs still use the
@@ -1311,9 +1320,12 @@ local function install_hooks()
                     -- whole scoop, stopped the other four sending, and the
                     -- cutscene never played. Only a declared completion event
                     -- finishes a scoop.
+                    local owner = completion.scoop and SCOOP_DATA[completion.scoop]
                     local finishes_scoop = completion.scoop
-                        and COMPLETION_EVENT_TO_SCOOP[completion.event]
-                            == completion.scoop
+                        and (COMPLETION_EVENT_TO_SCOOP[completion.event]
+                                == completion.scoop
+                             or (owner and owner.flag_completion_event
+                                 == completion.event))
 
                     local ss_block = scoop_sanity_enabled
                                   and not State.is_endgame_reached()
