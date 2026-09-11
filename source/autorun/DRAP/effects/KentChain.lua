@@ -258,6 +258,20 @@ local DEATH_CLEAR_WINDOW = 20.0  -- keep clearing this long after the edge:
                                  -- the death event may write the record
                                  -- again mid-cutscene after our first clear
 
+-- A full arm is two steps a couple of ticks apart: the wipe (START flags
+-- off, records cleared), then the start set. Written in one go, the START
+-- flag of a day whose queue number this session already used (out of
+-- order, day 2 runs on scoop 32's appear) never went off as far as the
+-- engine could see, and its queue entry stayed spent: a tester's 3->2->1
+-- run armed day 1 with 779 already on since day 2's arm, entered Paradise
+-- three times, and Kent never came. On the relaunch the quiet state had
+-- knocked 779 off 14s before the arm re-raised it, and he appeared at
+-- once (2026-09-10). Holding the wipe for START_EDGE_SECONDS gives the
+-- queue that off->on edge in session.
+local START_EDGE_SECONDS = 2.0
+local edge_pending = nil          -- { name, at, start_set, kept_days }
+local trace_t0 = nil              -- os.clock() of the last wipe (trace clock)
+
 -- The three rows' `flags` lists ARE the measured standalone start sets,
 -- and their guide entries carry Kent's authored spawn position.
 local start_sets = nil        -- name -> flags list, from shared data
@@ -537,18 +551,40 @@ local function apply_day(name)
     clear_enemy_records()
     reset_npc_record(record_stale, spawn_pos[name])
     record_stale = false
+    -- The start set follows from the tick, once the wipe has been seen.
+    edge_pending = { name = name, at = os.clock(), start_set = start_set,
+                     kept_days = kept_days }
+    trace_t0 = os.clock()
+    M.log(string.format(
+        "wiped for '%s' -- START held off %.1fs so the queue sees a fresh edge",
+        name, START_EDGE_SECONDS))
+    return "pending"
+end
+
+--- Second step of a full arm: the start set, and the armed bookkeeping.
+local function finish_edge()
+    local p = edge_pending
+    edge_pending = nil
     local ids = {}
-    for _, fid in ipairs(start_set) do
+    for _, fid in ipairs(p.start_set) do
         flag_set(fid, true)
         table.insert(ids, tostring(fid))
     end
     M.log(string.format(
         "armed '%s' (flags %s)%s; scheduler evaluates on area entry",
-        name, table.concat(ids, " "),
-        kept_days > 0
-            and (" -- kept " .. kept_days .. " completed day(s)' footprint")
+        p.name, table.concat(ids, " "),
+        p.kept_days > 0
+            and (" -- kept " .. p.kept_days .. " completed day(s)' footprint")
             or ""))
-    return true
+    armed_day = p.name
+    armed_at = os.clock()
+    box_topped_up = false
+    verify_pending = false
+    want_seen = p.name
+    want_since = os.clock()
+    arm_blocked_since = nil
+    moved_at = nil
+    last_pos = nil
 end
 
 -- While a day is armed and its photoshoot has not started, Kent's record
@@ -568,6 +604,7 @@ local SHOOT_STARTED_FLAG = {
     ["Photo Challenge"]         = 386,
 }
 
+local scrub_detail = nil
 local function maintain_record(name)
     local shoot_flag = SHOOT_STARTED_FLAG[name]
     if not shoot_flag then return end
@@ -598,6 +635,16 @@ local function maintain_record(name)
                 -- an armed day 2 play with day-1 dialogue and state
                 -- (regression, 2026-08-22). Never touch it here.
                 if scs == 2 or (free & ~1) ~= 0 then
+                    local tmo  = Shared.to_int(info:get_field("mScoopTimeOutFlag")) or 0
+                    local situ = Shared.to_int(info:get_field("mSituationNo")) or 0
+                    local px, py, pz = 0, 0, 0
+                    pcall(function()
+                        local p = info:get_field("mPos")
+                        px, py, pz = p.x, p.y, p.z
+                    end)
+                    scrub_detail = string.format(
+                        "scs=%d free=0x%x timeout=%d situ=%d pos=(%.1f, %.1f, %.1f)",
+                        scs, free, tmo, situ, px, py, pz)
                     info:set_field("mScoopCheckState", 0)
                     info:set_field("mScoopTimeOutFlag", 0)
                     info:set_field("mFreeFlag", free & 1)
@@ -623,7 +670,8 @@ local function maintain_record(name)
             end
         end)
         if dirty then
-            M.log("record guard: scrubbed a finished-day footprint off Kent's record")
+            M.log("record guard: scrubbed a finished-day footprint off Kent's record ("
+                .. tostring(scrub_detail) .. " -> authored position)")
             return
         end
     end
@@ -796,6 +844,209 @@ local function still_armed(name)
 end
 
 ------------------------------------------------------------
+-- Trace (the downstairs spawn, 2026-09-11)
+------------------------------------------------------------
+-- Day-1 Kent sometimes places at the engine's fallback point downstairs
+-- at the end of a 3->2->1 chain. It did not reproduce on demand, so the
+-- trace stays on, cheap enough to ship: twice a second while a Kent day
+-- is being armed or is armed, Kent's NPC record, the two EM45 save
+-- records, the flag family and the player's position, logged only when
+-- something other than a small walk changes, plus every load edge. A
+-- field report's log then answers the question by itself: was the
+-- record poisoned or absent when he was placed, and what touched it
+-- before the player reached him. Baseline of a good run (2026-09-11,
+-- drap_20260911_070102): record appears clean at the authored spot on
+-- Paradise entry, is poisoned (DONE + 0x200) as the actor goes live
+-- some 10s later, and the guard scrubs it at once. Off with
+-- drap_kent_trace(false).
+
+local trace_on = true
+local TRACE_PERIOD = 0.5
+local TRACE_MOVE = 3.0            -- metres of record movement worth a line
+local trace_last_pos = nil        -- record position at the last record line
+local trace_last_at = 0
+local trace_sig = {}              -- kind -> last logged signature
+local trace_in_game = nil         -- last is_in_game seen by the tracer
+
+local TRACE_FLAGS = {
+    779, 780, 781, 2710,           -- starts
+    843, 844, 845,                 -- finishes
+    2443, 2444, 2445,              -- successes
+    2507, 2508, 2509, 2541, 2542,  -- boxes
+    1224, 1225, 1277, 1278,        -- NPC21 appear / timeout
+    385, 386, 387, 342, 344, 345,  -- EM45 sets / battle records
+    1155, 1171, 1292,              -- day-3 residue
+}
+
+local function trace_read_record()
+    local mgr = npc_mgr:get()
+    if not mgr then return nil, "no NpcManager" end
+    local list
+    pcall(function() list = mgr:get_field("NpcInfoList") end)
+    if not list then return nil, "no list" end
+    local n = 0
+    pcall(function() n = list:call("get_Count") or 0 end)
+    local found
+    for i = 0, n - 1 do
+        pcall(function()
+            local info = list:call("get_Item", i)
+            if info and Shared.to_int(info:get_field("<Name>k__BackingField")) == KENT_STYPE then
+                local r = { count = n }
+                r.scs  = Shared.to_int(info:get_field("mScoopCheckState")) or -1
+                r.free = Shared.to_int(info:get_field("mFreeFlag")) or -1
+                r.tmo  = Shared.to_int(info:get_field("mScoopTimeOutFlag")) or -1
+                r.situ = Shared.to_int(info:get_field("mSituationNo")) or -1
+                pcall(function() r.live = Shared.to_int(info:get_field("mLiveState")) end)
+                pcall(function() r.area = Shared.to_int(info:get_field("mAreaNo")) end)
+                pcall(function() r.attr = Shared.to_int(info:get_field("mAttribute")) end)
+                pcall(function() r.notsave = info:get_field("IsOpeningNotSave") == true end)
+                pcall(function() r.dead = info:call("isDead") == true end)
+                pcall(function()
+                    local p = info:get_field("mPos")
+                    r.x, r.y, r.z = p.x, p.y, p.z
+                end)
+                found = r
+            end
+        end)
+        if found then break end
+    end
+    return found, n
+end
+
+--- Two strings: the record's state without its position (the change
+--- detector), and the full line with the position.
+local function trace_record_sig()
+    local r, n = trace_read_record()
+    if not r then
+        trace_last_pos = nil
+        local s = string.format("record: ABSENT (%s NPC records)", tostring(n))
+        return s, s
+    end
+    local state = string.format(
+        "record: scs=%d free=0x%x timeout=%d situ=%d live=%s area=%s attr=%s notsave=%s dead=%s",
+        r.scs, r.free, r.tmo, r.situ, tostring(r.live), tostring(r.area),
+        tostring(r.attr), tostring(r.notsave), tostring(r.dead))
+    local x, y, z = r.x or 0, r.y or 0, r.z or 0
+    local moved = trace_last_pos == nil
+    if not moved then
+        local dx, dy, dz = x - trace_last_pos.x, y - trace_last_pos.y, z - trace_last_pos.z
+        moved = (dx * dx + dy * dy + dz * dz) >= TRACE_MOVE * TRACE_MOVE
+    end
+    -- A move folds into the change detector so a walk of TRACE_MOVE logs
+    -- once, and a standing Kent logs nothing.
+    local key = state .. (moved and string.format(" @%.0f,%.0f,%.0f", x, y, z) or "")
+    return key, string.format("%s pos=(%.1f, %.1f, %.1f)", state, x, y, z), { x = x, y = y, z = z }
+end
+
+local function trace_em_sig()
+    local parts = {}
+    local em = em_mgr:get()
+    if em then
+        pcall(function()
+            local list = em:get_field("EnemySaveParamList")
+            local n = list and list:call("get_Count") or 0
+            for i = 0, n - 1 do
+                local entry = list:call("get_Item", i)
+                local which = entry and Shared.to_int(entry:get_field("EnumEmParam"))
+                for _, slot in ipairs(EMSAVE_SLOTS) do
+                    if which == slot then
+                        local e = entry:get_field("SaveData")
+                        local be = e and e:get_field("mBeflag") == true
+                        local p = e and e:get_field("Pos")
+                        parts[#parts + 1] = string.format("live%d be=%s pos=(%.1f, %.1f, %.1f)",
+                            which, tostring(be), p and p.x or 0, p and p.y or 0, p and p.z or 0)
+                    end
+                end
+            end
+        end)
+    end
+    local ss = ss_mgr:get()
+    if ss then
+        pcall(function()
+            local arr = ss:get_field("mSaveWork"):get_field("EmSaveParam")
+            for _, i in ipairs(EMSAVE_SLOTS) do
+                local e = arr:get_element(i)
+                local be = e and e:get_field("mBeflag") == true
+                local p = e and e:get_field("Pos")
+                parts[#parts + 1] = string.format("save%d be=%s pos=(%.1f, %.1f, %.1f)",
+                    i, tostring(be), p and p.x or 0, p and p.y or 0, p and p.z or 0)
+            end
+        end)
+    end
+    return "em: " .. (#parts > 0 and table.concat(parts, " | ") or "unreadable")
+end
+
+local function trace_flags_sig()
+    local on = {}
+    for _, fid in ipairs(TRACE_FLAGS) do
+        if flag_check(fid) == true then on[#on + 1] = tostring(fid) end
+    end
+    return "flags on: " .. table.concat(on, " ")
+end
+
+local function trace_player()
+    local p = player_pos()
+    if not p then return "player=?" end
+    return string.format("player=(%.1f, %.1f, %.1f) area=%s", p.x, p.y, p.z, tostring(current_area()))
+end
+
+local function trace_emit(kind, key, line, force)
+    line = line or key
+    if not force and trace_sig[kind] == key then return end
+    trace_sig[kind] = key
+    local t = trace_t0 and string.format("+%.2fs", os.clock() - trace_t0) or "     "
+    M.log(string.format("trace %s %s  [%s]", t, line, trace_player()))
+end
+
+local function trace_record()
+    local key, line, pos = trace_record_sig()
+    local before = trace_sig.record
+    trace_emit("record", key, line)
+    if trace_sig.record ~= before and pos then trace_last_pos = pos end
+end
+
+local function trace_tick()
+    if not trace_on then return end
+    local in_game = Shared.is_in_game()
+    if in_game ~= trace_in_game then
+        if trace_in_game ~= nil then
+            local t = trace_t0 and string.format("+%.2fs", os.clock() - trace_t0) or ""
+            M.log(string.format("trace %s LOAD EDGE %s (last seen: %s)", t,
+                in_game and "IN" or "OUT", tostring(trace_sig.record)))
+            if in_game then trace_sig = {} end   -- re-log everything after a load
+        end
+        trace_in_game = in_game
+    end
+    if not in_game then return end
+    if not (edge_pending or armed_day or pinned_day) then return end
+    local now = os.clock()
+    if now - trace_last_at < TRACE_PERIOD then return end
+    trace_last_at = now
+    trace_record()
+    trace_emit("em", trace_em_sig())
+    trace_emit("flags", trace_flags_sig())
+end
+
+re.on_frame(function()
+    if not scoop_sanity_on() then return end
+    pcall(trace_tick)
+end)
+
+_G.drap_kent_trace = function(on)
+    if on ~= nil then trace_on = on and true or false end
+    M.log("trace " .. (trace_on and "on" or "off"))
+    if trace_on then
+        trace_sig = {}
+        trace_last_pos = nil
+        pcall(function()
+            trace_record()
+            trace_emit("em", trace_em_sig(), nil, true)
+            trace_emit("flags", trace_flags_sig(), nil, true)
+        end)
+    end
+end
+
+------------------------------------------------------------
 -- Tick
 ------------------------------------------------------------
 
@@ -876,6 +1127,22 @@ function M.on_frame()
     -- (it completed, or the chain moved on), restore the retired state.
     if pinned_day and want ~= pinned_day then
         release_pins(pinned_day)
+    end
+
+    -- A wipe waiting for its start set. Nothing else touches the day
+    -- until it lands; a desired day that changed meanwhile drops it and
+    -- the new day arms from scratch.
+    if edge_pending then
+        if want ~= edge_pending.name then
+            M.log(string.format("dropped the pending arm of '%s' -- desired day is now %s",
+                edge_pending.name, tostring(want)))
+            edge_pending = nil
+        elseif os.clock() - edge_pending.at >= START_EDGE_SECONDS then
+            finish_edge()
+            return
+        else
+            return
+        end
     end
 
     -- Quiet state: no Kent day should run, so keep the engine's own
@@ -1006,7 +1273,9 @@ function M.on_frame()
     end
     if not token and not ceremony_settled() then return end
 
-    if apply_day(want) then
+    -- A gentle arm is complete at once; a full arm finishes from the tick
+    -- after its START edge (see edge_pending).
+    if apply_day(want) == true then
         armed_day = want
         armed_at = os.clock()
         box_topped_up = false
@@ -1055,10 +1324,13 @@ function M.arm_for_unlock(name)
             tostring(name)))
         return false
     end
-    if not apply_day(name) then return false end
-    armed_day = name
-    armed_at = os.clock()
-    box_topped_up = false
+    local r = apply_day(name)
+    if not r then return false end
+    if r == true then
+        armed_day = name
+        armed_at = os.clock()
+        box_topped_up = false
+    end
     want_seen = name
     want_since = os.clock()
     verify_pending = false
