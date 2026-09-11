@@ -13,14 +13,21 @@
 -- What does work, with nothing hooked: change the row's set number in the
 -- in-memory table. Every selection from it then produces a real zombie
 -- layout, loaded, prefabbed and streamed by the engine itself, while the
--- cult row is untouched. Rows are found by area, table type and their 326
--- gate, the original set number is kept, and the patch is reversible.
+-- cult row is untouched. Rows are found by area, table type and their flag
+-- gate, the original value is kept, and the patch is reversible.
 --
 -- Rules:
 --   Theater  (1283): patched whenever "A Strange Group" is NOT active --
 --                    not received yet, or completed. While it is active the
 --                    vanilla fight state stands: cultists, no zombies.
---   Food Court (2560): patched while the cult roams, i.e. not Cult Limited.
+--   Food Court (2560): both of its flag-gated rows hidden whenever they
+--                    exist: the cult row (326) and the Special Forces row
+--                    (309, set 9). The cult row's flag is on from "The Cult" until
+--                    the end of the run whatever Cult Limited says: Cult
+--                    Limited only clears the roaming flag (2063) outside
+--                    Colby's once "A Strange Group" is completed, so the
+--                    thin set was still being selected with no cultists
+--                    in sight (tester report, Cult Limited on).
 
 local Shared = require("DRAP/Shared")
 
@@ -31,6 +38,7 @@ local ELM_T = "app.solid.gamemastering.EnemyLayoutManager"
 local elm_mgr = M:add_singleton("elm", ELM_T)
 
 local CULT_FLAG   = 326
+local SF_FLAG     = 309      -- the Special Forces; their zombie row is thin too
 local ZOMBIE_TYPE = 1        -- rEnemySetControlTable.ETableType: zombie rows
 local CULT_SCOOP  = "A Strange Group"
 
@@ -42,10 +50,16 @@ local CULT_SCOOP  = "A Strange Group"
 --   hide:   move the row to area 0 so no load matches it and the engine
 --           falls through to the area's own day/night ladder. Food Court:
 --           it has a full ladder (200/210, 220/230, 240/250), so hiding
---           the cult row gives the right density for the clock.
+--           the cult row gives the right density for the clock. The
+--           cultists come from their own sub-table and are not affected.
+-- flags: a row is taken when its "and" condition carries any of these.
+-- The Food Court is the one area with a zombie row of its own for the
+-- Special Forces (set 9, gated 309): soldiers and next to no zombies
+-- (tester report). Hidden the same way, so the ladder stands under the
+-- Special Forces item and the soldiers still come from their own rows.
 local AREAS = {
-    [1283] = { name = "Colby's Movieland", to_set = 0, vanilla = 10000 },
-    [2560] = { name = "Food Court",        hide = true },
+    [1283] = { name = "Colby's Movieland", to_set = 0, vanilla = 10000, flags = { CULT_FLAG } },
+    [2560] = { name = "Food Court",        hide = true, flags = { CULT_FLAG, SF_FLAG } },
 }
 
 local safe = Shared.safe
@@ -65,8 +79,8 @@ local function control_rows()
     return tbl and safe(function() return tbl:get_field("mEnemySetControlTableList") end)
 end
 
---- Does this row's flag condition require 326 on?
-local function gated_on_cult(row)
+--- Does this row's "and" condition require any of these flags on?
+local function gated_on(row, flags)
     local cond = safe(function() return row:get_field("mEventFlagCondition") end)
     local arr = cond and safe(function() return cond:get_field("mAnd") end)
     if not arr then return false end
@@ -75,7 +89,9 @@ local function gated_on_cult(row)
     for k = 0, 7 do
         local v = safe(function() return arr:read_dword(0x20 + k * 4) end)
         if v == nil or v == 0xFFFFFFFF then break end
-        if v == CULT_FLAG then return true end
+        for _, f in ipairs(flags) do
+            if v == f then return true end
+        end
     end
     return false
 end
@@ -95,7 +111,7 @@ local function scan_table()
         if r then
             local a = tonumber(safe(function() return r:get_field("mAreaNo") end))
             local t = tonumber(safe(function() return r:get_field("mType") end))
-            if a and AREAS[a] and t == ZOMBIE_TYPE and gated_on_cult(r) then
+            if a and AREAS[a] and t == ZOMBIE_TYPE and gated_on(r, AREAS[a].flags) then
                 local st = state[a]
                 local field = AREAS[a].hide and "mAreaNo" or "mEmSetNo"
                 local v = tonumber(safe(function() return r:get_field(field) end))
@@ -114,7 +130,7 @@ local function scan_table()
         elseif st.original == cfg.to_set then
             st.original = cfg.vanilla
         end
-        M.log(string.format("%s: %d cult-time zombie row(s), original %s",
+        M.log(string.format("%s: %d flag-gated zombie row(s), original %s",
             cfg.name, #st.rows, tostring(st.original)))
     end
     table_scanned = true
@@ -135,7 +151,7 @@ local function apply(area, want_patched)
         if ok then ok_n = ok_n + 1 end
     end
     st.patched = want_patched
-    M.log(string.format("%s: cult-time zombie row %s = %d (%s, %d row(s)); takes effect on the next entry",
+    M.log(string.format("%s: flag-gated zombie row %s = %d (%s, %d row(s)); takes effect on the next entry",
         cfg.name, field, to, want_patched and "patched" or "restored", ok_n))
 end
 
@@ -153,18 +169,12 @@ local function scoop_active(name)
     return ok1 and received == true and not (ok2 and done == true)
 end
 
-local function cult_limited()
-    local su = unlocker()
-    if not (su and su.is_cult_limited_enabled) then return false end
-    return safe(su.is_cult_limited_enabled) == true
-end
-
 local function want_theater()
     return not scoop_active(CULT_SCOOP)
 end
 
 local function want_food_court()
-    return not cult_limited()
+    return true
 end
 
 function M.on_frame()
@@ -177,9 +187,9 @@ end
 
 _G.drap_cult_layout_status = function()
     for area, st in pairs(state) do
-        M.log(string.format("%s: rows=%d original=%s patched=%s | strange group active=%s cult limited=%s",
+        M.log(string.format("%s: rows=%d original=%s patched=%s | strange group active=%s",
             AREAS[area].name, #st.rows, tostring(st.original), tostring(st.patched),
-            tostring(scoop_active(CULT_SCOOP)), tostring(cult_limited())))
+            tostring(scoop_active(CULT_SCOOP))))
     end
 end
 
