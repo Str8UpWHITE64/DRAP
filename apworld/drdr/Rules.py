@@ -1172,7 +1172,7 @@ def set_rules(world) -> None:
     world.set_rule(world.multiworld.get_location("Meet Kent on day 1", world.player), And(CanReachRegion("Paradise Plaza"), (Has("Cut from the Same Cloth") if world.options.scoop_sanity else True_())))
     world.set_rule(world.multiworld.get_location("Complete Kent's day 1 photoshoot", world.player), CanReachLocation("Meet Kent on day 1"))
     if "Meet Kent on day 2" not in _dropped:
-        world.set_rule(world.multiworld.get_location("Meet Kent on day 2", world.player), And(CanReachRegion("Paradise Plaza"), (Or(Has("Novelty Mask (Bear)"), Has("Novelty Mask (Servbot)"), Has("Novelty Mask (Horse)")) if world.options.restricted_item_mode else True_()), (Has("Photo Challenge") if world.options.scoop_sanity else And(CanReachLocation("Complete Kent's day 1 photoshoot"), Has("DAY2_06_AM"), Has("DAY2_11_AM")))))
+        world.set_rule(world.multiworld.get_location("Meet Kent on day 2", world.player), And(CanReachRegion("Paradise Plaza"), (Or(Has("Novelty Mask (Bear)"), Has("Novelty Mask (Servbot)"), Has("Novelty Mask (Horse)"), And(Has("Novelty Mask (Ghoul)"), CanReachRegion("Entrance Plaza"))) if world.options.restricted_item_mode else True_()), (Has("Photo Challenge") if world.options.scoop_sanity else And(CanReachLocation("Complete Kent's day 1 photoshoot"), Has("DAY2_06_AM"), Has("DAY2_11_AM")))))
         world.set_rule(world.multiworld.get_location("Complete Kent's day 2 photoshoot", world.player), CanReachLocation("Meet Kent on day 2"))
     world.set_rule(world.multiworld.get_location("Meet Kent on day 3", world.player), And(CanReachRegion("Paradise Plaza"), (Has("Photographer's Pride") if world.options.scoop_sanity else And(CanReachLocation("Complete Kent's day 2 photoshoot"), Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM"), Has("DAY3_11_AM")))))
     world.set_rule(world.multiworld.get_location("Kill Kent on day 3", world.player), CanReachLocation("Meet Kent on day 3"))
@@ -1363,6 +1363,15 @@ def set_rules(world) -> None:
     # pushed behind the Warehouse instead of being an early-game filler
     # slot nobody can identify (#14).
     world.set_rule(world.multiworld.get_location("Fall from a high height", world.player), CanReachRegion("Warehouse"))
+    # Ten zombies in novelty masks. The Ghoul mask is stocked in Entrance
+    # Plaza, the other three in Paradise Plaza; either plaza has the zombies.
+    if "Costume Party - Put novelty masks on 10 zombies" not in _dropped:
+        world.set_rule(world.multiworld.get_location("Costume Party - Put novelty masks on 10 zombies", world.player),
+                       (Or(And(CanReachRegion("Entrance Plaza"), Has("Novelty Mask (Ghoul)")),
+                           And(CanReachRegion("Paradise Plaza"),
+                               Or(Has("Novelty Mask (Bear)"), Has("Novelty Mask (Servbot)"), Has("Novelty Mask (Horse)"))))
+                        if world.options.restricted_item_mode
+                        else Or(CanReachRegion("Entrance Plaza"), CanReachRegion("Paradise Plaza"))))
     if "Fire 30 bullets" not in _dropped:
         world.set_rule(world.multiworld.get_location("Fire 30 bullets", world.player), Or(CanReachLocation("Fire 300 bullets"), And(Has("Handgun"), Or(CanReachRegion("North Plaza"), CanReachRegion("Wonderland Plaza"), CanReachRegion("Paradise Plaza"), CanReachRegion("Al Fresca Plaza"))) if world.options.restricted_item_mode else Or(CanReachRegion("North Plaza"), CanReachRegion("Wonderland Plaza"), CanReachRegion("Paradise Plaza"), CanReachRegion("Al Fresca Plaza"))))
         world.set_rule(world.multiworld.get_location("Fire 300 bullets", world.player), (And(CanReachRegion("North Plaza"), Or(*[Has(g) for g in (("Handgun", "Shotgun", "Sniper Rifle") if world.options.door_randomizer else ("Handgun", "Submachine Gun", "Shotgun", "Sniper Rifle"))])) if world.options.restricted_item_mode else Or(CanReachRegion("North Plaza"), And(Or(*[Has(g) for g in ("Handgun", "Submachine Gun", "Shotgun", "Sniper Rifle", "Heavy Machinegun", "Machinegun")]), CanReachRegion("Rooftop")))))

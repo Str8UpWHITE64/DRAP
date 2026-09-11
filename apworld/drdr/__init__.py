@@ -146,6 +146,7 @@ SPITTER_EXCLUDED_LOCATIONS = {
     "Fire 30 bullets",
     "Fire 300 bullets",
     "Bowl over 5 zombies",
+    "Costume Party - Put novelty masks on 10 zombies",
     "Hit a golf ball 100 feet",
     "Hit 10 zombies with a parasol",
     "Kill 100 zombies with an RPG",

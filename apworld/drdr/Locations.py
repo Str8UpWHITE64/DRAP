@@ -780,6 +780,9 @@ location_tables = {
         DRLocationData("Kill 40 survivors", "Milk", DRLocationCategory.KILL_SURVIVOR),
         DRLocationData("Kill 45 survivors", "Milk", DRLocationCategory.KILL_SURVIVOR),
         DRLocationData("Kill 48 survivors", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        # Appended (2026-09-11): the Costume Party achievement, counted from
+        # the save's mask counter by ChallengeTracker like the strike.
+        DRLocationData("Costume Party - Put novelty masks on 10 zombies", "Milk", DRLocationCategory.CHALLENGE),
     ]
 }
 

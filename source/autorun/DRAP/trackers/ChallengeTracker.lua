@@ -174,6 +174,13 @@ local CHALLENGES = {
         targets = { 5 },
         location_ids = { "Bowl over 5 zombies" },
     },
+    -- The Costume Party achievement's own counter (SolidSave +0x194,
+    -- fed by addZombieNoveltyMaskCovered).
+    mZombieNoveltyMaskCoveredNum = {
+        label   = "Zombies in novelty masks",
+        targets = { 10 },
+        location_ids = { "Costume Party - Put novelty masks on 10 zombies" },
+    },
     VehicleJumpDistanceMax = {
         label   = "Vehicle jump distance",
         targets = { 1000 },

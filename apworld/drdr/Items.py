@@ -501,10 +501,13 @@ specialty_items = {
     # itself in Overtime, or the two halves the blender turns into one.
     "Rocket Launcher",
     "Mega Buster",
-    # Required for Kent Day 2 in restricted_item_mode:
+    # Required for Kent Day 2 and Costume Party in restricted_item_mode.
+    # The Ghoul mask is the Entrance Plaza one; the other three are in
+    # Paradise Plaza.
     "Novelty Mask (Bear)",
     "Novelty Mask (Horse)",
     "Novelty Mask (Servbot)",
+    "Novelty Mask (Ghoul)",
     # Required for PP-bonus location gating in restricted_item_mode:
     "Frying Pan",      # gates "Heat a pan on N stoves" locations
     "Uncooked Pizza",  # gates "Use N Microwaves" (alongside Raw Meat)
