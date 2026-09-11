@@ -102,7 +102,7 @@ SCOOP_SURVIVOR_COUNTS = {
 # making a check unreachable.
 KILL_POINT_GATES = {
     250: 10, 500: 13, 1000: 17, 2000: 22,
-    5000: 23, 10000: 24, 15000: 25, 20000: 25, 28594: 25,
+    5000: 23, 10000: 24, 15000: 25, 20000: 25, 27594: 25,
 }
 
 # The threshold at which an area starts wanting a weapon, and the one at which
@@ -113,7 +113,7 @@ KILL_QUEEN_FROM = 2000
 # Car Keys only: the two areas with drivable vehicles want a key for one that
 # is actually parked there once the counts get high. The thresholds differ
 # because the areas do -- Leisure Park tops out at 10000 and the Tunnel at
-# 28594, so the Tunnel can afford to start later.
+# 27594, so the Tunnel can afford to start later.
 #
 # The convicts' Humvee is deliberately not listed even though it sits in
 # Leisure Park: it only exists once the convicts have spawned and been killed,
@@ -186,6 +186,9 @@ KILL_WEAPONS = {
     "Crislip's Home Saloon": [["Fire Ax", "Queen"],
                               ["loc:Kill Cliff", "Machete"]],
     "Colby's Movieland":     [["Baseball Bat", "Queen"]],
+    # Nothing of note is stocked in the Warehouse, so it takes the North
+    # Plaza pair with the Queen on top, as the other small areas do.
+    "Warehouse":             [["Hunting Knife", "Queen"], ["Handgun", "Queen"]],
 }
 
 
@@ -744,7 +747,7 @@ def set_rules(world) -> None:
                 _rule)
 
     # Zombie Genocider: the top threshold in every area, which is the same
-    # 53,594 kills as clearing all 92 checks and eleven rules instead of 92.
+    # 53,594 kills as clearing all 99 checks and twelve rules instead of 99.
     if world.options.goal.value == 3:
         _tops = [
             CanReachLocation(f"Kill {max(_tiers['genocide'])} zombies in {_region}")

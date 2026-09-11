@@ -795,8 +795,8 @@ for location_table in location_tables.values():
 # so a check lands the moment the kill happens rather than on the way out of
 # the area. There is no engine-side per-area counter -- these are DRAP's.
 #
-# Each area's top threshold is what it takes to clear: 6 mains at 2000, 3
-# minors at 1000, Leisure Park at 10000 and the Tunnels at 28594 come to
+# Each area's top threshold is what it takes to clear: 6 mains at 2000, 4
+# minors at 1000, Leisure Park at 10000 and the Tunnels at 27594 come to
 # 53594, the Zombie Genocider number.
 # ----------------------------------------------------------------------------
 
@@ -922,8 +922,17 @@ location_tables["Zombie Kills"] = [
     DRLocationData("Kill 10000 zombies in Maintenance Tunnel", "Milk", DRLocationCategory.ZOMBIE_KILL),
     DRLocationData("Kill 15000 zombies in Maintenance Tunnel", "Milk", DRLocationCategory.ZOMBIE_KILL),
     DRLocationData("Kill 20000 zombies in Maintenance Tunnel", "Milk", DRLocationCategory.ZOMBIE_KILL),
-    DRLocationData("Kill 28594 zombies in Maintenance Tunnel", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 27594 zombies in Maintenance Tunnel", "Milk", DRLocationCategory.ZOMBIE_KILL),
     DRLocationData("Zombie Genocider: Kill 53,594 zombies across the mall", "Victory", DRLocationCategory.EVENT),
+    # The Warehouse came later (2026-09-11) and sits behind the event so the
+    # rows above keep their ids.
+    DRLocationData("Kill 10 zombies in Warehouse", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 25 zombies in Warehouse", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 50 zombies in Warehouse", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 100 zombies in Warehouse", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 250 zombies in Warehouse", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 500 zombies in Warehouse", "Milk", DRLocationCategory.ZOMBIE_KILL),
+    DRLocationData("Kill 1000 zombies in Warehouse", "Milk", DRLocationCategory.ZOMBIE_KILL),
 ]
 
 
