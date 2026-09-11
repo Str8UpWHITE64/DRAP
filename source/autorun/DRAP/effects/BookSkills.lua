@@ -46,7 +46,20 @@ local suppressed = {}
 -- falling edge. A book is off here until the player turns it back on.
 local user_disabled = {}
 
+-- Books that start OFF when received, with the reason shown on the row.
+-- The player can still turn them on; the choice persists like any other.
+--   171 Book [Firework]: with it on, the "Bowl over 5 zombies" check does
+--       not register however many zombies go down (tester report, isolated
+--       by turning books off one at a time and confirmed from the same
+--       autosave with the book on and off).
+local DEFAULT_OFF = {
+    [171] = "Off by default: while this book is on, the \"Bowl over 5 zombies\" "
+        .. "check does not register. Turn it on once that check is sent.",
+}
+
 local LEDGER_SECTION = "book_toggles"
+
+for id in pairs(DEFAULT_OFF) do user_disabled[id] = true end
 
 ------------------------------------------------------------
 -- Helpers
@@ -278,6 +291,11 @@ function M.is_user_enabled(item_no)
     return not user_disabled[item_no]
 end
 
+--- Why a book starts off, or nil for books that start on.
+function M.default_off_reason(item_no)
+    return DEFAULT_OFF[item_no]
+end
+
 --- Turn one book's effect on or off for the player. Persists immediately so
 --- a crash or hard exit cannot lose the choice.
 function M.set_user_enabled(item_no, enabled)
@@ -290,19 +308,27 @@ function M.set_user_enabled(item_no, enabled)
     M.save_user_toggles()
 end
 
---- Persisted as the DISABLED list, so a missing or unreadable section means
---- "every book on" -- the vanilla-equivalent default -- and newly received
---- books switch on by themselves.
+--- Persisted as the player's departures from the defaults: books turned
+--- off that start on, and books turned on that start off. A missing or
+--- unreadable section means every book at its default -- on, except the
+--- DEFAULT_OFF ones -- and newly received books take their default.
 function M.save_user_toggles()
     if not Ledger.is_init() then return false end
-    local ids = {}
-    for id in pairs(user_disabled) do table.insert(ids, id) end
-    table.sort(ids)   -- deterministic order on disk
-    return Ledger.set_section(LEDGER_SECTION, { disabled = ids })
+    local disabled, enabled = {}, {}
+    for id in pairs(user_disabled) do
+        if not DEFAULT_OFF[id] then table.insert(disabled, id) end
+    end
+    for id in pairs(DEFAULT_OFF) do
+        if not user_disabled[id] then table.insert(enabled, id) end
+    end
+    table.sort(disabled)   -- deterministic order on disk
+    table.sort(enabled)
+    return Ledger.set_section(LEDGER_SECTION, { disabled = disabled, enabled = enabled })
 end
 
 function M.reset_user_toggles()
     user_disabled = {}
+    for id in pairs(DEFAULT_OFF) do user_disabled[id] = true end
 end
 
 --- Called on the save-load boundary. Resets first: without that, one slot's
@@ -310,17 +336,24 @@ end
 function M.load_user_toggles()
     M.reset_user_toggles()
     local doc = Ledger.is_init() and Ledger.get_section(LEDGER_SECTION) or nil
-    if type(doc) ~= "table" or type(doc.disabled) ~= "table" then return false end
+    if type(doc) ~= "table" then return false end
     local n = 0
-    for _, id in ipairs(doc.disabled) do
+    for _, id in ipairs(type(doc.disabled) == "table" and doc.disabled or {}) do
         local num = tonumber(id)
         if num then
             user_disabled[num] = true
             n = n + 1
         end
     end
+    for _, id in ipairs(type(doc.enabled) == "table" and doc.enabled or {}) do
+        local num = tonumber(id)
+        if num then
+            user_disabled[num] = nil
+            n = n + 1
+        end
+    end
     if n > 0 then
-        log(string.format("Loaded %d player-disabled book(s)", n))
+        log(string.format("Loaded %d player book toggle(s)", n))
     end
     return true
 end
@@ -353,6 +386,13 @@ function M.draw_tab_content(debug)
         local row_changed, row_val = imgui.checkbox(label, book.enabled)
         if row_changed then
             M.set_user_enabled(book.item_number, row_val)
+        end
+        local reason = DEFAULT_OFF[book.item_number]
+        if reason then
+            if imgui.is_item_hovered() then imgui.set_tooltip(reason) end
+            imgui.same_line()
+            imgui.text_colored("(off by default)",
+                book.enabled and 0xFFFF8800 or 0xFF888888)
         end
 
         -- A guard holding a book off would otherwise look like a broken
