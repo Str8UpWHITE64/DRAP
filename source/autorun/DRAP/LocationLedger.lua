@@ -105,12 +105,29 @@ function M.is_init()
 end
 
 --- Records a locally-detected check. Persists immediately when new.
+---
+--- A name the ledger only knew from the server (another world collected it)
+--- is claimed for the player when they then do it themselves: its source
+--- changes, it stays acked, nothing is re-sent. Without this the early
+--- return below kept it "server" for good, so goal counts and scoop
+--- completions never saw it -- a collected "Kill 10 Special Forces" left
+--- the soldiers in the mall after the player killed ten and shot the
+--- helicopter down (report 2026-09-20).
 --- @param name string Location name
 --- @param source string|nil Where it came from (default "check")
 --- @return boolean true if this is a NEW entry
 function M.record(name, source)
     if not L or type(name) ~= "string" or name == "" then return false end
-    if L.locations[name] then return false end
+    local existing = L.locations[name]
+    if existing then
+        source = source or "check"
+        if existing.source == "server" and source ~= "server" then
+            existing.source = source
+            existing.detected_at = os.time()
+            save()
+        end
+        return false
+    end
     L.locations[name] = {
         source = source or "check",
         detected_at = os.time(),
