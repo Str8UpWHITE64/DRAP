@@ -69,6 +69,13 @@ local CHALLENGES = {
         label   = "Zombies killed",
         targets = { 1000, 2000, 5000, 10000 },
         location_ids = { "Kill 1000 zombies", "Kill 2000 zombies", "Kill 5000 zombies", "Kill 10000 zombies" },
+        -- The save field only moves on autosave, so these fired on the next
+        -- door instead of on the kill (#60). SolidStorage keeps the same
+        -- number live; measured 2026-09-24: getZombieKillNum 6 -> 13 -> 35
+        -- as kills happened while zombieKill_1Play sat at 4, then the
+        -- autosave copied 35 across. The getter is a folded field read:
+        -- safe to call, never to hook.
+        live_getter = "getZombieKillNum",
     },
     secretForceKill = {
         label   = "Special forces killed",
@@ -288,11 +295,18 @@ local function ensure_challenge_fields(save_obj)
     return true
 end
 
-local function handle_challenge_progress(field_name, def, state, save_obj)
+local function handle_challenge_progress(field_name, def, state, save_obj, ss)
     if not state.field or not def.targets or #def.targets == 0 then return end
 
     local ok_val, v = pcall(state.field.get_data, state.field, save_obj)
     if not ok_val or type(v) ~= "number" then return end
+    if def.live_getter and ss then
+        local ok_live, live = pcall(function() return ss:call(def.live_getter) end)
+        live = ok_live and tonumber(live) or nil
+        -- Never behind the save: the live counter is the same number ahead
+        -- of the next autosave, and a failed read keeps the save value.
+        if live and live > v then v = live end
+    end
 
     local current = v
 
@@ -377,7 +391,7 @@ function M.on_frame()
     for field_name, def in pairs(CHALLENGES) do
         local state = challenge_state[field_name]
         if state then
-            handle_challenge_progress(field_name, def, state, save_obj)
+            handle_challenge_progress(field_name, def, state, save_obj, ss)
         end
     end
 end
@@ -415,8 +429,13 @@ local function dump_challenge(field_name)
         local ok, v = pcall(state.field.get_data, state.field, save_obj)
         if ok and type(v) == "number" then cur = tostring(v) end
     end
-    M.log(string.format("[%s] field_resolved=%s current=%s last_value=%s",
-        field_name, tostring(state.field ~= nil), cur, tostring(state.last_value)))
+    local live = ""
+    if def.live_getter and ss then
+        local ok, v = pcall(function() return ss:call(def.live_getter) end)
+        live = string.format(" live(%s)=%s", def.live_getter, ok and tostring(v) or "?")
+    end
+    M.log(string.format("[%s] field_resolved=%s save=%s%s last_value=%s",
+        field_name, tostring(state.field ~= nil), cur, live, tostring(state.last_value)))
     if def.targets then
         for i, t in ipairs(def.targets) do
             local loc = (def.location_ids and def.location_ids[i]) or "?"
