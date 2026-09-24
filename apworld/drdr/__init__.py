@@ -461,10 +461,31 @@ class DRWorld(World):
             self.multiworld.push_precollected(self.create_item("Maintenance Tunnel Access Key"))
 
     
+    # Locations whose id table is not the region they are reached in. The id
+    # is positional within its table, so the row stays where it is and only
+    # the region it is created in moves. Stickers 98 and 99 are photographed
+    # in Paradise Plaza from the raincoat encounter but were filed under
+    # Leisure Park, which made Leisure Park a requirement nothing asked for
+    # (#65). Their rules already carry the cult requirement.
+    REGION_OVERRIDES = {
+        "Photograph PP Sticker 98": "Paradise Plaza",
+        "Photograph PP Sticker 99": "Paradise Plaza",
+    }
+
+    def _region_table(self, region_name):
+        rows = [loc for loc in location_tables[region_name]
+                if self.REGION_OVERRIDES.get(loc.name, region_name) == region_name]
+        for table_name, table in location_tables.items():
+            if table_name == region_name:
+                continue
+            rows.extend(loc for loc in table
+                        if self.REGION_OVERRIDES.get(loc.name) == region_name)
+        return rows
+
     def create_regions(self):
         regions: Dict[str, Region] = {}
         regions["Menu"] = self.create_region("Menu", [])
-        regions.update({region_name: self.create_region(region_name, location_tables[region_name]) for region_name in [
+        regions.update({region_name: self.create_region(region_name, self._region_table(region_name)) for region_name in [
             "Heliport",
             "Security Room",
             "Rooftop",
