@@ -958,6 +958,23 @@ location_tables["Kill Sanity"] = [
     for _n in range(1, _top + 1)
 ]
 
+# Name groups for the KillSanity locations: one per area and one for all of
+# them. The option pickers do not offer the 53,594 individual names (they
+# hung the Options Creator, #60), so these are how a player excludes or
+# prioritises kills.
+KILL_SANITY_GROUP_ALL = "KillSanity"
+
+
+def kill_sanity_group_name(region: str) -> str:
+    return f"KillSanity - {region}"
+
+
+kill_sanity_location_groups: Dict[str, set] = {KILL_SANITY_GROUP_ALL: set()}
+for _loc in location_tables["Kill Sanity"]:
+    _area = _loc.name.split(" in ", 1)[1]
+    kill_sanity_location_groups.setdefault(kill_sanity_group_name(_area), set()).add(_loc.name)
+    kill_sanity_location_groups[KILL_SANITY_GROUP_ALL].add(_loc.name)
+
 # The area each kill location counts for. The region above is a neutral one,
 # so the name is the only place the area survives -- Rules.py needs it back.
 ZOMBIE_KILL_REGION_OF = {

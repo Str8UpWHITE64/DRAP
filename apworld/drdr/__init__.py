@@ -8,6 +8,7 @@ from Options import OptionError
 from worlds.AutoWorld import World, WebWorld
 
 from .Items import DRItem, DRItemCategory, item_dictionary, key_item_names, item_descriptions, BuildItemPool, specialty_items, progression_skills, microwave_food_items, challenge_tool_items, kill_filler_items
+from .Locations import kill_sanity_location_groups
 from .Locations import (DRLocation, DRLocationCategory, location_tables,
                         location_dictionary, ZOMBIE_KILL_TIERS,
                         ZOMBIE_KILL_TIER_NAMES, zombie_kill_locations,
@@ -224,6 +225,7 @@ class DRWorld(World):
     required_client_version = (0, 5, 0)
     item_name_to_id = DRItem.get_name_to_id()
     location_name_to_id = DRLocation.get_name_to_id()
+    location_name_groups = kill_sanity_location_groups
     item_name_groups = {}
     item_descriptions = item_descriptions
 

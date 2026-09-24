@@ -2,6 +2,8 @@ import typing
 from dataclasses import dataclass
 import settings
 from Options import Toggle, DefaultOnToggle, FreeText, Option, Range, Choice, ItemDict, DeathLink, PerGameCommonOptions, StartInventoryPool, OptionGroup, OptionSet
+from Options import ExcludeLocations, PriorityLocations, StartLocationHints
+from .Locations import location_tables, kill_sanity_location_groups
 
 
 class DRDRSettings(settings.Group):
@@ -822,8 +824,63 @@ class SplitKeys(Toggle):
     default = False
     
 
+# ---------------------------------------------------------------------------
+# Location pickers without the KillSanity names (#60)
+# ---------------------------------------------------------------------------
+# The Options Creator lists every location in the datapackage for a location
+# option and filters it by substring as the player types, with no limit. With
+# KillSanity that is 54,000 names, and "Kil" or an area name matched tens of
+# thousands and hung it. It only pulls the datapackage when the option says
+# to verify location names, so these offer their own list instead: every
+# location except the KillSanity ones, plus a group per area and one for all
+# of them. A YAML may still name any location; verify() checks them against
+# the world exactly as the stock options do.
+_OFFERED_LOCATIONS = sorted(
+    {loc.name for table_name, table in location_tables.items()
+     if table_name != "Kill Sanity" for loc in table}
+    | set(kill_sanity_location_groups))
+
+
+class _BoundedLocationSet:
+    verify_location_name = False   # keeps the Creator off the full datapackage
+    convert_name_groups = True
+    valid_keys = _OFFERED_LOCATIONS
+
+    def verify_keys(self) -> None:
+        pass   # any real location is allowed; verify() checks it below
+
+    def verify(self, world, player_name, plando_options) -> None:
+        super().verify(world, player_name, plando_options)
+        expanded = set()
+        for name in self.value:
+            expanded |= world.location_name_groups.get(name, {name})
+        for name in expanded:
+            if name not in world.location_names:
+                raise Exception(f"Location '{name}' from option '{self}' is not a valid "
+                                f"location name from '{world.game}'.")
+        self.value = expanded
+
+
+class DRExcludeLocations(_BoundedLocationSet, ExcludeLocations):
+    __doc__ = ExcludeLocations.__doc__
+    rich_text_doc = True
+
+
+class DRPriorityLocations(_BoundedLocationSet, PriorityLocations):
+    __doc__ = PriorityLocations.__doc__
+    rich_text_doc = True
+
+
+class DRStartLocationHints(_BoundedLocationSet, StartLocationHints):
+    __doc__ = StartLocationHints.__doc__
+    rich_text_doc = True
+
+
 @dataclass
 class DROption(PerGameCommonOptions):
+    exclude_locations: DRExcludeLocations
+    priority_locations: DRPriorityLocations
+    start_location_hints: DRStartLocationHints
     start_inventory_from_pool: StartInventoryPool
     goal: Goal
     number_of_survivors: NumberOfSurvivors
