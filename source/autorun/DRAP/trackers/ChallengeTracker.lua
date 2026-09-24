@@ -49,6 +49,13 @@ local CHALLENGES = {
         label   = "Zombie Vehicle kills",
         targets = { 500, 1000 },
         location_ids = { "Kill 500 zombies by vehicle", "Kill 1000 zombies by vehicle" },
+        -- A lifetime total the game carries across every playthrough on the
+        -- save (44,820 on a measured save whose per-run count was 35), and
+        -- there is no per-run vehicle counter. Read against it directly,
+        -- both checks sent on the first read for anyone who had driven over
+        -- 1000 zombies before. Counted from a baseline taken at the start
+        -- of the seed instead.
+        baseline = true,
     },
     changeClothNum = {
         label   = "Outfit changes",
@@ -212,6 +219,40 @@ M.CHALLENGES = CHALLENGES
 ------------------------------------------------------------
 
 local challenge_state = {}
+
+------------------------------------------------------------
+-- Per-seed baselines for lifetime counters
+------------------------------------------------------------
+-- The first value seen in a seed is recorded in the run ledger, so a
+-- reload or a relaunch keeps counting from the same point. A value below
+-- the baseline means a different save's lifetime was loaded; the baseline
+-- moves down to it so later progress still counts.
+
+local BASELINE_SECTION = "challenge_baselines"
+
+local function ledger()
+    local ok, L = pcall(require, "DRAP/LocationLedger")
+    if ok and L and L.is_init and L.is_init() then return L end
+    return nil
+end
+
+--- The baseline for a field, recording the current value if there is none.
+--- nil until the run ledger is open (before a slot connects).
+local function baseline_for(field_name, raw)
+    local L = ledger()
+    if not L then return nil end
+    local doc = L.get_section(BASELINE_SECTION)
+    if type(doc) ~= "table" then doc = {} end
+    local b = tonumber(doc[field_name])
+    if b == nil or raw < b then
+        doc[field_name] = raw
+        L.set_section(BASELINE_SECTION, doc)
+        M.log(string.format("%s: baseline for this seed set at %d%s", field_name, raw,
+            b and string.format(" (was %d; a save with a lower lifetime was loaded)", b) or ""))
+        b = raw
+    end
+    return b
+end
 local save_td = nil
 local last_save_obj = nil
 local frame_counter = 0
@@ -306,6 +347,11 @@ local function handle_challenge_progress(field_name, def, state, save_obj, ss)
         -- Never behind the save: the live counter is the same number ahead
         -- of the next autosave, and a failed read keeps the save value.
         if live and live > v then v = live end
+    end
+    if def.baseline then
+        local b = baseline_for(field_name, v)
+        if b == nil then return end   -- no seed yet: nothing to count against
+        v = v - b
     end
 
     local current = v
@@ -433,6 +479,12 @@ local function dump_challenge(field_name)
     if def.live_getter and ss then
         local ok, v = pcall(function() return ss:call(def.live_getter) end)
         live = string.format(" live(%s)=%s", def.live_getter, ok and tostring(v) or "?")
+    end
+    if def.baseline then
+        local L = ledger()
+        local doc = L and L.get_section(BASELINE_SECTION)
+        live = live .. string.format(" baseline=%s",
+            tostring(type(doc) == "table" and doc[field_name] or nil))
     end
     M.log(string.format("[%s] field_resolved=%s save=%s%s last_value=%s",
         field_name, tostring(state.field ~= nil), cur, live, tostring(state.last_value)))
