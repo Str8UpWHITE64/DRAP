@@ -60,6 +60,10 @@ local CULT_SCOOP  = "A Strange Group"
 local AREAS = {
     [1283] = { name = "Colby's Movieland", to_set = 0, vanilla = 10000, flags = { CULT_FLAG } },
     [2560] = { name = "Food Court",        hide = true, flags = { CULT_FLAG, SF_FLAG } },
+    -- Entrance Plaza has two zombie rows of its own for the Special Forces,
+    -- sets 6009 and 9, both gated 309 (read 2026-09-24): soldiers and next
+    -- to no zombies (#59). Its ladder is the same shape as the Food Court's.
+    [256]  = { name = "Entrance Plaza",    hide = true, flags = { SF_FLAG } },
 }
 
 local safe = Shared.safe
@@ -183,6 +187,7 @@ function M.on_frame()
     if not table_scanned and not scan_table() then return end
     apply(1283, want_theater())
     if AREAS[2560] then apply(2560, want_food_court()) end
+    if AREAS[256] then apply(256, true) end
 end
 
 _G.drap_cult_layout_status = function()
