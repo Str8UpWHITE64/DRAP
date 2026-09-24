@@ -321,6 +321,54 @@ local function current_area()
     return Shared.to_int(Shared.safe_get_field(am, f))
 end
 
+------------------------------------------------------------
+-- Arms happen outside Paradise Plaza (#12)
+------------------------------------------------------------
+-- Every arm -- a new day, the next day after a completion, a re-arm after a
+-- save load -- now waits until the player has really left Paradise Plaza,
+-- and the day then spawns on the way back in. In place, a completing day's
+-- records and the next day's arm overlapped: a tester had days 2 and 3 up
+-- together, finished 2, died on 3, and the autosave brought 2 back and not 3.
+-- Leaving first gives the cleanup the time it needs, and the scheduler
+-- places Kent on a fresh entry every time.
+--
+-- "Really left" is a load screen (is_in_game going false then true) that
+-- ends in an area other than 512, then a moment there. A cutscene can move
+-- the area index without a load, and must not count.
+local PARADISE_AREA = 512
+local OUTSIDE_SETTLE = 2.0
+local saw_load = false            -- a load screen since the player was last in 512
+local outside_since = nil         -- os.clock() when a real stay outside began
+local outside_wait_logged = nil   -- day name the "waiting" line was logged for
+
+local function track_outside()
+    if not Shared.is_in_game() then
+        saw_load = true
+        outside_since = nil
+        return
+    end
+    local a = current_area()
+    if a == nil then return end
+    if a == PARADISE_AREA then
+        saw_load = false
+        outside_since = nil
+    elseif saw_load then
+        outside_since = outside_since or os.clock()
+    end
+end
+
+local function outside_paradise()
+    return outside_since ~= nil and os.clock() - outside_since >= OUTSIDE_SETTLE
+end
+
+local function note_waiting(name)
+    if outside_wait_logged == name then return end
+    outside_wait_logged = name
+    M.log(string.format(
+        "'%s' waits for the player to leave Paradise Plaza; it arms outside and spawns on the way back in",
+        tostring(name)))
+end
+
 local function unlocker()
     return _G.AP and _G.AP.ScoopUnlocker
 end
@@ -1052,6 +1100,7 @@ end
 
 function M.on_frame()
     if not M:should_run() then return end
+    track_outside()
     if not Shared.is_in_game() then
         want_since = nil
         verify_pending = true
@@ -1244,14 +1293,13 @@ function M.on_frame()
         M.log("armed state unwound by a load -- re-arming")
     end
 
-    -- Arm wherever the player stands, a short debounce after the desired
-    -- day CHANGED -- so the completing day's ceremony writes finish first.
-    -- The old outside-Paradise guard existed to dodge the ceremony re-fire,
-    -- but the footprint model already prevents that (completed days'
-    -- records are never touched), and the guard itself broke real flows:
-    -- vanilla 2->3 needs NO area change (psycho Kent appears in place), and
-    -- a quick dip out of 512 and back beat the settle timer, so the player
-    -- re-entered on un-armed state (measured: broken spawn).
+    -- Arm a short debounce after the desired day CHANGED, so the completing
+    -- day's ceremony writes finish first, and only outside Paradise Plaza
+    -- (see "Arms happen outside Paradise Plaza"). An earlier outside guard
+    -- was dropped because a quick dip out of 512 beat the settle timer and
+    -- the player re-entered on un-armed state; this one arms while the
+    -- player is still outside, so the re-entry always finds the day armed.
+    -- Vanilla 2->3 therefore no longer happens in place.
     --
     -- A re-arm with an UNCHANGED desired day (save load unwound the flags)
     -- skips the debounce -- the ceremony is long over.
@@ -1261,6 +1309,12 @@ function M.on_frame()
         return
     end
     if want_since and os.clock() - want_since < SETTLE_SECONDS then return end
+
+    if not outside_paradise() then
+        note_waiting(want)
+        return
+    end
+    outside_wait_logged = nil
 
     -- Handoff wait: while the completing day's cluster is in flight, arm
     -- the moment the engine's token appears (gentle path inside apply_day);
@@ -1305,6 +1359,12 @@ end
 --- Returning false is not a failure: ScoopUnlocker logs "KentChain will arm
 --- on tick" and on_frame arms it once the ceremony has settled.
 function M.arm_for_unlock(name)
+    if not outside_paradise() then
+        want_seen = name
+        want_since = os.clock()
+        note_waiting(name)
+        return false
+    end
     -- A sibling completing THIS instant means the engine's handoff cluster
     -- is in flight (the 2508/2509 token lands ~4s after the completion
     -- flag). The movement gate cannot see this -- moved_at is stale after
@@ -1362,7 +1422,9 @@ _G.drap_kent_chain = function()
     print("[KentChain] scoop_sanity=" .. tostring(scoop_sanity_on())
         .. " armed=" .. tostring(armed_day)
         .. " desired=" .. tostring(desired_day())
-        .. " area=" .. tostring(current_area()))
+        .. " area=" .. tostring(current_area())
+        .. " outside_ok=" .. tostring(outside_paradise())
+        .. " saw_load=" .. tostring(saw_load))
     if su then
         for i, name in ipairs(DAYS) do
             local r = pcall(su.has_received_scoop, name) and su.has_received_scoop(name)
