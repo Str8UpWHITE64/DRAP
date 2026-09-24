@@ -65,7 +65,6 @@
 --   drap_npc_save_guard_status() -- guard state + last boundary stats
 
 local Shared = require("DRAP/Shared")
-local Activation = require("DRAP/Activation")
 local SharedData = require("DRAP/SharedData")
 local Logger = require("DRAP/Logger")
 
@@ -125,11 +124,6 @@ local boundary_seq = 0
 local read_in_progress = false
 local read_window_start = nil
 local last_read_end = nil
-
--- Set by the read-side damage check (save thread); consumed by on_frame
--- (main thread) because re.msg must not be called from a save-thread hook.
-local damage_popup_pending = false
-local damage_popup_shown = false
 
 local stype_to_name = nil
 
@@ -528,13 +522,10 @@ local function on_save_read()
                     .. " records at the last write now missing: %s",
                 last_write.blanks, s.blanks,
                 #lost > 0 and table.concat(lost, ", ") or "(none)"))
-            -- The one experiment that separates read-side from write-side
-            -- corruption is re-loading the SAME file before any autosave
-            -- overwrites it -- and the field record shows nine autosaves
-            -- landed within minutes of the one instrumented corruption, so
-            -- it has never actually been run. Ask for it at the moment it
-            -- is possible. Shown from on_frame (main thread), once.
-            damage_popup_pending = true
+            -- Log only. A message box used to ask the player to reload the
+            -- same save as an experiment; it belonged to the survivor
+            -- repair era (removed in 3666dfe) and also fired on a new game,
+            -- where the old world's records are rightly gone.
         end
     end
 
@@ -733,25 +724,6 @@ function M.on_frame()
     if not hooks_installed then
         if not Shared.is_in_game() then return end
         install_hooks()
-    end
-
-    -- One-shot, main thread: turn the rare corruption moment into the
-    -- discriminating experiment while the pre-damage file still exists.
-    -- The guard still runs with no slot connected, but this asks for DRAP
-    -- logs -- meaningless to someone who thinks they are playing vanilla.
-    if damage_popup_pending and not damage_popup_shown
-        and Activation.is_active() then
-        damage_popup_pending = false
-        damage_popup_shown = true
-        pcall(re.msg,
-            "DRAP: this load DAMAGED survivor records (details in the log).\n\n"
-            .. "You can identify the cause right now:\n"
-            .. "1. Do NOT change areas -- an autosave would overwrite the evidence.\n"
-            .. "2. If possible, back up your save folder first.\n"
-            .. "3. Reload this SAME save again, right away.\n"
-            .. "4. Note whether the survivors are back, and send the DRAP_Logs files.\n\n"
-            .. "If they come back: the save file is fine and loading is the bug.\n"
-            .. "If they are still gone: the file itself is damaged.")
     end
 
     -- Debris purge on the MAIN thread, decoupled from the save hooks:
