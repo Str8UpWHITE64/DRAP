@@ -36,6 +36,14 @@ local configured = false
 local installed = false
 local last_scene = nil
 
+-- Vehicle kills per area, shown beside the area counts. Every vehicle kill
+-- also goes through addZombieKillNum, so it is already in the area count
+-- and the checks; this only says how many of those were with a vehicle.
+-- Measured 2026-09-24: a vehicle-only pass made 24 addZombieKillNum calls,
+-- 19 of them also addZombieVehicleKillNum (the rest were deaths the game
+-- did not credit to the car). Kept in the same ledger section, local only.
+local vehicle_counts = {}   -- region -> vehicle kills
+
 ------------------------------------------------------------
 -- Area
 ------------------------------------------------------------
@@ -400,13 +408,24 @@ end
 function M.save()
     local L = ledger()
     if not (L and L.is_init and L.is_init()) then return false end
-    return L.set_section(LEDGER_SECTION, counter.serialize()) == true
+    local doc = counter.serialize()
+    doc.vehicle = {}
+    for region, n in pairs(vehicle_counts) do doc.vehicle[region] = n end
+    return L.set_section(LEDGER_SECTION, doc) == true
 end
 
 function M.load()
     local L = ledger()
     if not (L and L.get_section) then return 0 end
-    return counter.restore(L.get_section(LEDGER_SECTION))
+    local doc = L.get_section(LEDGER_SECTION)
+    vehicle_counts = {}
+    if type(doc) == "table" and type(doc.vehicle) == "table" then
+        for region, n in pairs(doc.vehicle) do
+            n = tonumber(n)
+            if n and n > 0 then vehicle_counts[region] = n end
+        end
+    end
+    return counter.restore(doc)
 end
 
 --- Send every threshold the counts have already passed. Safe to call twice:
@@ -473,10 +492,28 @@ local function on_kill()
     end
 end
 
+local function on_vehicle_kill()
+    local region = counter.region_for(current_scene())
+    if not region then return end
+    vehicle_counts[region] = (vehicle_counts[region] or 0) + 1
+end
+
 local function install_hook()
     if installed then return true end
     local td = sdk.find_type_definition(SOLID_STORAGE)
     if not td then return false end
+    -- Fold-checked unique (2026-09-24). Counted before the area kill hook
+    -- flushes, so the save that follows carries it; a failure here only
+    -- costs the vehicle column.
+    local vmethod = td:get_method("addZombieVehicleKillNum(System.UInt32)")
+    if vmethod then
+        local vok, verr = pcall(sdk.hook, vmethod, function(args)
+            pcall(on_vehicle_kill)
+        end, nil)
+        if not vok then
+            M.log.warn("could not hook addZombieVehicleKillNum: " .. tostring(verr))
+        end
+    end
     local method = td:get_method("addZombieKillNum(System.UInt32)")
     if not method then
         M.log.warn("addZombieKillNum not found -- area kill checks are off")
@@ -603,6 +640,7 @@ function M.progress()
         table.insert(rows, {
             region = region,
             count = counter.count(region),
+            vehicle = vehicle_counts[region] or 0,
             next_threshold = next_up,
             done = next_up == nil,
         })
@@ -646,6 +684,7 @@ end
 --- its own, so the next pull restores them; sent checks stay sent.
 function M.debug_clear_local()
     counter.reset_counts()
+    vehicle_counts = {}
     M.save()
     M.log("debug: local counts cleared (the server still has its own)")
     return true
@@ -749,6 +788,15 @@ function M.draw_tab_content(debug)
     imgui.text_colored(
         "Zombies killed per area. Kills count where you are standing.",
         0xFF888888)
+    do
+        local total, by_vehicle = 0, 0
+        for _, row in ipairs(M.progress()) do
+            total = total + row.count
+            by_vehicle = by_vehicle + row.vehicle
+        end
+        imgui.text(string.format("This run: %d zombies, %d of them with a vehicle",
+            total, by_vehicle))
+    end
     imgui.separator()
 
     if debug then
@@ -759,13 +807,15 @@ function M.draw_tab_content(debug)
 
     imgui.begin_child_window("KillList", Vector2f.new(0, 0), true, 0)
     for _, row in ipairs(M.progress()) do
+        local car = row.vehicle > 0
+            and string.format("  (%d by vehicle)", row.vehicle) or ""
         if row.done then
-            imgui.text_colored(string.format("%-24s %7d  all done",
-                row.region, row.count), 0xFF66CC66)
+            imgui.text_colored(string.format("%-24s %7d  all done%s",
+                row.region, row.count, car), 0xFF66CC66)
         else
             local remaining = row.next_threshold - row.count
-            imgui.text(string.format("%-24s %7d / %-7d (%d to go)",
-                row.region, row.count, row.next_threshold, remaining))
+            imgui.text(string.format("%-24s %7d / %-7d (%d to go)%s",
+                row.region, row.count, row.next_threshold, remaining, car))
         end
 
         if debug then
