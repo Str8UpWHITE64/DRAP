@@ -360,6 +360,18 @@ local JESSIE_FLAG = 769  -- ON after talking to Jessie; OFF = player reloaded pr
 local RELOAD_CONFIRM_SECONDS = 2.0
 local jessie_false_since = nil
 
+-- Overtime, read from the game itself. Flag 312 (EV_EVENT50_A) is raised by
+-- the 72-hour ending, the same instant as "Get bit!", is already on when an
+-- Overtime save loads, and only goes off when the game unloads (every local
+-- flag trace since July agrees; DRAP never writes it). The event path alone
+-- could miss Overtime: a tracked event arriving while an unlock is writing
+-- flags is dropped. Turned off only after a confirmed dwell in game, so a
+-- load window cannot flip it, and so loading a 72-hour save of the same
+-- seed after Overtime hands the mall back to the mod.
+local OVERTIME_FLAG = 312
+local OVERTIME_OFF_CONFIRM_SECONDS = 5.0
+local overtime_off_since = nil
+
 function M.is_currently_unlocking()
     return currently_unlocking
 end
@@ -1510,6 +1522,19 @@ end
 -- State's on_unlock callback -- all eligibility/deferral decisions are
 -- made in ScoopState.request_unlock before this fires.
 local function apply_unlock_writes(scoop_name, scoop)
+    -- Overtime has no use for an armed 72-hour mission, and unlocks are
+    -- driven by the ledger, which is per slot and survives a new game. Checked
+    -- before anything else: the flag clears below used to run first, so
+    -- every launch's unlock replay cleared story flags in Overtime (Kent's
+    -- 2541/2542/1155, 292, Hideout's 304/355), and the return sat after
+    -- currently_unlocking was set, leaving it set -- the event hook then
+    -- ignored every tracked location, "Get bit!" included (drap_20260825).
+    if State.is_endgame_reached() then
+        M.log(string.format("Skipped unlocking '%s' -- Overtime writes no flags",
+            scoop_name))
+        return
+    end
+
     currently_unlocking = true
 
     -- disable_flags BEFORE enabling mission flags -- prevents stale flags from
@@ -1546,14 +1571,6 @@ local function apply_unlock_writes(scoop_name, scoop)
                 end
             end
         end
-    end
-
-    -- Overtime has no use for an armed 72-hour mission, and unlocks are
-    -- driven by the ledger, which is per slot and survives a new game.
-    if State.is_endgame_reached() then
-        M.log(string.format("Skipped unlocking '%s' -- Overtime writes no flags",
-            scoop_name))
-        return
     end
 
     local count = 0
@@ -2934,6 +2951,29 @@ function M.on_frame()
         end
     end
 
+    -- Overtime first, so nothing below writes a flag in the frame it begins.
+    if Shared.is_in_game() then
+        local ot = raw_check_flag(OVERTIME_FLAG)
+        if ot == true then
+            overtime_off_since = nil
+            if not State.is_endgame_reached() then
+                State.set_endgame_reached(true)
+                M.log("Overtime detected (flag 312 on) -- the mod stops writing story flags")
+                save_state()
+            end
+        elseif ot == false and State.is_endgame_reached() then
+            overtime_off_since = overtime_off_since or os.clock()
+            if os.clock() - overtime_off_since >= OVERTIME_OFF_CONFIRM_SECONDS then
+                overtime_off_since = nil
+                State.set_endgame_reached(false)
+                M.log("Flag 312 off in a loaded save -- back in the 72 hours, enforcement resumes")
+                save_state()
+            end
+        end
+    else
+        overtime_off_since = nil
+    end
+
     -- World-stability tracking + parked unlock/reapply draining.
     update_world_stability()
 
@@ -3249,6 +3289,8 @@ _G.scoop_status = function()
     print(string.format("AP Activated: %s | Time Frozen: %s | Chain Set: %s",
         tostring(State.is_activated()), tostring(State.is_time_frozen()), tostring(State.is_scoop_order_set())))
     print(string.format("Save: %s", tostring(save_filename or "none")))
+    print(string.format("Overtime: %s | flag %d = %s",
+        tostring(State.is_endgame_reached()), OVERTIME_FLAG, tostring(raw_check_flag(OVERTIME_FLAG))))
     for _, s in ipairs(M.get_all_status()) do
         local m = (s.received and "R" or ".") .. (s.flags_active and "A" or ".") .. (s.completed and "C" or ".")
         print(string.format("[%s] %s (%s)", m, s.name, s.category or "?"))

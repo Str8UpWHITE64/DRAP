@@ -65,6 +65,11 @@ end
 
 --- Declines by returning false, which costs nothing and leaves it banked.
 local function try_respawn()
+    -- Overtime is the game's; the trap stays banked.
+    local State = package.loaded["DRAP/scoops/ScoopState"]
+    if State and State.is_endgame_reached and State.is_endgame_reached() then
+        return false
+    end
     if not scoop_received() then return false end
 
     -- 445 off means they are already out there.
@@ -121,7 +126,12 @@ _G.drap_convict_trap_fire = function()
     if try_respawn() then
         M.log("armed by hand -- nothing was deducted from the bank")
     else
-        M.log("declined: need the scoop received and 445 on")
+        local State = package.loaded["DRAP/scoops/ScoopState"]
+        if State and State.is_endgame_reached and State.is_endgame_reached() then
+            M.log("declined: Overtime -- the trap stays banked until a 72-hour save is loaded")
+        else
+            M.log("declined: need the scoop received and 445 on")
+        end
     end
 end
 

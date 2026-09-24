@@ -45,6 +45,7 @@
 -- schedule, so a one-shot clear would not stay cleared.
 
 local Shared = require("DRAP/Shared")
+local State = require("DRAP/scoops/ScoopState")
 local SharedData = require("DRAP/SharedData")
 
 local M = Shared.create_module("KentChain")
@@ -1055,6 +1056,7 @@ end
 
 local function trace_tick()
     if not trace_on then return end
+    if State.is_endgame_reached() then return end
     local in_game = Shared.is_in_game()
     if in_game ~= trace_in_game then
         if trace_in_game ~= nil then
@@ -1107,6 +1109,8 @@ function M.on_frame()
         return
     end
     if not scoop_sanity_on() then return end
+    -- Overtime is the game's: no arms, no pins, no quiet-state suppression.
+    if State.is_endgame_reached() then return end
 
     -- Refresh the completion snapshot FIRST: arm_for_unlock runs between
     -- ticks inside the completion callstack, and comparing against this
@@ -1359,6 +1363,7 @@ end
 --- Returning false is not a failure: ScoopUnlocker logs "KentChain will arm
 --- on tick" and on_frame arms it once the ceremony has settled.
 function M.arm_for_unlock(name)
+    if State.is_endgame_reached() then return false end
     if not outside_paradise() then
         want_seen = name
         want_since = os.clock()

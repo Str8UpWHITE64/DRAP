@@ -30,6 +30,7 @@
 --                    in sight (tester report, Cult Limited on).
 
 local Shared = require("DRAP/Shared")
+local State = require("DRAP/scoops/ScoopState")
 
 local M = Shared.create_module("CultZombieLayout")
 M:set_throttle(1.0)
@@ -185,6 +186,12 @@ function M.on_frame()
     if not M:should_run() then return end
     if not Shared.is_in_game() then return end
     if not table_scanned and not scan_table() then return end
+    -- Overtime runs its own Special Forces on flag 309; every row goes back
+    -- to vanilla so its layouts are the game's.
+    if State.is_endgame_reached() then
+        for area in pairs(AREAS) do apply(area, false) end
+        return
+    end
     apply(1283, want_theater())
     if AREAS[2560] then apply(2560, want_food_court()) end
     if AREAS[256] then apply(256, true) end
