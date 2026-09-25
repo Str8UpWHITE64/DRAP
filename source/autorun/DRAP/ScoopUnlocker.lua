@@ -2987,6 +2987,59 @@ function M.draw_tab_content(debug)
     imgui.end_child_window()
 end
 
+-- The Last Resort finishes on 839 (EV_SCQ_FINISH07), which the game raises
+-- with the cutscene on leaving the tunnels for Leisure Park. Sometimes it
+-- plays the cutscene and never raises 839: measured 2026-09-25, all five
+-- bomb trucks and the cutscene's 298/318/319 on, 839 off, and the evFlagOn
+-- hook never saw it. Another player's only came after three reloads. Once
+-- everything the game would have checked is true, raise 839 the way the game
+-- does, and the hook completes the scoop as usual.
+local LAST_RESORT = "The Last Resort"
+local LAST_RESORT_FINISH_FLAG = 839
+local LAST_RESORT_CUTSCENE_FLAG = 298          -- EV_EVENT37_A1, the exit cutscene
+local LAST_RESORT_TRUCK_FLAGS = { 2066, 2067, 2068, 2069, 2070 }
+local LAST_RESORT_SCENE = "s700"               -- Leisure Park
+local LAST_RESORT_WAIT_SECONDS = 5.0
+local last_resort_ready_since = nil
+local last_resort_next_check = 0
+
+local function last_resort_fallback()
+    local now = os.clock()
+    if now < last_resort_next_check then return end
+    last_resort_next_check = now + 0.5
+
+    local ready = scoop_sanity_enabled
+        and State.is_activated()
+        and not State.is_endgame_reached()
+        and received_scoops[LAST_RESORT] and not completed_scoops[LAST_RESORT]
+        and not currently_unlocking
+        and world_stable()
+    if ready then
+        local scene = get_current_scene()
+        ready = scene ~= nil and scene:find(LAST_RESORT_SCENE) ~= nil
+            and raw_check_flag(LAST_RESORT_CUTSCENE_FLAG) == true
+            and raw_check_flag(LAST_RESORT_FINISH_FLAG) == false
+    end
+    if ready then
+        for _, fid in ipairs(LAST_RESORT_TRUCK_FLAGS) do
+            if raw_check_flag(fid) ~= true then ready = false break end
+        end
+    end
+    if not ready then
+        last_resort_ready_since = nil
+        return
+    end
+
+    -- A dwell, so the game's own 839 always gets the first chance.
+    last_resort_ready_since = last_resort_ready_since or now
+    if now - last_resort_ready_since < LAST_RESORT_WAIT_SECONDS then return end
+    last_resort_ready_since = nil
+    M.log(string.format(
+        "'%s': all five bombs in and the exit cutscene played, but flag %d never"
+        .. " went on -- raising it", LAST_RESORT, LAST_RESORT_FINISH_FLAG))
+    raw_set_flag_on(LAST_RESORT_FINISH_FLAG)
+end
+
 function M.on_frame()
     if not hooks_installed and not hook_install_attempted then
         if Shared.is_in_game and Shared.is_in_game() then
@@ -3019,6 +3072,8 @@ function M.on_frame()
 
     -- World-stability tracking + parked unlock/reapply draining.
     update_world_stability()
+
+    if Shared.is_in_game() then last_resort_fallback() end
 
     -- Process flag clears scheduled from the evFlagOn pre-hook. The one-frame
     -- delay lets the engine's evFlagOn body finish so the clear sticks.
