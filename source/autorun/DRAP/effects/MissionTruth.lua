@@ -147,6 +147,12 @@ local WAITING_TITLE = "Waiting for Mission"
 local WAITING_INFO =
     "Next mission will unlock once it is sent to you."
 
+-- Any order with nothing running: the player has to start one themselves,
+-- and "Waiting for Mission" told them to sit and wait for something they
+-- already had.
+local START_TITLE = "Start a Mission"
+local START_WHERE = "Archipelago window, Scoops tab"
+
 -- Repurposed survivor boxes: six indicator-less survivor scoops borrow a
 -- vanilla-only spare display entry (e.g. spare 2533 shows "Kindell's
 -- Betrayal"); we swap its placeholder to the real survivor. message.get
@@ -711,8 +717,19 @@ local function compute_target()
     -- put the first unfinished scoop in the box just for being held, so the
     -- HUD named a mission that was not running.
     if State.is_any_order() then
-        local running = State.active_main_scoop()
-        if running then return target_for_main(running) end
+        local ao = State.any_order_status()
+        if ao.running then return target_for_main(ao.running) end
+        if #ao.startable == 1 then
+            return make_target(START_TITLE, string.format(
+                "%s is ready to start. Press Start next to it in the"
+                .. " Scoops tab of the Archipelago window.", ao.startable[1]),
+                START_WHERE, nil)
+        elseif #ao.startable > 1 then
+            return make_target(START_TITLE, string.format(
+                "%d main missions are ready to start. Pick one in the"
+                .. " Scoops tab of the Archipelago window.", #ao.startable),
+                START_WHERE, nil)
+        end
         return goal_target()
             or make_target(WAITING_TITLE, WAITING_INFO, nil, nil)
     end

@@ -2594,13 +2594,38 @@ function M.draw_tab_content(debug)
 
     if State.is_scoop_order_set() and #scoop_order > 0 then
         local current_chain_name = M.get_current_chain_scoop()
+        -- Any order has no next scoop: the quest is the one the player
+        -- started. Reading the chain here named the first unfinished scoop
+        -- whatever was actually running.
+        local quest_name = current_chain_name
+        local ao = State.is_any_order() and State.any_order_status() or nil
+        if ao and ao.remaining > 0 then quest_name = ao.running end
 
-        if current_chain_name then
-            local info = SCOOP_DESCRIPTIONS[current_chain_name]
-            local waiting = current_scoop_blocker_text(current_chain_name)
+        if ao and ao.remaining > 0 and not ao.running then
+            imgui.text_colored("Current Quest: none started", COLOR_READY)
+            if #ao.startable == 1 then
+                imgui.text_colored(string.format(
+                    "  '%s' is ready. Press Start next to it below.",
+                    ao.startable[1]), COLOR_GO)
+            elseif #ao.startable > 1 then
+                imgui.text_colored(string.format(
+                    "  %d main scoops are ready. Pick one below and press Start.",
+                    #ao.startable), COLOR_GO)
+            elseif #ao.stuck > 0 then
+                imgui.text_colored(string.format(
+                    "  You have %d main scoop%s, but none can be started yet"
+                    .. " -- the list below says why.",
+                    #ao.stuck, #ao.stuck == 1 and "" or "s"), COLOR_READY)
+            else
+                imgui.text_colored(
+                    "  Waiting for a main scoop to be sent to you.", COLOR_READY)
+            end
+        elseif quest_name then
+            local info = SCOOP_DESCRIPTIONS[quest_name]
+            local waiting = current_scoop_blocker_text(quest_name)
             -- Green only when it can actually be started; cyan while it is
             -- still waiting on something, matching the list below.
-            imgui.text_colored("Current Quest: " .. current_chain_name,
+            imgui.text_colored("Current Quest: " .. quest_name,
                 waiting and COLOR_READY or COLOR_GO)
             if waiting then
                 imgui.text_colored("  " .. waiting, COLOR_READY)

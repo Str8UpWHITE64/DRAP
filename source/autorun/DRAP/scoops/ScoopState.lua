@@ -395,6 +395,30 @@ function M.main_scoop_menu()
     return out
 end
 
+--- Where an any-order run stands, for the scoops tab and the guide box.
+---
+--- One answer for both, so the tab cannot say "start one" while the box says
+--- "wait". `running` is the main the player started; with none running,
+--- `startable` holds the ones Start would accept now, `stuck` the ones held
+--- but not startable, and `remaining` counts every unfinished main.
+function M.any_order_status()
+    local out = { running = M.active_main_scoop(), startable = {}, stuck = {},
+                  remaining = 0 }
+    for _, name in ipairs(M.scoop_order) do
+        if not M.completed[name] then
+            out.remaining = out.remaining + 1
+            if not out.running and M.ap_received[name] then
+                if M.main_scoop_blocker(name) == nil then
+                    out.startable[#out.startable + 1] = name
+                else
+                    out.stuck[#out.stuck + 1] = name
+                end
+            end
+        end
+    end
+    return out
+end
+
 --- Start a main scoop the player chose. Returns ok, reason.
 function M.activate_main_scoop(scoop_name)
     local blocker = M.main_scoop_blocker(scoop_name)
