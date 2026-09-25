@@ -723,6 +723,9 @@ local function enforce_queen_spawning()
     end
 end
 local CULT_ON = { 326, 811, 1166, 2063 }
+local CULT_SCOOP = "The Cult"
+local STRANGE_GROUP_SCOOP = "A Strange Group"
+local JENNIFER_START_FLAG = 2699   -- EV_SCQ_STARTBE, Jennifer Gorman's start
 local CULT_OFF = {
     783,                                      -- scoop start flags
     4131, 738, 847, 875, 1173, 1294,          -- fight/kill flags
@@ -1619,8 +1622,23 @@ local function apply_unlock_writes(scoop_name, scoop)
                 scoop.category, scoop_name))
         end
     else
-        if scoop.flags then
-            for _, flag_id in ipairs(scoop.flags) do
+        local flags = scoop.flags
+        -- The Cult arriving after Sean is dead: its scoop start (787) and the
+        -- cult spawn flag (811) would start the cult all over again, which is
+        -- what a player with Cult Limited saw after killing Sean (report,
+        -- 2026-09-19 log: The Cult received ten minutes after Kill Sean).
+        -- Jennifer Gorman still has to be rescuable, so only her own start
+        -- flag goes on. 2699 is hers by the scoops' layout: each cult scoop
+        -- is scoop start + 811 + one start per survivor, and A Strange
+        -- Group's five survivors take 2700-2704.
+        if scoop_name == CULT_SCOOP and completed_scoops[STRANGE_GROUP_SCOOP] then
+            flags = { JENNIFER_START_FLAG }
+            M.log(string.format(
+                "'%s' after Sean's death -- Jennifer only (flag %d), the cult is not restarted",
+                scoop_name, JENNIFER_START_FLAG))
+        end
+        if flags then
+            for _, flag_id in ipairs(flags) do
                 if flag_id and flag_id ~= 0 and raw_set_flag_on(flag_id) then
                     count = count + 1
                 end
