@@ -1078,6 +1078,13 @@ local function trace_tick()
 end
 
 re.on_frame(function()
+    -- The load-screen watch has to live here. The main loop only ticks
+    -- modules while in game, so M.on_frame never saw a load screen: saw_load
+    -- stayed false, no stay outside Paradise ever counted, and every Kent
+    -- day waited forever (2026-09-25 log: Photographer's Pride received,
+    -- "waits for the player to leave Paradise Plaza", never armed despite
+    -- several Warehouse to Paradise round trips).
+    pcall(track_outside)
     if not scoop_sanity_on() then return end
     pcall(trace_tick)
 end)
@@ -1102,7 +1109,6 @@ end
 
 function M.on_frame()
     if not M:should_run() then return end
-    track_outside()
     if not Shared.is_in_game() then
         want_since = nil
         verify_pending = true
