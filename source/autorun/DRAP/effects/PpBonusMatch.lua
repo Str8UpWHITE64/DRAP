@@ -305,8 +305,29 @@ function M.setup(trigger_entries, ap_bridge)
         end
     end
 
+    -- Slot data carries the positions and the match kind but none of the
+    -- tuning, so on a real seed every poll ran on its defaults: treadmills
+    -- counted 2s instead of 10 with no movement gate, and sent about 8s
+    -- before the game's award (2026-09-25 log: "award after 10.0s ...
+    -- seconds=nil"). A value the slot lacks comes from the shipped entry
+    -- with the same id; it describes the object, not the seed.
+    local shipped = {}
+    do
+        local ok, SharedData = pcall(require, "DRAP/SharedData")
+        if ok and SharedData and SharedData.ap_trigger_locations then
+            for _, s in ipairs(SharedData.ap_trigger_locations()) do
+                if s.id then shipped[s.id] = s end
+            end
+        end
+    end
+
     local n = 0
-    for _, e in ipairs(trigger_entries or {}) do
+    for _, e0 in ipairs(trigger_entries or {}) do
+        local e = setmetatable({}, { __index = function(_, k)
+            local v = e0[k]
+            if v == nil and shipped[e0.id] then v = shipped[e0.id][k] end
+            return v
+        end })
         if type(e.instances) == "table" and #e.instances > 0 then
             instances_by_trigger[e.id] = {
                 match = e.match or "nearest",
@@ -329,6 +350,11 @@ function M.setup(trigger_entries, ap_bridge)
                 state_enum = e.state_enum,
                 state_from = e.state_from,
             }
+            local t = instances_by_trigger[e.id]
+            log(string.format("%s: %s seconds=%s move_min=%s radius=%s threshold=%s defer=%s",
+                tostring(e.id), tostring(t.match), tostring(t.seconds),
+                tostring(t.move_min), tostring(t.radius), tostring(t.threshold),
+                tostring(t.defer)))
             n = n + #e.instances
         end
     end
