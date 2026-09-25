@@ -235,6 +235,8 @@ class DRWorld(World):
         self.locked_locations = []
         self.enabled_location_categories = set()
         self.door_redirects = {}
+        # Area pairs a shuffled door joins, both directions (Door Locks).
+        self.door_joined_pairs = set()
         self.scoop_order = []
 
     def generate_early(self):
@@ -573,6 +575,7 @@ class DRWorld(World):
                     connection = Entrance(self.player, f"{x} -> {y}", regions[x])
                     regions[x].exits.append(connection)
                     connection.connect(regions[y])
+            self.door_joined_pairs = set(seen)
             return len(seen)
 
         create_connection("Menu", "Heliport")

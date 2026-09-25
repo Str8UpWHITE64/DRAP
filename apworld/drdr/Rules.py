@@ -600,9 +600,15 @@ def set_rules(world) -> None:
                 world.set_rule(_entrance, _dest_key(_entrance.connected_region.name))
 
         # Greg's passage isn't in the door table, so the shuffle leaves it
-        # where it is and it keeps its scoop gate.
+        # where it is and it keeps its scoop gate -- unless a shuffled door
+        # joins the same two areas. They then share one entrance, and the
+        # door needs only the key: gating it on Kill Adam, who is in
+        # Wonderland, locked a seed whose only way into Wonderland was that
+        # door.
         for _from, _to in (("Paradise Plaza", "Wonderland Plaza"),
                            ("Wonderland Plaza", "Paradise Plaza")):
+            if (_from, _to) in world.door_joined_pairs:
+                continue
             world.set_rule(world.multiworld.get_entrance(f"{_from} -> {_to}", world.player),
                           _dest_key(_to, CanReachLocation("Kill Adam")))
 
