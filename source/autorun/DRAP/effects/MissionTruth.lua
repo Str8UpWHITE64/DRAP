@@ -706,12 +706,108 @@ local function goal_target()
     return nil
 end
 
+------------------------------------------------------------
+-- The Facts: a route, not a spot
+------------------------------------------------------------
+-- The Facts comes after the chain, so neither the chain nor any-order's
+-- running scoop ever named it and the box sat on "Waiting for Mission". Its
+-- harvested guide is no use either (area 1025, not the Security Room). The
+-- way to Jessie is Paradise Plaza -> Warehouse -> Rooftop -> Security Room,
+-- and the compass cannot route across areas for an overridden mission
+-- (BACKLOG L2), so the box names the next leg and the pin sits on the door
+-- to it in the area the player is standing in.
+
+local FACTS = "The Facts"
+local FACTS_POS_TBL = 31
+-- Where the Security Room mains pin (The Last Resort's guide, area 288).
+local FACTS_JESSIE = { x = 149.65, y = 9.25, z = 228.65 }
+local FACTS_LEGS = {
+    s200 = { to = "s230", info = "Go to the Warehouse." },
+    s230 = { to = "s231", info = "Go up to the Rooftop." },
+    s231 = { to = "s136", info = "Go through the door to the Security Room." },
+}
+local FACTS_ROUTE_START = "s200"
+
+local function facts_running()
+    return State.has_received(FACTS) and not State.completed[FACTS]
+end
+
+local function player_scene()
+    local lock = AP and AP.DoorSceneLock
+    local path = lock and lock.CurrentLevelPath
+    return path and (tostring(path):gsub("^SCN_", "")) or nil
+end
+
+--- The first area on the way from `from` to `goal`, over the vanilla graph.
+local function next_hop(from, goal)
+    local graph = SharedData.area_graph()
+    local prev, queue, head = { [from] = from }, { from }, 1
+    while queue[head] do
+        local cur = queue[head]; head = head + 1
+        if cur == goal then break end
+        for _, nb in ipairs(graph[cur] or {}) do
+            if not prev[nb] then prev[nb] = cur; queue[#queue + 1] = nb end
+        end
+    end
+    if not prev[goal] then return nil end
+    local step = goal
+    while prev[step] ~= from do step = prev[step] end
+    return step
+end
+
+--- The door in `scene` that leads to `to`, nearest the player.
+local function door_to(scene, to)
+    local lock = AP and AP.DoorSceneLock
+    if not (lock and lock.door_triggers) then return nil end
+    local p = nil
+    pcall(function()
+        local pm = sdk.get_managed_singleton("app.solid.PlayerManager")
+        local pl = pm and pm:call("get_CurrentPlayer")
+        p = pl and pl:call("get_Transform"):call("get_Position")
+    end)
+    local best, best_d2 = nil, math.huge
+    for _, t in ipairs(lock.door_triggers(scene)) do
+        if t.to == to then
+            local d2 = p and ((p.x - t.x) ^ 2 + (p.z - t.z) ^ 2) or 0
+            if d2 < best_d2 then best, best_d2 = t, d2 end
+        end
+    end
+    return best
+end
+
+local function facts_target()
+    local scene = player_scene()
+    local info, to, where
+    if scene == "s136" then
+        return make_target(FACTS,
+            "Kill Zombie Jessie in the Security Room. If time doesn't speed up"
+            .. " afterwards, use the bench to fast-forward to the ending.",
+            "Security Room", { pos_tbl = FACTS_POS_TBL,
+                               x = FACTS_JESSIE.x, y = FACTS_JESSIE.y, z = FACTS_JESSIE.z })
+    elseif FACTS_LEGS[scene] then
+        info, to = FACTS_LEGS[scene].info, FACTS_LEGS[scene].to
+    else
+        to = scene and next_hop(scene, FACTS_ROUTE_START) or nil
+        info = "Head to Paradise Plaza, then the Warehouse and the Rooftop,"
+            .. " to reach the Security Room."
+    end
+    local area = to and Shared.SCENE_INFO and Shared.SCENE_INFO[to]
+    where = area and area.name or "Paradise Plaza"
+    local door = to and scene and door_to(scene, to)
+    -- No door found yet (area still scanning): the Security Room spot keeps
+    -- the pin somewhere sensible until it is.
+    local pin = door or FACTS_JESSIE
+    return make_target(FACTS, info, where,
+        { pos_tbl = FACTS_POS_TBL, x = pin.x, y = pin.y, z = pin.z })
+end
+
 -- Under ScoopSanity the main box never shows the vanilla story objective:
 -- show the current mission, else a "Waiting for Mission" placeholder. Only
 -- the endgame leaves the box to the engine (the finale plays normally).
 local function compute_target()
     if not scoop_unlocker then return nil end
     if State.is_endgame_reached() then return nil end
+    if facts_running() then return facts_target() end
     -- Any Order has no "next" scoop -- the player picks. Show the one they
     -- actually started, or the placeholder. Falling back to the chain here
     -- put the first unfinished scoop in the box just for being held, so the
@@ -751,7 +847,10 @@ end
 
 local function target_key(t)
     if not t then return "" end
+    -- The pin too: The Facts keeps its text across areas while its pin
+    -- moves from door to door.
     return t.title .. "\1" .. t.info .. "\1" .. tostring(t.pos_tbl)
+        .. "\1" .. string.format("%.0f,%.0f", t.x or 0, t.z or 0)
 end
 
 -- Rebuild the active repurpose swap set. Cheap + idempotent (safe every
