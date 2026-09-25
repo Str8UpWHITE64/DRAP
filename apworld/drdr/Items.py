@@ -639,8 +639,11 @@ def BuildItemPool(multiworld, count, options, excluded_scoop_names=(),
         "DAY2_06_AM", "DAY2_11_AM", "DAY3_00_AM", "DAY3_11_AM", "DAY4_12_PM"
     }
 
+    # Sets have no stable order between processes and the pool is shuffled
+    # at the end, so iterating one unsorted gave the same seed a different
+    # item pool on another run.
     if options.guaranteed_items.value:
-        for item_name in options.guaranteed_items.value:
+        for item_name in sorted(options.guaranteed_items.value):
             item = item_dictionary[item_name]
             item_pool.append(item)
             included_itemcount = included_itemcount + 1
@@ -650,7 +653,7 @@ def BuildItemPool(multiworld, count, options, excluded_scoop_names=(),
                                 type("X", (), {"value": False})()).value)
 
     if options.restricted_item_mode.value:
-        for item_name in specialty_items:
+        for item_name in sorted(specialty_items):
             # Spitter Only forces Restricted on, and most of the specialty
             # list is there to satisfy checks it has just dropped.
             if spitter_only and item_name not in spitter_kept_weapons and                     item_dictionary[item_name].category == DRItemCategory.WEAPON:
