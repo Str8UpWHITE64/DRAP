@@ -649,6 +649,27 @@ local function install_method_hook(id, t)
     log(string.format("%s: watching %s", id, key))
 end
 
+--- The instance for a rack, by address, else by where it stands.
+---
+--- The four racks were indexed on entering Entrance Plaza, and three
+--- minutes later, without leaving it, the rack being spun had an address the
+--- index had never seen (2026-09-25 log: indexed=4 live=4
+--- best_is_indexed=false), so no single rack sent until Spin All did. A rack
+--- turns in place and never moves, so its position still says which one it
+--- is; the new address is added to the index.
+local function rack_instance(scene, t, map, addr, om)
+    local inst = map[addr]
+    if inst then return inst end
+    local p = om_position(om)
+    inst = p and closest(t.items, scene, p.x, p.y, p.z, OBJECT_LIMIT)
+    if inst then
+        map[addr] = inst
+        log(string.format("%s at %s was not indexed -- matched by position to %s",
+            tostring(t.om_type), tostring(addr), tostring(inst.name)))
+    end
+    return inst
+end
+
 --- The indexed object whose field is furthest from zero.
 ---
 --- For display racks. Nothing on them counts rotations -- mRot is never
@@ -705,7 +726,7 @@ function most_active(scene, t)
         if v then
             local mag = math.abs(v)
             if mag > best_mag then
-                best, best_mag = map[addr], mag
+                best, best_mag = rack_instance(scene, t, map, addr, om), mag
             end
         end
     end
@@ -748,7 +769,7 @@ local function poll_rotation(scene, t)
             local acc = (rot_accum[addr] or 0) + math.abs(v) * dt
             if acc >= limit then
                 acc = 0
-                local inst = map[addr]
+                local inst = rack_instance(scene, t, map, addr, om)
                 if inst then out[#out + 1] = inst end
             end
             rot_accum[addr] = acc
