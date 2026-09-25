@@ -372,6 +372,18 @@ local OVERTIME_FLAG = 312
 local OVERTIME_OFF_CONFIRM_SECONDS = 5.0
 local overtime_off_since = nil
 
+-- Each main's completion flag is also the next main's controlled flag
+-- (Jessie's Discovery ends on 302, The Butcher's primary), which the
+-- controlled policy holds off while that main is not running. Overtime is
+-- the game's, and it replays a finished case whose record is off: the
+-- Hideout ending (#63, 301) and Jessie's Discovery in the Security Room
+-- (302), which soft-locked. On entering Overtime, once per session, every
+-- completed main's completion flag goes back on, plus 301 and 355 (EV_EVS02),
+-- which the Hideout ending sets, once 2322 is on.
+local OVERTIME_HIDEOUT_FLAGS = { 301, 355 }
+local HIDEOUT_DONE_FLAG = 2322
+local overtime_story_restored = false
+
 function M.is_currently_unlocking()
     return currently_unlocking
 end
@@ -3040,6 +3052,38 @@ local function last_resort_fallback()
     raw_set_flag_on(LAST_RESORT_FINISH_FLAG)
 end
 
+--- Put back the story flags the 72 hours cleared (see OVERTIME_HIDEOUT_FLAGS).
+local function restore_overtime_story()
+    local want = {}
+    for flag_id, row in pairs(COMPLETION_FLAGS) do
+        local data = row.scoop and SCOOP_DATA[row.scoop]
+        if data and data.category == "Main" and completed_scoops[row.scoop]
+                and COMPLETION_EVENT_TO_SCOOP[row.event] == row.scoop then
+            want[#want + 1] = flag_id
+        end
+    end
+    if raw_check_flag(HIDEOUT_DONE_FLAG) == true then
+        for _, fid in ipairs(OVERTIME_HIDEOUT_FLAGS) do want[#want + 1] = fid end
+    end
+    table.sort(want)
+
+    local put = {}
+    for _, fid in ipairs(want) do
+        if raw_check_flag(fid) == false then
+            -- Hook stood down: these are records of events that already
+            -- played, not events, and 355 would fire its Hideout trigger.
+            currently_unlocking = true
+            raw_set_flag_on(fid)
+            currently_unlocking = false
+            put[#put + 1] = tostring(fid)
+        end
+    end
+    if #put > 0 then
+        M.log("Overtime: put back story flags the 72 hours left off ("
+            .. table.concat(put, ", ") .. ")")
+    end
+end
+
 function M.on_frame()
     if not hooks_installed and not hook_install_attempted then
         if Shared.is_in_game and Shared.is_in_game() then
@@ -3057,10 +3101,15 @@ function M.on_frame()
                 M.log("Overtime detected (flag 312 on) -- the mod stops writing story flags")
                 save_state()
             end
+            if not overtime_story_restored then
+                overtime_story_restored = true
+                restore_overtime_story()
+            end
         elseif ot == false and State.is_endgame_reached() then
             overtime_off_since = overtime_off_since or os.clock()
             if os.clock() - overtime_off_since >= OVERTIME_OFF_CONFIRM_SECONDS then
                 overtime_off_since = nil
+                overtime_story_restored = false
                 State.set_endgame_reached(false)
                 M.log("Flag 312 off in a loaded save -- back in the 72 hours, enforcement resumes")
                 save_state()
