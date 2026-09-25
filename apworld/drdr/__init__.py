@@ -410,19 +410,29 @@ class DRWorld(World):
             # Get the door randomizer mode (0 = chaos, 1 = paired)
             door_mode = self.options.door_randomizer_mode.value
 
-            # Generate door redirects for this player using per-slot random
-            # This ensures each player gets a unique door layout even with the same server seed
-            self.door_redirects = generate_door_randomization_for_ap(
-                self.random,
-                mode=door_mode,
-                randomize_rooftop_service_hallway=bool(
-                    self.options.randomize_rooftop_service_hallway_doors
-                ),
-                # ScoopSanity unlocks the Security Room <-> Entrance Plaza
-                # door pair (no longer cutscene-only after Jessie), so they
-                # become randomizable+walkable.
-                scoop_sanity=bool(self.options.scoop_sanity.value),
-            )
+            # Universal Tracker re-generation: take the seed's real layout from
+            # slot data. Door Locks rules follow the layout, so a fresh roll
+            # gave the tracker a different map from the server's.
+            _passthrough = getattr(self.multiworld, "re_gen_passthrough", None)
+            _ut_doors = None
+            if _passthrough and self.game in _passthrough:
+                _ut_doors = (_passthrough[self.game] or {}).get("door_redirects")
+            if _ut_doors is not None:
+                self.door_redirects = dict(_ut_doors)
+            else:
+                # Generate door redirects for this player using per-slot random
+                # This ensures each player gets a unique door layout even with the same server seed
+                self.door_redirects = generate_door_randomization_for_ap(
+                    self.random,
+                    mode=door_mode,
+                    randomize_rooftop_service_hallway=bool(
+                        self.options.randomize_rooftop_service_hallway_doors
+                    ),
+                    # ScoopSanity unlocks the Security Room <-> Entrance Plaza
+                    # door pair (no longer cutscene-only after Jessie), so they
+                    # become randomizable+walkable.
+                    scoop_sanity=bool(self.options.scoop_sanity.value),
+                )
 
         # If ScoopSanity is enabled, generate a randomized main scoop order and precollect all time keys
         if self.options.scoop_sanity:
