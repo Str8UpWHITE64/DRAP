@@ -39,10 +39,21 @@ class RestrictedItemMode(Toggle):
 
 class KillSanity(Toggle):
     """
-    Every zombie kill in an area is its own check, up to that area's top
-    threshold at your Zombie Kill Tiers setting. Easy is a few hundred
-    checks; genocide is all 53,594 of them. Does nothing with the tiers
-    set to none.
+    Every zombie kill in each area is its own check, up to the number
+    specified in the Zombie Kill Tier. This will add a lot of useless
+    filler items, but most of it will be placed in your game.
+    
+    Each tier adds this many locations:
+
+    None: 0
+    Easy: 2300
+    Normal: 6400
+    Nightmare: 15000
+    Genocide: 53594
+
+    NOTE: Due to the number of locations it adds and because it increases
+    generation time dramaticlly, KillSanity with Genocide needs to be
+    enabled in the host.yaml file of whoever is generating the multiworld.
     """
     display_name = "KillSanity"
     default = False
@@ -59,8 +70,8 @@ class DamageLink(Toggle):
     block. Small hits are added up rather than sent one at a time. Type
     /damagelink off in the client window to leave the link mid-session.
 
-    Damage arriving this way CAN kill, and death runs the game's own path, so
-    it behaves like any other death (including DeathLink, if that is on too).
+    Damage arriving this way CAN kill, and it behaves like any other death
+    (including triggering DeathLink, if that is on too).
     """
     display_name = "DamageLink"
     default = False
@@ -93,24 +104,15 @@ class KnockbackLink(Toggle):
 
 class SpitterOnly(Toggle):
     """
-    Spitter Only. No weapon ever reaches the item pool, so with Restricted
-    Item Mode there is nothing to pick up and swing -- the spit is the whole
-    arsenal. Melee is left barely able to scratch a zombie.
+    This mode limits Frank to Spitfire only, and it is always active. Other
+    weapons are removed from the item pool, leaving only healing items.
 
-    Turning this on forces Restricted Item Mode on, because without it the
-    mall is still full of weapons to grab.
+    Any location that requires an item is removed in this mode (the bowling
+    achievment, firing bullets, etc). The logic for Kent's Day 2 Photoshoot is
+    set to require an outtake photo from a survivor, such as Ronald, Gil, or
+    Paul (if Psycho goal is chosen, only the Paul photo will be available).
 
-    The checks that are nothing but a weapon -- the bullet counts, bowling,
-    golf, the parasol and the RPG -- are dropped, since no amount of spitting
-    finishes them. So are the ones that need a weapon in hand: the stoves (a
-    frying pan) and rescuing Paul (an extinguisher). Isabela's queen stays in
-    the pool.
-
-    Kent's day 2 photoshoot wants an outtake photo taken before you talk to
-    him, and with no masked zombies to shoot it has to come from a scoop:
-    Ronald right after you meet him, Gil right after you meet him, or Paul
-    once he is beaten. Each shot is offered only once, so take it and keep
-    it. Under the Psycho goal, Paul's is the only one.
+    Obviously enabling this mode will dramatically increase the game's difficulty.
     """
     display_name = "Spitter Only"
     default = False
@@ -118,10 +120,12 @@ class SpitterOnly(Toggle):
 
 class DoorRandomizer(Toggle):
     """
-    When enabled, door connections throughout the mall are randomized.
-    All area keys are given to you at the start, and doors lead to unexpected locations.
+    When enabled, door connections throughout the mall are randomized depending on
+    the setting chosen below. Each entrance will lead to an unexpected location.
 
     The randomizer ensures all areas remain reachable and no softlocks occur.
+
+    In-game, a tab in the Archipelago menu allows access to a map showing connections.
     """
     display_name = "Door Randomizer"
     default = False
@@ -133,11 +137,15 @@ class DoorRandomizerMode(Choice):
 
     Chaos: Doors are fully randomized. Going through door A to reach area B
            does NOT mean the door in B will take you back to A. Navigation
-           requires careful attention to the door map.
+           requires careful attention to the door map. All area keys are
+           given at the start of a run when this mode is selected, so the
+           entire mall is available from the beginning.
 
     Paired: Doors are randomized in pairs. If door A leads to area B, then
             a door in B will lead back to A. This creates a more intuitive
-            but still randomized layout.
+            but still randomized layout. Area keys are an option in this mode
+            if the Door Locks option is enabled. Otherwise, area keys are
+            given at the start and the whole mall will be open right away.
     """
     display_name = "Door Randomizer Mode"
     option_chaos = 0
@@ -147,16 +155,11 @@ class DoorRandomizerMode(Choice):
 
 class DoorLocks(Toggle):
     """
-    When enabled (and Door Randomizer is on), the area keys still lock doors.
-    Normally every key is given to you at the start when doors are randomized,
-    because the logic tracks the vanilla layout rather than the shuffled one.
-    With this on, the logic follows the doors where they actually go and a door
-    is locked by the key for wherever it now leads.
+    When enabled (and Door Randomizer is on), moving to a new area will require
+    having that area's key. Logic will be updated to reflect your randomized layout.
 
-    Paired mode only. A door is locked by the key for the area it now leads to,
-    so this needs the area keys. Selecting 'Door Randomizer', 'Door Locks' and
-    'Split Keys' together swaps the per-door keys out and uses the area keys
-    for that run.
+    Door Locks is only possible with Paired Mode, and it is not compatible with the
+    Split Keys option.
 
     Has no effect if Door Randomizer is disabled.
     """
@@ -166,13 +169,13 @@ class DoorLocks(Toggle):
 
 class RandomizeRooftopServiceHallwayDoors(Toggle):
     """
-    When enabled (and Door Randomizer is on), the doors between Rooftop and
-    Warehouse are included in the randomization pool.
+    When enabled (and Door Randomizer is on), this option adds the doors
+    between Rooftop and Warehouse into the randomization pool.
 
     When disabled (the default), those two doors are left vanilla even with
-    Door Randomizer on, so the opening sequence behaves as expected. Only
-    affects the Rooftop <-> Warehouse pair; all other doors still
-    randomize normally.
+    Door Randomizer on. The reason for this is that the cutscene with Jessie
+    in the Warehouse is required at the start of every run. If these doors are
+    randomized, finding the Warehouse to begin with is much more difficult.
 
     Has no effect if Door Randomizer is disabled.
     """
@@ -183,29 +186,29 @@ class Goal(Choice):
     """
     Determines the victory condition for the game.
 
-    Ending S: Complete all overtime missions and defeat Brock on the tank.
-              This is the full game experience including overtime mode.
+    Ending S: Complete all Overtime missions and defeat Brock on the tank.
+              This is the full game experience including Overtime Mode.
 
     Ending A: Solve all of the cases and reach the helipad by 12pm on Day 4.
-              Overtime scoops are removed from the pool, making for a shorter run.
+              Overtime locations are removed from the pool, making for a shorter run.
 
-    Savior:   Rescue a specified number of survivors to win (see
-              "Number of Survivors" below). In ScoopSanity, there will not be any
-              Main Scoop locations. If ScoopSanity is off, then Ending S / Ending A
-              locations still exist as normal but are filler-only and not the goal.
+    Savior:   Rescue a specified number of survivors (see "Number of Survivors"
+              below). In ScoopSanity, there will not be any Main Scoop locations.
+              If ScoopSanity is off, then Ending S / Ending A locations still exist
+              but are filler-only and not the goal.
 
     Zombie Genocider:
               Kill 53,594 zombies spread across every area of the mall. Forces
-              "Zombie Kill Tiers" to genocide whatever it is set to. Like
-              Savior, ScoopSanity drops the Main Scoop locations; without
-              ScoopSanity they stay as ordinary checks.
+              "Zombie Kill Tiers" to Genocide regardless of what it is set to.
+              Like Savior, ScoopSanity drops the Main Scoop locations. Without
+              ScoopSanity they remain as ordinary checks.
 
-    Psycho:   Savior turned inside out. Every survivor becomes a target: their
-              "Rescue" checks are replaced by "Kill" checks, and you win by
-              killing the number set in "Number of Kills" below. Survivors turn
-              hostile once their scoop starts, and only kills you land yourself
-              count -- one lost to the zombies is a target gone for good, so
-              set the number well under the 48 in the mall.
+    Psycho:   Kill a specified number of survivors (see "Number of Kills"
+              below). Survivors will turn hostile once they are encountered.
+              Only kills done by Frank count, not ones from zombies, so setting
+              the goal number below 48 leaves a bit of room for missed kills.
+              In ScoopSanity, there are no Main Scoops. If ScoopSanity is on,
+              Main Scoop locations still exist but will be filler-only.
     """
     display_name = "Goal"
     option_ending_s = 0
@@ -221,9 +224,7 @@ class NumberOfSurvivors(Range):
     The number of survivors that must be rescued for the Savior goal. Only has
     an effect when Goal is set to Savior.
 
-    The maximum (48) requires rescuing every survivor in the game — 45 from
-    survivor/psychopath scoops plus the 3 free survivors (Bill Brenton,
-    Jeff Meyer, Natalie Meyer) who arrive without a dedicated scoop.
+    The maximum (48) requires rescuing every survivor in the game.
     """
     display_name = "Number of Survivors"
     range_start = 1
@@ -233,25 +234,23 @@ class NumberOfSurvivors(Range):
 
 class ScoopSanity(Toggle):
     """
-    When enabled, scoops are sent to the player as items and the game time is frozen
-    after completing the Entrance Plaza prologue.
+    When enabled, time freezes after the Entrance Plaza prologue. Scoops are
+    added to the item pool and will not begin until the player recieves them.
+    Main Scoops will also not trigger until the player reaches their position
+    in the randomized order, which is listed in the in-game Archipelago window.
 
-    The order for main scoops will be randomized and the player will need
-    to receive the scoop item in order for the next scoop to spawn in the world.
+    For example, if the scoop order is 1. Girl Hunting, 2. Hideout, players need
+    to wait until they receive "Girl Hunting" as an item and can reach North Plaza
+    to trigger it. Even if they receive the "Hideout" item first, they cannot start
+    it until all prior main scoops have been completed. Even if you begin a new run,
+    Main Scoop progress will be saved and they do not need to be repeated.
 
-    An example:
-    The player's scoop order is 1. Girl Hunting, 2. Carlito's Hideout, 3. Backup for Brad.
-    After completing the Entrance Plaza prologue, the player will need to wait
-    until they receive the Girl Hunting scoop item from AP before they can do the mission.
-    If they receive a later mission, like Backup for Brad, they will not be able to do it until they
-    receive and complete the prior missions.
+    Side Scoops are also items, and they spawn into the world right away. For
+    example, receiving "Lovers" spawns Tonya and Ross in Wonderland Plaza. If
+    you begin a new run, all Side Scoops will respawn in the mall.
 
-    Players will also receive side scoops as items, which will spawn the NPCs into
-    the world right away.
-
-    An example:
-    The player receives "Lovers".  Tonya and Ross will now spawn into the world in
-    Wonderland plaza and are rescuable.
+    If ScoopSanity is disabled, time will move normally and the game plays similarly
+    to the vanilla experience. Scoops will unlock based on time, not by items.
     """
     display_name = "ScoopSanity"
     default = True
@@ -259,13 +258,11 @@ class ScoopSanity(Toggle):
 
 class RandomizeScoopOrder(DefaultOnToggle):
     """
-    When enabled (the default), the main scoop chain is shuffled and you
-    receive the scoops in that new order.
+    When enabled (the default), the main scoop order is shuffled. The in-game
+    Archipelago window has a Scoop tab that lists the randomized order.
 
-    When disabled, the chain keeps its vanilla order, starting with Backup for
-    Brad. You still have to receive each scoop as an item before you can do it,
-    and the level requirements per position still apply, so the run is paced
-    the same as a randomized one.
+    When disabled, it will instead keep the vanilla order, starting with Backup for
+    Brad. You still have to receive each scoop as an item before you can do it.
 
     Has no effect if ScoopSanity is disabled.
     """
@@ -274,13 +271,10 @@ class RandomizeScoopOrder(DefaultOnToggle):
 
 class MainScoopsAnyOrder(Toggle):
     """
-    When enabled, any main scoop you have received can be started as soon as
-    you can reach it, instead of waiting for its turn in the chain. Activate
-    the one you want from the Scoops window; only one runs at a time.
-
-    The per-position level requirements do not apply in this mode. They exist
-    to spread a fixed chain across the run, which choosing the order already
-    does, so a scoop is available as soon as you can reach it.
+    When enabled, Main Scoops can be completed in any order. The player still
+    needs to receive the scoop item, and they must also be able to complete it
+    before it can be triggered. Main Scoops must be activated manually from the
+    in-game Archipelago scoop tab. Only one main scoop can be active at a time.
 
     Has no effect if ScoopSanity is disabled.
     """
@@ -291,8 +285,8 @@ class MainScoopsAnyOrder(Toggle):
 class ExcludeLevelsAbove(Range):
     """
     Level-ups above this value still exist as checks but are prevented from
-    holding progression items, which limits how much grinding a run can
-    demand.
+    holding progression items. This setting can be used to limit how much
+    grinding a run may demand.
 
     50 is max level, so setting it there excludes nothing.
     """
@@ -305,12 +299,12 @@ class ExcludeLevelsAbove(Range):
 
 class ExcludeRescuesAbove(Range):
     """
-    "Rescue N survivors" checks above this value still exist as checks but are
-    prevented from holding progression items. The later ones need most of the
-    mall rescued, so an item behind one sits at the end of the run.
+    "Rescue N survivors" checks above this value still exist but will not hold
+    progression items. This option prevents the player from having to rescue
+    every single survivor in the mall to retrieve an important item.
 
-    The checks are every fifth survivor up to 45, plus 48 -- every survivor in
-    the mall. Setting it to 48 excludes nothing.
+    The checks are every fifth survivor up to 45, plus one more at 48 for the
+    max number of survivors. Setting it to 48 excludes nothing.
     """
 
     display_name = "Exclude Rescues Above"
@@ -322,22 +316,22 @@ class ExcludeRescuesAbove(Range):
 class ZombieKillTiers(Choice):
     """
     Adds "Kill N zombies in <area>" checks, counted per area as you kill.
+    This incentivizes combat throughout the entire mall, not just hopping
+    into a car and driving over a few thousand in the Maintenance Tunnel.
 
-    Right now the only reason to kill zombies anywhere in particular is the
-    Maintenance Tunnel, where a car makes the global kill counts trivial.
-    These spread the killing across the mall.
+    Kills can be tracked using the in-game Archipelago Kills tab. Obviously,
+    choosing the higher tiers can add a significant grind to your game.
 
     none:      no area kill checks at all.
-    easy:      the default. Stops at 100 in the plazas, 50 in the small
-               areas (the three stores and the Warehouse), 500 in Leisure
-               Park and 1000 in the Maintenance Tunnel -- enough to get you
-               fighting around the mall without becoming a grind.
-    normal:    up to 500 in the plazas, 100 in the small areas, 1000 in
-               Leisure Park and 2000 in the Maintenance Tunnel.
-    nightmare: up to 1000 in the plazas, 500 in the small areas, 2000 in
-               Leisure Park and 5000 in the Maintenance Tunnel.
-    genocide:  every threshold, up to 27594 in the Maintenance Tunnel. Clearing
-               all of them is 53594 kills -- the Zombie Genocider count.
+    easy:      100 in main plazas and Food Court, 50 in small stores and
+               Warehouse, 500 in Leisure Park, 1000 in the Maintenance Tunnel.
+    normal:    500 in the main plazas and Food Court, 100 in small stores and
+               Warehouse, 1000 in Leisure Park, 2000 in the Maintenance Tunnel.
+    nightmare: 1000 in the main plazas and Food Court, 500 in small stores and
+               Warehouse, 2000 in Leisure Park, 5000 in the Maintenance Tunnel.
+    genocide:  2000 in main plazas and Food Court, 1000 in small stores and
+               Warehouse, 10000 in Leisure Park, 27594 in the Maintenance tunnel
+               (bringing the total to 53594 kills -- the Zombie Genocider count).
     """
     display_name = "Zombie Kill Tiers"
     option_none = 0
@@ -393,22 +387,22 @@ class EnabledTraps(OptionSet):
 
 class SpecialForcesMode(Choice):
     """
-    Puts the Overtime Special Forces in the mall during the 72 hours.
+    Puts the Special Forces in the mall prior to Overtime.
 
-    They are the soldiers who normally only show up after the story ends.
-    Zombies stay where they are -- the soldiers are added on top, not swapped
-    in -- and the mall's background music is silenced while they are around.
+    Be careful with this setting. Depending on which option you choose
+    and how unlucky you are, this could mean having Special Forces in
+    the Warehouse when you have few weapons and only early-game stats.
 
-    Requires ScoopSanity -- without it this does nothing.
+    This is only compatible with ScoopSanity. Without it, this does nothing.
 
-    Nothing happens until you have talked to Jessie, the same as every scoop.
-
-    none:      the default. Vanilla -- no Special Forces before Overtime.
-    item:      an AP item turns them on. They leave once you have both
-               "Kill 10 Special Forces" and "Hella Copter - Shoot down the
-               Special Forces Helicopter", so the checks are what sends them
-               home. Those two move into the main pool for this mode.
-    permanent: on for the whole run, from Jessie onward.
+    none:      the default. Special Forces will only be present in Overtime.
+    item:      an AP item turns them on, and they will be in every area of
+               the mall until you complete both "Kill 10 Special Forces" and
+               "Hella Copter - Shoot down the Special Forces Helicopter".
+               Once those locations are completed, Special Forces will leave.
+    permanent: Special Forces will be on for the whole run, from the Jessie
+               cutscene onward. This is a significant increase in difficulty,
+               especially early game in the Warehouse. Caution is advised.
     """
     display_name = "Special Forces Mode"
     option_none = 0
@@ -462,17 +456,17 @@ class VanillaProgression(Choice):
     Controls how Frank's natural level-up rewards interact with AP items.
 
     vanilla_only:
-        Engine grants skills/stats normally on level-up. AP skill/stat items
-        are NOT in the pool. Use this if you only want scoop/door
-        randomization without touching Frank's progression.
+        Level-ups grant skills/stats normally. AP skill/stat items are
+        NOT in the pool. Use this if you do not want to change Frank's
+        progression.
 
     replace:
-        Engine's level-up grants are suppressed (re-overridden each level).
+        Level-ups rewards are suppressed (re-overridden each level).
         AP items are the only source of skills and stats. The default.
 
     extra_buffs_only:
-        Engine grants normally, AP items contain ONLY the over-vanilla extras
-        (cap-pushing items). Best paired with Enable Extra Stat Buffs = true.
+        Level-ups grants rewards normally, AP items ONLY give the over-vanilla
+        extras. Best paired with Enable Extra Stat Buffs = true.
     """
     display_name = "Vanilla Progression"
     option_vanilla_only = 0
@@ -486,10 +480,8 @@ class TrapPercentage(Range):
     Percentage of filler-item slots that become traps. 0 = no traps,
     10 = default, 50 = aggressive, 100 = chaos. The selected
     fraction of filler slots is dedicated to traps and round-robin
-    distributed across all six trap types (Stomach Ache Trap, Zombait
-    Trap, Skipped Leg Day Trap, Damage Player Trap, Hostile NPC Trap, Special
-    Forces Trap) so every type appears at least once before any
-    repeats.
+    distributed across all trap types so they each appears at least once
+    before any repeats.
     """
     display_name = "Trap Percentage"
     range_start = 0
@@ -521,13 +513,13 @@ class HostileSurvivorCountMax(Range):
 
 class CultLimited(Toggle):
     """
-    In ScoopSanity, cultists will appear after beginning either 'The Cult' or
-    'A Strange Group', and they will remain in the mall indefinitely.
+    In ScoopSanity, cultists will appear after beginning either "The Cult" or
+    "A Strange Group", and they will remain in the mall indefinitely.
 
-    If this option is enabled, the cult will instead disappear from the mall
+    If this option is enabled, the cultists will instead disappear from the mall
     after Sean is killed like they do in the regular game. However, they will
     still be clustered outside the boss room in Colby's movie theater so you
-    can complete any cult-related checks.
+    can complete any cult-related checks with them there.
 
     This option has no effect if ScoopSanity is off.
     """
@@ -552,19 +544,9 @@ class NumberOfKills(Range):
 
 class OvertimeProgressionGating(Toggle):
     """
-    Adds gates to Overtime so Ending S is a longer run than Ending A rather
-    than the same run with a different ending.
-
-    With this off, Overtime plays as it always has. Its checks still exist --
-    the queens, the gates in the tunnel, the suppressant hand-ins and the rest --
-    they are simply not held back by anything.
-
-    With this on, two things are gated behind items the multiworld has to send
-    you. Isabela will not leave for the tunnel without the Clock Tower Tunnel
-    Key, and the Humvee will not start without the Humvee Key.
-
-    The suppressant ingredients are not gated either way -- they are picked up
-    normally and their checks fire when you collect them.
+    This option adds two key items that are required to complete Overtime
+    mode. Isabela will not leave the mall without the Clock Tower Tunnel
+    Key, and the military humvee will not start without the Humvee Key.
 
     This option has no effect unless the goal is Ending S.
     """
@@ -576,8 +558,7 @@ class NightModeEnabled(Toggle):
     When enabled, zombies behave as if it is always night, regardless of
     the in-game time. The night-side parameters of `ZombieDefinitionUserData`
     (HoldMissRate, HoldBlockRate, HoldBlockFallRate) are written over the
-    day-side fields, and `ZombieManager.isHourNight()` is hooked to always
-    return true.
+    day-side fields, and `ZombieManager.isHourNight()` is always on.
 
     Effects:
       * Higher chance for grabs to land (Day 5% miss → Night 15% miss)
@@ -587,13 +568,11 @@ class NightModeEnabled(Toggle):
     The glowing red eyes come with it. Every zombie gets them, including ones
     that spawn later, so the mall looks like night even in daylight.
 
-    With ScoopSanity on, the mall lighting goes to night as well — the sun
-    goes down and the interior lights come up — starting once you have met
-    Jessie in the warehouse, so the prologue plays in its intended daylight.
+    With ScoopSanity on, the mall lighting goes to night as well. This begins once
+    you have met Jessie in the warehouse.
 
     Without ScoopSanity the lighting is left alone. The clock is still running
-    in that mode and the game cycles into night on its own, so there is no
-    reason to override it.
+    in that mode and the game cycles into night on its own. Only behavior changes.
     """
     display_name = "Night Mode"
     default = False
@@ -601,30 +580,29 @@ class NightModeEnabled(Toggle):
 
 class CarKeys(Toggle):
     """
-    When enabled, the mall's drivable vehicles stay locked until the
-    multiworld sends you their key. Five keys cover every vehicle:
+    When enabled, the mall's drivable vehicles stay locked until you receive
+    their key. Five keys cover every vehicle:
 
-      * Sedan Key          — the white sedan in the Maintenance Tunnels
+      * Sedan Key          — the white sedan in the Maintenance Tunnel
       * Sports Car Key     — the red sports car in Leisure Park
-      * Truck Key          — the box truck in the Maintenance Tunnels
+      * Truck Key          — the box truck in the Maintenance Tunnel
       * Motorcycle Key     — both motorcycles, in Leisure Park and (after
                              Girl Hunting) North Plaza
       * Convict Humvee Key — the convicts' vehicle in Leisure Park
 
-    The vehicle challenges move behind the keys they can be done with: the
-    "Kill N zombies by vehicle" checks take any car, and "Jump a vehicle 50
-    feet" needs the sedan or the sports car.
+    For locations that require vehicles, logic is updated to reflect these
+    items. "Kill N zombies by vehicle" checks take any car, and "Jump a
+    vehicle 50 feet" needs the sedan or the sports car.
 
-    The per-area zombie kill checks in Leisure Park and the Maintenance
-    Tunnels also want a car once the counts climb — from 1,000 and 2,000
-    respectively. The convicts' Humvee never counts toward logic, since it
-    only exists after the convicts have been dealt with.
+    If Zombie Kill Tiers is active, the per-area zombie kill checks in
+    Leisure Park and the Maintenance Tunnel also require a car in that
+    region.
 
     Restricted Item Mode turns this on automatically. It can also be run on
-    its own, without item restriction.
+    its own, without any other item restrictions.
 
-    The Overtime Humvee is unaffected; it has its own key under Overtime
-    Progression Gating.
+    The Overtime military humvee is unaffected; it has its own key under
+    Overtime Progression Gating.
     """
     display_name = "Car Keys"
     default = False
@@ -635,9 +613,7 @@ class ZombieSpawnMultiplier(Range):
     Multiplies the number of zombies each area spawns.
 
     1 is vanilla and 5 is the maximum. At 5 an area that normally holds a
-    hundred zombies will hold roughly five hundred, which changes how you move
-    through the mall — crowds become walls, and routes that were a jog become
-    a fight.
+    hundred zombies will hold roughly five hundred.
 
     This costs performance. Every extra zombie is more to draw, animate and
     path, so higher values are not recommended on lower-end machines. If the
@@ -652,18 +628,17 @@ class ZombieSpawnMultiplier(Range):
 class HardcoreZombiesEnabled(Toggle):
     """
     When enabled, zombies become significantly more dangerous on top of
-    Night Mode. **Implies Night Mode** — turning this on without enabling
-    Night Mode auto-enables it.
+    Night Mode. Turning this on without enabling Night Mode auto-enables it.
 
     Amplified parameters:
-      * Bite damage: -1000 → -3000 HP per tick (3×)
-      * Downed-bite damage: -3000 → -9000 HP per tick (3×)
-      * Scratch damage rate: 3.5 → 7.0 (2×)
-      * Player aggro radius: 9 → 25 units (much harder to sneak past)
-      * General aggro radius: 13 → 35 units
-      * NPC aggro radius: 10 → 25 units (zombies notice survivors faster)
-      * Grab escape mash count: 15 → 30 (2× harder to escape)
-      * Mash decay rate: 0.02 → 0.05 (gauge drains faster while mashing)
+      * Bite damage: -1000 -> -3000 HP per tick (3×)
+      * Downed-bite damage: -3000 > -9000 HP per tick (3×)
+      * Scratch damage rate: 3.5 -> 7.0 (2×)
+      * Player aggro radius: 9 -> 25 units (much harder to sneak past)
+      * General aggro radius: 13 -> 35 units
+      * NPC aggro radius: 10 -> 25 units (zombies notice survivors faster)
+      * Grab escape mash count: 15 -> 30 (2× harder to escape)
+      * Mash decay rate: 0.02 -> 0.05 (gauge drains faster while mashing)
 
     Recommended only for experienced players seeking a challenge run.
     """
@@ -701,7 +676,7 @@ class CostumeChaosMode(Toggle):
     area, with a fresh random outfit each time.
 
     Uses the same Body-first randomization rules as Random Starting Costume.
-    Each area transition will count toward the "Change into 8 different
+    Each area transition will count toward the "Change into 5 different
     outfits" achievement, which may complete that location very quickly.
 
     Compatible with Random Starting Costume. If both are on, the starting
@@ -725,18 +700,16 @@ class PpBonusLocations(DefaultOnToggle):
       * Obtain First Aid Kit (in Seon's Food and Stuff, gated on defeating Steven)
 
     Counted-progression checks (per-instance + ALL-X final):
-      * Walk on N Treadmills (1..6, plus All Treadmills)         -- Al Fresca
-      * Destroy N Sandbags (1..4, plus All Sandbags)             -- Al Fresca
-      * Spin N Display Racks (1..4, plus All Display Racks)      -- Entrance
-      * Break N Food Court Wall Plates (1..18, no separate "all")
-      * Microwave N Items (1..9, plus Microwave All Items)
-      * Heat N Pans (1..5, plus Heat All Pans)
+      * Walk on N Treadmills (1 to 6, plus All Treadmills)         -- Al Fresca
+      * Destroy N Sandbags (1 to 4, plus All Sandbags)             -- Al Fresca
+      * Spin N Display Racks (1 to 4, plus All Display Racks)      -- Entrance
+      * Break N Food Court Wall Plates (1 to 18, no separate "all")
+      * Microwave N Items (1 to 9, plus Microwave All Items)
+      * Heat N Pans (1 to 5, plus Heat All Pans)
 
-    Logic gating: each check requires the relevant region. Microwave/Heat
-    locations require Food Court access (the most restrictive of the regions
-    those events occur in). In Restricted Item Mode, microwave checks
-    additionally require Uncooked Pizza or Raw Meat, and stove checks
-    require Frying Pan.
+    Logic gating: each check requires the relevant region. In Restricted Item Mode,
+    microwave checks additionally require Uncooked Pizza or Raw Meat, as well as
+    access to Seon's. Stove checks require Frying Pan.
     """
     display_name = "PP-Bonus Locations"
 
@@ -744,7 +717,7 @@ class PpBonusLocations(DefaultOnToggle):
 class DLCOutfitsEnabled(Toggle):
     """
     When enabled, the costume randomizer's Body pool includes the 20 DLC
-    outfit IDs (43..62) on top of the 43 regular Body costumes. DLC IDs
+    outfit IDs (43 to 62) on top of the 43 regular Body costumes. DLC IDs
     function as full-outfit anchors — picking one applies a complete DLC
     outfit (e.g. Mega Man armor, knight set) instead of a partial body.
 
@@ -783,6 +756,10 @@ class PPStickersFiller(Toggle):
     """
     When enabled, PP stickers and their milestone checks (such as
     "Photograph 10 PP Stickers") will still exist but will only have filler.
+
+    This option pairs well with certain Door Randomizer options. If the entire
+    mall is accessible from the start, then PP stickers alone will put 108
+    locations into early spheres of the multiworld.
     """
     display_name = "PP Stickers Filler"
     default = False
@@ -791,11 +768,8 @@ class PPStickersFiller(Toggle):
 class OvertimeChecksFiller(Toggle):
     """
     When enabled, every check in Overtime still exists but will only ever hold
-    filler, so no progression is placed past the point of no return.
-
-    The Overtime items are untouched: the Clock Tower Tunnel Key and the Humvee
-    Key are still progression and can still be what the multiworld sends you.
-    This only stops Overtime's own checks from holding anything you need.
+    filler, so no progression is placed past the point of no return. This means
+    that no key items will be placed at the very end of your game.
 
     Has no effect on Ending A, which drops the Overtime checks entirely.
     """
@@ -888,51 +862,51 @@ class DROption(PerGameCommonOptions):
     priority_locations: DRPriorityLocations
     start_location_hints: DRStartLocationHints
     start_inventory_from_pool: StartInventoryPool
-    goal: Goal
-    number_of_survivors: NumberOfSurvivors
-    number_of_kills: NumberOfKills
     guaranteed_items: GuaranteedItemsOption
     death_link: DeathLink
     damage_link: DamageLink
     damage_link_group: DamageLinkGroup
     knockback_link: KnockbackLink
-    restricted_item_mode: RestrictedItemMode
-    spitter_only: SpitterOnly
+    goal: Goal
+    number_of_survivors: NumberOfSurvivors
+    number_of_kills: NumberOfKills
+    scoop_sanity: ScoopSanity
+    randomize_scoop_order: RandomizeScoopOrder
+    main_scoops_any_order: MainScoopsAnyOrder
+    zombie_kill_tiers: ZombieKillTiers
+    kill_sanity: KillSanity
+    pp_bonus_locations: PpBonusLocations
+    exclude_levels_above: ExcludeLevelsAbove
+    exclude_rescues_above: ExcludeRescuesAbove
+    overtime_checks_filler: OvertimeChecksFiller
+    pp_stickers_filler: PPStickersFiller
     door_randomizer: DoorRandomizer
     door_randomizer_mode: DoorRandomizerMode
     door_locks: DoorLocks
     randomize_rooftop_service_hallway_doors: RandomizeRooftopServiceHallwayDoors
-    scoop_sanity: ScoopSanity
-    randomize_scoop_order: RandomizeScoopOrder
-    main_scoops_any_order: MainScoopsAnyOrder
-    exclude_levels_above: ExcludeLevelsAbove
-    exclude_rescues_above: ExcludeRescuesAbove
-    zombie_kill_tiers: ZombieKillTiers
-    kill_sanity: KillSanity
-    special_forces_mode: SpecialForcesMode
-    enabled_traps: EnabledTraps
+    restricted_item_mode: RestrictedItemMode
+    car_keys: CarKeys
+    split_keys: SplitKeys
+    overtime_progression_gating: OvertimeProgressionGating
+    exclude_overpowered_items: ExcludeOverpoweredItems
     enable_skill_items: EnableSkillItems
     enable_stat_items: EnableStatItems
     enable_extra_stat_buffs: EnableExtraStatBuffs
     vanilla_progression: VanillaProgression
-    exclude_overpowered_items: ExcludeOverpoweredItems
-    overtime_checks_filler: OvertimeChecksFiller
+    enabled_traps: EnabledTraps
     trap_percentage: TrapPercentage
     hostile_survivor_count_min: HostileSurvivorCountMin
     hostile_survivor_count_max: HostileSurvivorCountMax
     cult_limited: CultLimited
-    overtime_progression_gating: OvertimeProgressionGating
+    special_forces_mode: SpecialForcesMode
+    spitter_only: SpitterOnly
     night_mode_enabled: NightModeEnabled
     hardcore_zombies_enabled: HardcoreZombiesEnabled
-    zombie_spawn_multiplier: ZombieSpawnMultiplier
-    car_keys: CarKeys
+    zombie_spawn_multiplier: ZombieSpawnMultiplier    
     random_starting_costume: RandomStartingCostume
     costume_chaos_mode: CostumeChaosMode
     dlc_outfits_enabled: DLCOutfitsEnabled
-    pp_bonus_locations: PpBonusLocations
-    pp_stickers_filler: PPStickersFiller
-    split_keys: SplitKeys
-
+    
 dr_option_groups = [
     OptionGroup("Goal and Location Settings",
         [
@@ -942,14 +916,13 @@ dr_option_groups = [
             ScoopSanity,
             RandomizeScoopOrder,
             MainScoopsAnyOrder,
+            ZombieKillTiers,
+            KillSanity,
             PpBonusLocations,
             ExcludeLevelsAbove,
             ExcludeRescuesAbove,
-            ZombieKillTiers,
-            SpecialForcesMode,
-            PPStickersFiller,
-            OvertimeProgressionGating,
             OvertimeChecksFiller,
+            PPStickersFiller,
         ],
     ),
     OptionGroup(
@@ -962,10 +935,12 @@ dr_option_groups = [
         ],
     ),
     OptionGroup(
-        "Item Settings",
+        "Item and Key Settings",
         [
             RestrictedItemMode,
-            SpitterOnly,
+            CarKeys,
+            SplitKeys,
+            OvertimeProgressionGating,
             ExcludeOverpoweredItems,
         ],
     ),
@@ -991,11 +966,11 @@ dr_option_groups = [
         "Difficulty Settings",
         [
             CultLimited,
-            SplitKeys,
+            SpecialForcesMode,
+            SpitterOnly,
             NightModeEnabled,
             HardcoreZombiesEnabled,
             ZombieSpawnMultiplier,
-            CarKeys,
         ],
     ),
     OptionGroup(
@@ -1006,10 +981,6 @@ dr_option_groups = [
             DLCOutfitsEnabled,
         ],
     ),
-    # The location pickers replace the stock classes, and Archipelago files
-    # this section by class, so without this they fell to the top of Game
-    # Options. It appends the stock options after these; DRWeb sorts them
-    # back into the stock order.
     OptionGroup(
         "Item & Location Options",
         [
