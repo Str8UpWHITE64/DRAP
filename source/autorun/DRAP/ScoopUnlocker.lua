@@ -379,9 +379,21 @@ local overtime_off_since = nil
 -- the game's, and it replays a finished case whose record is off: the
 -- Hideout ending (#63, 301) and Jessie's Discovery in the Security Room
 -- (302), which soft-locked. On entering Overtime, once per session, every
--- completed main's completion flag goes back on, plus 301 and 355 (EV_EVS02),
--- which the Hideout ending sets, once 2322 is on.
+-- completed main's flags go back on, plus 301 and 355 (EV_EVS02), which the
+-- Hideout ending sets, once 2322 is on.
+--
+-- All of a main's flags, not just its completion: the game replays an event
+-- whose trigger is on and whose own record is off. Putting back 284 alone
+-- (Professor's Past's completion, Girl Hunting's start) with 285 still off
+-- replayed Girl Hunting in Seon's and then Isabela leaving (287), which took
+-- the Overtime items with her (RobaRising, 2026-10-08). Every flag a main
+-- owns is on in a vanilla Overtime save except these two of The Last
+-- Resort's, so they stay as they are.
 local OVERTIME_HIDEOUT_FLAGS = { 301, 355 }
+local OVERTIME_LEAVE_OFF = {
+    [443] = true,  -- HAVING_BOM
+    [452] = true,  -- EVM37A_RIDE_OFF
+}
 local HIDEOUT_DONE_FLAG = 2322
 local overtime_story_restored = false
 
@@ -3232,16 +3244,26 @@ end
 
 --- Put back the story flags the 72 hours cleared (see OVERTIME_HIDEOUT_FLAGS).
 local function restore_overtime_story()
-    local want = {}
+    local wanted = {}
+    local function finished_main(name)
+        local data = name and SCOOP_DATA[name]
+        return data and data.category == "Main" and completed_scoops[name]
+    end
+    for flag_id, name in pairs(CONTROLLED_FLAGS) do
+        if finished_main(name) then wanted[flag_id] = true end
+    end
+    for flag_id, name in pairs(CASCADE_FLAGS) do
+        if finished_main(name) then wanted[flag_id] = true end
+    end
     for flag_id, row in pairs(COMPLETION_FLAGS) do
-        local data = row.scoop and SCOOP_DATA[row.scoop]
-        if data and data.category == "Main" and completed_scoops[row.scoop]
-                and COMPLETION_EVENT_TO_SCOOP[row.event] == row.scoop then
-            want[#want + 1] = flag_id
-        end
+        if finished_main(row.scoop) then wanted[flag_id] = true end
     end
     if raw_check_flag(HIDEOUT_DONE_FLAG) == true then
-        for _, fid in ipairs(OVERTIME_HIDEOUT_FLAGS) do want[#want + 1] = fid end
+        for _, fid in ipairs(OVERTIME_HIDEOUT_FLAGS) do wanted[fid] = true end
+    end
+    local want = {}
+    for fid in pairs(wanted) do
+        if not OVERTIME_LEAVE_OFF[fid] then want[#want + 1] = fid end
     end
     table.sort(want)
 
