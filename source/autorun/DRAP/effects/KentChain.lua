@@ -754,12 +754,59 @@ end
 -- HEAD's disable-active behavior for the armed day, verbatim: pin the
 -- listed flags off each tick until the day completes. See
 -- CLEAR_WHILE_ARMED for why this exists and why it must be continuous.
+-- The pins hold 1224 off for all of day 2, so the scheduler fires the
+-- appear on every Paradise entry. After the first one Kent's record is
+-- awake, and a re-entry places him from it AND from the appear: two Kents.
+-- Outside Paradise, before the shoot, the record goes back to sleep, the
+-- state the first entry found it in. Same move as Brad's escort record.
+local LIVE_STATE_SLEEP = 9
+local record_rested_logged = false
+local function rest_record_outside(name)
+    if name ~= "Photo Challenge" then return end
+    if outside_since == nil or os.clock() - outside_since < OUTSIDE_SETTLE then
+        record_rested_logged = false
+        return
+    end
+    if flag_check(SHOOT_STARTED_FLAG[name]) ~= false then return end
+    if flag_check(1224) ~= false then return end  -- no appear coming: keep him
+    local mgr = npc_mgr:get()
+    if not mgr then return end
+    local list
+    pcall(function() list = mgr:get_field("NpcInfoList") end)
+    if not list then return end
+    local n
+    pcall(function() n = list:call("get_Count") end)
+    for i = 0, (n or 0) - 1 do
+        local info
+        pcall(function()
+            local e = list:call("get_Item", i)
+            if e and Shared.to_int(e:get_field("<Name>k__BackingField")) == KENT_STYPE then
+                info = e
+            end
+        end)
+        if info then
+            local state = Shared.to_int(Shared.safe(function() return info:get_field("mLiveState") end))
+            if state ~= nil and state ~= LIVE_STATE_SLEEP then
+                pcall(function() info:call("setLiveState", LIVE_STATE_SLEEP) end)
+                if not record_rested_logged then
+                    record_rested_logged = true
+                    M.log(string.format(
+                        "Kent's day-2 record was awake outside Paradise (live %d) -- put to sleep so the next entry places one Kent",
+                        state))
+                end
+            end
+            return
+        end
+    end
+end
+
 local clears_logged = {}
 local pinned_day = nil
 local function maintain_clears(name)
     local list = CLEAR_WHILE_ARMED[name]
     if not list then return end
     pinned_day = name
+    rest_record_outside(name)
     for _, fid in ipairs(list) do
         if flag_check(fid) == true then
             flag_set(fid, false)
