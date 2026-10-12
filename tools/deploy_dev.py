@@ -19,6 +19,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
 SRC_AUTORUN = os.path.join(REPO, "source", "autorun")
 SRC_DATA = os.path.join(REPO, "source", "data")
+# Loose asset overrides (PP sticker logo). Land at <game>/natives, which
+# REFramework's LooseFileLoader reads -- and only when it is enabled.
+SRC_NATIVES = os.path.join(REPO, "source", "natives")
 
 DEFAULT_GAME = (
     r"C:\Program Files (x86)\Steam\steamapps\common\DEAD RISING DELUXE REMASTER"
@@ -64,8 +67,13 @@ def main() -> int:
         shutil.copyfile(full, os.path.join(data_out, name))
         n_data += 1
 
+    n_nat = 0
+    if os.path.isdir(SRC_NATIVES):
+        n_nat = copy_tree(SRC_NATIVES, os.path.join(game, "natives"))
+
     print(f"  {n_lua} script(s) -> reframework/autorun")
     print(f"  {n_data} data file(s) -> reframework/data")
+    print(f"  {n_nat} loose asset(s) -> natives")
     print(f"  deployed to {game}")
 
     deploy_apworld()

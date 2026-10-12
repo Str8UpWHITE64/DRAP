@@ -4,6 +4,9 @@ Outputs into tools/release_out/:
   DRAP_<version>.zip  -- extract straight into the game install folder
   drdr.apworld        -- goes into Archipelago's custom_worlds
 
+The zip also carries source/natives as natives/ at the game root (loose asset
+overrides; see below).
+
 The zip carries source/autorun as reframework/autorun AND source/data as
 reframework/data. Both halves are required: SharedData reads drdr_shared.json
 from the data folder at runtime, DoorRandomizer reads drdr_doors.json and
@@ -106,6 +109,7 @@ def main():
     zpath = os.path.join(OUT, f"DRAP_{version}.zip")
     autorun = os.path.join(REPO, "source", "autorun")
     data = os.path.join(REPO, "source", "data")
+    natives = os.path.join(REPO, "source", "natives")
     with zipfile.ZipFile(zpath, "w", zipfile.ZIP_DEFLATED) as z:
         z.write(os.path.join(REPO, "dinput8.dll"), "dinput8.dll")
         z.write(os.path.join(REPO, "lua-apclientpp.dll"), "lua-apclientpp.dll")
@@ -132,6 +136,23 @@ def main():
                 full = os.path.join(root, f)
                 arc = "reframework/data/" + os.path.relpath(full, data).replace(os.sep, "/")
                 z.write(full, arc)
+        # Turns REFramework's loose-file loader on (it is off by default, so
+        # without this the natives/ overrides below never load). Measured
+        # 2026-10-11: a config holding only this key is accepted and REFramework
+        # fills every other setting with its defaults. Extracting over an
+        # existing config replaces it, so their other REFramework settings
+        # reset; see docs/BACKLOG.md. Lua cannot do this itself (its io is
+        # sandboxed to reframework/data).
+        z.write(os.path.join(REPO, "tools", "release_extra", "re2_fw_config.txt"), "re2_fw_config.txt")
+        # Loose asset overrides (PP sticker logo) sit beside reframework/ at
+        # the game root, where REFramework's LooseFileLoader looks. They are
+        # only read when LooseFileLoader_Enabled=true in re2_fw_config.txt.
+        if os.path.isdir(natives):
+            for root, dirs, files in os.walk(natives):
+                for f in files:
+                    full = os.path.join(root, f)
+                    arc = "natives/" + os.path.relpath(full, natives).replace(os.sep, "/")
+                    z.write(full, arc)
 
     entries = len(zipfile.ZipFile(zpath).namelist())
     print(f"built {os.path.basename(zpath)} ({entries} entries, world {version})")

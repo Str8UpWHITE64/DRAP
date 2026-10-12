@@ -27,6 +27,8 @@ Currently, there is only one goal, to get Ending S and beat Brock. We may add mo
 ```DEAD RISING DELUXE REMASTER
 ├── dinput8.dll             (REFramework v1.5.9.1, DD2 build)
 ├── lua-apclientpp.dll      (Archipelago client library)
+├── re2_fw_config.txt       (turns on REFramework's loose-file loader)
+├── natives                 (replacement PP sticker textures)
 ├── THIRD-PARTY-LICENSES.md
 └── reframework
     ├── autorun
@@ -37,6 +39,7 @@ Currently, there is only one goal, to get Ending S and beat Brock. We may add mo
 ```
 > **Extract both folders.** `reframework/data` is not optional — without it the mod loads but registers no items and finds no scoop data.
 > **If you already have your own REFramework installed, let the zip overwrite it.** REFramework only learned about Dead Rising in **v1.5.8** (25 Oct 2024) — the `DD2.zip` build. Anything older loads and looks fine, but it cannot find one of the engine functions it needs to track object lifetimes, and the result is memory corruption: garbled text in the console, and occasional wrong behaviour or crashes that are impossible to trace. If you want to supply your own, use v1.5.8 or newer.
+> **Let the zip overwrite `re2_fw_config.txt`.** It turns on REFramework's loose-file loader, which DRAP needs for the PP sticker logo, and it resets your other REFramework settings to defaults. If you keep your own config, set `LooseFileLoader_Enabled=true` in it instead.
 
 2. Download `drdr.apworld` from the Releases page and place it into your Archipelago `custom_worlds` folder.
 3. Launch the game.  You should see the AP client connect window pop up, along with the REFramework window.  If you do not see the AP client connect window, scroll down in the REFramework window to "Script Generated UI" and make sure "Show Archipelago Client UI" is checked.  If the mod reports that `lua-apclientpp.dll` could not load, re-extract the zip and make sure both dll files sit next to the game exe.

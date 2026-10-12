@@ -61,3 +61,14 @@ Binary distributions may contain parts of OpenSSL and other software.
 For OpenSSL see https://www.openssl.org/source/apache-license-2.0.txt
 See subprojects on https://github.com/black-sliver/lua-apclientpp/ for more
 details and individual licenses.
+
+## Archipelago logo (PP sticker textures)
+
+`natives/STM/Item/model/om/om013f/` holds replacement textures for the PP
+stickers that show the Archipelago logo. The logo belongs to the Archipelago
+project (https://github.com/ArchipelagoMW/Archipelago); its repository is
+MIT-licensed code and no separate artwork licence was found. It is used here
+only to identify this as an Archipelago mod, not as a claim of endorsement.
+These files contain no Capcom artwork, only our own re-encoding of that logo in
+the game's texture format. The matching `om013f.mdf2.40` is the game's own
+material file with a single colour value changed; it carries no other change.
