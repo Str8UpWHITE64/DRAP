@@ -143,7 +143,7 @@ def main():
         # existing config replaces it, so their other REFramework settings
         # reset; see docs/BACKLOG.md. Lua cannot do this itself (its io is
         # sandboxed to reframework/data).
-        z.write(os.path.join(REPO, "tools", "release_extra", "re2_fw_config.txt"), "re2_fw_config.txt")
+        z.write(os.path.join(REPO, "re2_fw_config.txt"), "re2_fw_config.txt")
         # Loose asset overrides (PP sticker logo) sit beside reframework/ at
         # the game root, where REFramework's LooseFileLoader looks. They are
         # only read when LooseFileLoader_Enabled=true in re2_fw_config.txt.
