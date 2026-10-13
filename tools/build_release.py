@@ -28,6 +28,7 @@ docs/reframework/features/logging.md.
 import json
 import os
 import re
+import time
 import zipfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -129,6 +130,18 @@ def main():
         for f in ("DRAP Music Builder.bat", "DRAP Music Uninstall.bat",
                   "DRAP-MusicBuilder.ps1"):
             z.write(os.path.join(music, f), f)
+        # The Linux (Proton) twin: a python3 builder and two sh launchers.
+        # LF line endings whatever the checkout uses (a CRLF shebang does not
+        # run), and the executable bit set so a file manager can run them.
+        for f in ("DRAP Music Builder.sh", "DRAP Music Uninstall.sh",
+                  "drap_music_builder.py"):
+            with open(os.path.join(music, f), "rb") as fh:
+                body = fh.read().replace(b"\r\n", b"\n")
+            info = zipfile.ZipInfo(f, date_time=time.localtime(os.path.getmtime(os.path.join(music, f)))[:6])
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.external_attr = (0o100755 << 16)
+            info.create_system = 3          # unix, so the mode bits are honoured
+            z.writestr(info, body)
         for root, dirs, files in os.walk(autorun):
             for f in files:
                 full = os.path.join(root, f)

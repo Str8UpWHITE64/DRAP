@@ -422,20 +422,6 @@ public static class DrapMusic {
     public static void SetF32(byte[] b, int off, float v) { Buffer.BlockCopy(BitConverter.GetBytes(v), 0, b, off, 4); }
     public static byte[] Slice(byte[] b, int n) { byte[] o = new byte[Math.Min(n, b.Length)]; Buffer.BlockCopy(b, 0, o, 0, o.Length); return o; }
 
-    // 16-bit PCM times a gain in dB, clamped (targets are well below full
-    // scale, so the clamp only ever touches stray peaks).
-    public static byte[] ScalePcm(byte[] pcm, double gainDb) {
-        double g = Math.Pow(10.0, gainDb / 20.0);
-        byte[] o = new byte[pcm.Length];
-        for (int i = 0; i + 1 < pcm.Length; i += 2) {
-            double v = (short)(pcm[i] | (pcm[i + 1] << 8)) * g;
-            int s = (int)Math.Round(v);
-            if (s > 32767) s = 32767; else if (s < -32768) s = -32768;
-            o[i] = (byte)(s & 0xFF); o[i + 1] = (byte)((s >> 8) & 0xFF);
-        }
-        return o;
-    }
-
     // A Sound body with its Volume property (prop id 0) set, inserting the
     // property if the template has none. Prop bundle at 28: count, ids, values.
     public static byte[] WithVolume(byte[] body, float vol) {
@@ -567,8 +553,17 @@ if (-not $ffmpeg) {
 }
 
 function Get-Songs($dir) {
-    @(Get-ChildItem -Path $dir -File -Recurse -ErrorAction SilentlyContinue |
-        Where-Object { $AudioExt -contains $_.Extension.ToLowerInvariant() } | Sort-Object FullName)
+    $files = @(Get-ChildItem -Path $dir -File -Recurse -ErrorAction SilentlyContinue |
+        Where-Object { $AudioExt -contains $_.Extension.ToLowerInvariant() })
+    if ($files.Count -eq 0) { return , @() }
+    # Ordinal order of the upper-cased path inside the pool folder, with '/'
+    # separators: the Linux builder (drap_music_builder.py) sorts the same way,
+    # so both add songs in the same order and write identical files.
+    $root = (Get-Item -LiteralPath $dir).FullName.TrimEnd('\')
+    [string[]]$keys = @($files | ForEach-Object { $_.FullName.Substring($root.Length + 1).Replace('\', '/').ToUpperInvariant() })
+    [object[]]$arr = $files
+    [Array]::Sort($keys, $arr, [StringComparer]::Ordinal)
+    return , $arr
 }
 $songs = @()
 foreach ($s in (Get-Songs $MallDir)) { $songs += , @("mall", $s) }
@@ -660,10 +655,18 @@ function Get-Lufs($raw, $rate, $ch) {
     return [double]::Parse($v, $inv)
 }
 
-# Raw PCM gained to an exact integrated loudness, wrapped as a PCM .wem.
-function Write-Wem($pcm, $measured, $target, $rate, $ch, $out) {
+# Raw PCM gained to an exact integrated loudness (ffmpeg's volume filter),
+# wrapped as a PCM .wem.
+function Write-Wem($raw, $measured, $target, $rate, $ch, $out) {
     $g = if ($measured -ne $null) { $target - $measured } else { 0 }
-    [IO.File]::WriteAllBytes($out, [DrapMusic]::PcmWem([DrapMusic]::ScalePcm($pcm, $g), $rate, $ch))
+    $gained = "$out.raw"
+    $ff = @("-v", "error", "-y", "-f", "s16le", "-ar", "$rate", "-ac", "$ch", "-i", $raw,
+            "-af", ("volume={0}dB:precision=double" -f $g.ToString("0.000000", $inv)),
+            "-f", "s16le", "-acodec", "pcm_s16le", $gained)
+    & $ffmpeg @ff
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path $gained)) { throw "ffmpeg could not set the volume of a converted song" }
+    [IO.File]::WriteAllBytes($out, [DrapMusic]::PcmWem([IO.File]::ReadAllBytes($gained), $rate, $ch))
+    Remove-Item $gained
 }
 
 function Add-Sound($templateId, $soundId, $sourceId, $wemPath, $bus, $parentKeep, $volume) {
@@ -715,18 +718,17 @@ try {
         if ($pool -eq "mall") {
             $raw = Join-Path $work "$i.raw"
             Render $song 22050 1 $raw
-            $pcm = [IO.File]::ReadAllBytes($raw)
             $measured = Get-Lufs $raw 22050 1
-            Remove-Item $raw
             $srcs = @()
             for ($l = 0; $l -lt 2; $l++) {
                 $wem = Join-Path $work "$i.$l.wem"
-                Write-Wem $pcm $measured ([double]$T.mall_lufs[$l] + [double]$gain.mall_gain_db) 22050 1 $wem
+                Write-Wem $raw $measured ([double]$T.mall_lufs[$l] + [double]$gain.mall_gain_db) 22050 1 $wem
                 $sid = New-Id "$key|layer$l|sound"; $src = New-Id "$key|layer$l|source"
                 Add-Sound $T.mall_layers[$l] $sid $src $wem $null $true $null
                 $sounds += $sid; $srcs += $src
                 $total += (Get-Item $wem).Length
             }
+            Remove-Item $raw
             # Theater version for Colby's: the same audio, layer 1 quieter,
             # layer 2 shared -- as the game's own theater versions are built.
             $th0 = New-Id "$key|theater0|sound"
@@ -736,11 +738,10 @@ try {
         } else {
             $raw = Join-Path $work "$i.raw"
             Render $song 48000 2 $raw
-            $pcm = [IO.File]::ReadAllBytes($raw)
             $measured = Get-Lufs $raw 48000 2
-            Remove-Item $raw
             $wem = Join-Path $work "$i.wem"
-            Write-Wem $pcm $measured ([double]$T.act_lufs + [double]$gain.action_gain_db) 48000 2 $wem
+            Write-Wem $raw $measured ([double]$T.act_lufs + [double]$gain.action_gain_db) 48000 2 $wem
+            Remove-Item $raw
             $sid = New-Id "$key|sound"; $src = New-Id "$key|source"
             Add-Sound $T.act_sound $sid $src $wem $T.act_bus $false $T.act_volume
             $sounds += $sid

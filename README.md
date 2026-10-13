@@ -32,6 +32,9 @@ Currently, there is only one goal, to get Ending S and beat Brock. We may add mo
 ├── DRAP Music Builder.bat  (optional: adds your own songs, see Music Shuffle and Custom Music)
 ├── DRAP Music Uninstall.bat
 ├── DRAP-MusicBuilder.ps1
+├── DRAP Music Builder.sh   (the same for Linux / Steam Deck)
+├── DRAP Music Uninstall.sh
+├── drap_music_builder.py
 ├── THIRD-PARTY-LICENSES.md
 └── reframework
     ├── autorun
@@ -129,6 +132,23 @@ Your songs are **added** to the game; none of the game's own music is changed. T
    `DRAP Music\Installed songs.txt` lists what was added.
 6. **Play.** Connect to a seed that has `music_shuffle: true`. Each mall area plays its own song, and the fight and event music plays your Action songs. Songs loop until the game moves on.
 
+#### Linux and Steam Deck (Proton)
+
+The Windows `.bat` files don't run on Linux. Use the two `.sh` files instead; they do the same job and write the same files. The setup above applies, with these differences:
+
+1. **Find the game folder.** In Steam, right-click Dead Rising Deluxe Remaster, then **Manage > Browse local files**. It's usually `~/.steam/steam/steamapps/common/DEAD RISING DELUXE REMASTER`. Extract the release zip there as on Windows. It includes `DRAP Music Builder.sh`, `DRAP Music Uninstall.sh` and `drap_music_builder.py`.
+2. **You need python3.** Most Linux systems and SteamOS already have it; check with `python3 --version`.
+3. **Get ffmpeg.**
+   - On a desktop system, install it with your package manager, for example `sudo apt install ffmpeg` (Ubuntu, Debian, Mint, Pop!_OS), `sudo dnf install ffmpeg` (Fedora) or `sudo pacman -S ffmpeg` (Arch, Manjaro).
+   - On a Steam Deck, or anywhere you can't install packages, download a Linux build from one of the links on [ffmpeg.org/download.html](https://ffmpeg.org/download.html) and copy its `ffmpeg` file into the `DRAP Music` folder.
+4. **Run the builder from a terminal**, with the game closed:
+   ```sh
+   cd ~/.steam/steam/steamapps/common/"DEAD RISING DELUXE REMASTER"
+   sh "DRAP Music Builder.sh"
+   ```
+   Run it once to create the song folders, put your songs in them, then run it again, exactly as in steps 3-5 above. To remove your songs, run `sh "DRAP Music Uninstall.sh"`.
+5. **Volume, changing songs and the log file** work the same as on Windows.
+
 #### Changing your songs
 
 Add or remove files in the two folders, then run `DRAP Music Builder.bat` again with the game closed. It replaces its previous build each time.
@@ -163,6 +183,11 @@ The window says what happened, and the same text is saved to `DRAP Music\Music B
 | `The game's music no longer matches this version of DRAP` | A game update changed the music files. Nothing was changed; check for a newer DRAP release. |
 | `...larger than 3.5 GB...` | Too much music for one build. Remove some songs, or use shorter ones. Mall songs take about 2.6 MB per minute, Action songs about 11.5 MB per minute. |
 | `Failed: ...` | Nothing in the game folder was changed. Send the log file. |
+| Linux: `python3 was not found` | Install python3 with your package manager, then run the `.sh` again. |
+| Linux: `ffmpeg was not found` | Install ffmpeg with your package manager, or put a Linux `ffmpeg` file in the `DRAP Music` folder (Linux step 3). |
+| Linux: `Dead Rising is running` | Close the game and wait for Steam to show it as stopped. Proton can take a few seconds to exit. |
+| Linux: `Permission denied` when running the `.sh` | Run it as `sh "DRAP Music Builder.sh"`, not `./DRAP Music Builder.sh`. |
+| Linux: the songs never play in game | Check `re2_fw_config.txt` in the game folder contains `LooseFileLoader_Enabled=true`. |
 
 ## Save Data and the "Failed to Save" Error
 
