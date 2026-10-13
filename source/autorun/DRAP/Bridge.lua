@@ -348,6 +348,14 @@ local function handle_bounced(json_rows)
     if not has_tag(json_rows["tags"], "DeathLink") then return end
 
     local data = json_rows["data"] or {}
+
+    -- This client's own death, echoed back by the server. A DeathLink from
+    -- another client has no uuid of ours and still goes through.
+    if damage_uuid and tostring(data["uuid"] or "") == damage_uuid then
+        M.log("DeathLink echo ignored")
+        return
+    end
+
     local source = data["source"] or data["player"] or "Unknown"
     local cause = data["cause"] or ("DeathLink from " .. tostring(source))
 
@@ -384,7 +392,8 @@ function M.send_deathlink(data)
     local deathLinkData = {
         time = (data and data.time) or time_of_death,
         cause = (data and data.cause) or (my_alias .. " died."),
-        source = my_alias
+        source = my_alias,
+        uuid = get_damage_uuid(),
     }
 
     if type(AP_REF.APClient.Bounce) == "function" then
