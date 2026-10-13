@@ -1061,8 +1061,6 @@ def set_rules(world) -> None:
     world.set_rule(_survivor_location(world, "Rescue Jennifer Gorman"), And(CanReachRegion("Paradise Plaza"), (Has("The Cult") if world.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM")))))
     world.set_rule(_survivor_location(world, "Rescue Tad Hawthorne"), And(CanReachRegion("Paradise Plaza"), CanReachLocation("Kill Kent on day 3"), (_kent_day("Photographer's Pride") if world.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM"), Has("DAY3_11_AM")))))
     world.set_rule(_survivor_location(world, "Rescue Simone Ravendark"), And(CanReachRegion("Paradise Plaza"), (Has("A Woman in Despair") if world.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM"), Has("DAY3_11_AM"), CanReachLocation("Complete Santa Cabeza")))))
-    ## 1.1.0 HAS A BUG WITH "Rescue Simone Ravendark", THIS NEXT LINE EXCLUDES THIS CHECK IN ALL PLAY MODES AND SHOULD BE REMOVED UPON FIX BEING IMPLEMENTED
-    _survivor_location(world, "Rescue Simone Ravendark").progress_type = LocationProgressType.EXCLUDED
 
     # Survivors in Leisure Park
     world.set_rule(_survivor_location(world, "Rescue Sophie Richard"), And(CanReachRegion("Leisure Park"), (Has("The Convicts") if world.options.scoop_sanity else True_())))
