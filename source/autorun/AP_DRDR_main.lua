@@ -154,6 +154,7 @@ AP.effects.ZombieEffects              = require("DRAP/effects/ZombieEffects")
 AP.effects.VehicleGate                = require("DRAP/effects/VehicleGate")
 AP.effects.UnlockItemSpawns           = require("DRAP/effects/UnlockItemSpawns")
 AP.effects.CostumeRandomizer          = require("DRAP/effects/CostumeRandomizer")
+AP.effects.MusicShuffle               = require("DRAP/effects/MusicShuffle")
 AP.effects.AP_LocationTriggers        = require("DRAP/effects/AP_LocationTriggers")
 AP.effects.PpBonusMatch               = require("DRAP/effects/PpBonusMatch")
 AP.effects.DoorPromptOverlay          = require("DRAP/effects/DoorPromptOverlay")
@@ -651,6 +652,13 @@ local function run_slot_connect(slot_data)
             tostring(starting), tostring(chaos), tostring(dlc)))
     end
 
+    -- Music Shuffle: cosmetic, seeded from seed + slot so a reconnect hears
+    -- the same soundtrack. The table write itself happens on the frame.
+    if AP.effects.MusicShuffle then
+        AP.effects.MusicShuffle.setup(
+            type(slot_data) == "table" and slot_data.music_shuffle == true, seed, slot)
+    end
+
     -- PP-bonus AP location triggers. Slot data carries the per-entry mapping
     -- (msg_no -> location_name(s)) so this Lua module just walks the list,
     -- registers MsgEvents watchers, and fires AP_BRIDGE.check on each event.
@@ -861,6 +869,7 @@ re.on_frame(function()
     safe_on_frame(AP.effects.CultZombieLayout, "CultZombieLayout")
     safe_on_frame(AP.effects.PsychoHostility, "PsychoHostility")
     safe_on_frame(AP.effects.SpecialForces, "SpecialForces")
+    safe_on_frame(AP.effects.MusicShuffle, "MusicShuffle")
     -- Re-arms the spawn multiplier when a new area's layout appears; the
     -- instantinateZombies pre-hook fires too early to catch it.
     safe_on_frame(AP.effects.ZombieEffects, "ZombieEffects")

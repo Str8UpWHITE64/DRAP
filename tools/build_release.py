@@ -120,6 +120,15 @@ def main():
         migrate = os.path.join(REPO, "tools", "migrate")
         for f in ("Migrate Old AP Saves.bat", "Migrate-OldAPSaves.ps1"):
             z.write(os.path.join(migrate, f), f)
+        # Music Builder: adds the player's own songs to the game's music as new
+        # tracks (nothing vanilla is replaced); Music Shuffle plays them only
+        # when connected. Next to DRDR.exe, where it finds the paks and
+        # natives/. Ships no audio and no ffmpeg; the script finds the
+        # player's own ffmpeg.
+        music = os.path.join(REPO, "tools", "music")
+        for f in ("DRAP Music Builder.bat", "DRAP Music Uninstall.bat",
+                  "DRAP-MusicBuilder.ps1"):
+            z.write(os.path.join(music, f), f)
         for root, dirs, files in os.walk(autorun):
             for f in files:
                 full = os.path.join(root, f)

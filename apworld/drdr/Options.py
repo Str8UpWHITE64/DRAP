@@ -758,6 +758,25 @@ class DLCOutfitsEnabled(Toggle):
     default = False
 
 
+class MusicShuffle(Toggle):
+    """
+    Shuffles the game's music in two groups. Mall Music: the songs on the
+    mall's PA speakers. Action Music: the psychopath fights and the story and
+    event music. Songs only swap within their own group, and the shuffle is
+    the same every time you connect to this seed.
+
+    Your own songs: run the DRAP Music Builder (see the DRAP README) to add
+    them. Each mall area with PA speakers then plays its own song, and the
+    fight and event music plays your Action songs. Each song is used at most
+    once per seed, and any slots left over play the game's own music.
+
+    Only while connected to this seed; offline the game plays its normal
+    music. Cosmetic only: it changes no items, locations or logic.
+    """
+    display_name = "Music Shuffle"
+    default = False
+
+
 class ExcludeOverpoweredItems(Toggle):
     """
     When enabled, removes a curated set of items widely considered too
@@ -929,6 +948,7 @@ class DROption(PerGameCommonOptions):
     random_starting_costume: RandomStartingCostume
     costume_chaos_mode: CostumeChaosMode
     dlc_outfits_enabled: DLCOutfitsEnabled
+    music_shuffle: MusicShuffle
     pp_bonus_locations: PpBonusLocations
     pp_stickers_filler: PPStickersFiller
     split_keys: SplitKeys
@@ -1004,6 +1024,12 @@ dr_option_groups = [
             RandomStartingCostume,
             CostumeChaosMode,
             DLCOutfitsEnabled,
+        ],
+    ),
+    OptionGroup(
+        "Music Settings",
+        [
+            MusicShuffle,
         ],
     ),
     # The location pickers replace the stock classes, and Archipelago files
