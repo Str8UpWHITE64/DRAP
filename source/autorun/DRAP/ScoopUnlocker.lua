@@ -390,6 +390,13 @@ local overtime_off_since = nil
 -- owns is on in a vanilla Overtime save except these two of The Last
 -- Resort's, so they stay as they are.
 local OVERTIME_HIDEOUT_FLAGS = { 301, 355 }
+-- 276 is event 16's record (the walk into Entrance Plaza that opens Rescue
+-- the Professor) and 275 its trigger. The restore puts 275 back, and the EP
+-- door toggle held 276 off everywhere but Paradise Plaza, so walking in from
+-- Al Fresca in Overtime replayed the cutscene and reset the mall (RobaRising,
+-- 2026-10-13). Vanilla Overtime has 276 on; it goes back on here and the
+-- toggle stands down for Overtime.
+local OVERTIME_EP_DOOR_FLAG = 276
 local OVERTIME_LEAVE_OFF = {
     [443] = true,  -- HAVING_BOM
     [452] = true,  -- EVM37A_RIDE_OFF
@@ -3261,6 +3268,7 @@ local function restore_overtime_story()
     if raw_check_flag(HIDEOUT_DONE_FLAG) == true then
         for _, fid in ipairs(OVERTIME_HIDEOUT_FLAGS) do wanted[fid] = true end
     end
+    wanted[OVERTIME_EP_DOOR_FLAG] = true
     local want = {}
     for fid in pairs(wanted) do
         if not OVERTIME_LEAVE_OFF[fid] then want[#want + 1] = fid end
@@ -3420,7 +3428,8 @@ function M.on_frame()
     -- When professor is active: one-time disable of 276, then hands-off so
     -- the game can re-enable it during the completion cutscene.
     -- When professor is NOT active: enable 276 in Paradise Plaza, disable elsewhere.
-    if State.is_activated() and efm_mgr:get() then
+    -- Not in Overtime: the restore leaves 276 on there (OVERTIME_EP_DOOR_FLAG).
+    if State.is_activated() and efm_mgr:get() and not State.is_endgame_reached() then
         local professor_flag_on = raw_check_flag(275)
         local professor_done = completed_scoops["Rescue the Professor"]
         local professor_active = professor_flag_on and not professor_done
