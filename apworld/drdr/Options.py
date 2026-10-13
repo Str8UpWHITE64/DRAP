@@ -649,6 +649,34 @@ class ZombieSpawnMultiplier(Range):
     default = 1
 
 
+class InfinityDrain(Toggle):
+    """
+    Infinity Mode's health drain, in a normal run. Frank slowly loses health
+    over time, and food is how you keep him going.
+
+    The drain runs on real time and stops while the game is paused, in the
+    map, during cutscenes and loading, and whenever time is skipped, so a
+    time skip can never kill him. It keeps going in vehicles and in Overtime.
+
+    Dying to the drain is a normal death and sends a DeathLink if that is on.
+    With DamageLink on, every full health block drained sends one block out.
+    Without a server connection the game plays as vanilla.
+    """
+    display_name = "Infinity Drain"
+    default = False
+
+
+class InfinityDrainRate(Range):
+    """
+    Seconds for the Infinity Drain to empty one health block. 100 is vanilla
+    Infinity Mode: ten health a second. Lower is harsher.
+    """
+    display_name = "Infinity Drain Rate"
+    range_start = 30
+    range_end = 600
+    default = 100
+
+
 class HardcoreZombiesEnabled(Toggle):
     """
     When enabled, zombies become significantly more dangerous on top of
@@ -949,6 +977,8 @@ class DROption(PerGameCommonOptions):
     costume_chaos_mode: CostumeChaosMode
     dlc_outfits_enabled: DLCOutfitsEnabled
     music_shuffle: MusicShuffle
+    infinity_drain: InfinityDrain
+    infinity_drain_rate: InfinityDrainRate
     pp_bonus_locations: PpBonusLocations
     pp_stickers_filler: PPStickersFiller
     split_keys: SplitKeys
@@ -1016,6 +1046,8 @@ dr_option_groups = [
             HardcoreZombiesEnabled,
             ZombieSpawnMultiplier,
             CarKeys,
+            InfinityDrain,
+            InfinityDrainRate,
         ],
     ),
     OptionGroup(

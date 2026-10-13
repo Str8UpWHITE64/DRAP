@@ -1196,6 +1196,8 @@ class DRWorld(World):
         dlc_outfits_enabled     = bool(self.options.dlc_outfits_enabled.value)
         # Music Shuffle is cosmetic: the Lua seeds the shuffle from seed + slot.
         music_shuffle = bool(self.options.music_shuffle.value)
+        infinity_drain = bool(self.options.infinity_drain.value)
+        infinity_drain_rate = int(self.options.infinity_drain_rate.value)
 
         # PP-bonus location toggle + the per-entry firing-rule data the Lua
         # side needs to convert MsgEvents fires into AP location checks.
@@ -1300,6 +1302,8 @@ class DRWorld(World):
                 "costume_chaos_mode": costume_chaos_mode,
                 "dlc_outfits_enabled": dlc_outfits_enabled,
                 "music_shuffle": music_shuffle,
+                "infinity_drain": infinity_drain,
+                "infinity_drain_rate": infinity_drain_rate,
                 "pp_bonus_locations": pp_bonus_locations_enabled,
                 "pp_stickers_filler": pp_stickers_filler_enabled,
                 "overtime_checks_filler": overtime_checks_filler_enabled,
@@ -1363,6 +1367,8 @@ class DRWorld(World):
             "costume_chaos_mode": costume_chaos_mode,
             "dlc_outfits_enabled": dlc_outfits_enabled,
             "music_shuffle": music_shuffle,
+            "infinity_drain": infinity_drain,
+            "infinity_drain_rate": infinity_drain_rate,
             "pp_stickers_filler": pp_stickers_filler_enabled,
             "pp_bonus_locations": pp_bonus_locations_enabled,
             "pp_bonus_trigger_data": pp_bonus_trigger_data,

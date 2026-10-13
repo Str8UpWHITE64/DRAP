@@ -155,6 +155,7 @@ AP.effects.VehicleGate                = require("DRAP/effects/VehicleGate")
 AP.effects.UnlockItemSpawns           = require("DRAP/effects/UnlockItemSpawns")
 AP.effects.CostumeRandomizer          = require("DRAP/effects/CostumeRandomizer")
 AP.effects.MusicShuffle               = require("DRAP/effects/MusicShuffle")
+AP.effects.InfinityDrain              = require("DRAP/effects/InfinityDrain")
 AP.effects.AP_LocationTriggers        = require("DRAP/effects/AP_LocationTriggers")
 AP.effects.PpBonusMatch               = require("DRAP/effects/PpBonusMatch")
 AP.effects.DoorPromptOverlay          = require("DRAP/effects/DoorPromptOverlay")
@@ -437,6 +438,12 @@ local function run_slot_connect(slot_data)
         AP.KnockbackLink.apply_received(value, source)
     end
     log("KnockbackLink enabled=" .. tostring(knockback_link_enabled))
+
+    -- Infinity Mode's health drain. Off unless the slot asks; offline there
+    -- is no slot, so the game stays vanilla.
+    AP.effects.InfinityDrain.setup(
+        type(slot_data) == "table" and slot_data.infinity_drain == true,
+        type(slot_data) == "table" and slot_data.infinity_drain_rate or nil)
 
     -- Spitter Only. Arrives with restricted_item_mode already forced on by
     -- the apworld, so the pickup half above is what stops the player picking
@@ -870,6 +877,7 @@ re.on_frame(function()
     safe_on_frame(AP.effects.PsychoHostility, "PsychoHostility")
     safe_on_frame(AP.effects.SpecialForces, "SpecialForces")
     safe_on_frame(AP.effects.MusicShuffle, "MusicShuffle")
+    safe_on_frame(AP.effects.InfinityDrain, "InfinityDrain")
     -- Re-arms the spawn multiplier when a new area's layout appears; the
     -- instantinateZombies pre-hook fires too early to catch it.
     safe_on_frame(AP.effects.ZombieEffects, "ZombieEffects")

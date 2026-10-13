@@ -460,7 +460,7 @@ end
 --- HP to 0 leaves the player undead -- HP<=0 with no death or respawn, which
 --- needs a restart. DamageLink is meant to be able to kill, so the last hit
 --- goes through the game's own death instead of through HP: damage down to
---- the floor, then playerDead().
+--- the floor, then DeathLink.kill_player().
 ---
 --- @param amount integer HP to remove
 --- @param reason string for the death log if it lands
