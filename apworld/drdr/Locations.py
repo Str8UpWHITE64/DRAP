@@ -33,6 +33,8 @@ class DRLocationCategory(IntEnum):
     # far past the 1000-per-table slot, so it takes the ID range after
     # every other table.
     KILL_SANITY = 14
+    # Otis's first call in an area. One flag per call, read as a level.
+    OTIS_CALL = 15
 
 
 class DRLocationData(NamedTuple):
@@ -186,6 +188,8 @@ location_tables = {
         DRLocationData("Meet Jessie in the Warehouse", "Milk", DRLocationCategory.MAIN_SCOOP),
         DRLocationData("Witness Special Forces 10pm day 3", "Milk", DRLocationCategory.MAIN_SCOOP),
 
+        # Appended: the first radio call Otis makes on entering the area.
+        DRLocationData("Answer Otis's Call in Warehouse", "Milk", DRLocationCategory.OTIS_CALL),
     ],
 
 
@@ -421,6 +425,8 @@ location_tables = {
         DRLocationData("Kill Paul Carson", "Milk", DRLocationCategory.KILL_SURVIVOR),
         DRLocationData("Kill Leroy McKenna", "Milk", DRLocationCategory.KILL_SURVIVOR),
         DRLocationData("Kill Susan Walsh", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        # Appended: the first radio call Otis makes on entering the area.
+        DRLocationData("Answer Otis's Call in Wonderland Plaza", "Milk", DRLocationCategory.OTIS_CALL),
     ],
 
     "North Plaza": [
@@ -463,6 +469,8 @@ location_tables = {
         DRLocationData("Kill Brett Styles", "Milk", DRLocationCategory.KILL_SURVIVOR),
         DRLocationData("Kill Jonathan Picardson", "Milk", DRLocationCategory.KILL_SURVIVOR),
         DRLocationData("Kill Alyssa Laurent", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        # Appended: the first radio call Otis makes on entering the area.
+        DRLocationData("Answer Otis's Call in North Plaza", "Milk", DRLocationCategory.OTIS_CALL),
     ],
     "Seon's Food and Stuff": [
         # Events in Seon's Food and Stuff
@@ -595,6 +603,8 @@ location_tables = {
         DRLocationData("Bomb Collector - Wonderland Plaza Truck", "Apple", DRLocationCategory.MAIN_SCOOP),
         DRLocationData("Bomb Collector - Seon's Food and Stuff Truck", "Orange Juice", DRLocationCategory.MAIN_SCOOP),
         DRLocationData("Obtain Maintenance Tunnel Key", "Milk", DRLocationCategory.PP_BONUS),
+        # Appended: the first radio call Otis makes on entering the area.
+        DRLocationData("Answer Otis's Call in Maintenance Tunnel", "Milk", DRLocationCategory.OTIS_CALL),
     ],
 
     # Off the Maintenance Tunnel and nothing else, so its key gates all four.

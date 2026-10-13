@@ -282,6 +282,7 @@ class DRWorld(World):
         self.enabled_location_categories.add(DRLocationCategory.LEVEL_UP)
         self.enabled_location_categories.add(DRLocationCategory.PP_STICKER)
         self.enabled_location_categories.add(DRLocationCategory.CAMERA_PART)
+        self.enabled_location_categories.add(DRLocationCategory.OTIS_CALL)
         if self.main_scoops_enabled:
             self.enabled_location_categories.add(DRLocationCategory.MAIN_SCOOP)
         if self.options.goal.value == 0:  # Ending S
