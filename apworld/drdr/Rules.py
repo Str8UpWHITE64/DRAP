@@ -1138,10 +1138,18 @@ def set_rules(world) -> None:
             continue
         world.multiworld.get_location(_name, world.player).progress_type = LocationProgressType.EXCLUDED
 
-    world.set_rule(world.multiworld.get_location("Kill 1000 zombies", world.player), CanReachRegion("Maintenance Tunnel"))
-    world.set_rule(world.multiworld.get_location("Kill 2000 zombies", world.player), And(CanReachRegion("Maintenance Tunnel"), CanReachRegion("North Plaza"), CanReachRegion("Entrance Plaza")))
-    world.set_rule(world.multiworld.get_location("Kill 5000 zombies", world.player), And(CanReachRegion("Maintenance Tunnel"), CanReachRegion("North Plaza"), CanReachRegion("Entrance Plaza"), CanReachRegion("Wonderland Plaza"), CanReachRegion("Al Fresca Plaza")))
-    world.set_rule(world.multiworld.get_location("Kill 10000 zombies", world.player), And(CanReachRegion("Maintenance Tunnel"), CanReachRegion("North Plaza"), CanReachRegion("Entrance Plaza"), CanReachRegion("Wonderland Plaza"), CanReachRegion("Al Fresca Plaza"), ending_a_rule))
+    # Each higher count also needs the one below it, so 2000 is never in logic
+    # before 1000.
+    # With Restricted Items or Car Keys the Tunnel alone is not enough to kill a
+    # thousand, so the challenge takes the same rule as the Tunnel area check at
+    # 1000 (points gate, plus the SMG under Restricted Items).
+    if world.options.restricted_item_mode or world.options.car_keys:
+        world.set_rule(world.multiworld.get_location("Kill 1000 zombies", world.player), _area_kill_rule("Maintenance Tunnel", 1000))
+    else:
+        world.set_rule(world.multiworld.get_location("Kill 1000 zombies", world.player), CanReachRegion("Maintenance Tunnel"))
+    world.set_rule(world.multiworld.get_location("Kill 2000 zombies", world.player), And(CanReachRegion("Maintenance Tunnel"), CanReachRegion("North Plaza"), CanReachRegion("Entrance Plaza"), CanReachLocation("Kill 1000 zombies")))
+    world.set_rule(world.multiworld.get_location("Kill 5000 zombies", world.player), And(CanReachRegion("Maintenance Tunnel"), CanReachRegion("North Plaza"), CanReachRegion("Entrance Plaza"), CanReachRegion("Wonderland Plaza"), CanReachRegion("Al Fresca Plaza"), CanReachLocation("Kill 2000 zombies")))
+    world.set_rule(world.multiworld.get_location("Kill 10000 zombies", world.player), And(CanReachRegion("Maintenance Tunnel"), CanReachRegion("North Plaza"), CanReachRegion("Entrance Plaza"), CanReachRegion("Wonderland Plaza"), CanReachRegion("Al Fresca Plaza"), CanReachLocation("Kill 5000 zombies"), ending_a_rule))
     world.set_rule(world.multiworld.get_location("Walk a quarter marathon", world.player), And(CanReachRegion("Leisure Park"), CanReachRegion("Al Fresca Plaza"), CanReachRegion("Wonderland Plaza"), CanReachRegion("North Plaza"), CanReachRegion("Entrance Plaza"), CanReachRegion("Food Court"), CanReachRegion("Paradise Plaza"), CanReachRegion("Seon's Food and Stuff"), CanReachRegion("Crislip's Home Saloon"), CanReachRegion("Colby's Movieland")))
     world.set_rule(world.multiworld.get_location("Destroy all of the wall plates in the Food Court", world.player), CanReachRegion("Food Court"))
 
