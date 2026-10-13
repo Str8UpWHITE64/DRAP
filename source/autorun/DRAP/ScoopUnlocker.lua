@@ -2236,6 +2236,32 @@ function M.reset_for_new_game()
     State.reset_for_new_game()
 end
 
+--- Hand a scoop to the player the way an Archipelago receipt does: a main
+--- goes through the chain (or waits for Start in Any Order), so only one main
+--- runs at a time and a later one is queued behind the active one. Raw
+--- unlock_scoop does no such check -- request_unlock gates only side scoops
+--- against mains -- so the debug button used to start every main it was
+--- pressed on. unlock_all / unlock_category stay the deliberate force-all.
+function M.unlock_scoop_gated(scoop_name)
+    local data = SCOOP_DATA[scoop_name]
+    State.mark_ap_received(scoop_name)
+    if data and data.category == "Main" then
+        -- Works with no scoop order too (drap_activate_debug). Like Any
+        -- Order's Start, a refused main is not queued: it stays received and
+        -- the player unlocks it again once the running one is done.
+        local blocker = State.manual_main_blocker(scoop_name)
+        if blocker then
+            M.log(string.format("Refused to unlock '%s': %s", scoop_name, blocker))
+            return false, blocker
+        end
+        if State.is_scoop_order_set() then
+            State.try_advance_chain()
+            return State.has_received(scoop_name), nil
+        end
+    end
+    return M.unlock_scoop(scoop_name)
+end
+
 function M.unlock_category(category)
     local count = 0
     if category == "Main" then
@@ -3056,9 +3082,12 @@ function M.draw_tab_content(debug)
                     end
                 end
 
-                if imgui.button("Unlock##" .. s.name) then
-                    State.mark_ap_received(s.name)
-                    M.unlock_scoop(s.name)
+                local manual_block = s.category == "Main"
+                    and State.manual_main_blocker(s.name) or nil
+                if manual_block then
+                    imgui.text_colored("[wait: " .. manual_block .. "]", COLOR_BLOCKED)
+                elseif imgui.button("Unlock##" .. s.name) then
+                    M.unlock_scoop_gated(s.name)
                 end
                 imgui.same_line()
 
@@ -3480,7 +3509,7 @@ re.on_frame(function()
     M.on_frame()
 end)
 
-_G.scoop_unlock     = function(name) return M.unlock_scoop(name) end
+_G.scoop_unlock     = function(name) return M.unlock_scoop_gated(name) end
 _G.scoop_complete   = function(name) return M.complete_scoop(name) end
 _G.scoop_unlock_all = function() return M.unlock_all() end
 _G.scoop_enforce    = function() M.force_enforce() end

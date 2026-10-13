@@ -324,6 +324,31 @@ function M.active_main_scoop()
     return nil
 end
 
+--- The running main scoop whether or not a scoop order is set. active_main_scoop
+--- walks the order, which is empty in a debug session (drap_activate_debug), so
+--- fall back to scanning the scoop data there.
+function M.running_main()
+    local active = M.active_main_scoop()
+    if active or scoop_order_set then return active end
+    for name, data in pairs(cfg.scoop_data) do
+        if data.category == "Main" and M.received[name] and not M.completed[name] then
+            return name
+        end
+    end
+    return nil
+end
+
+--- Why a manual (debug/console) unlock of main `scoop_name` must wait: another
+--- main is running. Same wording as main_scoop_blocker's. nil if it may start.
+function M.manual_main_blocker(scoop_name)
+    if M.received[scoop_name] then return nil end
+    local active = M.running_main()
+    if active and active ~= scoop_name then
+        return string.format("'%s' is still running", active)
+    end
+    return nil
+end
+
 --- Why `scoop_name` cannot be started right now, or nil if it can.
 function M.main_scoop_blocker(scoop_name)
     if not cfg.any_order then return "not in any-order mode" end
