@@ -842,6 +842,9 @@ re.on_frame(function()
         -- thing protecting an AP save loaded offline. Leave them outside.
         safe_on_frame(AP.effects.NpcSaveGuard, "NpcSaveGuard")
         safe_on_frame(AP.effects.PartyHudGuard, "PartyHudGuard")
+        -- One more: a save redirect left by an earlier session (Reset
+        -- Scripts, or a run that never connected) is cleaned here too.
+        safe_on_frame(AP.SaveSlot, "SaveSlot")
         was_in_game = now_in_game
         return
     end

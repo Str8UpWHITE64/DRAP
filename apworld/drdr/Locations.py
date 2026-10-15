@@ -6,6 +6,9 @@ from .Items import DRItem
 from .shared_data import ZOMBIE_KILL_TIERS as SHARED_ZOMBIE_KILL_TIERS
 
 
+KILL_SANITY_BASE_ID = 1251000
+
+
 class DRLocationCategory(IntEnum):
     SKIP = 0,
     EVENT = 1,
@@ -102,9 +105,12 @@ class DRLocation(Location):
 
         # KillSanity is 53,594 entries in one table, so it sits after the
         # last ordinary slot and nothing may ever be appended behind it.
+        # The base is frozen (it equals base_id + 21 * table_offset today):
+        # deriving it from len(table_order) renumbered every kill id, in seeds
+        # already generated, whenever a region was added.
         output.update({location_data.name: id for id, location_data in
                        enumerate(location_tables["Kill Sanity"],
-                                 base_id + (table_offset * len(table_order)))})
+                                 KILL_SANITY_BASE_ID)})
 
         return output
 

@@ -516,9 +516,30 @@ local function fixup_s100()
     return true
 end
 
+--- ScoopSanity plus an activated session (connect or drap_activate_debug).
+local function hideout_redirect_wanted()
+    local su = get_scoop_unlocker()
+    return su ~= nil
+        and su.is_scoop_sanity_enabled and su.is_scoop_sanity_enabled()
+        and su.is_ap_activated and su.is_ap_activated()
+        or false
+end
+
 local function fixup_s504()
     local dr = _G.AP and _G.AP.DoorRandomizer
     if not dr or not dr.add_static_redirect then return true end
+
+    -- Only ScoopSanity under an active AP or debug session redirects the
+    -- exit; elsewhere the redirect and its toast would be false.
+    -- Drop one registered before the session went dormant.
+    if not hideout_redirect_wanted() then
+        if dr.remove_static_redirect then
+            for _, door_id in ipairs(HIDEOUT_EXIT_DOOR_IDS) do
+                pcall(dr.remove_static_redirect, door_id)
+            end
+        end
+        return true
+    end
 
     local existing = dr.get_static_redirects and dr.get_static_redirects() or {}
     if existing[HIDEOUT_EXIT_DOOR_IDS[1]] then return true end
@@ -628,6 +649,10 @@ end
 --- Park is expected rather than a surprise. Enter/exit edge, so walking away
 --- and back says it again.
 local function show_hideout_exit_toast()
+    if not hideout_redirect_wanted() then
+        near_hideout_exit = false
+        return
+    end
     local am = sdk.get_managed_singleton("app.solid.gamemastering.AreaManager")
     if not am then return end
     local path

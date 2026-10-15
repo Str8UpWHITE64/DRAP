@@ -1242,7 +1242,8 @@ local function handle_net_item(net_item, is_replay)
     -- Look up the game item number from our registered mappings
     local game_item_no = ITEM_NAME_TO_GAME_NO[item_name]
 
-    if not is_replay then
+    if not is_replay and not net_item._recorded then
+        net_item._recorded = true  -- a retried item is not recorded twice
         table.insert(RECEIVED_ITEMS, {
             index = index,
             item_id = item_id,
@@ -1277,6 +1278,14 @@ local function handle_net_item(net_item, is_replay)
             pcall(Notify.item_received, item_name, flags, sender_name, is_self)
         end
     end
+end
+
+-- An effect module that registers an item name replaces the per-item shim, so
+-- the shim cannot be what tells ItemRestriction to rescan. Do it once per
+-- batch here instead, whoever handled the items.
+local function rescan_restriction()
+    local ok, IR = pcall(require, "DRAP/ItemRestriction")
+    if ok and IR and IR.on_items_received then pcall(IR.on_items_received) end
 end
 
 -- Queue and return. This runs inside lua-apclientpp's C dispatch, so it does
@@ -1351,6 +1360,7 @@ function M.reapply_all_items()
         }
         handle_net_item(fake_net_item, true)
     end
+    rescan_restriction()
 end
 
 ------------------------------------------------------------
@@ -1373,12 +1383,33 @@ function M.on_frame()
             table.sort(queue, function(a, b)
                 return (a.index or 0) < (b.index or 0)
             end)
-            for _, queued in ipairs(queue) do
+            -- The cursor moves only after the handler succeeds. A throw puts
+            -- the failed item and the rest of the batch back on the queue for
+            -- the next frame (one bad item cannot silently drop the batch).
+            for i, queued in ipairs(queue) do
                 if queued.index and queued.index > last_item_index then
-                    last_item_index = queued.index
-                    handle_net_item(queued, false)
+                    local ok, err = pcall(handle_net_item, queued, false)
+                    if not ok then
+                        queued.attempts = (queued.attempts or 0) + 1
+                        M.log.error(string.format("Item index=%s failed (attempt %d): %s",
+                            tostring(queued.index), queued.attempts, tostring(err)))
+                        if queued.attempts >= 3 then
+                            -- Give up on this one item so it cannot wedge the queue.
+                            last_item_index = queued.index
+                        else
+                            for j = i, #queue do
+                                if queue[j].index and queue[j].index > last_item_index then
+                                    table.insert(pending_items, queue[j])
+                                end
+                            end
+                            break
+                        end
+                    else
+                        last_item_index = queued.index
+                    end
                 end
             end
+            rescan_restriction()
             if next(kill_filler_batch) then
                 local parts, total = {}, 0
                 for name, n in pairs(kill_filler_batch) do

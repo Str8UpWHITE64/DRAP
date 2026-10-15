@@ -42,13 +42,41 @@ local dirty = false
 -- Persistence
 ------------------------------------------------------------
 
+-- Two-file commit. REFramework's Lua cannot rename, so every save writes a
+-- sibling (.next) first and the main file second, each stamped with an
+-- increasing write_seq. A crash leaves at most one of them truncated, and
+-- load_best() takes the valid one with the higher seq.
 local function save()
     if not FILE or not L then return end
+    L.write_seq = (tonumber(L.write_seq) or 0) + 1
+    Shared.save_json(FILE .. ".next", L, 2, log)
     Shared.save_json(FILE, L, 2, log)
     dirty = false
 end
 
 local load_json_if_exists = Shared.load_json_if_exists
+
+local function load_valid(path)
+    local ok, data = pcall(load_json_if_exists, path)
+    if ok and type(data) == "table" and type(data.locations) == "table" then
+        return data
+    end
+    return nil
+end
+
+local function load_best(path)
+    local main = load_valid(path)
+    local nxt = load_valid(path .. ".next")
+    if main and nxt then
+        if (tonumber(nxt.write_seq) or 0) > (tonumber(main.write_seq) or 0) then
+            log("ledger: main file older than .next, using .next")
+            return nxt
+        end
+        return main
+    end
+    if nxt then log("ledger: main file unreadable, recovered from .next") end
+    return main or nxt
+end
 
 ------------------------------------------------------------
 -- Public API
@@ -66,8 +94,8 @@ function M.init(slot, seed, legacy_names)
     FILE = string.format("./AP_DRDR_Items/AP_DRDR_ledger_%s_%s.json",
         safe_slot, safe_seed)
 
-    local data = load_json_if_exists(FILE)
-    if data and type(data.locations) == "table" then
+    local data = load_best(FILE)
+    if data then
         L = data
         L.schema_version = L.schema_version or SCHEMA_VERSION
     else
