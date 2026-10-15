@@ -1068,6 +1068,22 @@ function M.has_local_check(loc_name)
     return PENDING_CHECKS[loc_name] == true
 end
 
+--- Is a slot connected whose ledger has not finished loading?
+---
+--- True between set_completed_checks_filename and load_completed_checks. A
+--- caller deciding "was this already done?" must not answer from an empty
+--- ledger in that window.
+function M.ledger_pending()
+    return ledger_slot ~= nil and not Ledger.is_init()
+end
+
+--- Was this goal location already sent by this player (ledger or this
+--- session's pending journal)? Local only: a server "collect" from another
+--- world's finish must not suppress an ending the player has not had.
+function M.is_goal_sent(loc_name)
+    return M.has_local_check(loc_name)
+end
+
 --- Has this check been recorded AT ALL this session, ledger or not?
 ---
 --- has_completed_check reads only the ledger, which does not exist until a

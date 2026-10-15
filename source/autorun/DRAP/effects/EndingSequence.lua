@@ -181,6 +181,9 @@ local SETTLE_SECONDS = 5.0
 
 -- What to send once the ending has played, or nil when nothing is pending.
 local pending_goal_location = nil
+local pending_manual = false      -- replay: the goal check is already sent
+local deferred_request = nil       -- request_ending made before the ledger loaded
+local arm_ending
 -- Which ending the pending goal wants, and the flag that says it has played.
 local pending_ending = "b"
 local pending_done_flag = FLAG_ENDING_B
@@ -482,7 +485,71 @@ end
 function M.request_ending(goal_location, opts)
     if pending_goal_location then return end
     opts = opts or {}
+
+    local bridge = AP and AP.AP_BRIDGE
+    -- On launch the goal code can run before the ledger has loaded; an empty
+    -- ledger would say "not sent yet". Wait for it instead of deciding.
+    if bridge and bridge.ledger_pending and bridge.ledger_pending() then
+        deferred_request = { goal_location, opts }
+        return
+    end
+    -- Already won: the check is in the ledger, so the ending has played and
+    -- must not be armed again on every launch. (M.play_ending_manually is the
+    -- deliberate replay.)
+    if bridge and bridge.is_goal_sent and bridge.is_goal_sent(goal_location) then
+        M.log(string.format("goal already sent (%s) -- not arming the ending",
+            tostring(goal_location)))
+        return
+    end
+    arm_ending(goal_location, opts)
+end
+
+local function default_goal_location()
+    local goal = AP and tonumber(AP.Goal)
+    if goal == 4 then return "Psycho: Kill enough survivors to escape" end
+    if goal == 3 then return "Zombie Genocider: Kill 53,594 zombies across the mall" end
+    return "Savior: Rescue enough survivors to escape"
+end
+
+--- Start the ending on demand once the goal has already been sent (for the
+--- ending button). Does nothing if the goal is not sent yet -- that case
+--- arms through request_ending as usual -- or if an ending is already
+--- waiting. The goal check is not re-sent afterwards.
+---
+--- @param goal_location string|nil defaults to the seed's goal location
+--- @return boolean true if an ending was armed
+function M.play_ending_manually(goal_location)
+    if pending_goal_location then return false end
+    goal_location = goal_location or default_goal_location()
+    local bridge = AP and AP.AP_BRIDGE
+    if not (bridge and bridge.is_goal_sent and bridge.is_goal_sent(goal_location)) then
+        M.log("manual ending ignored -- the goal has not been sent yet")
+        return false
+    end
+    arm_ending(goal_location, { ending = tonumber(AP and AP.Goal) == 4 and "psycho" or "b" }, true)
+    return true
+end
+
+--- Whether the "Play ending" button should show: the goal is recorded as
+--- sent, the ledger has loaded, and no ending is already waiting.
+function M.can_play_manually()
+    if pending_goal_location or deferred_request then return false end
+    local bridge = AP and AP.AP_BRIDGE
+    if not (bridge and bridge.is_goal_sent) then return false end
+    if bridge.ledger_pending and bridge.ledger_pending() then return false end
+    return bridge.is_goal_sent(default_goal_location()) == true
+end
+
+--- Short status for the button, or nil when no ending is under way.
+function M.manual_status()
+    if not (pending_goal_location and pending_manual) then return nil end
+    if jumped or psycho_stage ~= nil then return "Playing ending" end
+    return "Head to the Security Room"
+end
+
+arm_ending = function(goal_location, opts, manual)
     pending_goal_location = goal_location
+    pending_manual = manual == true
     pending_ending = opts.ending or "b"
     pending_done_flag = (pending_ending == "psycho")
         and FLAG_PSYCHO_CAPTURE or FLAG_ENDING_B
@@ -515,6 +582,11 @@ local function send_pending_goal()
     local name = pending_goal_location
     pending_goal_location = nil
     if not name then return end
+    if pending_manual then
+        pending_manual = false
+        M.log("ending played -- goal already sent, not re-sending " .. name)
+        return
+    end
     M.log(string.format("ending played -- sending %s", name))
     if AP and AP.AP_BRIDGE and AP.AP_BRIDGE.check then
         AP.AP_BRIDGE.check(name)
@@ -522,6 +594,14 @@ local function send_pending_goal()
 end
 
 function M.on_frame()
+    if deferred_request then
+        local bridge = AP and AP.AP_BRIDGE
+        if not (bridge and bridge.ledger_pending and bridge.ledger_pending()) then
+            local d = deferred_request
+            deferred_request = nil
+            M.request_ending(d[1], d[2])
+        end
+    end
     if not pending_goal_location then return end
     if not M:should_run() then return end
     if not Shared.is_in_game() then return end
@@ -551,6 +631,13 @@ function M.on_frame()
     if os.clock() - in_room_since < SETTLE_SECONDS then return end
 
     jumped = true
+    -- Manual replay: clear the leftover done flag so the watcher sees this
+    -- ending set it, not the win that came before. Game flag only; the goal
+    -- and ledger are untouched.
+    if pending_manual then
+        flag_off(pending_done_flag)
+        M.log("manual ending: cleared done flag " .. tostring(pending_done_flag))
+    end
     if pending_ending == "psycho" then
         M.jump_to_ending_psycho()
     else
@@ -561,6 +648,8 @@ end
 --- Forget a pending ending. Used when a save is loaded into a different run.
 function M.reset()
     pending_goal_location = nil
+    pending_manual = false
+    deferred_request = nil
     jessie_wait_logged = false
     pending_ending = "b"
     pending_done_flag = FLAG_ENDING_B
@@ -603,6 +692,9 @@ end
 -- wins, having done everything right.
 re.on_frame(function()
     if not pending_goal_location then return end
+    -- A manual replay starts with the done flag possibly already on (a won
+    -- save keeps it); only count it once this replay has jumped.
+    if pending_manual and not jumped then return end
     if flag_is_on(pending_done_flag) == true then
         send_pending_goal()
     end

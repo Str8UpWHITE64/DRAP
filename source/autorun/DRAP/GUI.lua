@@ -101,6 +101,21 @@ local function draw_window()
 
     imgui.separator()
 
+    -- Replay the ending once the goal is already sent. Nothing is re-sent.
+    do
+        local ok, Ending = pcall(require, "DRAP/effects/EndingSequence")
+        if ok and Ending and Ending.can_play_manually then
+            local status = Ending.manual_status and Ending.manual_status()
+            if status then
+                imgui.text_colored(status, 0xFF88CCFF)
+            elseif Ending.can_play_manually() then
+                if imgui.button("Play ending") then
+                    pcall(Ending.play_ending_manually)
+                end
+            end
+        end
+    end
+
     -- Tab content
     if active_tab == "Items" then
         if ItemSpawner and ItemSpawner.draw_tab_content then
