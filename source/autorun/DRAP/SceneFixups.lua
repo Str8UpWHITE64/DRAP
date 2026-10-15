@@ -43,8 +43,96 @@ local AREA_S231 = 535   -- Rooftop (canonical "from-area" for the rescue cutscen
 -- the full retry budget. See scene_fixups.md.
 local get_escort_count
 
--- s136 (Security Room): disable the south-door barricade and, if the player
--- arrived via an EP->s136 redirect with an escorted NPC, patch
+-- The Security Room's door to Entrance Plaza is solid.MT2RE.uOm114, a uDoor
+-- that only opens while the game flow sits inside its own mGameFlowRanges.
+-- The prologue is inside them, so the door opens; after Get to the Stairs the
+-- flow has moved past them and the door reads "welded shut". Giving the door a
+-- range that covers every flow makes it open the way it does at the start of
+-- a run. Door Locks and Split Keys still apply: they gate the doorway's area
+-- hit, not this door.
+--
+-- A Security Room cutscene reloads the room and brings a fresh door with the
+-- original ranges, so this runs on every load and again whenever the player
+-- gets control back in the room (see watch_sr_door). A door that already
+-- matches the flow, or is already hidden, is left alone, so a re-run costs one
+-- OmList walk. If the widened range does not read back as a match, the door
+-- is hidden instead, which is what DRAP did before.
+local SR_DOOR_TYPE = "solid.MT2RE.uOm114"
+local SR_DOOR_ALL_FLOWS = 0x7FFFFFFF
+
+local function current_game_flow()
+    local td = sdk.find_type_definition("app.solid.gamemastering.InGameFlowManagerBase")
+    local m = td and td:get_method("get_BaseInstance")
+    local mgr = m and m:call(nil)
+    return mgr and tonumber(mgr:call("getGameFlow")) or nil
+end
+
+local function open_sr_door(om, flow)
+    local list = om:get_field("mGameFlowRanges")
+    if not list then return false end
+    local range = ValueType.new(sdk.find_type_definition("via.RangeI"))
+    range:set_field("s", 0)
+    range:set_field("r", SR_DOOR_ALL_FLOWS)
+    local n = tonumber(list:call("get_Count")) or 0
+    if n > 0 then
+        list:call("set_Item", 0, range)
+    else
+        list:call("Add", range)
+    end
+    return flow ~= nil and om:call("isGameFlowMatch", flow) == true
+end
+
+local function hide_sr_door(om)
+    local go = om:call("get_GameObject")
+    if not go then return false end
+    go:call("set_UpdateSelf", false)
+    go:call("set_DrawSelf", false)
+    return true
+end
+
+--- Returns true once every Security Room door in the OmList is handled.
+local function fix_sr_door()
+    local am = sdk.get_managed_singleton("app.solid.gamemastering.AreaManager")
+    if not am then return false end
+    local list
+    pcall(function() list = am:get_field("OmList") end)
+    if not list then return false end
+    local count
+    pcall(function() count = list:call("get_Count") end)
+    count = tonumber(count) or 0
+    if count == 0 then return false end
+
+    local flow
+    pcall(function() flow = current_game_flow() end)
+    if flow == nil then return false end
+    local found = false
+    for i = 0, count - 1 do
+        local om
+        pcall(function() om = list:call("get_Item", i) end)
+        local td = om and om:get_type_definition()
+        if td and td:get_full_name() == SR_DOOR_TYPE then
+            found = true
+            local matches, hidden = false, false
+            pcall(function() matches = om:call("isGameFlowMatch", flow) == true end)
+            pcall(function() hidden = om:call("get_GameObject"):call("get_UpdateSelf") == false end)
+            if not matches and not hidden then
+                local ok, opened = pcall(open_sr_door, om, flow)
+                if ok and opened then
+                    log(string.format("s136: Entrance Plaza door opened for every flow (OmList[%d], flow %s)",
+                        i, tostring(flow)))
+                else
+                    local hid = select(2, pcall(hide_sr_door, om))
+                    log(string.format("s136: Entrance Plaza door would not open (flow %s, %s) -- hidden=%s",
+                        tostring(flow), ok and "no match" or tostring(opened), tostring(hid)))
+                end
+            end
+        end
+    end
+    return found
+end
+
+-- s136 (Security Room): open the Entrance Plaza door (above) and, if the
+-- player arrived via an EP->s136 redirect with an escorted NPC, patch
 -- AreaManager.mAreaIndex/mOldAreaIndex so the rescue cutscene fires.
 -- See scene_fixups.md.
 local function fixup_s136()
@@ -72,34 +160,17 @@ local function fixup_s136()
             AREA_S136, AREA_S231))
     end
 
-    -- Disable PREF_uOm114 barricade.
-    local list
-    pcall(function() list = am:get_field("OmList") end)
-    if not list then return false end
-    local count
-    pcall(function() count = list:call("get_Count") end)
-    count = tonumber(count) or 0
-    if count == 0 then return false end
+    return fix_sr_door()  -- false: keep waiting, the OmList may not be populated yet
+end
 
-    for i = 0, count - 1 do
-        local om
-        pcall(function() om = list:call("get_Item", i) end)
-        if om then
-            local td = om:get_type_definition()
-            local tname = (td and td:get_full_name()) or ""
-            if tname == "solid.MT2RE.uOm114" then
-                local go
-                pcall(function() go = om:call("get_GameObject") end)
-                if go then
-                    pcall(function() go:call("set_UpdateSelf", false) end)
-                    pcall(function() go:call("set_DrawSelf", false) end)
-                    log(string.format("s136: disabled uOm114 (OmList[%d])", i))
-                    return true
-                end
-            end
-        end
+-- Door-only re-run after a Security Room cutscene. The escort patch above
+-- must not run again here: it belongs to arriving in the room.
+local function refix_s136_door()
+    local su = get_scoop_unlocker()
+    if not su or not su.is_ap_activated or not su.is_ap_activated() then
+        return true
     end
-    return false  -- keep waiting; OmList might not have populated yet
+    return fix_sr_door()
 end
 
 -- s100 (Entrance Plaza): when AP is active, register a DoorRandomizer
@@ -696,11 +767,35 @@ local function show_hideout_exit_toast()
     log("player reached the hideout exit -- told about the redirect")
 end
 
+-- A Security Room cutscene reloads the room without a map load, so the load
+-- hook never sees it. PlayerReady already polls for cutscenes and loads; when
+-- the player gets control back in s136, queue the door again. Only that edge
+-- costs a managed read.
+local SR_DOOR_PENDING = "SCN_s136 door"
+local sr_was_ready = false
+
+local function watch_sr_door()
+    local pr = package.loaded["DRAP/PlayerReady"]
+    if not (pr and pr.ready) then return end
+    local ready = pr.ready(0.5) == true
+    if ready and not sr_was_ready and not pending.SCN_s136 then
+        local am = sdk.get_managed_singleton("app.solid.gamemastering.AreaManager")
+        local path
+        pcall(function() path = am:get_field("CurrentLevelPath") end)
+        if tostring(path or "") == "SCN_s136" then
+            pending[SR_DOOR_PENDING] = refix_s136_door
+            frames_waited[SR_DOOR_PENDING] = 0
+        end
+    end
+    sr_was_ready = ready
+end
+
 local function install_frame_cb()
     if frame_cb_installed then return end
     re.on_frame(function()
         check_ap_state_transition()
         show_hideout_exit_toast()
+        watch_sr_door()
         if next(pending) == nil then return end
         for scene, fn in pairs(pending) do
             frames_waited[scene] = (frames_waited[scene] or 0) + 1
