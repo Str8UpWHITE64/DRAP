@@ -52,14 +52,8 @@ AP.GUI               = require("DRAP/GUI")
 AP.Notify            = require("DRAP/Notify")
 AP.MsgEvents         = require("DRAP/MsgEvents")
 
--- Debug modules. Noisy output (per-flag prints) and JSON persistence inside
--- EventFlagExplorer gate themselves on GUI's "Debug Mode" checkbox.
-AP.EventFlagExplorer = require("DRAP/debug/EventFlagExplorer")
--- FlagTraceRecorder self-registers its own re.on_frame (it must keep
--- recording during cutscenes, where the isInGame-gated loop below stops).
-AP.FlagTraceRecorder = require("DRAP/debug/FlagTraceRecorder")
--- Console-only: reads state the flag trace cannot see.
-AP.StateProbe = require("DRAP/debug/StateProbe")
+-- Debug modules (EventFlagExplorer, FlagTraceRecorder, StateProbe) live in
+-- a local dev package that is never released.
 
 local Shared = require("DRAP/Shared")
 local SharedData = require("DRAP/SharedData")
@@ -885,9 +879,6 @@ re.on_frame(function()
     -- instantinateZombies pre-hook fires too early to catch it.
     safe_on_frame(AP.effects.ZombieEffects, "ZombieEffects")
     safe_on_frame(AP.effects.PartyHudGuard, "PartyHudGuard")
-
-    -- Debug modules
-    safe_on_frame(AP.EventFlagExplorer, "EventFlagExplorer")
 
     -- Enter-game edge detection
     if now_in_game and not was_in_game then

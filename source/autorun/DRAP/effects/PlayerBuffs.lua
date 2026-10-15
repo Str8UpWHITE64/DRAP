@@ -307,7 +307,7 @@ re.on_frame(function()
         local now = os.clock()
         if now - god_last_tick >= GOD_TICK_SECONDS then
             god_last_tick = now
-            -- NoDamage covers grab immunity (Alex) -- no juice needed.
+            -- NoDamage covers grab immunity -- no juice needed.
             _set_invincible(true)                        -- area loads may reset
             _set_speed_table(GOD_SPEED)                  -- level-ups rewrite it
             _set_god_run(GOD_RUN_LEVEL)                  -- ditto run level
