@@ -170,7 +170,7 @@ location_tables = {
         # Overtime First Aid Kit cannot be confused with the story one,
         # which is also in Seon's.
         DRLocationData("Find the Coffee Filters", "Milk", DRLocationCategory.OVERTIME_SCOOP),
-        DRLocationData("Obtain Mall Map and Transceiver", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Obtain Mall Map and Transceiver", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Use All Microwaves", "Milk", DRLocationCategory.PP_BONUS),
         DRLocationData("Heat a pan on all stoves", "Milk", DRLocationCategory.PP_BONUS),
         DRLocationData("Psycho: Kill enough survivors to escape", "Victory", DRLocationCategory.EVENT),
@@ -493,7 +493,7 @@ location_tables = {
         # Overtime First Aid Kit cannot be confused with the story one,
         # which is also in Seon's.
         DRLocationData("Find the First Aid Kit", "Milk", DRLocationCategory.OVERTIME_SCOOP),
-        DRLocationData("Obtain First Aid Kit", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Obtain First Aid Kit", "Milk", DRLocationCategory.CHALLENGE),
     ],
     "Food Court": [
         # Events in Food Court
@@ -608,7 +608,7 @@ location_tables = {
         DRLocationData("Bomb Collector - Al Fresca Plaza Truck", "Yogurt", DRLocationCategory.MAIN_SCOOP),
         DRLocationData("Bomb Collector - Wonderland Plaza Truck", "Apple", DRLocationCategory.MAIN_SCOOP),
         DRLocationData("Bomb Collector - Seon's Food and Stuff Truck", "Orange Juice", DRLocationCategory.MAIN_SCOOP),
-        DRLocationData("Obtain Maintenance Tunnel Key", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Obtain Maintenance Tunnel Key", "Milk", DRLocationCategory.CHALLENGE),
         # Appended: the first radio call Otis makes on entering the area.
         DRLocationData("Answer Otis's Call in Maintenance Tunnel", "Milk", DRLocationCategory.OTIS_CALL),
     ],
@@ -739,7 +739,7 @@ location_tables = {
         DRLocationData("Kill 5000 zombies", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Kill 10000 zombies", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Kill 10 Special Forces", "Milk", DRLocationCategory.SPECIAL_FORCES_SCOOP),
-        DRLocationData("Destroy all of the wall plates in the Food Court", "Milk", DRLocationCategory.CHALLENGE),
+        DRLocationData("Destroy all of the wall plates in the Food Court", "Milk", DRLocationCategory.PP_BONUS),
         DRLocationData("Fire 30 bullets", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Fire 300 bullets", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Ride zombies for 50 feet", "Milk", DRLocationCategory.CHALLENGE),

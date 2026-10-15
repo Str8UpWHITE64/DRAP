@@ -773,27 +773,28 @@ class CostumeChaosMode(Toggle):
 
 class PpBonusLocations(DefaultOnToggle):
     """
-    Adds ~57 extra AP location checks tied to PP-bonus events and key-item
-    pickup banners that DRAP detects via the MsgEvents watcher:
+    Adds extra AP location checks tied to PP-bonus events that DRAP detects
+    via the MsgEvents watcher. (Obtain Mall Map and Transceiver, Obtain
+    Maintenance Tunnel Key and Obtain First Aid Kit are ordinary checks on
+    every seed and are not part of this option.)
 
     Single-fire checks:
       * Realign Servbot Head (Paradise Plaza fountain)
       * Ride the Space Rider
-      * Obtain Mall Map and Transceiver (Otis bundle)
-      * Obtain Maintenance Tunnel Key
-      * Obtain First Aid Kit (in Seon's Food and Stuff, gated on defeating Steven)
 
     Counted-progression checks (per-instance + ALL-X final):
       * Walk on N Treadmills (1..6, plus All Treadmills)         -- Al Fresca
       * Destroy N Sandbags (1..4, plus All Sandbags)             -- Al Fresca
       * Spin N Display Racks (1..4, plus All Display Racks)      -- Entrance
-      * Break N Food Court Wall Plates (1..18, no separate "all")
+      * Break Food Court Wall Plates (all 18, plus Destroy all of the wall
+        plates in the Food Court)
       * Microwave N Items (1..9, plus Microwave All Items)
       * Heat N Pans (1..5, plus Heat All Pans)
 
     Logic gating: each check requires the relevant region. Microwave/Heat
     locations require Food Court access (the most restrictive of the regions
-    those events occur in). In Restricted Item Mode, microwave checks
+    those events occur in). The wall plates need access to a gun, except in
+    Spitter Only, where the spit reaches them. In Restricted Item Mode, microwave checks
     additionally require Uncooked Pizza or Raw Meat, and stove checks
     require Frying Pan.
     """

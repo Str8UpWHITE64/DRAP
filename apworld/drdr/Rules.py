@@ -20,7 +20,7 @@ from .Locations import (DRLocationCategory, location_tables,
                         ZOMBIE_KILL_REGION_OF, ZOMBIE_KILL_TIERS, SURVIVOR_MILESTONES,
                         kill_sanity_location_name)
 from .shared_data import (
-    AREA_KEY_NAMES,
+    AREA_KEY_NAMES, AP_TRIGGER_LOCATIONS,
     SCOOP_COMPLETION_MAP, SCOOP_EVENTS, SCOOP_REGION_REQUIREMENTS,
     SCOOP_SPLIT_KEY_DOORS as SPLIT_KEY_SCOOP_DOORS,
 )
@@ -146,6 +146,25 @@ CAR_HOME = {
 # cannot supply -- it has to be carried in from one of these.
 SMG_AREAS = ("Al Fresca Plaza", "Entrance Plaza", "Paradise Plaza",
              "Food Court", "Maintenance Tunnel")
+
+
+def _plate_gun_access(world):
+    """Access to a gun, for the Food Court wall plates (same shape as the
+    Special Forces helicopter's). Restricted Items needs the gun item and a
+    place it spawns; otherwise guns lie around the mall, or arrive as items."""
+    _pistol = ("Paradise Plaza", "Al Fresca Plaza", "Wonderland Plaza", "North Plaza")
+    _sniper = ("North Plaza",)
+    _smg = ("Al Fresca Plaza", "Entrance Plaza", "Paradise Plaza", "Food Court")
+    if world.options.restricted_item_mode:
+        return Or(
+            And(Has("Handgun"), Or(*[CanReachRegion(r) for r in _pistol])),
+            And(Has("Sniper Rifle"), Or(*[CanReachRegion(r) for r in _sniper])),
+            And(Has("Submachine Gun"), Or(*[CanReachRegion(r) for r in _smg])),
+        )
+    return Or(
+        Or(*[CanReachRegion(r) for r in sorted(set(_pistol + _sniper + _smg))]),
+        Or(*[Has(g) for g in ("Handgun", "Sniper Rifle", "Submachine Gun")]),
+    )
 
 
 def _smg_from_elsewhere():
@@ -1151,7 +1170,24 @@ def set_rules(world) -> None:
     world.set_rule(world.multiworld.get_location("Kill 5000 zombies", world.player), And(CanReachRegion("Maintenance Tunnel"), CanReachRegion("North Plaza"), CanReachRegion("Entrance Plaza"), CanReachRegion("Wonderland Plaza"), CanReachRegion("Al Fresca Plaza"), CanReachLocation("Kill 2000 zombies")))
     world.set_rule(world.multiworld.get_location("Kill 10000 zombies", world.player), And(CanReachRegion("Maintenance Tunnel"), CanReachRegion("North Plaza"), CanReachRegion("Entrance Plaza"), CanReachRegion("Wonderland Plaza"), CanReachRegion("Al Fresca Plaza"), CanReachLocation("Kill 5000 zombies"), ending_a_rule))
     world.set_rule(world.multiworld.get_location("Walk a quarter marathon", world.player), And(CanReachRegion("Leisure Park"), CanReachRegion("Al Fresca Plaza"), CanReachRegion("Wonderland Plaza"), CanReachRegion("North Plaza"), CanReachRegion("Entrance Plaza"), CanReachRegion("Food Court"), CanReachRegion("Paradise Plaza"), CanReachRegion("Seon's Food and Stuff"), CanReachRegion("Crislip's Home Saloon"), CanReachRegion("Colby's Movieland")))
-    world.set_rule(world.multiworld.get_location("Destroy all of the wall plates in the Food Court", world.player), CanReachRegion("Food Court"))
+    # A PP Bonus check now, so it is absent when that option is off. The
+    # plates are shot down from the tables. Spitter Only spits them down at
+    # extra range and needs no gun; every other mode needs access to one, for
+    # each plate and for the all-plates check.
+    if world.options.pp_bonus_locations:
+        _plate_rule = CanReachRegion("Food Court")
+        if not world.spitter_only:
+            _plate_rule = And(_plate_rule, _plate_gun_access(world))
+        _plate_names = ["Destroy all of the wall plates in the Food Court"]
+        for _pe in AP_TRIGGER_LOCATIONS:
+            if _pe.get("id") == "pp_food_court_dish":
+                _plate_names += [i["name"] for i in _pe.get("instances", []) if i.get("name")]
+        for _pn in _plate_names:
+            try:
+                _pl = world.multiworld.get_location(_pn, world.player)
+            except KeyError:
+                continue
+            world.set_rule(_pl, _plate_rule)
 
     # --------------------------------------------------------------------
     # --------------------------------------------------------------------
@@ -1750,20 +1786,22 @@ def set_rules(world) -> None:
     # asking for more are here -- treadmills, dishes and sandbags have no
     # rule on purpose. set_rule REPLACES that default, so each line below
     # names its own region.
+    # The three key-item pickups are ordinary checks on every seed, so they
+    # sit outside the PP Bonus option.
+    # A player sent the Access Key opens that door without going down.
+    world.set_rule(world.multiworld.get_location("Obtain Maintenance Tunnel Key", world.player), Or(CanReachRegion("Maintenance Tunnel"), Has("Maintenance Tunnel Access Key")))
+
+    # Behind the Seon's register scoop, so it is not created on a seed
+    # where main scoops are not checks.
+    try:
+        _first_aid = world.multiworld.get_location("Obtain First Aid Kit", world.player)
+    except KeyError:
+        _first_aid = None
+    if _first_aid is not None:
+        world.set_rule(_first_aid, And(CanReachRegion("Seon's Food and Stuff"), CanReachLocation("Clean up... Register 6!")))
+
     if world.options.pp_bonus_locations:
         restricted_mode_on = bool(world.options.restricted_item_mode.value)
-
-        # A player sent the Access Key opens that door without going down.
-        world.set_rule(world.multiworld.get_location("Obtain Maintenance Tunnel Key", world.player), Or(CanReachRegion("Maintenance Tunnel"), Has("Maintenance Tunnel Access Key")))
-
-        # Behind the Seon's register scoop, so it is not created on a seed
-        # where main scoops are not checks.
-        try:
-            _first_aid = world.multiworld.get_location("Obtain First Aid Kit", world.player)
-        except KeyError:
-            _first_aid = None
-        if _first_aid is not None:
-            world.set_rule(_first_aid, And(CanReachRegion("Seon's Food and Stuff"), CanReachLocation("Clean up... Register 6!")))
 
         # A microwave needs food. Seon's is where it comes from; being sent it
         # is just as good, except in restricted mode which needs both.

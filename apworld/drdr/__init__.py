@@ -345,22 +345,23 @@ class DRWorld(World):
         # PP-bonus entries whose requires_location predecessor isn't enabled
         # this seed (e.g. First Aid Kit needs "Clean up... Register 6!" which
         # is MAIN_SCOOP-only). Filtered from both create_region and rule-build.
+        # Computed whatever the PP Bonus option says: First Aid Kit is a plain
+        # check on every seed now, and still needs its predecessor.
         self._pp_bonus_excluded_names: Set[str] = set()
-        if self.options.pp_bonus_locations:
-            for _entry in AP_TRIGGER_LOCATIONS:
-                _req = _entry.get("requires_location")
-                if not _req:
-                    continue
-                _req_data = location_dictionary.get(_req)
-                if not _req_data:
-                    # Predecessor isn't even in the static table -- bad data;
-                    # skip the entry to be safe.
-                    for _n in expand_trigger_location_names(_entry):
-                        self._pp_bonus_excluded_names.add(_n)
-                    continue
-                if _req_data.category not in self.enabled_location_categories:
-                    for _n in expand_trigger_location_names(_entry):
-                        self._pp_bonus_excluded_names.add(_n)
+        for _entry in AP_TRIGGER_LOCATIONS:
+            _req = _entry.get("requires_location")
+            if not _req:
+                continue
+            _req_data = location_dictionary.get(_req)
+            if not _req_data:
+                # Predecessor isn't even in the static table -- bad data;
+                # skip the entry to be safe.
+                for _n in expand_trigger_location_names(_entry):
+                    self._pp_bonus_excluded_names.add(_n)
+                continue
+            if _req_data.category not in self.enabled_location_categories:
+                for _n in expand_trigger_location_names(_entry):
+                    self._pp_bonus_excluded_names.add(_n)
 
         # The Space Rider does not run at night, so its PP bonus cannot be
         # earned in a seed that forces night. Hardcore implies night, same as
@@ -774,7 +775,8 @@ class DRWorld(World):
             elif location.category in self.enabled_location_categories:
                 # Skip PP-bonus locations whose required predecessor wasn't
                 # created this seed (set populated in __init__ above).
-                if (location.category == DRLocationCategory.PP_BONUS
+                if (location.category in (DRLocationCategory.PP_BONUS,
+                                          DRLocationCategory.CHALLENGE)
                         and location.name in self._pp_bonus_excluded_names):
                     continue
                 if (location.category == DRLocationCategory.ZOMBIE_KILL
@@ -1211,53 +1213,58 @@ class DRWorld(World):
         # we send a per-N list plus an all_location_name keyed off all_msg_no.
         pp_bonus_locations_enabled = bool(self.options.pp_bonus_locations.value)
         pp_bonus_trigger_data: List[Dict[str, Any]] = []
-        if pp_bonus_locations_enabled:
-            for _entry in AP_TRIGGER_LOCATIONS:
-                _names = expand_trigger_location_names(_entry)
-                if not _names:
-                    continue
-                # Skip entries whose required-predecessor location wasn't
-                # created this seed (matches the create_region filter).
-                # Lua wouldn't be able to resolve these names to AP IDs
-                # anyway -- pruning here saves the failed lookups.
-                if any(n in self._pp_bonus_excluded_names for n in _names):
-                    continue
-                _t = _entry.get("type")
-                _d: Dict[str, Any] = {
-                    "id":      _entry.get("id"),
-                    "list":    _entry.get("list"),
-                    "msg_no":  _entry.get("msg_no"),
-                    "type":    _t,
-                }
-                if _t == "single":
-                    _d["location_name"] = _entry.get("location_name")
-                elif _t == "counted":
-                    # Per-count names: index N-1 -> name for count N
-                    _max = int(_entry.get("max_count", 0))
-                    # The first _max items in _names are the per-count names
-                    # Instance entries have no counted names any more, so
-                    # there is nothing for Lua to fall back to -- and sending
-                    # one would name a location this seed does not have.
-                    _d["count_names"] = ([] if _entry.get("instances")
-                                         else _names[:_max])
-                    # The all-X name goes through whenever it is set: Lua
-                    # sends every instance once the all-X is out, whether the
-                    # game announced it (all_msg_no) or a challenge counter did.
-                    if _entry.get("all_msg_no") is not None:
-                        _d["all_msg_no"] = _entry["all_msg_no"]
-                    if _entry.get("all_location_name"):
-                        _d["all_location_name"] = _entry["all_location_name"]
-                    # Per-object positions, so Lua can name the one that was
-                    # actually used rather than counting. Passed through as-is;
-                    # the Lua side decides how to match on them.
-                    if _entry.get("instances"):
-                        _d["instances"] = _entry["instances"]
-                        _d["match"]     = _entry.get("match", "nearest")
-                        for _k in ("om_type", "method", "state_field",
-                                   "state_enum", "state_from"):
-                            if _entry.get(_k):
-                                _d[_k] = _entry[_k]
-                pp_bonus_trigger_data.append(_d)
+        # The three key-item pickups are ordinary checks on every seed; the
+        # rest of the table belongs to the PP Bonus option.
+        _always_on_triggers = {"todo_maint_key", "todo_mall_map", "todo_first_aid"}
+        for _entry in AP_TRIGGER_LOCATIONS:
+            if (not pp_bonus_locations_enabled
+                    and _entry.get("id") not in _always_on_triggers):
+                continue
+            _names = expand_trigger_location_names(_entry)
+            if not _names:
+                continue
+            # Skip entries whose required-predecessor location wasn't
+            # created this seed (matches the create_region filter).
+            # Lua wouldn't be able to resolve these names to AP IDs
+            # anyway -- pruning here saves the failed lookups.
+            if any(n in self._pp_bonus_excluded_names for n in _names):
+                continue
+            _t = _entry.get("type")
+            _d: Dict[str, Any] = {
+                "id":      _entry.get("id"),
+                "list":    _entry.get("list"),
+                "msg_no":  _entry.get("msg_no"),
+                "type":    _t,
+            }
+            if _t == "single":
+                _d["location_name"] = _entry.get("location_name")
+            elif _t == "counted":
+                # Per-count names: index N-1 -> name for count N
+                _max = int(_entry.get("max_count", 0))
+                # The first _max items in _names are the per-count names
+                # Instance entries have no counted names any more, so
+                # there is nothing for Lua to fall back to -- and sending
+                # one would name a location this seed does not have.
+                _d["count_names"] = ([] if _entry.get("instances")
+                                     else _names[:_max])
+                # The all-X name goes through whenever it is set: Lua
+                # sends every instance once the all-X is out, whether the
+                # game announced it (all_msg_no) or a challenge counter did.
+                if _entry.get("all_msg_no") is not None:
+                    _d["all_msg_no"] = _entry["all_msg_no"]
+                if _entry.get("all_location_name"):
+                    _d["all_location_name"] = _entry["all_location_name"]
+                # Per-object positions, so Lua can name the one that was
+                # actually used rather than counting. Passed through as-is;
+                # the Lua side decides how to match on them.
+                if _entry.get("instances"):
+                    _d["instances"] = _entry["instances"]
+                    _d["match"]     = _entry.get("match", "nearest")
+                    for _k in ("om_type", "method", "state_field",
+                               "state_enum", "state_from"):
+                        if _entry.get(_k):
+                            _d[_k] = _entry[_k]
+            pp_bonus_trigger_data.append(_d)
 
         slot_data = {
             "options": {
