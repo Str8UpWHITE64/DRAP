@@ -320,6 +320,85 @@ function M.send_knockback(x, y, z)
     return false
 end
 
+------------------------------------------------------------
+-- TrapLink (protocol tag "TrapLink")
+------------------------------------------------------------
+-- {time, source, trap_name}. The protocol's own echo filter is source == our
+-- player name; the uuid is an extra field only this client reads, so a second
+-- DRAP client on the same name is filtered too.
+
+local TRAP_LINK_TAG = "TrapLink"
+
+M.traplink_enabled = false
+
+--- Called with the trap name and sender. Set by TrapLink.lua.
+M.on_trap_link = nil
+
+function M.set_traplink_enabled(v)
+    M.traplink_enabled = (v == true)
+    M.log("TrapLink enabled: " .. tostring(M.traplink_enabled))
+end
+
+function M.get_trap_link_tag() return TRAP_LINK_TAG end
+
+local function own_alias()
+    local alias = "DRDR Player"
+    if AP_REF.APClient and AP_REF.APClient.get_player_alias and AP_REF.APClient.get_slot then
+        local ok_slot, slot = pcall(AP_REF.APClient.get_slot, AP_REF.APClient)
+        if ok_slot and slot then
+            local ok_alias, a = pcall(AP_REF.APClient.get_player_alias,
+                                      AP_REF.APClient, slot)
+            if ok_alias and a then alias = Shared.clean_string(a) end
+        end
+    end
+    return alias
+end
+
+local function handle_trap_link(data)
+    if not M.traplink_enabled then return end
+    if damage_uuid and tostring(data["uuid"] or "") == damage_uuid then return end
+    local source = data["source"]
+    if source ~= nil and tostring(source) == own_alias() then return end
+
+    local name = data["trap_name"]
+    if type(name) ~= "string" then return end
+    M.log(string.format("TrapLink received: %s from %s", name, tostring(source)))
+    if M.on_trap_link then
+        pcall(M.on_trap_link, name, tostring(source or "someone"))
+    end
+end
+
+--- Broadcast one of our traps by its standard name.
+function M.send_trap_link(trap_name)
+    if not M.traplink_enabled then return false end
+    if not AP_REF.APClient then return false end
+    if not is_connected() then return false end
+    if type(trap_name) ~= "string" or trap_name == "" then return false end
+
+    local now = math.floor(os.time())
+    if AP_REF.APClient.get_server_time then
+        local ok, t = pcall(AP_REF.APClient.get_server_time, AP_REF.APClient)
+        if ok and t then now = math.floor(tonumber(t) or os.time()) end
+    end
+
+    local payload = {
+        time = now,
+        source = own_alias(),
+        trap_name = trap_name,
+        uuid = get_damage_uuid(),
+    }
+
+    if type(AP_REF.APClient.Bounce) ~= "function" then return false end
+    local ok, err = pcall(AP_REF.APClient.Bounce, AP_REF.APClient, payload,
+                          nil, nil, { TRAP_LINK_TAG })
+    if ok then
+        M.log("Sent TrapLink: " .. trap_name)
+        return true
+    end
+    M.log.error("TrapLink send failed: " .. tostring(err))
+    return false
+end
+
 local function has_tag(tags, needle)
     if not tags or type(tags) ~= "table" then return false end
     for _, v in pairs(tags) do
@@ -341,6 +420,11 @@ local function handle_bounced(json_rows)
 
     if has_tag(json_rows["tags"], KNOCKBACK_TAG) then
         handle_knockback(json_rows["data"] or {})
+        return
+    end
+
+    if has_tag(json_rows["tags"], TRAP_LINK_TAG) then
+        handle_trap_link(json_rows["data"] or {})
         return
     end
 

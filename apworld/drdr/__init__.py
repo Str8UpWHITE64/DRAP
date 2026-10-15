@@ -1145,6 +1145,9 @@ class DRWorld(World):
         damage_link_enabled = bool(self.options.damage_link.value)
         damage_link_group = str(self.options.damage_link_group.value or "")
         knockback_link_enabled = bool(self.options.knockback_link.value)
+        trap_link_enabled = bool(self.options.trap_link.value)
+        # Traps the player allowed in their yaml. TrapLink only applies those.
+        enabled_traps = sorted(self.options.enabled_traps.value)
         restricted_item_mode_enabled = bool(self.options.restricted_item_mode.value)
         door_randomizer_enabled = bool(self.options.door_randomizer.value)
         door_randomizer_mode = self.options.door_randomizer_mode.value
@@ -1267,6 +1270,8 @@ class DRWorld(World):
                 "damage_link": damage_link_enabled,
                 "damage_link_group": damage_link_group,
                 "knockback_link": knockback_link_enabled,
+                "trap_link": trap_link_enabled,
+                "enabled_traps": enabled_traps,
                 "restricted_item_mode": restricted_item_mode_enabled,
                 "spitter_only": self.spitter_only,
                 "door_randomizer": door_randomizer_enabled,
@@ -1317,6 +1322,8 @@ class DRWorld(World):
             "damage_link": damage_link_enabled,
             "damage_link_group": damage_link_group,
             "knockback_link": knockback_link_enabled,
+            "trap_link": trap_link_enabled,
+            "enabled_traps": enabled_traps,
             "restricted_item_mode": restricted_item_mode_enabled,
             "spitter_only": self.spitter_only,
             "door_randomizer": door_randomizer_enabled,

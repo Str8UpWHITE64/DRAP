@@ -91,6 +91,24 @@ class KnockbackLink(Toggle):
     default = False
 
 
+class TrapLink(Toggle):
+    """
+    Share traps with the rest of the multiworld, the Trap Link protocol that
+    Sonic Adventure 2, Super Mario World and others already speak.
+
+    When one of your traps goes off, its standard name is sent out for other
+    players with Trap Link on. When another game sends a trap, Dead Rising
+    does the nearest thing it can: damage, poison, slowing down, a bonk,
+    swearing, zombies, hostile survivors and so on. Names it has no match for
+    are ignored. Traps you removed from Enabled Traps are never applied.
+
+    A trap that arrived over the link is never sent on again. Type /traplink
+    off in the client window to leave the link mid-session.
+    """
+    display_name = "Trap Link"
+    default = False
+
+
 class SpitterOnly(Toggle):
     """
     Spitter Only. No weapon ever reaches the item pool, so with Restricted
@@ -362,12 +380,18 @@ class EnabledTraps(OptionSet):
     Effects:    Stomach Ache, Zombait, Damage Player, Skipped Arm Day (no
                 strength for 30s), Skipped Leg Day (no speed for 30s), Oops
                 More Zombies (double spawns for a minute), Potty Mouth (Frank
-                swears at you).
+                swears at you), Bonk (Frank is knocked about), Tiny (half size
+                for 30s), Giant (one and a half times size for 30s), 1 HP (Frank is
+                left on one hit point; never kills), Night (midnight for 30s;
+                never in Overtime), Cardio (twice the run speed for 30s).
     NPC:        Hostile NPC, Special Forces, Convicts Respawn.
+    Warp:       Teleport (Frank is sent to the Security Room and his followers
+                stay where they were; waits until after Jessie, never in
+                Overtime or while escorting Brad or Isabela).
 
     Some traps drop out on their own regardless of this list: Convicts Respawn
     is ScoopSanity-only, since it waits on a scoop item that does not otherwise
-    exist.
+    exist. Night is left out whenever Night Mode or Hardcore Zombies is on.
     """
     display_name = "Enabled Traps"
     valid_keys = {
@@ -387,6 +411,13 @@ class EnabledTraps(OptionSet):
         "Skipped Arm Day Trap",
         "Oops More Zombies Trap",
         "Potty Mouth Trap",
+        "Bonk Trap",
+        "Tiny Trap",
+        "Giant Trap",
+        "1 HP Trap",
+        "Night Trap",
+        "Cardio Trap",
+        "Teleport Trap",
     }
     default = frozenset(valid_keys)
 
@@ -943,6 +974,7 @@ class DROption(PerGameCommonOptions):
     damage_link: DamageLink
     damage_link_group: DamageLinkGroup
     knockback_link: KnockbackLink
+    trap_link: TrapLink
     restricted_item_mode: RestrictedItemMode
     spitter_only: SpitterOnly
     door_randomizer: DoorRandomizer

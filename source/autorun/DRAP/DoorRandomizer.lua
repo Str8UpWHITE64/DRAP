@@ -66,6 +66,13 @@ local hit_data_fields_discovered = false
 
 local redirect_count = 0
 
+-- True only for the length of an areaJump call made by warp_to with
+-- opts.no_redirect. The warp's door id is "<scene>|s136|door0", which is a
+-- real shuffled door from the Rooftop (and from Entrance Plaza under
+-- ScoopSanity), so without this a Teleport Trap fired there went wherever
+-- that door had been randomized to.
+local bypass_redirects = false
+
 -- Vehicle door-blocking state. While in a vehicle with door randomization
 -- active, every area-jump HIT_DATA is set Disabled=true. Restored on dismount.
 local vehicle_blocked_doors = {}   -- layout_info -> jump_name
@@ -356,8 +363,12 @@ local function install_hook()
                     -- gameplay-driven) take precedence over slot-data ones.
                     local was_redirected = false
                     local redirect_target = nil
-                    local active_redirect = STATIC_REDIRECTS[door_id]
-                    if (not active_redirect) and randomization_enabled and not suppressed then
+                    local active_redirect = nil
+                    if not bypass_redirects then
+                        active_redirect = STATIC_REDIRECTS[door_id]
+                    end
+                    if (not active_redirect) and not bypass_redirects
+                        and randomization_enabled and not suppressed then
                         active_redirect = DOOR_REDIRECTS[door_id]
                     end
 
@@ -798,15 +809,28 @@ end
 --- @param pos table|nil {x,y,z}; the area's origin when omitted
 --- @param angle table|nil {x,y,z}
 --- @param label string|nil name for the log line
-function M.warp_to(area_name, pos, angle, label)
+--- @param opts table|nil { leave_party = true } leaves followers where they
+---   stand (Teleport Trap); { no_redirect = true } ignores door redirects.
+function M.warp_to(area_name, pos, angle, label, opts)
     if not ensure_area_jump_method() then return false end
+    opts = opts or {}
 
     -- Bring the party. A warp skips the engine's door path, so
     -- checkCarryOverNpc never runs and NpcCarryover never sees the crossing --
     -- escorts were left behind in the old area. Done BEFORE the player moves,
     -- because members are matched against the area they are standing in.
     local carryover = _G.AP and _G.AP.NpcCarryover
-    if not carryover then
+    if opts.leave_party then
+        -- Nothing is rewritten: followers keep their JOIN records in the area
+        -- they are in, the vanilla "left behind at a door" state. The engine
+        -- can still accept the pair from the Rooftop or Entrance Plaza (both
+        -- have a real door to s136), so its verdict is answered no instead.
+        if carryover and type(carryover.begin_warp_strand) == "function" then
+            pcall(carryover.begin_warp_strand)
+        else
+            M.log("leave_party: begin_warp_strand missing -- engine may still carry")
+        end
+    elseif not carryover then
         M.log("carry-over: AP.NpcCarryover missing -- party not brought")
     elseif type(carryover.carry_party_to) ~= "function" then
         M.log("carry-over: carry_party_to missing -- party not brought")
@@ -865,7 +889,9 @@ function M.warp_to(area_name, pos, angle, label)
     end
     pcall(function() hit_data:set_field("mDoorNo", 0) end)
 
+    bypass_redirects = opts.no_redirect == true
     local ok, err = pcall(area_jump_method.call, area_jump_method, ahlm, hit_data)
+    bypass_redirects = false
     if ok then
         M.log(string.format(
             "Warped to %s (%.2f, %.2f, %.2f) via simulated door entry, using %s",

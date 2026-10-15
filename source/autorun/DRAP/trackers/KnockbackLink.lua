@@ -288,13 +288,13 @@ local function take_knockback(x, y, z, source)
     local len = math.sqrt(x * x + y * y + z * z)
     if len <= 0 then
         M.log("knockback with no direction -- ignored")
-        return
+        return false
     end
 
     local cond = player_condition()
     if not cond then
         M.log("no PlayerCondition -- knockback dropped")
-        return
+        return false
     end
 
     -- requestDamage wants a DamageDir, which points AT whatever hit him, so
@@ -306,7 +306,7 @@ local function take_knockback(x, y, z, source)
     local value = reactions[name]
     if value == nil then
         M.log(string.format("reaction %s did not resolve -- knockback dropped", name))
-        return
+        return false
     end
 
     applying_received = true
@@ -317,6 +317,21 @@ local function take_knockback(x, y, z, source)
 
     M.log(string.format("knocked about by %s: (%.2f, %.2f, %.2f) as %s%s",
         tostring(source or "someone"), x, y, z, name, ok and "" or " FAILED"))
+    return ok
+end
+
+--- A bonk: Frank is knocked about in a random direction, whether or not
+--- KnockbackLink is on. This is the Bonk Trap, and also what a Bonk / Slip /
+--- Banana trap from another game becomes. Returns false to decline, so
+--- TrapBank keeps it banked.
+---
+--- It is not rebroadcast over KnockbackLink: take_knockback holds the
+--- applying_received flag the send hook honours, and a trap is not a thing
+--- the player did to themselves.
+function M.bonk(source)
+    local angle = math.random() * 2 * math.pi
+    return take_knockback(2.0 * math.cos(angle), 0.0, 2.0 * math.sin(angle),
+                          source or "a bonk") ~= false
 end
 
 --- Called by Bridge when a KnockbackLink bounce arrives.
@@ -392,6 +407,12 @@ end
 _G.drap_knockback_take = function(x, y, z)
     take_knockback(tonumber(x) or 2.0, tonumber(y) or 0.0, tonumber(z) or 0.0,
                    "console")
+end
+
+--- Bonk Frank in a random direction, as the Bonk Trap does. Works with the
+--- link off.
+_G.drap_knockback_bonk = function()
+    M.log("bonk: " .. tostring(M.bonk("console")))
 end
 
 --- Receive a knockback through the real path, holding and all, to test the

@@ -135,9 +135,15 @@ AP.effects.NpcSaveGuard               = require("DRAP/effects/NpcSaveGuard")
 AP.effects.ConvictRespawnTrap         = require("DRAP/effects/ConvictRespawnTrap")
 AP.effects.InventoryTraps             = require("DRAP/effects/InventoryTraps")
 AP.effects.CostumeTraps               = require("DRAP/effects/CostumeTraps")
+AP.effects.BonkTrap                   = require("DRAP/effects/BonkTrap")
+AP.effects.SizeTraps                  = require("DRAP/effects/SizeTraps")
+AP.effects.OneHpTrap                  = require("DRAP/effects/OneHpTrap")
+AP.effects.NightTrap                  = require("DRAP/effects/NightTrap")
+AP.effects.TeleportTrap               = require("DRAP/effects/TeleportTrap")
 AP.effects.SpecialForces              = require("DRAP/effects/SpecialForces")
 AP.effects.SpitterMode                = require("DRAP/effects/SpitterMode")
 AP.TrapBank                           = require("DRAP/TrapBank")
+AP.TrapLink                           = require("DRAP/TrapLink")
 AP.effects.KentChain                  = require("DRAP/effects/KentChain")
 AP.effects.CultZombieLayout           = require("DRAP/effects/CultZombieLayout")
 AP.effects.PartyHudGuard              = require("DRAP/effects/PartyHudGuard")
@@ -170,6 +176,12 @@ AP.effects.HostileSurvivorTrap.register()
 AP.effects.ConvictRespawnTrap.register()
 AP.effects.InventoryTraps.register()
 AP.effects.CostumeTraps.register()
+AP.effects.BonkTrap.register()
+AP.effects.SizeTraps.register()
+AP.effects.OneHpTrap.register()
+AP.effects.NightTrap.register()
+AP.effects.TeleportTrap.register()
+AP.TrapLink.init()
 AP.effects.ZombieEffects.register()
 AP.effects.VehicleGate.register()
 AP.effects.UnlockItemSpawns.register()
@@ -432,6 +444,31 @@ local function run_slot_connect(slot_data)
         AP.KnockbackLink.apply_received(value, source)
     end
     log("KnockbackLink enabled=" .. tostring(knockback_link_enabled))
+    -- /knockbacklink in the client window flips the tag; this flips the rest.
+    AP_BRIDGE.AP_REF.on_knockback_link_toggled = function(on)
+        AP.KnockbackLinkEnabled = on
+        AP.KnockbackLink.set_enabled(on)
+        AP_BRIDGE.set_knockbacklink_enabled(on)
+        log("KnockbackLink " .. (on and "on" or "off") .. " (client command)")
+    end
+
+    -- TrapLink. The traps the yaml allows gate what a foreign trap may do.
+    local trap_link_enabled = (type(slot_data) == "table" and slot_data.trap_link == true)
+    AP.TrapLinkEnabled = trap_link_enabled
+    AP.TrapLink.set_enabled_traps(type(slot_data) == "table" and slot_data.enabled_traps or nil)
+    AP.TrapLink.set_enabled(trap_link_enabled)
+    AP_BRIDGE.set_traplink_enabled(trap_link_enabled)
+    AP_BRIDGE.on_trap_link = function(name, source)
+        AP.TrapLink.receive(name, source)
+    end
+    log("TrapLink enabled=" .. tostring(trap_link_enabled))
+    -- /traplink in the client window flips the tag; this flips the rest.
+    AP_BRIDGE.AP_REF.on_trap_link_toggled = function(on)
+        AP.TrapLinkEnabled = on
+        AP.TrapLink.set_enabled(on)
+        AP_BRIDGE.set_traplink_enabled(on)
+        log("TrapLink " .. (on and "on" or "off") .. " (client command)")
+    end
 
     -- Infinity Mode's health drain. Off unless the slot asks; offline there
     -- is no slot, so the game stays vanilla.
@@ -868,6 +905,7 @@ re.on_frame(function()
     safe_on_frame(AP.effects.BookGuards, "BookGuards")
     safe_on_frame(AP.effects.NpcSaveGuard, "NpcSaveGuard")
     safe_on_frame(AP.TrapBank, "TrapBank")
+    safe_on_frame(AP.effects.NightTrap, "NightTrap")
     safe_on_frame(AP.effects.InventoryTraps, "InventoryTraps")
     safe_on_frame(AP.effects.KentChain, "KentChain")
     safe_on_frame(AP.effects.CultZombieLayout, "CultZombieLayout")

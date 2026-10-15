@@ -328,6 +328,9 @@ local function isabela_in_party()
     return false, nil
 end
 
+-- The Teleport Trap holds while she is in the party.
+M.isabela_in_party = isabela_in_party
+
 --- Tune the Rooftop arrival spot in game, and report whether she is detected.
 ---   drap_isabela_target()             -- read, plus the detection result
 ---   drap_isabela_target(x, y, z)      -- move the arrival point

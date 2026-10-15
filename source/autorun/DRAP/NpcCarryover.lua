@@ -38,6 +38,7 @@ local is_carry_over_method = nil
 -- just changes where they land. A warp is not a pair the engine accepts --
 -- isCarryOverNpc answers 0 for it -- so nothing carries them at all.
 local warp_carry_until = 0
+local warp_strand_until = 0     -- the reverse: answered FALSE (Teleport Trap)
 local WARP_CARRY_SECONDS = 3.0
 local npc_manager_td = nil
 
@@ -327,6 +328,9 @@ local function install_hooks()
                 if os.clock() <= warp_carry_until then
                     return sdk.to_ptr(1)
                 end
+                if os.clock() <= warp_strand_until then
+                    return sdk.to_ptr(0)
+                end
                 return retval
             end)
         end)
@@ -543,7 +547,19 @@ end)
 --- Call immediately before a warp; it lapses on its own.
 function M.begin_warp_carry()
     install_hooks()
+    warp_strand_until = 0
     warp_carry_until = os.clock() + WARP_CARRY_SECONDS
+end
+
+--- The opposite window, for the Teleport Trap: the engine is told no one
+--- carries, so followers stay in the area they were in. That is what a warp
+--- to an area pair the engine does not accept already does (measured, see
+--- warp_carry_until); this makes the Rooftop and Entrance Plaza, which do
+--- have a real door to the Security Room, behave the same.
+function M.begin_warp_strand()
+    install_hooks()
+    warp_carry_until = 0
+    warp_strand_until = os.clock() + WARP_CARRY_SECONDS
 end
 
 function M.carry_party_to(area, pos)

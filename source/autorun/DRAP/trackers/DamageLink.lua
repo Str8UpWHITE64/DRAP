@@ -72,6 +72,12 @@ local damage_carry = 0
 -- damage would be broadcast straight back out.
 local applying_received = false
 
+-- Damage from a trap that arrived over TrapLink is not this player's to
+-- broadcast: every TrapLink player took the same trap, and each would send
+-- the damage on to the whole room. Until this passes, hits are measured and
+-- discarded rather than sent.
+local mute_until = 0
+
 -- Set by the hook when the PLAYER took a hit. The hook says WHEN and WHO;
 -- how much comes from the health bar on the next frame.
 --
@@ -227,6 +233,11 @@ local function drain_damage(prev_hp, cur_hp)
         end
     end
 
+    if os.clock() < mute_until then
+        damage_carry = 0
+        return
+    end
+
     if not enabled or taken <= 0 then return end
 
     damage_carry = damage_carry + taken
@@ -257,6 +268,13 @@ function M.set_enabled(on)
 end
 
 function M.is_enabled() return enabled end
+
+--- Do not send damage for the next `seconds`. Called as a TrapLink damage
+--- trap fires.
+function M.mute(seconds)
+    mute_until = math.max(mute_until, os.clock() + (tonumber(seconds) or 0))
+    damage_carry = 0
+end
 
 --- Run fn as damage this client deals itself and does not share: the hook
 --- ignores it and the HP it takes is booked off the next measured drop.

@@ -434,6 +434,29 @@ _all_items = [DRItemData(row[0], row[1], row[2]) for row in [
     ("Oops More Zombies Trap", 4084, DRItemCategory.TRAP),
     ("Potty Mouth Trap",    4085, DRItemCategory.TRAP),
 
+    # Knockback trap (DRAP/trackers/KnockbackLink.lua). Also the answer to the
+    # Bonk / Slip / Banana names arriving over TrapLink. Appended after 4086.
+    ("Bonk Trap",           4087, DRItemCategory.TRAP),
+
+    # 1 HP Trap (DRAP/effects/OneHpTrap.lua): Frank is left on one hit point.
+    ("1 HP Trap",           4088, DRItemCategory.TRAP),
+
+    # Size traps (DRAP/effects/SizeTraps.lua). 4089 is reserved.
+    ("Tiny Trap",           4090, DRItemCategory.TRAP),
+    ("Giant Trap",          4091, DRItemCategory.TRAP),
+
+    # Night Trap (DRAP/effects/NightTrap.lua): midnight for 30 s. Dropped from
+    # the pool when Night Mode (or Hardcore, which implies it) is on.
+    ("Night Trap",          4092, DRItemCategory.TRAP),
+
+    # Cardio Trap (DRAP/effects/PlayerBuffs.lua): twice the run speed for 30 s,
+    # the counterpart of Skipped Leg Day. Also the answer to TrapLink's Fast Trap.
+    ("Cardio Trap",         4093, DRItemCategory.TRAP),
+
+    # Teleport Trap (DRAP/effects/TeleportTrap.lua): Frank is sent to the
+    # Security Room and his followers stay where they were.
+    ("Teleport Trap",       4095, DRItemCategory.TRAP),
+
     # special_forces_mode = item. A scoop so it shows in the scoop list with
     # hover text; unlocking it sets flag 309 and the Overtime soldiers arrive.
     # It completes on BOTH of its checks, so the checks send them home.
@@ -704,6 +727,10 @@ def BuildItemPool(multiworld, count, options, excluded_scoop_names=(),
     if not options.scoop_sanity:
         trapList = [item for item in trapList
                     if item.name != "Convicts Respawn Trap"]
+    # Night Mode already makes it night all run, so the trap has nothing to add.
+    if (bool(getattr(getattr(options, "night_mode_enabled", None), "value", 0))
+            or bool(getattr(getattr(options, "hardcore_zombies_enabled", None), "value", 0))):
+        trapList = [item for item in trapList if item.name != "Night Trap"]
     # Player's own list. An empty set means no traps at all, which is the same
     # as a trap percentage of zero -- honoured rather than treated as "unset",
     # because emptying the list is a deliberate thing to do.

@@ -462,7 +462,17 @@ local function _capture_night()
     return saved
 end
 
+-- Every owner of night (the YAML mode, Night Mode, Hardcore's underlay, the
+-- Night Trap) takes a reference. The fields and eyes only go back when the
+-- last one lets go, and they go back to what was there before the FIRST
+-- owner -- an owner that captured while another was running would otherwise
+-- restore night values and leave the zombies stuck at night.
+local _night_refs = 0
+local _night_baseline = nil
+
 local function _apply_night()
+    if _night_refs == 0 then _night_baseline = _capture_night() end
+    _night_refs = _night_refs + 1
     _install_night_hook()
     _night_active = true
     -- Glowing eyes, on the zombies standing here now and on later spawns.
@@ -480,6 +490,10 @@ local function _apply_night()
 end
 
 local function _restore_night(saved)
+    if _night_refs > 0 then _night_refs = _night_refs - 1 end
+    if _night_refs > 0 then return end
+    saved = _night_baseline or saved
+    _night_baseline = nil
     _night_active = false
     -- Clear the eyes off anything still standing, then stop sweeping.
     _night_eyes = false
@@ -690,6 +704,11 @@ function M.night_mode(sec)
         _restore_night)
 end
 
+--- Zombie night for another module's timed effect (the Night Trap). Balanced
+--- calls only: every acquire needs exactly one release.
+function M.night_acquire() _apply_night() end
+function M.night_release() _restore_night(nil) end
+
 function M.hardcore_zombies(sec)
     sec = tonumber(sec) or DEFAULT_HARDCORE_DURATION
     -- Stack night mode underneath
@@ -717,6 +736,8 @@ function M.get_active_effects()
 end
 
 function M.cancel_all()
+    local NT = package.loaded["DRAP/effects/NightTrap"]
+    if NT and NT.cancel then pcall(NT.cancel) end
     for _, entry in pairs(_timed) do
         pcall(entry.restore_fn)
     end

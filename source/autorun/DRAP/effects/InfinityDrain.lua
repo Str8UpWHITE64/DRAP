@@ -62,6 +62,7 @@ local was_live = false
 local carry = 0                 -- fractional HP owed
 local drained_for_link = 0      -- HP drained toward the next DamageLink block
 local last_why = nil
+local grace_until = 0       -- os.clock() before which the drain holds off
 
 ------------------------------------------------------------
 -- World access. One table so the unit test can replace it.
@@ -169,6 +170,7 @@ local function blocked(dt, clock)
     if not enabled and not forced then return "off" end
     if not forced and not world.connected() then return "not connected" end
     if not world.in_game() then return "not in game" end
+    if world.now() < grace_until then return "grace" end
     if world.dead() then return "dead" end
     local hp = world.hp()
     if not hp or hp <= 0 then return "no hp" end
@@ -239,6 +241,15 @@ end
 
 function M.is_enabled() return enabled or forced end
 
+--- Hold the drain off for `seconds` (the 1 HP Trap: the next tick would kill).
+--- Resets the partial HP owed, and the second after the grace is skipped like
+--- after any other guard.
+function M.grace(seconds)
+    grace_until = math.max(grace_until, world.now() + (tonumber(seconds) or 0))
+    carry = 0
+    was_live = false
+end
+
 function M.on_frame()
     if not enabled and not forced then return end
     local now = world.now()
@@ -270,6 +281,7 @@ function M._reset()
     enabled, forced, rate = false, false, DEFAULT_RATE
     last_sample, last_clock, was_live = nil, nil, false
     carry, drained_for_link, last_why = 0, 0, nil
+    grace_until = 0
 end
 
 local function status_line()
