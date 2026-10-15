@@ -502,8 +502,10 @@ class VanillaProgression(Choice):
         AP items are the only source of skills and stats. The default.
 
     extra_buffs_only:
-        Engine grants normally, AP items contain ONLY the over-vanilla extras
-        (cap-pushing items). Best paired with Enable Extra Stat Buffs = true.
+        Engine grants normally and keeps everything it grants (level-ups,
+        skills, stat gains); AP stat items are added on top. The pool holds
+        ONLY the over-vanilla extras (cap-pushing items), and only when
+        Enable Extra Stat Buffs is on. With it off, the pool has no stat items.
     """
     display_name = "Vanilla Progression"
     option_vanilla_only = 0

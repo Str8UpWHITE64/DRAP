@@ -30,9 +30,8 @@
 -- which verifies the death and falls back to playerDead(); that death is an
 -- ordinary one and sends a DeathLink.
 --
--- PlayerStats.apply() refills HP to max on every call today (PL-01, card
--- 1884619577036375885). Nothing here depends on how that is fixed; until it
--- is, doors and grants top Frank back up.
+-- PlayerStats.apply() no longer refills HP: it only raises current HP by the
+-- amount max HP rose, so doors, grants and save loads cannot undo the drain.
 
 local Shared = require("DRAP/Shared")
 local PlayerReady = require("DRAP/PlayerReady")

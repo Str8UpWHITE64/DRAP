@@ -845,7 +845,8 @@ def BuildItemPool(multiworld, count, options, excluded_scoop_names=(),
     # whether extras are enabled. Modes:
     #   * vanilla_only    — neither skills nor stat upgrades added
     #   * replace         — full core pool (extras add more if enabled)
-    #   * extra_buffs_only — only the extra/over-vanilla pool added
+    #   * extra_buffs_only — only the extra/over-vanilla pool added, and only
+    #                        when enable_extra_stat_buffs is on
     progression_mode = getattr(options, "vanilla_progression",
                                type("X", (), {"value": 1})()).value
     # Match Options.py Choice: 0=vanilla_only, 1=replace, 2=extra_buffs_only
@@ -879,7 +880,10 @@ def BuildItemPool(multiworld, count, options, excluded_scoop_names=(),
             if progression_mode == 1:   # replace
                 count_to_add = base + (extra if extras_enabled else 0)
             elif progression_mode == 2:   # extra_buffs_only
-                count_to_add = extra
+                # Only the over-vanilla extras, and only when they are
+                # switched on: with Enable Extra Stat Buffs off this pool is
+                # empty and the engine's level-ups are all Frank gets.
+                count_to_add = extra if extras_enabled else 0
             for _ in range(count_to_add):
                 item_pool.append(upg)
                 remaining_count -= 1
