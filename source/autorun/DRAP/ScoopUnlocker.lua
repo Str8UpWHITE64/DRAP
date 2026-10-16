@@ -537,6 +537,17 @@ end
 -- of M.on_frame so the engine's evFlagOn implementation has already run
 -- and we're not racing it.
 local pending_flag_clears = {}
+-- Scoop completions seen by the evFlagOn hook, applied on the next frame.
+local pending_completions = {}
+local pending_completions_set = {}
+-- Their location checks, sent on the same frame (see the Overtime gate there).
+local pending_checks = {}
+-- Main finishes the hook saw since the last drain, whether queued or not.
+local main_finishes_seen = 0
+-- Overtime started from the title menu (12-day entry), not by playing Day 3.
+local overtime_from_title = false
+-- FLAG_TRIGGERS the hook saw, applied on the frame (none in Overtime).
+local pending_triggers = {}
 
 -- ScoopSanity-only: hold the EP shutters open by flooring GAME FLOW.
 --
@@ -1430,6 +1441,9 @@ local function install_hooks()
                                 == completion.scoop
                              or (owner and owner.flag_completion_event
                                  == completion.event))
+                    if finishes_scoop and owner and owner.category == "Main" then
+                        main_finishes_seen = main_finishes_seen + 1
+                    end
 
                     local ss_block = scoop_sanity_enabled
                                   and not State.is_endgame_reached()
@@ -1463,31 +1477,28 @@ local function install_hooks()
                             finishes_scoop and "COMPLETION" or "STEP",
                             flag_id, completion.event))
                         if finishes_scoop then
-                            M.complete_scoop(completion.scoop)
+                            -- Queued, not applied here: the Overtime start writes
+                            -- about fourteen completion flags in a burst on the
+                            -- loader thread, and completing scoops from inside
+                            -- the hook crashed SCQManager::checkQueStart. The
+                            -- frame drains it in arrival order.
+                            if not pending_completions_set[completion.scoop] then
+                                pending_completions_set[completion.scoop] = true
+                                pending_completions[#pending_completions + 1] = completion.scoop
+                            end
                         end
-                        if on_completion_detected_callback then
-                            pcall(on_completion_detected_callback,
-                                completion.event, flag_id, completion.scoop)
-                        end
+                        pending_checks[#pending_checks + 1] = {
+                            completion.event, flag_id, completion.scoop }
                     end
                 end
 
                 -- ScoopSanity-only: flag triggers, time skips, and controlled flag suppression
                 if scoop_sanity_enabled then
-                    local trigger = FLAG_TRIGGERS[flag_id]
-                    if trigger then
-                        if trigger.enable then
-                            for _, target in ipairs(trigger.enable) do
-                                raw_set_flag_on(target)
-                                M.log(string.format("Trigger: flag %d -> enabled %d", flag_id, target))
-                            end
-                        end
-                        if trigger.disable then
-                            for _, target in ipairs(trigger.disable) do
-                                raw_set_flag_off(target)
-                                M.log(string.format("Trigger: flag %d -> disabled %d", flag_id, target))
-                            end
-                        end
+                    -- Applied on the frame, not here: the title-menu Overtime
+                    -- start writes 355 in its burst, and this cleared the
+                    -- game's own 300 from the loader thread.
+                    if FLAG_TRIGGERS[flag_id] then
+                        pending_triggers[#pending_triggers + 1] = flag_id
                     end
 
                     local skip = ENDING_JUMP_TRIGGERS[flag_id]
@@ -3328,6 +3339,72 @@ function M.on_frame()
         end
     end
 
+    -- Apply completions and checks the evFlagOn hook queued (see the hook for
+    -- why). Mains cannot be played in Overtime, so with 312 on a main's
+    -- completion is the game's, not the player's: the 12-day title entry
+    -- writes every main as finished in one burst. Those are neither completed
+    -- nor sent. Seeing one before the restore has run is what marks an
+    -- Overtime started from the title menu; a Day 3 ending writes none.
+    -- 312 unreadable (a load) holds the queue for a later frame.
+    local ot_now = raw_check_flag(OVERTIME_FLAG)
+    if ot_now ~= nil and (#pending_completions > 0 or #pending_checks > 0
+            or main_finishes_seen > 0 or #pending_triggers > 0) then
+        local function is_main(name)
+            local data = name and SCOOP_DATA[name]
+            return data and data.category == "Main"
+        end
+        if ot_now and main_finishes_seen > 0 and not overtime_story_restored
+                and not overtime_from_title then
+            overtime_from_title = true
+            M.log("Overtime started from the title menu -- its finished mains"
+                .. " are the game's own; no checks, no story flag restore")
+        end
+        main_finishes_seen = 0
+        local checks, batch = pending_checks, pending_completions
+        pending_checks, pending_completions, pending_completions_set = {}, {}, {}
+        local dropped = 0
+        local triggers = pending_triggers
+        pending_triggers = {}
+        for _, fid in ipairs(triggers) do
+            local trigger = FLAG_TRIGGERS[fid]
+            if trigger and not ot_now and not State.is_endgame_reached() then
+                for _, target in ipairs(trigger.enable or {}) do
+                    raw_set_flag_on(target)
+                    M.log(string.format("Trigger: flag %d -> enabled %d", fid, target))
+                end
+                for _, target in ipairs(trigger.disable or {}) do
+                    raw_set_flag_off(target)
+                    M.log(string.format("Trigger: flag %d -> disabled %d", fid, target))
+                end
+            end
+        end
+        -- A title-menu Overtime earns nothing from the burst: it also writes
+        -- rows with no scoop (Backup for Brad's 270, Ending A's 312, Memories,
+        -- Greg's passage), and those checks went out unearned.
+        for _, c in ipairs(checks) do
+            if overtime_from_title
+                    or (ot_now and is_main(c[3] or COMPLETION_EVENT_TO_SCOOP[c[1]])) then
+                dropped = dropped + 1
+            elseif on_completion_detected_callback then
+                pcall(on_completion_detected_callback, c[1], c[2], c[3])
+            end
+        end
+        for _, scoop in ipairs(batch) do
+            if ot_now and is_main(scoop) then
+                dropped = dropped + 1
+            else
+                local ok, err = pcall(M.complete_scoop, scoop)
+                if not ok then
+                    M.log(string.format("complete_scoop('%s') failed: %s", scoop, tostring(err)))
+                end
+            end
+        end
+        if dropped > 0 then
+            M.log(string.format("Overtime: ignored %d completion(s) and check(s)"
+                .. " the game wrote with flag 312 on", dropped))
+        end
+    end
+
     -- Overtime first, so nothing below writes a flag in the frame it begins.
     if Shared.is_in_game() then
         local ot = raw_check_flag(OVERTIME_FLAG)
@@ -3340,13 +3417,22 @@ function M.on_frame()
             end
             if not overtime_story_restored then
                 overtime_story_restored = true
-                restore_overtime_story()
+                -- The restore puts back what DRAP's 72 hours switched off.
+                -- A title-menu Overtime had no 72 hours: the game set its
+                -- story the vanilla way, and the restore's start/success
+                -- markers on top of that crashed SCQManager.checkQueStart.
+                if overtime_from_title then
+                    M.log("Overtime from the title menu: story flag restore skipped")
+                else
+                    restore_overtime_story()
+                end
             end
         elseif ot == false and State.is_endgame_reached() then
             overtime_off_since = overtime_off_since or os.clock()
             if os.clock() - overtime_off_since >= OVERTIME_OFF_CONFIRM_SECONDS then
                 overtime_off_since = nil
                 overtime_story_restored = false
+                overtime_from_title = false
                 State.set_endgame_reached(false)
                 M.log("Flag 312 off in a loaded save -- back in the 72 hours, enforcement resumes")
                 save_state()
@@ -3366,9 +3452,13 @@ function M.on_frame()
 
     -- Process flag clears scheduled from the evFlagOn pre-hook. The one-frame
     -- delay lets the engine's evFlagOn body finish so the clear sticks.
+    -- Not in Overtime: the title-menu start writes every main's completion
+    -- before endgame is set, and with ScoopSanity on the guard queues a clear
+    -- for each one -- a finished case the game would then replay.
     if next(pending_flag_clears) then
         for fid, _ in pairs(pending_flag_clears) do
-            if raw_check_flag(fid) then
+            if ot_now == false and not State.is_endgame_reached()
+                    and raw_check_flag(fid) then
                 raw_set_flag_off(fid)
                 if verbose_logging then
                     M.log(string.format(
