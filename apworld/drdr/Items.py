@@ -453,6 +453,10 @@ _all_items = [DRItemData(row[0], row[1], row[2]) for row in [
     # the counterpart of Skipped Leg Day. Also the answer to TrapLink's Fast Trap.
     ("Cardio Trap",         4093, DRItemCategory.TRAP),
 
+    # Invisibility Trap (DRAP/effects/InvisibleTrap.lua): Frank's model is
+    # hidden for 30 s. Render only; zombies still see him.
+    ("Invisibility Trap",   4094, DRItemCategory.TRAP),
+
     # Teleport Trap (DRAP/effects/TeleportTrap.lua): Frank is sent to the
     # Security Room and his followers stay where they were.
     ("Teleport Trap",       4095, DRItemCategory.TRAP),

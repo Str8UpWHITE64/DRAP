@@ -56,6 +56,7 @@ M.SEND = {
     ["Tiny Trap"]               = "Tiny Trap",
     ["Cardio Trap"]             = "Fast Trap",
     ["Teleport Trap"]           = "Teleport Trap",
+    ["Invisibility Trap"]       = "Invisible Trap",
 }
 
 -- Our trap -> the standard names that fire it.
@@ -118,6 +119,7 @@ local RECEIVE_GROUPS = {
     -- are close enough to receive.
     ["Giant Trap"] = { "W I D E Trap", "Fat CJ Trap" },
     ["Night Trap"] = { "Nightmare Trap" },
+    ["Invisibility Trap"] = { "Invisible Trap", "Invisibility Trap" },
     -- Sent home to the Security Room, followers left where they are.
     ["Teleport Trap"] = { "Teleport Trap", "Bubble Trap", "Home Trap" },
 }
