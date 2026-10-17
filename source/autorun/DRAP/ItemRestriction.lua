@@ -125,6 +125,23 @@ end
 -- Allowed Items Management
 ------------------------------------------------------------
 
+-- Items that turn into another item when they break. The new item appears in
+-- Frank's hands mid-swing, where the sweep cannot take it back safely,
+-- so receiving the whole item allows its broken form too. Game item numbers:
+-- Push Broom 8 -> Push Broom Handle 9, Mailbox 252 -> Mailbox Post 254.
+local BREAKS_INTO = {
+    [8]   = 9,
+    [252] = 254,
+}
+
+local function allow_broken_forms()
+    for whole, broken in pairs(BREAKS_INTO) do
+        if (ALLOWED_ITEM_COUNTS[whole] or 0) > 0 then
+            ALLOWED_ITEM_COUNTS[broken] = math.max(ALLOWED_ITEM_COUNTS[broken] or 0, 1)
+        end
+    end
+end
+
 --- Rebuilds the allowed item counts from AP bridge received items
 local function rebuild_allowed_items()
     ALLOWED_ITEM_COUNTS = {}
@@ -143,6 +160,7 @@ local function rebuild_allowed_items()
             ALLOWED_ITEM_COUNTS[game_item_no] = (ALLOWED_ITEM_COUNTS[game_item_no] or 0) + 1
         end
     end
+    allow_broken_forms()
 end
 
 --- Rebuilds and folds in anything granted by hand. Called wherever the
@@ -152,6 +170,7 @@ local function rebuild_allowed_with_grants()
     for item_no in pairs(GRANTED) do
         ALLOWED_ITEM_COUNTS[item_no] = (ALLOWED_ITEM_COUNTS[item_no] or 0) + 1
     end
+    allow_broken_forms()
 end
 
 -- An item is allowed iff: restricted mode is off, OR the item is not a
