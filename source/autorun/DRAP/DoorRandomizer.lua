@@ -75,7 +75,7 @@ local bypass_redirects = false
 
 -- Vehicle door-blocking state. While in a vehicle with door randomization
 -- active, every area-jump HIT_DATA is set Disabled=true. Restored on dismount.
-local vehicle_blocked_doors = {}   -- layout_info -> jump_name
+local vehicle_blocked_doors = {}   -- layout_info -> Disabled state before the vehicle block
 local player_was_in_vehicle = false
 
 ------------------------------------------------------------
@@ -645,18 +645,9 @@ end
 ------------------------------------------------------------
 -- Vehicle Door Blocking
 -- While in a vehicle, all area-jump doors are Disabled=true so the player
--- can't transition through one. Restored on dismount, respecting any
--- DoorSceneLock locks still in effect.
+-- can't transition through one. Each door's prior Disabled state is saved and
+-- put back on dismount, so DoorSceneLock's locks survive the ride.
 ------------------------------------------------------------
-
-local DoorSceneLock = nil
-local function get_door_scene_lock()
-    if not DoorSceneLock then
-        local ok, mod = pcall(require, "DRAP/DoorSceneLock")
-        if ok and mod then DoorSceneLock = mod end
-    end
-    return DoorSceneLock
-end
 
 local function is_player_in_vehicle()
     local pm = pm_mgr:get()
@@ -703,19 +694,21 @@ local function scan_and_set_doors_disabled(disabled)
 
                                 if mHitData and jump_name ~= "" then
                                     if disabled then
+                                        -- Remember what Door Locks had set, so the get-off
+                                        -- can put back exactly that. Re-deriving it from the
+                                        -- vanilla jump_name was wrong: Door Locks decides by
+                                        -- the redirected destination, so doors it had locked
+                                        -- came back open.
+                                        local ok_get, was = pcall(mHitData.get_field, mHitData, "Disabled")
                                         local ok_set = pcall(mHitData.set_field, mHitData, "Disabled", true)
                                         if ok_set then
-                                            vehicle_blocked_doors[li] = jump_name
+                                            vehicle_blocked_doors[li] = (ok_get and was == true) or false
                                             count = count + 1
                                         end
-                                    elseif vehicle_blocked_doors[li] then
-                                        -- Only re-enable doors WE blocked, and only
-                                        -- if DoorSceneLock doesn't have the scene locked
-                                        local dsl = get_door_scene_lock()
-                                        local scene_locked = dsl and dsl.is_scene_locked(jump_name)
-                                        if not scene_locked then
-                                            pcall(mHitData.set_field, mHitData, "Disabled", false)
-                                        end
+                                    elseif vehicle_blocked_doors[li] ~= nil then
+                                        -- Only doors WE blocked: restore their prior state.
+                                        pcall(mHitData.set_field, mHitData, "Disabled",
+                                              vehicle_blocked_doors[li])
                                         vehicle_blocked_doors[li] = nil
                                         count = count + 1
                                     end
