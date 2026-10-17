@@ -110,7 +110,13 @@ function M.send_goal_complete()
             return true
         else
             M.log.error("StatusUpdate failed: " .. tostring(err))
-            re.msg("Goal completion failed to send: " .. tostring(err))
+            -- Not re.msg: a modal message box stops the game until it is
+            -- dismissed, and this runs in the middle of the ending.
+            local ok_n, Notify = pcall(require, "DRAP/Notify")
+            if ok_n and Notify and Notify.error then
+                pcall(Notify.error, "Goal completion failed to send: " .. tostring(err),
+                    { duration = 10 })
+            end
         end
     else
         M.log("StatusUpdate method not found on APClient")
