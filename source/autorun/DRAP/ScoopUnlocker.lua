@@ -1875,7 +1875,8 @@ State.init({
         local ssc = AP and AP.effects and AP.effects.SurvivorScoopCompletion
         if ssc and ssc.reset_world then pcall(ssc.reset_world) end
         local nt = AP and AP.NpcTracker
-        if nt and nt.reset_rescued then pcall(nt.reset_rescued) end
+        if nt and nt.reset_world then pcall(nt.reset_world, "new world")
+        elseif nt and nt.reset_rescued then pcall(nt.reset_rescued) end
     end,
     scoop_survivors = SharedData.scoop_survivors(),
     -- NpcTracker owns liveness: it already walks NpcInfoList every half

@@ -306,6 +306,26 @@ function M.player_kill_count()
     return n
 end
 
+--- Forget everything remembered about the last world: rescues, deaths and
+--- player kills. All of it is session-local, so after a new game, or a
+--- different slot in the same session, the first world's Psycho kills stayed
+--- in killed_by_player and the same survivor's second kill was swallowed as a
+--- repeat -- no "killed by the player", no "Kill <name>" check. Liveness
+--- rebuilds from the live records within a tick.
+function M.reset_world(reason)
+    local k, d = 0, 0
+    for _ in pairs(killed_by_player) do k = k + 1 end
+    for _ in pairs(dead_now) do d = d + 1 end
+    killed_by_player = {}
+    dead_now = {}
+    seen_alive = {}
+    M.reset_rescued()
+    if k > 0 or d > 0 then
+        M.log(string.format("%s -- forgot %d player kill(s) and %d death(s)",
+            tostring(reason or "new world"), k, d))
+    end
+end
+
 local function record_is_alive(npc_info)
     local dead = nil
     pcall(function() dead = npc_info:call("isDead") end)
@@ -328,6 +348,9 @@ local function fold_liveness(npc_id, any_alive)
         seen_alive[npc_id] = true
         if dead_now[npc_id] then
             dead_now[npc_id] = nil
+            -- An earlier save brought them back: the kill is undone with the
+            -- death, or killing them again is never credited.
+            killed_by_player[npc_id] = nil
             M.log(string.format("%s is alive again -- death retracted",
                 survivor_id_to_friendly_name(npc_id)))
         end

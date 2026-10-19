@@ -347,6 +347,8 @@ end
 -- Slot Connection Handler
 ------------------------------------------------------------
 
+local last_slot_key = nil   -- slot|seed of the last connect this session
+
 local function extract_seed(slot_data)
     local raw = slot_data and (slot_data.seed_name or slot_data.seed or slot_data.seed_id) or "unknown"
     return Shared.clean_string(raw)
@@ -370,6 +372,15 @@ local function run_slot_connect(slot_data)
     local seed = extract_seed(slot_data)
 
     log("Slot connected: slot=" .. slot .. " seed=" .. seed)
+
+    -- Another slot in the same session is another world: what NpcTracker
+    -- remembers of the last one (kills above all) must not leak into it. A
+    -- reconnect to the same slot keeps it, since those survivors are still dead.
+    local slot_key = slot .. "|" .. seed
+    if last_slot_key and last_slot_key ~= slot_key then
+        AP.NpcTracker.reset_world("slot change")
+    end
+    last_slot_key = slot_key
 
     -- Before any of the restore below: the mod is dormant until here, and
     -- everything that follows expects to be running for real.
@@ -805,6 +816,7 @@ local function try_reapply_if_ready()
                 log("New game detected -- resetting side scoop progress")
                 AP.ScoopUnlocker.reset_for_new_game()
                 AP.EventTracker.reset_sent()
+                AP.NpcTracker.reset_world("new game")
             end
         else
             return  -- retry next frame; don't reapply against unsettled flags
