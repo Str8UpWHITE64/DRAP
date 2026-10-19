@@ -393,6 +393,75 @@ local function fire_spawn(stype, live_state, hp_mult)
 end
 
 ------------------------------------------------------------
+-- HP bar guard on NPC destroy
+------------------------------------------------------------
+
+-- Back to Title crashed with a trap survivor alive. NpcBase.doOnDestroy (and
+-- NpcBaseOpening's own copy) does, with no null check:
+--     if iconElementIndex >= 0 then
+--         FloatUIManager._Instance.npcHpUi:delElement(iconElementIndex)
+-- The HP UI's close callback (FloatUIManager <openNpcHpUi>b__86_1) clears
+-- npcHpUi. The game's own NPCs are destroyed before that happens; ours are
+-- destroyed about half a second later, so delElement runs with this = null and
+-- faults reading idleElementIndexQueue at +0xC0 (RIP DRDR+0x176e759, RDX = 0
+-- in every crash dump).
+--
+-- Fix: just before doOnDestroy runs, if the HP UI is already gone, set the
+-- NPC's iconElementIndex to -1 so the call is skipped. That only changes the
+-- case that would crash anyway -- there is no HP UI left to remove a bar from.
+-- Both native addresses are unique in the dump (142244330, 14234d590).
+local NPC_BASE_TYPE   = "app.solid.npc.NpcBase"
+local FLOAT_UI_TYPE   = "app.solid.FloatUIManager"
+local icon_index_off  = nil   -- NpcBase.iconElementIndex
+local npc_hp_ui_off   = nil   -- FloatUIManager.<npcHpUi>k__BackingField
+local float_ui        = nil   -- refreshed every frame, read inside the hook
+local hp_guard_skips  = 0
+local hp_guard_logged = 0
+
+local function field_offset(type_name, field_name)
+    local td = sdk.find_type_definition(type_name)
+    local f = td and td:get_field(field_name)
+    return f and f:get_offset_from_base() or nil
+end
+
+local function guard_npc_destroy(args)
+    if not (icon_index_off and npc_hp_ui_off and float_ui) then return end
+    pcall(function()
+        local npc = sdk.to_managed_object(args[2])
+        if not npc then return end
+        local idx = npc:read_dword(icon_index_off)
+        if idx == nil or idx < 0 or idx >= 0x80000000 then return end   -- already -1
+        if float_ui:read_qword(npc_hp_ui_off) ~= 0 then return end
+        npc:write_dword(icon_index_off, 0xFFFFFFFF)
+        hp_guard_skips = hp_guard_skips + 1
+    end)
+end
+
+local function install_hp_guard()
+    icon_index_off = field_offset(NPC_BASE_TYPE, "iconElementIndex")
+    npc_hp_ui_off  = field_offset(FLOAT_UI_TYPE, "<npcHpUi>k__BackingField")
+    if not (icon_index_off and npc_hp_ui_off) then
+        log("HP bar guard not installed (field offsets not found)")
+        return
+    end
+    local hooked = 0
+    for _, tn in ipairs({ NPC_BASE_TYPE, "app.solid.npc.NpcBaseOpening" }) do
+        local ok = pcall(function()
+            local td = sdk.find_type_definition(tn)
+            local m = td and td:get_method("doOnDestroy")
+            if not m then return end
+            sdk.hook(m, guard_npc_destroy, function(r) return r end)
+            hooked = hooked + 1
+        end)
+        if not ok then log("HP bar guard: hooking " .. tn .. ".doOnDestroy failed") end
+    end
+    log(string.format("HP bar guard installed on %d doOnDestroy method(s)", hooked))
+end
+install_hp_guard()
+
+_G.drap_hp_guard_skips = function() return hp_guard_skips end
+
+------------------------------------------------------------
 -- Per-frame upkeep
 ------------------------------------------------------------
 
@@ -402,6 +471,12 @@ end
 re.on_frame(function()
     update_trap_area_lock()
     update_area_settle()
+    float_ui = sdk.get_managed_singleton(FLOAT_UI_TYPE)
+    if hp_guard_skips ~= hp_guard_logged then
+        log(string.format("HP bar guard: skipped the bar removal for %d NPC(s) destroyed after the HP UI closed",
+            hp_guard_skips - hp_guard_logged))
+        hp_guard_logged = hp_guard_skips
+    end
 end)
 
 ------------------------------------------------------------
