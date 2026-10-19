@@ -441,7 +441,11 @@ _all_items = [DRItemData(row[0], row[1], row[2]) for row in [
     # 1 HP Trap (DRAP/effects/OneHpTrap.lua): Frank is left on one hit point.
     ("1 HP Trap",           4088, DRItemCategory.TRAP),
 
-    # Size traps (DRAP/effects/SizeTraps.lua). 4089 is reserved.
+    # Knockout Gas Trap (DRAP/effects/GasTrap.lua): Frank is hit with the
+    # raincoat cultists' knockout powder for about 12 s.
+    ("Knockout Gas Trap",   4089, DRItemCategory.TRAP),
+
+    # Size traps (DRAP/effects/SizeTraps.lua).
     ("Tiny Trap",           4090, DRItemCategory.TRAP),
     ("Giant Trap",          4091, DRItemCategory.TRAP),
 

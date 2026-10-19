@@ -57,6 +57,7 @@ M.SEND = {
     ["Cardio Trap"]             = "Fast Trap",
     ["Teleport Trap"]           = "Teleport Trap",
     ["Invisibility Trap"]       = "Invisible Trap",
+    ["Knockout Gas Trap"]       = "Gas Trap",
 }
 
 -- Our trap -> the standard names that fire it.
@@ -69,7 +70,7 @@ local RECEIVE_GROUPS = {
     },
     ["Stomach Ache Trap"] = {
         "Poison Trap", "Poison Mushroom", "Food Poisoning Trap", "Toxin Trap",
-        "Gas Trap", "Stinky Trap", "Poisontoad", "Guest Vomiting Trap",
+        "Poisontoad", "Guest Vomiting Trap",
     },
     -- Frank cannot be frozen, so the freeze family becomes the slow.
     ["Skipped Leg Day Trap"] = {
@@ -77,8 +78,8 @@ local RECEIVE_GROUPS = {
         "Tar Trap", "Tarr Trap", "Iron Boots Trap", "Sinking Trap",
         "Underwater Trap",
         "Freeze Trap", "Frozen Trap", "Ice Trap", "Ice Floor Trap",
-        "Frost Trap", "Paralyze Trap", "Paralysis Trap", "Stun Trap",
-        "Chaos Control Trap", "Sleep Trap", "Sleeptoad", "Confuse Trap",
+        "Frost Trap", "Paralyze Trap", "Paralysis Trap",
+        "Chaos Control Trap", "Confuse Trap",
         "Confusion Trap", "Confound Trap",
     },
     ["Skipped Arm Day Trap"] = {
@@ -120,6 +121,10 @@ local RECEIVE_GROUPS = {
     ["Giant Trap"] = { "W I D E Trap", "Fat CJ Trap" },
     ["Night Trap"] = { "Nightmare Trap" },
     ["Invisibility Trap"] = { "Invisible Trap", "Invisibility Trap" },
+    -- The cultists' powder: gas, stun and sleep names all knock Frank out.
+    ["Knockout Gas Trap"] = {
+        "Gas Trap", "Stinky Trap", "Stun Trap", "Sleep Trap", "Sleeptoad",
+    },
     -- Sent home to the Security Room, followers left where they are.
     ["Teleport Trap"] = { "Teleport Trap", "Bubble Trap", "Home Trap" },
 }

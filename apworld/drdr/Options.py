@@ -400,7 +400,9 @@ class EnabledTraps(OptionSet):
                 for 30s), Giant (one and a half times size for 30s), 1 HP (Frank is
                 left on one hit point; never kills), Night (midnight for 30s;
                 never in Overtime), Cardio (twice the run speed for 30s), Invisibility
-                (Frank can't be seen for 30s; zombies still can).
+                (Frank can't be seen for 30s; zombies still can), Knockout Gas
+                (the cultists' powder: Frank is blinded and unsteady for about 12s;
+                waits until after Jessie, never in Overtime).
     NPC:        Hostile NPC, Special Forces, Convicts Respawn.
     Warp:       Teleport (Frank is sent to the Security Room and his followers
                 stay where they were; waits until after Jessie, never in
@@ -435,6 +437,7 @@ class EnabledTraps(OptionSet):
         "Night Trap",
         "Cardio Trap",
         "Invisibility Trap",
+        "Knockout Gas Trap",
         "Teleport Trap",
     }
     default = frozenset(valid_keys)
