@@ -151,6 +151,7 @@ function M.build(deps)
                 -- Cult Limited: keep cultists in Colby's theater (scene
                 -- s503) by clearing the spawn flag everywhere else. Keyed
                 -- on scene, not area -- door-rando can reroute the exit.
+                -- The mall's own cult rows are hidden by CultZombieLayout.
                 if ctx.scene and not ctx.scene:find("s503") then
                     claim(2063, "off")
                 end

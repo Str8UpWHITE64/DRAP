@@ -28,6 +28,16 @@
 --                    Colby's once "A Strange Group" is completed, so the
 --                    thin set was still being selected with no cultists
 --                    in sight (tester report, Cult Limited on).
+--   Cult rows (Cult Limited): once "A Strange Group" is completed, every
+--                    cult row (table type 2) gated on 326 is hidden except
+--                    the theater's. 326 itself is left to the game: the
+--                    Paradise Plaza cutscene turns it on and nothing turns
+--                    it off before Sean's kill, so the cult stayed in the
+--                    whole mall. Holding 326 off instead emptied Colby's
+--                    too, and since the layout is picked during the load,
+--                    a flag keyed on the current scene always lands one
+--                    area late in both directions. The rows don't care
+--                    which way the player is walking.
 
 local Shared = require("DRAP/Shared")
 local State = require("DRAP/scoops/ScoopState")
@@ -41,6 +51,8 @@ local elm_mgr = M:add_singleton("elm", ELM_T)
 local CULT_FLAG   = 326
 local SF_FLAG     = 309      -- the Special Forces; their zombie row is thin too
 local ZOMBIE_TYPE = 1        -- rEnemySetControlTable.ETableType: zombie rows
+local CULT_TYPE   = 2        -- ETableType.eCult: the cult rows
+local THEATER     = 1283     -- s503, the one area that keeps its cult rows
 local CULT_SCOOP  = "A Strange Group"
 
 -- area -> how its cult-time zombie row is patched.
@@ -72,6 +84,13 @@ local safe = Shared.safe
 -- area -> { rows = {row objects}, original = set number or area, patched = bool }
 local state = {}
 local table_scanned = false
+
+-- The cult rows Cult Limited hides: { row = obj, area = original area }.
+-- Hidden the same way as the Food Court's zombie row, by moving the row to
+-- area 0. A row found already at 0 (a script reset mid-session) has lost
+-- its area and stays hidden until the game restarts.
+local cult_rows = {}
+local cult_hidden = false
 
 ------------------------------------------------------------
 -- Table access
@@ -116,6 +135,9 @@ local function scan_table()
         if r then
             local a = tonumber(safe(function() return r:get_field("mAreaNo") end))
             local t = tonumber(safe(function() return r:get_field("mType") end))
+            if a and a ~= THEATER and t == CULT_TYPE and gated_on(r, { CULT_FLAG }) then
+                table.insert(cult_rows, { row = r, area = (a ~= 0) and a or nil })
+            end
             if a and AREAS[a] and t == ZOMBIE_TYPE and gated_on(r, AREAS[a].flags) then
                 local st = state[a]
                 local field = AREAS[a].hide and "mAreaNo" or "mEmSetNo"
@@ -138,8 +160,30 @@ local function scan_table()
         M.log(string.format("%s: %d flag-gated zombie row(s), original %s",
             cfg.name, #st.rows, tostring(st.original)))
     end
+    local areas = {}
+    cult_hidden = #cult_rows > 0
+    for _, c in ipairs(cult_rows) do
+        if c.area then cult_hidden = false end
+    end
+    for _, c in ipairs(cult_rows) do table.insert(areas, tostring(c.area or "0 (hidden earlier)")) end
+    M.log(string.format("Cult rows outside the theater: %d (areas %s)", #cult_rows, table.concat(areas, ",")))
     table_scanned = true
     return true
+end
+
+local function apply_cult(want_hidden)
+    if #cult_rows == 0 or cult_hidden == want_hidden then return end
+    local ok_n = 0
+    for _, c in ipairs(cult_rows) do
+        local to = want_hidden and 0 or c.area
+        if to ~= nil then
+            local ok = pcall(function() c.row:set_field("mAreaNo", to) end)
+            if ok then ok_n = ok_n + 1 end
+        end
+    end
+    cult_hidden = want_hidden
+    M.log(string.format("Cult rows outside the theater %s (%d of %d); takes effect on the next entry",
+        want_hidden and "hidden" or "restored", ok_n, #cult_rows))
 end
 
 local function apply(area, want_patched)
@@ -182,6 +226,16 @@ local function want_food_court()
     return true
 end
 
+--- Cult Limited, Sean done: the cult stays only in the theater.
+local function want_cult_hidden()
+    local su = unlocker()
+    if not su then return false end
+    local ok1, limited = pcall(su.is_cult_limited_enabled)
+    local ok2, sanity = pcall(su.is_scoop_sanity_enabled)
+    local ok3, done = pcall(su.is_scoop_completed, CULT_SCOOP)
+    return ok1 and limited == true and ok2 and sanity == true and ok3 and done == true
+end
+
 function M.on_frame()
     if not M:should_run() then return end
     if not Shared.is_in_game() then return end
@@ -190,11 +244,13 @@ function M.on_frame()
     -- to vanilla so its layouts are the game's.
     if State.is_endgame_reached() then
         for area in pairs(AREAS) do apply(area, false) end
+        apply_cult(false)
         return
     end
     apply(1283, want_theater())
     if AREAS[2560] then apply(2560, want_food_court()) end
     if AREAS[256] then apply(256, true) end
+    apply_cult(want_cult_hidden())
 end
 
 _G.drap_cult_layout_status = function()
@@ -203,6 +259,8 @@ _G.drap_cult_layout_status = function()
             AREAS[area].name, #st.rows, tostring(st.original), tostring(st.patched),
             tostring(scoop_active(CULT_SCOOP))))
     end
+    M.log(string.format("Cult rows outside the theater: %d, hidden=%s (wanted %s)",
+        #cult_rows, tostring(cult_hidden), tostring(want_cult_hidden())))
 end
 
 return M
