@@ -768,7 +768,7 @@ def BuildItemPool(multiworld, count, options, excluded_scoop_names=(),
 
     fillerList = nonTrapFiller + trapList
 
-    # Everything Overtime Progression Gating puts behind the multiworld. Their
+    # Everything Extra Overtime Keys puts behind the multiworld. Their
     # locations are Ending-S only, so the items have to be too, or the pool
     # outgrows the locations -- and with the gating off nothing enforces them,
     # so they would be items with nothing to open.

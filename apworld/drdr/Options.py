@@ -1,7 +1,7 @@
 import typing
 from dataclasses import dataclass
 import settings
-from Options import Toggle, DefaultOnToggle, FreeText, Option, Range, Choice, ItemDict, DeathLink, PerGameCommonOptions, StartInventoryPool, OptionGroup, OptionSet
+from Options import Visibility, Toggle, DefaultOnToggle, FreeText, Option, Range, Choice, ItemDict, DeathLink, PerGameCommonOptions, StartInventoryPool, OptionGroup, OptionSet
 from Options import ExcludeLocations, PriorityLocations, StartLocationHints
 from .Locations import location_tables, kill_sanity_location_groups
 
@@ -42,7 +42,7 @@ class KillSanity(Toggle):
     Every zombie kill in each area is its own check, up to the number
     specified in the Zombie Kill Tier. This will add a lot of useless
     filler items, but most of it will be placed in your game.
-    
+
     Each tier adds this many locations:
 
     None: 0
@@ -52,7 +52,7 @@ class KillSanity(Toggle):
     Genocide: 53594
 
     NOTE: Due to the number of locations it adds and because it increases
-    generation time dramaticlly, KillSanity with Genocide needs to be
+    generation time dramatically, KillSanity with Genocide needs to be
     enabled in the host.yaml file of whoever is generating the multiworld.
     """
     display_name = "KillSanity"
@@ -122,11 +122,15 @@ class TrapLink(Toggle):
 
 class SpitterOnly(Toggle):
     """
-    This mode limits Frank to Spitfire only, and it is always active. Other
-    weapons are removed from the item pool, leaving only healing items.
+    This mode limits Frank to Spitfire only. Other weapons are removed from
+    the item pool; skills, stats, keys, traps and healing items stay.
+
+    Turning this on also forces Restricted Item Mode and ScoopSanity on, and
+    the Savior goal is capped at 47 survivors, since Paul cannot be rescued
+    without an extinguisher. Isabela's queen stays in the pool.
 
     Any location that requires an item is removed in this mode (the bowling
-    achievment, firing bullets, etc). The logic for Kent's Day 2 Photoshoot is
+    achievement, firing bullets, etc). The logic for Kent's Day 2 Photoshoot is
     set to require an outtake photo from a survivor, such as Ronald, Gil, or
     Paul (if Psycho goal is chosen, only the Paul photo will be available).
 
@@ -176,8 +180,8 @@ class DoorLocks(Toggle):
     When enabled (and Door Randomizer is on), moving to a new area will require
     having that area's key. Logic will be updated to reflect your randomized layout.
 
-    Door Locks is only possible with Paired Mode, and it is not compatible with the
-    Split Keys option.
+    Door Locks is only possible with Paired Mode. With Split Keys on, Split Keys
+    is ignored and the area keys are used.
 
     Has no effect if Door Randomizer is disabled.
     """
@@ -210,7 +214,7 @@ class Goal(Choice):
     Ending A: Solve all of the cases and reach the helipad by 12pm on Day 4.
               Overtime locations are removed from the pool, making for a shorter run.
 
-    Savior:   Rescue a specified number of survivors (see "Number of Survivors"
+    Savior:   Rescue a specified number of survivors (see "Savior Survivor Goal"
               below). In ScoopSanity, there will not be any Main Scoop locations.
               If ScoopSanity is off, then Ending S / Ending A locations still exist
               but are filler-only and not the goal.
@@ -221,12 +225,13 @@ class Goal(Choice):
               Like Savior, ScoopSanity drops the Main Scoop locations. Without
               ScoopSanity they remain as ordinary checks.
 
-    Psycho:   Kill a specified number of survivors (see "Number of Kills"
+    Psycho:   Kill a specified number of survivors (see "Psycho Kill Goal"
               below). Survivors will turn hostile once they are encountered.
               Only kills done by Frank count, not ones from zombies, so setting
               the goal number below 48 leaves a bit of room for missed kills.
-              In ScoopSanity, there are no Main Scoops. If ScoopSanity is on,
-              Main Scoop locations still exist but will be filler-only.
+              In ScoopSanity, there are no Main Scoops. If ScoopSanity is off,
+              the Ending S / Ending A locations still exist but are
+              filler-only and not the goal.
     """
     display_name = "Goal"
     option_ending_s = 0
@@ -244,7 +249,7 @@ class NumberOfSurvivors(Range):
 
     The maximum (48) requires rescuing every survivor in the game.
     """
-    display_name = "Number of Survivors"
+    display_name = "Savior Survivor Goal"
     range_start = 1
     range_end = 48
     default = 35
@@ -253,7 +258,7 @@ class NumberOfSurvivors(Range):
 class ScoopSanity(Toggle):
     """
     When enabled, time freezes after the Entrance Plaza prologue. Scoops are
-    added to the item pool and will not begin until the player recieves them.
+    added to the item pool and will not begin until the player receives them.
     Main Scoops will also not trigger until the player reaches their position
     in the randomized order, which is listed in the in-game Archipelago window.
 
@@ -274,30 +279,47 @@ class ScoopSanity(Toggle):
     default = True
 
 
-class RandomizeScoopOrder(DefaultOnToggle):
+class ScoopsanityOrder(Choice):
     """
-    When enabled (the default), the main scoop order is shuffled. The in-game
-    Archipelago window has a Scoop tab that lists the randomized order.
+    How the main scoops are ordered when ScoopSanity is on. You still have to
+    receive each scoop as an item before you can do it. The in-game
+    Archipelago window has a Scoop tab that lists the order.
 
-    When disabled, it will instead keep the vanilla order, starting with Backup for
-    Brad. You still have to receive each scoop as an item before you can do it.
+    shuffled:  the default. The main scoop order is shuffled, and each scoop
+               has to be completed before the next one can start.
+    vanilla:   the story order, starting with Backup for Brad. Same chain
+               rules as shuffled, just in the story's order.
+    any_order: the list shows the story order, but the scoops can be done in
+               any order. A scoop needs its item and whatever its regions
+               require, and Main Scoops are started manually from the
+               in-game Archipelago scoop tab. Only one main scoop can be
+               active at a time. One scoop, picked at random, is still
+               placed early in the multiworld.
 
     Has no effect if ScoopSanity is disabled.
+
+    Old YAMLs with Randomize Scoop Order or Main Scoops In Any Order still
+    work, unless this option is set to something other than shuffled.
     """
+    display_name = "Scoopsanity Order"
+    option_shuffled = 0
+    option_vanilla = 1
+    option_any_order = 2
+    alias_randomized = 0
+    default = 0
+
+
+class RandomizeScoopOrder(DefaultOnToggle):
+    """Replaced by Scoopsanity Order. Still read from old YAMLs."""
     display_name = "Randomize Scoop Order"
+    visibility = Visibility.none
 
 
 class MainScoopsAnyOrder(Toggle):
-    """
-    When enabled, Main Scoops can be completed in any order. The player still
-    needs to receive the scoop item, and they must also be able to complete it
-    before it can be triggered. Main Scoops must be activated manually from the
-    in-game Archipelago scoop tab. Only one main scoop can be active at a time.
-
-    Has no effect if ScoopSanity is disabled.
-    """
+    """Replaced by Scoopsanity Order. Still read from old YAMLs."""
     display_name = "Main Scoops In Any Order"
     default = False
+    visibility = Visibility.none
 
 
 class ExcludeLevelsAbove(Range):
@@ -341,7 +363,7 @@ class ZombieKillTiers(Choice):
     choosing the higher tiers can add a significant grind to your game.
 
     none:      no area kill checks at all.
-    easy:      100 in main plazas and Food Court, 50 in small stores and
+    easy:      the default. 100 in main plazas and Food Court, 50 in small stores and
                Warehouse, 500 in Leisure Park, 1000 in the Maintenance Tunnel.
     normal:    500 in the main plazas and Food Court, 100 in small stores and
                Warehouse, 1000 in Leisure Park, 2000 in the Maintenance Tunnel.
@@ -494,7 +516,7 @@ class VanillaProgression(Choice):
         progression.
 
     replace:
-        Level-ups rewards are suppressed (re-overridden each level).
+        Level-up rewards are suppressed (re-overridden each level).
         AP items are the only source of skills and stats. The default.
 
     extra_buffs_only:
@@ -515,7 +537,7 @@ class TrapPercentage(Range):
     Percentage of filler-item slots that become traps. 0 = no traps,
     10 = default, 50 = aggressive, 100 = chaos. The selected
     fraction of filler slots is dedicated to traps and round-robin
-    distributed across all trap types so they each appears at least once
+    distributed across all trap types so they each appear at least once
     before any repeats.
     """
     display_name = "Trap Percentage"
@@ -571,7 +593,7 @@ class NumberOfKills(Range):
     count. A survivor the zombies get to first is gone, so a number close to
     48 leaves very little room for accidents.
     """
-    display_name = "Number of Kills"
+    display_name = "Psycho Kill Goal"
     range_start = 5
     range_end = 48
     default = 25
@@ -585,7 +607,7 @@ class OvertimeProgressionGating(Toggle):
 
     This option has no effect unless the goal is Ending S.
     """
-    display_name = "Overtime Progression Gating"
+    display_name = "Extra Overtime Keys"
 
 
 class NightModeEnabled(Toggle):
@@ -607,7 +629,8 @@ class NightModeEnabled(Toggle):
     you have met Jessie in the warehouse.
 
     Without ScoopSanity the lighting is left alone. The clock is still running
-    in that mode and the game cycles into night on its own. Only behavior changes.
+    in that mode and the game cycles into night on its own. Only the zombies'
+    behavior changes.
     """
     display_name = "Night Mode"
     default = False
@@ -637,7 +660,7 @@ class CarKeys(Toggle):
     its own, without any other item restrictions.
 
     The Overtime military humvee is unaffected; it has its own key under
-    Overtime Progression Gating.
+    Extra Overtime Keys.
     """
     display_name = "Car Keys"
     default = False
@@ -695,7 +718,7 @@ class HardcoreZombiesEnabled(Toggle):
 
     Amplified parameters:
       * Bite damage: -1000 -> -3000 HP per tick (3×)
-      * Downed-bite damage: -3000 > -9000 HP per tick (3×)
+      * Downed-bite damage: -3000 -> -9000 HP per tick (3×)
       * Scratch damage rate: 3.5 -> 7.0 (2×)
       * Player aggro radius: 9 -> 25 units (much harder to sneak past)
       * General aggro radius: 13 -> 35 units
@@ -739,7 +762,7 @@ class CostumeChaosMode(Toggle):
     area, with a fresh random outfit each time.
 
     Uses the same Body-first randomization rules as Random Starting Costume.
-    Each area transition will count toward the "Change into 5 different
+    Each area transition will count toward the "Change into 5 new
     outfits" achievement, which may complete that location very quickly.
 
     Compatible with Random Starting Costume. If both are on, the starting
@@ -825,6 +848,7 @@ class ExcludeOverpoweredItems(Toggle):
       * Book [Martial Arts]         (massively-boosted unarmed damage)
       * Laser Sword                 (high-damage, high-durability weapon)
       * Real Mega Buster            (high-damage ranged weapon)
+      * Rocket Launcher             (high-damage explosive weapon)
 
     Disabled by default. Players who want these items to remain in
     rotation should leave it off; players who want a more balanced run
@@ -853,10 +877,16 @@ class PPStickersFiller(Toggle):
 class OvertimeChecksFiller(Toggle):
     """
     When enabled, every check in Overtime still exists but will only ever hold
-    filler, so no progression is placed past the point of no return. This means
-    that no key items will be placed at the very end of your game.
+    filler, so no progression is placed past the point of no return.
 
-    Has no effect on Ending A, which drops the Overtime checks entirely.
+    The Overtime items are untouched: the Clock Tower Tunnel Key and the Humvee
+    Key are still progression and can still be what the multiworld sends you.
+    This only stops Overtime's own checks from holding anything you need.
+    Under Ending S, the Ending A check ("Solve all of the cases...") is
+    treated the same way.
+
+    Has no effect when Ending A is the goal, which drops the Overtime checks
+    entirely.
     """
     display_name = "Overtime Checks Filler"
     default = False
@@ -887,7 +917,7 @@ class SplitKeys(Toggle):
     """
     display_name = "Split Keys"
     default = False
-    
+
 
 # ---------------------------------------------------------------------------
 # Location pickers without the KillSanity names (#60)
@@ -957,6 +987,7 @@ class DROption(PerGameCommonOptions):
     number_of_survivors: NumberOfSurvivors
     number_of_kills: NumberOfKills
     scoop_sanity: ScoopSanity
+    scoopsanity_order: ScoopsanityOrder
     randomize_scoop_order: RandomizeScoopOrder
     main_scoops_any_order: MainScoopsAnyOrder
     zombie_kill_tiers: ZombieKillTiers
@@ -1004,8 +1035,7 @@ dr_option_groups = [
             NumberOfSurvivors,
             NumberOfKills,
             ScoopSanity,
-            RandomizeScoopOrder,
-            MainScoopsAnyOrder,
+            ScoopsanityOrder,
             ZombieKillTiers,
             KillSanity,
             PpBonusLocations,

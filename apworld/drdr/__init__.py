@@ -7,14 +7,14 @@ from Options import OptionError, item_and_loc_options
 
 from worlds.AutoWorld import World, WebWorld
 
-from .Items import DRItem, DRItemCategory, item_dictionary, key_item_names, item_descriptions, BuildItemPool, specialty_items, progression_skills, microwave_food_items, challenge_tool_items, kill_filler_items, KENT_DAYS, PROGRESSIVE_KENT
+from .Items import DRItem, DRItemCategory, item_dictionary, key_item_names, item_descriptions, BuildItemPool, specialty_items, overpowered_items, progression_skills, microwave_food_items, challenge_tool_items, kill_filler_items, KENT_DAYS, PROGRESSIVE_KENT
 from .Locations import kill_sanity_location_groups
 from .Locations import (DRLocation, DRLocationCategory, location_tables,
                         location_dictionary, ZOMBIE_KILL_TIERS,
                         ZOMBIE_KILL_TIER_NAMES, zombie_kill_locations,
                         ZOMBIE_KILL_REGION_OF, KILL_SANITY_TOPS,
                         kill_sanity_location_name)
-from .Options import DROption, dr_option_groups, DRDRSettings
+from .Options import DROption, dr_option_groups, DRDRSettings, ScoopsanityOrder
 
 
 from .DoorRandomization import (
@@ -264,6 +264,21 @@ class DRWorld(World):
             if self.options.number_of_survivors.value > SPITTER_MAX_SURVIVORS:
                 self.options.number_of_survivors.value = SPITTER_MAX_SURVIVORS
 
+        # Scoopsanity Order replaced two toggles. Old YAMLs still set those,
+        # so fold them in unless the new option was set. Downstream keeps
+        # reading the old attributes, now written from the one choice.
+        _order = self.options.scoopsanity_order
+        if _order.value == ScoopsanityOrder.option_shuffled:
+            if self.options.main_scoops_any_order:
+                _order.value = ScoopsanityOrder.option_any_order
+            elif not self.options.randomize_scoop_order:
+                _order.value = ScoopsanityOrder.option_vanilla
+        self.options.main_scoops_any_order.value = int(
+            _order.value == ScoopsanityOrder.option_any_order)
+        self.options.randomize_scoop_order.value = int(
+            _order.value == ScoopsanityOrder.option_shuffled)
+        self.early_scoop = None
+
         # Savior+ScoopSanity drops main scoops entirely — the player wins by
         # rescuing survivors, so main scoops would only advance unused state.
         self.main_scoops_enabled = not (
@@ -461,10 +476,12 @@ class DRWorld(World):
                 if _ut_order:
                     self.scoop_order = list(_ut_order)
                 elif not self.options.randomize_scoop_order:
-                    # Vanilla order, so Backup for Brad leads. set_rules gates
-                    # the Entrance Plaza shutter on the Brad escort in that
-                    # case, and the runtime lets the mission fire the cutscene.
+                    # Vanilla (or Any Order) lists the story order. The early
+                    # scoop is picked apart from the list so Any Order does
+                    # not always favour Backup for Brad.
                     self.scoop_order = list(MAIN_SCOOP_NAMES)
+                    if self.options.main_scoops_any_order:
+                        self.early_scoop = self.random.choice(self.scoop_order)
                 else:
                     # Backup for Brad may lead. It used to be swapped out of
                     # the first slot because its mission holds the EP shutter
@@ -936,6 +953,10 @@ class DRWorld(World):
             # (Mirrors BuildItemPool: skills only join the pool when
             # enable_skill_items is on AND vanilla_progression == replace.)
             item_classification = ItemClassification.progression
+        elif name in overpowered_items:
+            # After the branches above, so the Rocket Launcher stays
+            # progression in Restricted Item Mode.
+            item_classification = ItemClassification.useful
         elif item_dictionary[name].category in useful_categories:
             item_classification = ItemClassification.useful
         elif item_dictionary[name].category == DRItemCategory.TRAP:
@@ -967,7 +988,8 @@ class DRWorld(World):
 
         # scoop_order is empty for Savior+ScoopSanity (main scoops excluded).
         if self.options.scoop_sanity and self.scoop_order:
-            self.multiworld.early_items[self.player][self.scoop_order[0]] = 1
+            self.multiworld.early_items[self.player][
+                self.early_scoop or self.scoop_order[0]] = 1
 
         # KillSanity: pick this world's kill slots for the local share. The
         # placing happens in stage_pre_fill, pooled across every Dead Rising
@@ -1497,6 +1519,13 @@ class DRWorld(World):
     def write_spoiler(self, spoiler_handle) -> None:
         if self.options.scoop_sanity and self.scoop_order:
             player_name = self.multiworld.get_player_name(self.player)
+            if self.options.main_scoops_any_order:
+                spoiler_handle.write(
+                    f"\nScoopSanity Main Scoops, any order ({player_name}):\n")
+                for scoop_name in self.scoop_order:
+                    spoiler_handle.write(f"  {scoop_name}\n")
+                spoiler_handle.write(f"  Placed early: {self.early_scoop}\n")
+                return
             spoiler_handle.write(f"\nScoopSanity Main Scoop Order ({player_name}):\n")
             for i, scoop_name in enumerate(self.scoop_order):
                 spoiler_handle.write(f"  {i + 1}. {scoop_name}\n")

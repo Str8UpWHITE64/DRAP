@@ -934,7 +934,7 @@ def set_rules(world) -> None:
 
     # Overtime rules only apply when goal is Ending S
     if world.options.goal.value == 0:
-        # Overtime Progression Gating decides whether any of this sits behind
+        # Extra Overtime Keys decides whether any of this sits behind
         # an item. With it off every check still exists -- nothing holds them.
         _gating = bool(world.options.overtime_progression_gating.value)
 
@@ -1559,6 +1559,11 @@ def set_rules(world) -> None:
             or (_d.category == DRLocationCategory.SPECIAL_FORCES_SCOOP
                 and not world.options.special_forces_mode.value)
         }
+        if world.options.goal.value == 0:
+            # Ending S: the Ending A check sits just before Overtime, so it
+            # is filler-only too. On the Ending A goal it IS the goal.
+            _overtime_names.add(
+                "Ending A: Solve all of the cases and be on the helipad at 12pm")
         for location in world.multiworld.get_locations(world.player):
             if location.name in _overtime_names:
                 location.progress_type = LocationProgressType.EXCLUDED
