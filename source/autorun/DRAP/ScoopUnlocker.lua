@@ -3248,17 +3248,80 @@ end
 -- respawn, which clears his death and finish flags on purpose (CULT_OFF);
 -- the main-scoop psychopaths get no finish flags at their deaths even in
 -- vanilla.
+-- `hide_body` is the EnemyKindID (Em47 = 0x47) of a body to take away after
+-- a raise. Only Paul: he alone becomes a survivor after his defeat, and the
+-- others' corpses are normal game behaviour.
 local PSYCHO_FINISH = {
     { die = 1293, flags = { 846, 2446, 1172 } },            -- Cliff
     { die = 1295, flags = { 848, 2448 } },                  -- Adam
     { die = 1296, flags = { 849, 2449 } },                  -- Jo
-    { die = 1297, flags = { 850, 2450 } },                  -- Paul
+    { die = 1297, flags = { 850, 2450 }, hide_body = 0x47 },  -- Paul
     { die = 1302, flags = { 874, 2474 } },                  -- Cletus
     { die = 453,  flags = { 872 } },                        -- the convicts, all three
 }
 local PSYCHO_FINISH_WAIT_SECONDS = 3.0
 local psycho_finish_missing_since = {}
 local psycho_finish_next_check = 0
+
+-- Raising Paul's flags late does not take away his psycho body: the defeat
+-- scene ends while the scoop still reads unfinished, the area puts him back
+-- at his start spot at 0 HP, and he stands beside his survivor self until
+-- the next area load (measured 2026-10-19). So after a raise, hide any
+-- Em47 body at 0 HP for a while. Never one with health left, and survivor
+-- Paul is an NPC, not an enemy, so he is never matched.
+-- Kept on PSYCHO_FINISH (ipairs skips it), not a new local: this file's
+-- main chunk is at Lua's 200-local limit.
+PSYCHO_FINISH.bodies = { SWEEP_SECONDS = 120, sweep = {} }   -- sweep: kind -> until (os.clock)
+
+function PSYCHO_FINISH.bodies.event_playing()
+    local etm = sdk.get_managed_singleton("app.solid.gamemastering.EventTimelineManager")
+    return etm and Shared.safe(function() return etm:call("isEventPlaying") end) == true
+end
+
+function PSYCHO_FINISH.bodies.scene_enemies()
+    local sm = sdk.get_native_singleton("via.SceneManager")
+    local smt = sdk.find_type_definition("via.SceneManager")
+    local scene = sm and Shared.safe(function()
+        return sdk.call_native_func(sm, smt, "get_CurrentScene()") end)
+    local arr = scene and Shared.safe(function()
+        return scene:call("findComponents(System.Type)",
+            sdk.typeof("app.solid.enemy.EnemyController")) end)
+    local out = {}
+    if not arr then return out end
+    local n = Shared.safe(function() return arr:get_size() end) or 0
+    for i = 0, n - 1 do out[#out + 1] = Shared.safe(function() return arr:get_element(i) end) end
+    return out
+end
+
+-- Called from on_frame (never from a hook).
+function PSYCHO_FINISH.bodies.hide(now)
+    local sweep = PSYCHO_FINISH.bodies.sweep
+    if not next(sweep) then return end
+    -- Not during a scene: the defeat scene itself may still be showing him.
+    if PSYCHO_FINISH.bodies.event_playing() then return end
+    for _, c in ipairs(PSYCHO_FINISH.bodies.scene_enemies()) do
+        local kind = c and Shared.safe(function() return c:call("get_KindID") end)
+        local kind_n = kind and tonumber(tostring(kind))
+        if kind_n and sweep[kind_n] then
+            local hpc = Shared.safe(function() return c:call("get_HitPoint") end)
+            local hp = hpc and Shared.safe(function()
+                return hpc:get_field("<CurrentHitPoint>k__BackingField") end)
+            local go = Shared.safe(function() return c:call("get_GameObject") end)
+            if hp ~= nil and tonumber(hp) <= 0 and go
+                and Shared.safe(function() return go:call("get_DrawSelf") end) ~= false then
+                Shared.safe(function()
+                    go:call("set_DrawSelf", false)
+                    go:call("set_UpdateSelf", false)
+                end)
+                M.log(string.format("hid psychopath body (kind 0x%X, 0 HP) left standing after"
+                    .. " a late scoop finish", kind_n))
+            end
+        end
+    end
+    for kind, until_t in pairs(sweep) do
+        if now >= until_t then sweep[kind] = nil end
+    end
+end
 
 local function psycho_finish_fallback()
     local now = os.clock()
@@ -3285,9 +3348,11 @@ local function psycho_finish_fallback()
                 for _, fid in ipairs(row.flags) do
                     if raw_check_flag(fid) == false then raw_set_flag_on(fid) end
                 end
+                if row.hide_body then PSYCHO_FINISH.bodies.sweep[row.hide_body] = now + PSYCHO_FINISH.bodies.SWEEP_SECONDS end
             end
         end
     end
+    PSYCHO_FINISH.bodies.hide(now)
 end
 
 --- Put back the story flags the 72 hours cleared (see OVERTIME_HIDEOUT_FLAGS).
