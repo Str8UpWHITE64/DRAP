@@ -614,11 +614,12 @@ local function target_for_main(name)
     return make_target(name, objective_text(name), loc, d and d.guide)
 end
 
--- Any active main scoop (received, not completed). Fallback when there's
+-- Any running main scoop (received, not completed). Fallback when there's
 -- no formal chain order set -- e.g. debug/manual unlocking without a seed.
 local function find_active_main()
     for _, s in ipairs(SharedData.scoops()) do
-        if s.category == "Main" and scoop_unlocker.is_scoop_active(s.name) then
+        if s.category == "Main" and scoop_unlocker.has_received_scoop(s.name)
+            and not State.completed[s.name] then
             return s.name
         end
     end
@@ -832,8 +833,11 @@ local function compute_target()
 
     -- current objective: chain order if set, else any manually-active main
     local current = scoop_unlocker.get_current_chain_scoop()
-    if current and (scoop_unlocker.is_scoop_active(current)
-        or scoop_unlocker.has_received_scoop(current)) then
+    -- Received only. A story flag the game switches on (or DRAP holds on, as
+    -- 272 is held to clear Brad out) does not make a mission the player's:
+    -- the box named A Temporary Agreement for ~10 s before it was sent.
+    if current and scoop_unlocker.has_received_scoop(current)
+        and not State.completed[current] then
         return target_for_main(current)
     end
     local active_main = find_active_main()
