@@ -154,6 +154,7 @@ AP.effects.PlayerBuffs                = require("DRAP/effects/PlayerBuffs")
 AP.effects.HostileSurvivorTrap        = require("DRAP/effects/HostileSurvivorTrap")
 AP.effects.ZombieEffects              = require("DRAP/effects/ZombieEffects")
 AP.effects.VehicleGate                = require("DRAP/effects/VehicleGate")
+AP.effects.CameraLock                 = require("DRAP/effects/CameraLock")
 AP.effects.UnlockItemSpawns           = require("DRAP/effects/UnlockItemSpawns")
 AP.effects.CostumeRandomizer          = require("DRAP/effects/CostumeRandomizer")
 AP.effects.MusicShuffle               = require("DRAP/effects/MusicShuffle")
@@ -188,6 +189,7 @@ AP.effects.TeleportTrap.register()
 AP.TrapLink.init()
 AP.effects.ZombieEffects.register()
 AP.effects.VehicleGate.register()
+AP.effects.CameraLock.register()
 AP.effects.UnlockItemSpawns.register()
 AP.effects.CostumeRandomizer.register()
 AP.effects.AP_LocationTriggers.register()
@@ -683,6 +685,12 @@ local function run_slot_connect(slot_data)
     if AP.effects.VehicleGate then
         AP.effects.VehicleGate.set_enabled(
             type(slot_data) == "table" and slot_data.car_keys == true)
+    end
+
+    -- Camera Item: the shutter waits on the Camera. Off plays as vanilla.
+    if AP.effects.CameraLock then
+        AP.effects.CameraLock.setup(
+            type(slot_data) == "table" and slot_data.camera_item == true)
     end
 
     -- Costume randomizer toggles (3 independent options):

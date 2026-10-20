@@ -1044,6 +1044,11 @@ class DRWorld(World):
     def set_rules(self) -> None:
         Rules.set_rules(self)
 
+    def set_rule(self, spot, rule) -> None:
+        # Camera Item: a check that takes a photo also needs the Camera,
+        # whatever rule it is given and wherever that is set.
+        super().set_rule(spot, Rules.camera_gate(self, spot, rule))
+
 
     def _door_locks_area_graph(self) -> Dict[str, List[str]]:
         """{scene_code: [scene_code, ...]} of where the doors actually lead.
@@ -1215,6 +1220,7 @@ class DRWorld(World):
         # 1 is vanilla; the Lua side clamps to the same maximum.
         zombie_spawn_multiplier = int(self.options.zombie_spawn_multiplier.value)
         car_keys_enabled = bool(self.options.car_keys.value)
+        camera_item_enabled = bool(self.options.camera_item.value)
 
         # Costume randomizer toggles. Body-first randomization rule (DLC
         # anchor overrides accessories, regular Body co-randomizes
@@ -1333,6 +1339,7 @@ class DRWorld(World):
                 "hardcore_zombies_enabled": hardcore_zombies_enabled,
                 "zombie_spawn_multiplier": zombie_spawn_multiplier,
                 "car_keys": car_keys_enabled,
+                "camera_item": camera_item_enabled,
                 "random_starting_costume": random_starting_costume,
                 "costume_chaos_mode": costume_chaos_mode,
                 "dlc_outfits_enabled": dlc_outfits_enabled,
@@ -1400,6 +1407,7 @@ class DRWorld(World):
             "hardcore_zombies_enabled": hardcore_zombies_enabled,
             "zombie_spawn_multiplier": zombie_spawn_multiplier,
             "car_keys": car_keys_enabled,
+            "camera_item": camera_item_enabled,
             "random_starting_costume": random_starting_costume,
             "costume_chaos_mode": costume_chaos_mode,
             "dlc_outfits_enabled": dlc_outfits_enabled,

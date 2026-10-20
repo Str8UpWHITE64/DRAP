@@ -496,6 +496,8 @@ _all_items = [DRItemData(row[0], row[1], row[2]) for row in [
     # The convicts' vehicle. Shares its RIDE_CAR_TYPE with the Overtime
     # Humvee, so the runtime tells them apart by GameObject name.
     ("Convict Humvee Key", 5014, DRItemCategory.LOCK),
+    # Camera Item: the shutter stays locked until this arrives.
+    ("Camera", 5015, DRItemCategory.LOCK),
 
     # KillSanity filler. One per kill location, most of them placed straight
     # back onto kill locations so the multiworld pool is not flooded. They do
@@ -795,6 +797,8 @@ def BuildItemPool(multiworld, count, options, excluded_scoop_names=(),
     }
     car_keys_on = bool(getattr(options, "car_keys",
                                type("X", (), {"value": False})()).value)
+    camera_item_on = bool(getattr(options, "camera_item",
+                                  type("X", (), {"value": False})()).value)
 
     for lock in lockList:
         if lock.name in suppressant_names:
@@ -802,6 +806,8 @@ def BuildItemPool(multiworld, count, options, excluded_scoop_names=(),
         if lock.name in overtime_item_names                 and (options.goal.value != 0 or not overtime_gating_on):
             continue
         if lock.name in car_key_names and not car_keys_on:
+            continue
+        if lock.name == "Camera" and not camera_item_on:
             continue
         # Area keys are precollected under door randomization, and replaced by
         # the per-door keys under Split Keys

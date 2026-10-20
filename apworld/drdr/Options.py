@@ -714,6 +714,20 @@ class InfinityDrainRate(Range):
     default = 100
 
 
+class CameraItem(Toggle):
+    """
+    The camera becomes an item. Until you receive the Camera, Frank can
+    still raise it and aim, but the shutter will not fire.
+
+    Every check that needs a photo then needs the Camera: the PP Stickers and
+    their milestones, the photo challenges and Kent's photoshoots. Without
+    ScoopSanity, Kent's later days wait on his earlier shoots, so they need
+    it too.
+    """
+    display_name = "Camera Item"
+    default = False
+
+
 class HardcoreZombiesEnabled(Toggle):
     """
     When enabled, zombies become significantly more dangerous on top of
@@ -1006,6 +1020,7 @@ class DROption(PerGameCommonOptions):
     randomize_rooftop_service_hallway_doors: RandomizeRooftopServiceHallwayDoors
     restricted_item_mode: RestrictedItemMode
     car_keys: CarKeys
+    camera_item: CameraItem
     split_keys: SplitKeys
     overtime_progression_gating: OvertimeProgressionGating
     exclude_overpowered_items: ExcludeOverpoweredItems
@@ -1062,6 +1077,7 @@ dr_option_groups = [
         [
             RestrictedItemMode,
             CarKeys,
+            CameraItem,
             SplitKeys,
             OvertimeProgressionGating,
             ExcludeOverpoweredItems,
