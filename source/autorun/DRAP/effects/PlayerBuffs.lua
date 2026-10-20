@@ -404,7 +404,7 @@ function M.stomach_ache(sec)
     sec = sec or 60
     if _trigger_juice(JUICE.STOMACH_ACHE, sec) then
         log("Stomach Ache Trap fired")
-        _notify_trap("Stomach Ache Trap", string.format("Periodic damage for %ds", sec))
+        _notify_trap("Stomach Ache Trap", string.format("Your tummy hurts for %ds", sec))
     end
 end
 
@@ -592,7 +592,7 @@ function M.arm_day_trap(sec)
         function() return true end,
         function()
             PlayerStats.set_attack_override(ARM_DAY_ATTACK_PCT)
-            _notify_trap("You skipped arm day.")
+            _notify_trap("Skipped Arm Day Trap", "Your attacks are feeble")
             log(string.format("Skipped Arm Day Trap: attack %d%% for %.0fs",
                 ARM_DAY_ATTACK_PCT, sec))
         end,
@@ -646,7 +646,7 @@ function M.potty_mouth_trap(sec)
     local now = os.clock()
     _potty.until_at = now + sec
     _potty.next_at = now          -- first one immediately
-    _notify_trap("Frank has some choice words.")
+    _notify_trap("Potty Mouth Trap", "Watch your mouth, Frank!")
     log(string.format("Potty Mouth Trap: barking for %.0fs", sec))
 end
 

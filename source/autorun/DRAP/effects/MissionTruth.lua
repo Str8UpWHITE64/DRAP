@@ -678,7 +678,7 @@ local function goal_target()
         return make_target("Savior",
             string.format("Rescue %d survivors and escape. Rescued %d of %d.",
                 t, n, t),
-            "Anywhere in the mall", nil)
+            "Security Room", nil)
     end
 
     if goal == GOAL_PSYCHO then
@@ -689,7 +689,7 @@ local function goal_target()
         return make_target("Psycho",
             string.format("Kill %d survivors and escape. Killed %d of %d.",
                 t, n, t),
-            "Anywhere in the mall", nil)
+            "Security Room", nil)
     end
 
     if goal == GOAL_GENOCIDE then
@@ -697,7 +697,7 @@ local function goal_target()
         if not left then return nil end
         return make_target("Zombie Genocider",
             left == 0
-                and "Every area is cleared."
+                and "Every area is cleared. Return to the Security Room"
                 or string.format(
                     "Kill 53,594 zombies across the mall. %d of %d area%s"
                     .. " still to clear.", left, total, left == 1 and "" or "s"),
@@ -725,7 +725,7 @@ local FACTS_JESSIE = { x = 149.65, y = 9.25, z = 228.65 }
 local FACTS_LEGS = {
     s200 = { to = "s230", info = "Go to the Warehouse." },
     s230 = { to = "s231", info = "Go up to the Rooftop." },
-    s231 = { to = "s136", info = "Go through the door to the Security Room." },
+    s231 = { to = "s136", info = "Go through the vent to the Security Room." },
 }
 local FACTS_ROUTE_START = "s200"
 
@@ -781,8 +781,7 @@ local function facts_target()
     local info, to, where
     if scene == "s136" then
         return make_target(FACTS,
-            "Kill Zombie Jessie in the Security Room. If time doesn't speed up"
-            .. " afterwards, use the bench to fast-forward to the ending.",
+            "Kill Zombie Jessie.",
             "Security Room", { pos_tbl = FACTS_POS_TBL,
                                x = FACTS_JESSIE.x, y = FACTS_JESSIE.y, z = FACTS_JESSIE.z })
     elseif FACTS_LEGS[scene] then

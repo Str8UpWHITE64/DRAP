@@ -129,10 +129,10 @@ local active = nil      -- { kind, queue, wait, tries, zeroed, done, frames }
 
 local function busy() return active ~= nil end
 
-local function notify(text)
+local function notify(name, detail)
     local Notify = package.loaded["DRAP/Notify"]
-    if Notify and Notify.send then
-        pcall(Notify.send, text, { duration = 5.0 })
+    if Notify and Notify.trap_fired then
+        pcall(Notify.trap_fired, name, detail, { duration = 5.0 })
     end
 end
 
@@ -152,7 +152,7 @@ local function start_butterfingers(inv)
     active = { kind = "drop", queue = queue, wait = 0, done = 0, frames = 0,
                stall = 0 }
     M.log(string.format("butterfingers: dropping %d item(s)", #queue))
-    notify("You fumble everything you were carrying!")
+    notify("Butterfingers Trap", "Oops, you dropped everything on the floor")
     return true
 end
 
@@ -205,7 +205,7 @@ local function fire_last_shot(inv)
     if n == 0 then return false end
     M.log(string.format("last shot: %d item(s) set to 1 durability (%d with ammo)",
         n, guns))
-    notify("Everything you carry is about to break.")
+    notify("Last Shot Trap", "One shot is all it takes")
     return true
 end
 
@@ -221,7 +221,7 @@ local function start_vanish(inv)
     if (held_count(inv) or 0) == 0 then return false end
     active = { kind = "break", wait = 0, tries = 0, zeroed = false, done = 0,
                frames = 0 }
-    notify("Your inventory shatters!")
+    notify("Where'd Your Inventory Go? Trap", "Your inventory is now empty")
     return true
 end
 

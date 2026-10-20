@@ -114,7 +114,8 @@ function M.send_goal_complete()
             -- dismissed, and this runs in the middle of the ending.
             local ok_n, Notify = pcall(require, "DRAP/Notify")
             if ok_n and Notify and Notify.error then
-                pcall(Notify.error, "Goal completion failed to send: " .. tostring(err),
+                pcall(Notify.error, "Goal completion failed to send: " .. tostring(err)
+                    .. ".  Please post your logs in the Discord.",
                     { duration = 10 })
             end
         end
@@ -311,7 +312,7 @@ function M.send_knockback(x, y, z)
         time = now,
         uuid = get_damage_uuid(),
         source = my_alias,
-        cause = my_alias .. " got knocked about.",
+        cause = my_alias .. " got knocked back!",
         value = { x = x, y = y, z = z },
     }
 

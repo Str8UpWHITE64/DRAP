@@ -2791,7 +2791,7 @@ function M.draw_tab_content(debug)
         if ao and ao.remaining > 0 then quest_name = ao.running end
 
         if ao and ao.remaining > 0 and not ao.running then
-            imgui.text_colored("Current Quest: none started", COLOR_READY)
+            imgui.text_colored("No scoop started. Start one to see details.", COLOR_READY)
             if #ao.startable == 1 then
                 imgui.text_colored(string.format(
                     "  '%s' is ready. Press Start next to it below.",
@@ -2802,8 +2802,7 @@ function M.draw_tab_content(debug)
                     #ao.startable), COLOR_GO)
             elseif #ao.stuck > 0 then
                 imgui.text_colored(string.format(
-                    "  You have %d main scoop%s, but none can be started yet"
-                    .. " -- the list below says why.",
+                    "  You have %d main scoop%s, but none can be started yet.",
                     #ao.stuck, #ao.stuck == 1 and "" or "s"), COLOR_READY)
             else
                 imgui.text_colored(

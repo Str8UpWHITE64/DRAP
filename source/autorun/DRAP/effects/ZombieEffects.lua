@@ -699,7 +699,7 @@ function M.night_mode(sec)
         function()
             _apply_night()
             _notify_trap("Night Mode",
-                string.format("Zombies grab harder for %.0fs", sec))
+                string.format("Increased zombie detection for %.0fs", sec))
         end,
         _restore_night)
 end

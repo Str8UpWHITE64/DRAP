@@ -561,7 +561,7 @@ arm_ending = function(goal_location, opts, manual)
         .. " (%s, ending %s)", tostring(goal_location), pending_ending))
     local ok, Notify = pcall(require, "DRAP/Notify")
     if ok and Notify and Notify.send then
-        pcall(Notify.send, "Goal complete -- return to the Security Room.")
+        pcall(Notify.send, "Goal met -- return to the Security Room.")
     end
 end
 

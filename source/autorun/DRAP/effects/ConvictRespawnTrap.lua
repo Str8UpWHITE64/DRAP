@@ -94,8 +94,8 @@ local function try_respawn()
     M.log("convicts respawn armed -- they return on the next entry to Leisure Park")
     local Notify = package.loaded["DRAP/Notify"] or require("DRAP/Notify")
     if Notify and Notify.send then
-        pcall(Notify.send, "The convicts are back in Leisure Park.",
-              { duration = 5.0 })
+        pcall(Notify.trap_fired, "Convicts Respawn Trap",
+              "Somehow, the convicts returned", { duration = 5.0 })
     end
     return true
 end

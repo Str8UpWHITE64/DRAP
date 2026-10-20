@@ -3085,7 +3085,7 @@
       "description": {
         "location": "Food Court",
         "trigger": "Enter the Food Court",
-        "description": "Help Brad fight Carlito."
+        "description": "Fight Carlito in Food Court, then go to the bookstore in Entrance Plaza"
       },
       "disp_flag": 2497,
       "disp_end_flag": 2543,
@@ -3138,7 +3138,7 @@
       "description": {
         "location": "Security Room",
         "trigger": "Walk through the Security Room rear door",
-        "description": "Watch the monitor cutscene with Jessie."
+        "description": "Watch the monitor cutscene with Jessie in the Security Room"
       },
       "disp_flag": 2498,
       "disp_end_flag": 2544,
@@ -3170,7 +3170,7 @@
       "description": {
         "location": "Entrance Plaza",
         "trigger": "Enter the Entrance Plaza",
-        "description": "Rescue Dr. Barnaby from Carlito."
+        "description": "Go to the door in Paradise Plaza that leads to Entrance Plaza"
       },
       "disp_flag": 2498,
       "disp_end_flag": 2544,
@@ -3202,7 +3202,7 @@
       "description": {
         "location": "Seon's Food and Stuff",
         "trigger": "Open the back office hallway door in the Seon's Food and Stuff",
-        "description": "Find medicine for Brad and return to the Security Room."
+        "description": "Find medicine for Brad in Seon's and return to the Security Room"
       },
       "disp_flag": 2499,
       "disp_end_flag": 2545,
@@ -3228,7 +3228,7 @@
       "description": {
         "location": "Security Room",
         "trigger": "Enter the Security Room",
-        "description": "Speak with Dr. Barnaby."
+        "description": "Speak with Dr. Barnaby in the Security Room"
       },
       "disp_flag": 2500,
       "disp_end_flag": 2546,
@@ -3256,7 +3256,7 @@
       "description": {
         "location": "North Plaza",
         "trigger": "Approach the Seon's Food and Stuff entrance",
-        "description": "Fight Isabela on her motorcycle."
+        "description": "Fight Isabela on her motorcycle outside Seon's"
       },
       "disp_flag": 2500,
       "disp_end_flag": 2546,
@@ -3292,7 +3292,7 @@
       "description": {
         "location": "North Plaza",
         "trigger": "Walk into the small room near the Leisure Park entrance",
-        "description": "Escort Isabela to the Security Room."
+        "description": "Meet Isabela in North Plaza and escort her to the Security Room"
       },
       "disp_flag": 2501,
       "disp_end_flag": 2547,
@@ -3321,7 +3321,7 @@
       "description": {
         "location": "Security Room",
         "trigger": "Enter the Security Room",
-        "description": "Speak with Isabela about Santa Cabeza."
+        "description": "Speak with Isabela in the Security Room"
       },
       "disp_flag": 2502,
       "disp_end_flag": 2548,
@@ -3422,7 +3422,7 @@
       "description": {
         "location": "Security Room",
         "trigger": "Enter the Security Room",
-        "description": "Speak with Jessie."
+        "description": "Speak with Jessie in the Security Room"
       },
       "disp_flag": 2504,
       "disp_end_flag": 2550,
@@ -3450,7 +3450,7 @@
       "description": {
         "location": "Meat Processing Area",
         "trigger": "Enter the Meat Processing Area in the Maintenance Tunnels",
-        "description": "Fight the butcher."
+        "description": "Fight the butcher in the Meat Processing Area"
       },
       "disp_flag": 2504,
       "disp_end_flag": 2550,
@@ -3476,7 +3476,7 @@
       "description": {
         "location": "Security Room",
         "trigger": "Walk into Paradise Plaza",
-        "description": "Head back to the Security Room to talk to Jessie. If time doesn't speed up after killing Zombie Jessie, go to the bench in the Security Room and fast-forward to the ending."
+        "description": "Go to Paradise Plaza, then Warehouse, then the Security Room to find Jessie"
       },
       "disp_flag": 2505,
       "guide": {
