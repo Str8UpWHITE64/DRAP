@@ -715,6 +715,13 @@ def BuildItemPool(multiworld, count, options, excluded_scoop_names=(),
         remaining_count = remaining_count - 1
         included_itemcount = included_itemcount + 1
 
+    # Both camera books gate "Get 10000 PP in one photo", so each has to exist.
+    for _book in ("Book [Camera 1]", "Book [Camera 2]"):
+        if _book not in (options.guaranteed_items.value or {}):
+            item_pool.append(item_dictionary[_book])
+            remaining_count = remaining_count - 1
+            included_itemcount = included_itemcount + 1
+
     itemList = [item for item in _all_items]
     lockList = [item for item in _all_items if item.category == DRItemCategory.LOCK]
     scoopList = [item for item in _all_items if item.category == DRItemCategory.SCOOP]

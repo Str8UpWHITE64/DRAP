@@ -1832,7 +1832,14 @@ def set_rules(world) -> None:
         world.set_rule(world.multiworld.get_location(_name, world.player),
                       AtLeast(_n, *_sticker_children))
     if not world.psycho_mode:  # dropped from Psycho seeds in create_region
-        world.set_rule(world.multiworld.get_location("Get 10000 PP in one photo", world.player), CanReachRegion("Rooftop"))
+        # 10,000 PP in one shot needs both camera books' PP bonuses, and any
+        # part of the mall with zombies in it to photograph.
+        world.set_rule(world.multiworld.get_location("Get 10000 PP in one photo", world.player),
+                       And(Or(*[CanReachRegion(r) for r in ZOMBIE_KILL_TIERS]),
+                           Has("Book [Camera 1]"), Has("Book [Camera 2]")))
+    # Fifty targets in one frame takes the Maintenance Tunnel's crowd.
+    world.set_rule(world.multiworld.get_location("Get 50 targets in one photo", world.player),
+                   CanReachRegion("Maintenance Tunnel"))
 
     world.set_rule(world.multiworld.get_location("Find Greg's secret passage", world.player), CanReachLocation("Kill Adam"))
     # Endings

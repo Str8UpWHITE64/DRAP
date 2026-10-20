@@ -931,6 +931,9 @@ class DRWorld(World):
             # in every mode -- "sent it OR can walk to it" without Restricted,
             # both with it -- so state.has must see them either way.
             item_classification = ItemClassification.progression
+        elif name in ("Book [Camera 1]", "Book [Camera 2]"):
+            # "Get 10000 PP in one photo" needs both, in every mode.
+            item_classification = ItemClassification.progression
         elif name == "Book [Blender]":
             # Both routes to "Kill 100 zombies with an RPG" go through it, and
             # on goals without Overtime it is the only route, so state.has
