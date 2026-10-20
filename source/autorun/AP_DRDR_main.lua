@@ -694,9 +694,9 @@ local function run_slot_connect(slot_data)
             type(slot_data) == "table" and slot_data.car_keys == true)
     end
 
-    -- Custom PP stickers: off unless the slot asks.
+    -- Extra PP Stickers (custom stickers): off unless the slot asks.
     if AP.CustomStickers then
-        AP.CustomStickers.setup(type(slot_data) == "table" and slot_data.custom_pp_stickers == true)
+        AP.CustomStickers.setup(type(slot_data) == "table" and slot_data.extra_pp_stickers == true)
     end
 
     -- Camera Item: the shutter waits on the Camera. Off plays as vanilla.

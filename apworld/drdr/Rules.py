@@ -264,6 +264,7 @@ REGION_LEVEL_VALUES = {
 CAMERA_ITEM = "Camera"
 CAMERA_LOCATIONS = frozenset(
     [f"Photograph PP Sticker {_n}" for _n in range(1, 101)]
+    + [f"Photograph Extra PP Sticker {_n}" for _n in range(1, 41)]
     + [f"Photograph {_n} PP Stickers" for _n in range(10, 100, 10)]
     + [
         "Photograph all PP Stickers",
@@ -1621,12 +1622,20 @@ def set_rules(world) -> None:
     # PP Stickers
     # --------------------------------------------------------------------
     # PP Stickers Filler code (make all PP sticker checks excluded)
+    # Extra PP Stickers 3 and 20 can't be photographed where they stand. Until
+    # they are replaced they only hold filler, and keep their numbers.
+    if world.options.extra_pp_stickers:
+        for _n in (3, 20):
+            world.multiworld.get_location(f"Photograph Extra PP Sticker {_n}",
+                                          world.player).progress_type = LocationProgressType.EXCLUDED
+
     if world.options.pp_stickers_filler:
         for location in world.multiworld.get_locations(world.player):
             name = location.name
 
-            # "Photograph PP Sticker 1" to "Photograph PP Sticker 100"
-            if re.match(r"Photograph PP Sticker \d+", name):
+            # "Photograph PP Sticker 1" to "Photograph PP Sticker 100", and the
+            # extra ones ("Photograph Extra PP Sticker N")
+            if re.match(r"Photograph (Extra )?PP Sticker \d+", name):
                 location.progress_type = LocationProgressType.EXCLUDED
                 continue
 

@@ -891,6 +891,20 @@ class PPStickersFiller(Toggle):
     default = False
 
 
+class ExtraPPStickers(Toggle):
+    """
+    Adds 40 extra PP stickers to the mall, in places the vanilla game has
+    none. Each one is a check: photograph it the way you would a vanilla PP
+    sticker. Each photo of one is worth only 1 PP, so they don't change your
+    levels.
+
+    With Camera Item on, they need the Camera like every other photo check.
+    With PP Stickers Filler on, they only hold filler too.
+    """
+    display_name = "Extra PP Stickers"
+    default = False
+
+
 class OvertimeChecksFiller(Toggle):
     """
     When enabled, every check in Overtime still exists but will only ever hold
@@ -1014,6 +1028,7 @@ class DROption(PerGameCommonOptions):
     exclude_rescues_above: ExcludeRescuesAbove
     overtime_checks_filler: OvertimeChecksFiller
     pp_stickers_filler: PPStickersFiller
+    extra_pp_stickers: ExtraPPStickers
     door_randomizer: DoorRandomizer
     door_randomizer_mode: DoorRandomizerMode
     door_locks: DoorLocks
@@ -1061,6 +1076,7 @@ dr_option_groups = [
             ExcludeRescuesAbove,
             OvertimeChecksFiller,
             PPStickersFiller,
+            ExtraPPStickers,
         ],
     ),
     OptionGroup(

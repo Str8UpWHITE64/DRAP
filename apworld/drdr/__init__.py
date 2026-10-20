@@ -298,6 +298,8 @@ class DRWorld(World):
         self.enabled_location_categories.add(DRLocationCategory.PP_STICKER)
         self.enabled_location_categories.add(DRLocationCategory.CAMERA_PART)
         self.enabled_location_categories.add(DRLocationCategory.OTIS_CALL)
+        if self.options.extra_pp_stickers:
+            self.enabled_location_categories.add(DRLocationCategory.CUSTOM_STICKER)
         if self.main_scoops_enabled:
             self.enabled_location_categories.add(DRLocationCategory.MAIN_SCOOP)
         if self.options.goal.value == 0:  # Ending S
@@ -1192,6 +1194,7 @@ class DRWorld(World):
             if tiers[self.zombie_kill_tier]
         }
         pp_stickers_filler_enabled = bool(self.options.pp_stickers_filler.value)
+        extra_pp_stickers_enabled = bool(self.options.extra_pp_stickers.value)
         overtime_checks_filler_enabled = bool(self.options.overtime_checks_filler.value)
 
         # Player-stats / progression options (PlayerStats + PlayerBuffs +
@@ -1348,6 +1351,7 @@ class DRWorld(World):
                 "infinity_drain_rate": infinity_drain_rate,
                 "pp_bonus_locations": pp_bonus_locations_enabled,
                 "pp_stickers_filler": pp_stickers_filler_enabled,
+                "extra_pp_stickers": extra_pp_stickers_enabled,
                 "overtime_checks_filler": overtime_checks_filler_enabled,
             },
             "goal": goal,
@@ -1415,6 +1419,7 @@ class DRWorld(World):
             "infinity_drain": infinity_drain,
             "infinity_drain_rate": infinity_drain_rate,
             "pp_stickers_filler": pp_stickers_filler_enabled,
+            "extra_pp_stickers": extra_pp_stickers_enabled,
             "pp_bonus_locations": pp_bonus_locations_enabled,
             "pp_bonus_trigger_data": pp_bonus_trigger_data,
             "hints": hints,

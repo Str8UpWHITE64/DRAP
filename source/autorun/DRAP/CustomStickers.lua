@@ -17,16 +17,18 @@
 --   * Which sticker was photographed comes from the rating itself: PhotoRating.mTarget[i].FuncParam is the photographed
 --     GameObject. Only a rating that started after the shot counts (the lists keep the last photo's rows; the game
 --     zeroes mTargetNum when a rating starts, so rows past mTargetNum are stale), and only rows i < mTargetNum.
---   * PP like a vanilla sticker: the game pays a PP sticker (ids 128..227) its scoop points (5000) times the camera's
---     PP rate, the percentage shown while aiming. Any other id gets its points unscaled, so the spare id's points are
---     zeroed and DRAP grants 5000 x the rate the camera showed when the photo was taken.
+--   * PP: 1 per photo (extra stickers must not move levels). A non-PP id is paid its scoop points
+--     unscaled, and a 0-point target gets the game's 999 floor, so the spare id's points are set to 1; DRAP adds none.
 --   * Uncollected stickers hold mMaxCount at 0xFFFF so the shared count never flips them; a detected one gets
 --     mMaxCount 0 and plays the game's own collected animation. The spare count is reset to 0 after each photo.
 --   * Collected = the location is checked in the ledger. Collected stickers are not spawned again.
 --   * Never move a spawned sticker by its transform; spawn it where it belongs.
 --
--- Off unless the slot asks (slot_data.custom_pp_stickers). Camera Item needs nothing here: no Camera, no photo.
--- Console (testing): drap_cstick_enable(true), drap_cstick_add("s231", x, y, z, yaw, n), drap_cstick_status().
+-- Off unless the slot asks (slot_data.extra_pp_stickers). Camera Item needs nothing here: no Camera, no photo.
+-- Console (testing): drap_extra_pp_stickers(true) / drap_extra_pp_stickers_reset() (offline, no seed or server),
+-- drap_cstick_enable(true), drap_cstick_add("s231", x, y, z, yaw, n), drap_cstick_status().
+-- Test spots (drap_cstick_spot, drap_cstick_remove) are test stickers: they work without a slot or test
+-- mode, a photo marks them in the test file and never sends a check. An edit or removal despawns the old one.
 
 local Shared = require("DRAP/Shared")
 local SharedData = require("DRAP/SharedData")
@@ -37,10 +39,10 @@ local SPARE_ID = 229
 local TEMPLATE_ID = 164
 local CLASS = "uOm13f"
 local HOLD_MAX = 0xFFFF
--- PP (4 m): the camera showed the same rate for ours and a vanilla stand-in (72.4% / 72.3%), but the game
--- scored the vanilla one 5000 x rate (3634) and ours a flat 5000: only ids 128..227 are multiplied by the PP rate.
--- So the spare id's scoop points are zeroed and DRAP grants base x the rate the camera showed when the photo was taken,
--- less what the game still paid for our target (a floor of 999 even with zero points).
+-- PP: the game pays our id its scoop points unscaled (a flat 5000 at 72% framing), and pays 999 when they are
+-- 0. Extra stickers are worth nothing towards levels, so every score is 1 and DRAP grants nothing;
+-- the camera rate is still logged.
+local POINTS = 1
 local PP_BASE_FALLBACK = 5000
 local RESPAWN_SETTLE_S = 2.0     -- after an area change, before spawning
 local FIND_TIMEOUT_S = 10.0      -- a requested sticker must appear within this
@@ -55,6 +57,7 @@ local RADIUS_SCALE = 1.0
 local enabled = false
 local debug_enabled = nil        -- console override
 local debug_rows = {}            -- console-added table rows
+local doomed = {}                -- removed or edited stickers still to take away: { om, go, known, pos, t }
 
 -- number -> { row, go, om, attr, addr, state = "pending"|"live", t, hits_ok, collected }
 local live = {}
@@ -107,12 +110,14 @@ local function get_count(id)
     return arr and num(pc(function() return arr:read_dword(0x20 + 4 * id) end)) or nil
 end
 
-local function is_on()
+local function table_on()
     if debug_enabled ~= nil then return debug_enabled end
     if not enabled then return false end
     local Activation = package.loaded["DRAP/Activation"]
     return Activation ~= nil and Activation.is_active ~= nil and Activation.is_active() == true
 end
+-- test spots run on their own, with the table off
+local function is_on() return table_on() or #debug_rows > 0 or next(doomed) ~= nil end
 
 ------------------------------------------------------------
 -- the table
@@ -121,7 +126,9 @@ end
 -- rows: { Number, LocationName, Area = "s231", Pos = {x,y,z}, Yaw, Pitch, Roll } (radians)
 local function rows()
     local out = {}
-    for _, r in ipairs(SharedData.custom_stickers and SharedData.custom_stickers() or {}) do out[#out + 1] = r end
+    if table_on() then
+        for _, r in ipairs(SharedData.custom_stickers and SharedData.custom_stickers() or {}) do out[#out + 1] = r end
+    end
     for _, r in ipairs(debug_rows) do out[#out + 1] = r end
     return out
 end
@@ -131,7 +138,22 @@ local function area_index_of(code)
     return info and info.index or nil
 end
 
+-- Offline testing (drap_extra_pp_stickers): no slot, so no ledger to remember what was photographed. Debug mode keeps
+-- its own list in reframework/data/DRAP_extra_stickers_test.json; drap_extra_pp_stickers_reset() clears it.
+local TEST_FILE = "DRAP_extra_stickers_test.json"
+local test_collected = nil
+local function test_load()
+    if test_collected then return test_collected end
+    local d = pc(function() return json.load_file(TEST_FILE) end)
+    test_collected = (type(d) == "table" and type(d.collected) == "table") and d.collected or {}
+    return test_collected
+end
+local function test_save()
+    pc(function() json.dump_file(TEST_FILE, { collected = test_collected or {} }) end)
+end
+
 local function is_collected(r)
+    if (debug_enabled or r.Test) and test_load()[tostring(r.Number)] then return true end
     local Ledger = package.loaded["DRAP/LocationLedger"]
     if r.LocationName and Ledger and Ledger.is_init and Ledger.is_init() and Ledger.is_checked then
         return Ledger.is_checked(r.LocationName) == true
@@ -166,13 +188,27 @@ local function ensure_scoop_points()
     for _, f in ipairs(SCOOP_FIELDS) do
         local v = fld(src, f)
         -- scores zeroed (DRAP pays the vanilla way, see PP above); trends and the message stay the template's
-        if f:sub(1, 3) ~= "mTr" and f ~= "mMsgId" then v = 0 end
+        if f:sub(1, 3) ~= "mTr" and f ~= "mMsgId" then v = POINTS end
         if v ~= nil then pc(function() dst:set_field(f, v) end) end
     end
-    scoop_ready = num(fld(dst, "mNormal")) == 0
+    scoop_ready = num(fld(dst, "mNormal")) == POINTS
     M.log(string.format("Scoop points for spare id %d copied from %d (normal %s): %s", SPARE_ID, TEMPLATE_ID,
         tostring(fld(dst, "mNormal")), tostring(scoop_ready)))
     return scoop_ready
+end
+
+-- Loading another save rebuilds the spare id's scoop data with 0 points, and the game pays a 0-point target its
+-- 999 floor. So the points are checked on the live object, not trusted to a flag, and set again when reset.
+local function verify_scoop_points()
+    if not scoop_ready then return ensure_scoop_points() end
+    local pm = photo_mgr()
+    local dst = pm and pc(function() return pm:call("getScoopData(System.UInt16)", SPARE_ID) end)
+    if dst and num(fld(dst, "mNormal")) ~= POINTS then
+        scoop_ready = false
+        M.log("Scoop points for spare id " .. SPARE_ID .. " were reset; setting them again")
+        return ensure_scoop_points()
+    end
+    return true
 end
 
 -- the PhotoSealUserData is the shared resource every sticker's SolidModelAttribute points at
@@ -296,12 +332,13 @@ local function request_spawn(r)
             key, Vector3f.new(p.x, p.y, p.z), rotation(r), nil, folder)
     end)
     if not ok then return false, tostring(err) end
-    live[r.Number] = { row = r, state = "pending", t = os.clock(), known = known, folder = where }
+    live[r.Number] = { row = r, state = "pending", t = os.clock(), known = known, folder = where,
+                       pos = { x = p.x, y = p.y, z = p.z } }
     return true
 end
 
 local function find_spawned(e)
-    local p = e.row.Pos
+    local p = e.pos or e.row.Pos
     for _, c in ipairs(scene_stickers()) do
         local a = addr(c)
         if a and not e.known[a] then
@@ -361,11 +398,28 @@ local function maintain()
     local idx = num(fld(am, "mAreaIndex"))
     if idx ~= area_index then
         area_index, area_since = idx, os.clock()
-        live, go_to_number = {}, {}
+        live, go_to_number, doomed = {}, {}, {}
         return
+    end
+    for k, d in pairs(doomed) do
+        if not d.om then
+            local om, go = find_spawned(d)
+            if om then d.om, d.go = om, go end
+        end
+        if d.om then
+            pc(function() d.go:call("set_DrawSelf", false) end)
+            pc(function() d.om:set_field("mMaxCount", 0) end)
+            local tr = go_tr(d.go)
+            local q = tr and pc(function() return tr:call("get_Position") end)
+            if q and q.y > -500 then pc(function() tr:call("set_Position", Vector3f.new(q.x, q.y - 1000.0, q.z)) end) end
+            doomed[k] = nil
+        elseif os.clock() - d.t > FIND_TIMEOUT_S then
+            doomed[k] = nil
+        end
     end
     if os.clock() - area_since < RESPAWN_SETTLE_S then return end
     if pc(function() return am:call("isOmSetLoading") end) == true then return end
+    if next(live) ~= nil then verify_scoop_points() end
 
     for _, r in ipairs(rows()) do
         if r.Number and r.Pos and area_index_of(r.Area) == idx then
@@ -405,20 +459,34 @@ end
 local function on_detect(n, game_score)
     local e = live[n]
     if not e or e.collected then return end
+    photo.got_one = true
     e.collected = true
     stats.detected = stats.detected + 1
     local r = e.row
-    M.log(string.format("Custom sticker %d photographed (%s)", n, tostring(r.LocationName)))
+    local test = debug_enabled or r.Test
+    if r.Spot then
+        M.log(string.format("Placement spot %s photographed: camera %.0f%% (custom sticker %d)", tostring(r.Spot),
+            (photo.rate_at_shot or 0) * 100, n))
+    else
+        M.log(string.format("Custom sticker %d photographed (%s)", n, tostring(r.LocationName)))
+    end
     pc(function() e.om:set_field("mMaxCount", 0) end)
-    if M.on_check and r.LocationName then pcall(M.on_check, r.LocationName, n) end
+    if test then
+        test_load()[tostring(n)] = true
+        test_save()
+        M.log(string.format("Test mode: Extra PP Sticker %d marked collected locally (%s; no check is sent without a slot)",
+            n, tostring(r.LocationName)))
+    end
+    -- test mode sends nothing: Bridge would journal the check and replay it on the next real connect
+    if not test and M.on_check and r.LocationName then pcall(M.on_check, r.LocationName, n) end
     local rate = photo.rate_at_shot or 0
     local target = math.floor((pp_base or PP_BASE_FALLBACK) * rate + 0.5)
     local paid = game_score or 0
-    local grant = math.max(0, target - paid)
+    local grant = 0
     stats.last_rate, stats.last_grant, stats.last_game_score, stats.last_total = rate, grant, paid, paid + grant
-    M.log(string.format("Custom sticker %d: camera rate %.3f -> %d PP (game paid %d, DRAP adds %d)", n, rate, target, paid, grant))
+    M.log(string.format("Custom sticker %d: camera rate %.3f (a vanilla sticker would pay %d); the game paid %d", n, rate, target, paid))
     local PB = package.loaded["DRAP/effects/PlayerBuffs"]
-    if PB and PB.pp_boost and grant > 0 then pcall(PB.pp_boost, grant) end
+    if PB and PB.pp_boost and grant > 0 then pcall(PB.pp_boost, grant) end   -- grant is 0: the game's 1 point is all
 end
 
 -- per frame while any of ours is live. Arm when the photo mode enters rating (2) and remember the rows already in
@@ -450,6 +518,26 @@ local function watch_photo()
     end
     if mode ~= 2 and photo.mode == 2 then
         photo.armed = false
+        -- a photo with none of ours in it while one is close: say which, to help find stickers that won't rate
+        -- (an early offline test: 3, 20 and 31 never collected)
+        if not photo.got_one then
+            local pgo = sdk.get_managed_singleton("app.solid.PlayerManager")
+            pgo = pgo and pc(function() return pgo:call("get_CurrentPlayer") end)
+            local fp = go_pos(pgo)
+            local best, bd
+            for n2, e2 in pairs(live) do
+                if e2.state == "live" and not e2.collected and e2.go and fp then
+                    local gp = go_pos(e2.go)
+                    local d = gp and dist(gp, fp)
+                    if d and d < 15 and (not bd or d < bd) then best, bd = n2, d end
+                end
+            end
+            if best then
+                M.log(string.format("Photo rated none of the extra stickers; nearest uncollected is %d, %.1f m away (camera %.0f%%)",
+                    best, bd, (photo.rate_at_shot or 0) * 100))
+            end
+        end
+        photo.got_one = false
         local c = get_count(SPARE_ID)
         if c and c > 0 then set_count(SPARE_ID, 0) end
     end
@@ -506,17 +594,65 @@ function M.status()
 end
 
 rawset(_G, "drap_cstick_enable", function(on) debug_enabled = (on ~= false); return debug_enabled end)
+
+-- Offline test, no seed or server: drap_extra_pp_stickers(true) turns the 40 table stickers on. They spawn in
+-- their own areas (now, and on every area load), a photo pays the PP and marks them collected in TEST_FILE, so they
+-- are not spawned again. drap_extra_pp_stickers(false) turns them off (already spawned ones stay until the area is left).
+rawset(_G, "drap_extra_pp_stickers", function(on)
+    debug_enabled = (on ~= false)
+    if not debug_enabled then debug_enabled = nil end
+    local n = #rows()
+    local done = 0
+    for _ in pairs(test_load()) do done = done + 1 end
+    local msg = debug_enabled and string.format("Extra PP Stickers test mode on: %d stickers, %d already collected", n, done)
+        or "Extra PP Stickers test mode off"
+    M.log(msg)
+    return msg
+end)
+-- forget what test mode has collected; stickers already collected in this area come back on the next area load
+rawset(_G, "drap_extra_pp_stickers_reset", function()
+    test_collected = {}
+    test_save()
+    for _, e in pairs(live) do e.collected = nil end
+    M.log("Extra PP Stickers test mode: collected list cleared")
+    return "cleared"
+end)
 rawset(_G, "drap_cstick_add", function(area, x, y, z, yaw, n, name, pitch, roll)
     n = num(n) or (900 + #debug_rows + 1)
-    debug_rows[#debug_rows + 1] = { Number = n, LocationName = name or ("Photograph Custom PP Sticker " .. tostring(n)),
+    debug_rows[#debug_rows + 1] = { Number = n, LocationName = name or ("Photograph Extra PP Sticker " .. tostring(n)),
                                     Area = area, Pos = { x = num(x), y = num(y), z = num(z) }, Yaw = num(yaw) or 0.0,
                                     Pitch = num(pitch) or 0.0, Roll = num(roll) or 0.0 }
     return n
 end)
 rawset(_G, "drap_cstick_status", function() return M.status() end)
+-- take a spawned (or still spawning) sticker away; the area owns it, so it is hidden and dropped under the map
+local function despawn(n)
+    local e = live[n]
+    if not e then return end
+    live[n] = nil
+    if e.addr then go_to_number[e.addr] = nil end
+    local d = { om = e.om, go = e.go, known = e.known or {}, pos = e.pos or e.row.Pos, t = os.clock() }
+    doomed[d] = d
+end
 rawset(_G, "drap_cstick_remove", function(n)
-    for i, r in ipairs(debug_rows) do if r.Number == num(n) then table.remove(debug_rows, i); return true end end
+    n = num(n)
+    despawn(n)
+    for i, r in ipairs(debug_rows) do if r.Number == n then table.remove(debug_rows, i); return true end end
     return false
+end)
+-- Add or replace test sticker n at a spot. A replaced one is despawned and spawned afresh where
+-- the spot now is, and is photographable again (its test-file mark is cleared).
+rawset(_G, "drap_cstick_spot", function(n, area, x, y, z, yaw, pitch, roll, spot)
+    n = num(n)
+    if not n then return nil end
+    despawn(n)
+    for i, r in ipairs(debug_rows) do if r.Number == n then table.remove(debug_rows, i); break end end
+    local tc = test_load()
+    if tc[tostring(n)] then tc[tostring(n)] = nil; test_save() end
+    debug_rows[#debug_rows + 1] = { Number = n, Test = true, Spot = spot, LocationName = "Placement spot " .. tostring(spot or n),
+                                    Area = area, Pos = { x = num(x), y = num(y), z = num(z) }, Yaw = num(yaw) or 0.0,
+                                    Pitch = num(pitch) or 0.0, Roll = num(roll) or 0.0 }
+    return n
 end)
 rawset(_G, "drap_cstick_radius_scale", function(x) RADIUS_SCALE = num(x) or RADIUS_SCALE; return RADIUS_SCALE end)
 
