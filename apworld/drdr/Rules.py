@@ -1366,6 +1366,11 @@ def set_rules(world) -> None:
     # Restricted cannot pick the blender's output up either.
     if _restricted:
         _rpg_blend.append(Has("Rocket Launcher"))
+    # The blend can be in hand before any zombies are, from the start of the
+    # run. A hundred kills need an area that holds that many: one whose 100
+    # kill check exists even on the easy tier.
+    _rpg_blend.append(Or(*[CanReachRegion(r) for r, tiers in ZOMBIE_KILL_TIERS.items()
+                           if 100 in tiers.get("easy", [])]))
     _rpg_rule = And(*_rpg_blend)
 
     if world.options.goal.value == 0:
