@@ -20,6 +20,7 @@ local PlayerReady = require("DRAP/PlayerReady")
 local M = Shared.create_module("OneHpTrap")
 
 local NAME = "1 HP Trap"
+local _notify_trap = Shared.lazy_notify_trap()
 local DRAIN_GRACE_SECONDS = 10
 
 local PSM_TYPE = "app.solid.PlayerStatusManager"
@@ -45,6 +46,7 @@ function M.fire()
     if hp < 1 then return false end         -- dead or dying: not ours to touch
     if hp == 1 then
         M.log("already on 1 HP -- nothing to do")
+        _notify_trap(NAME, "Don't get hit!")
         return true
     end
 
@@ -69,6 +71,7 @@ function M.fire()
     local Drain = package.loaded["DRAP/effects/InfinityDrain"]
     if Drain and Drain.grace then Drain.grace(DRAIN_GRACE_SECONDS) end
     M.log(string.format("HP %d -> 1", hp))
+    _notify_trap(NAME, "Don't get hit!")
     return true
 end
 

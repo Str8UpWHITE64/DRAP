@@ -626,7 +626,7 @@ function M.zombie_swarm_trap(sec)
             local entry = _timed_effects[NAME]
             local base = (entry and tonumber(entry.saved)) or 1
             Zombies.set_spawn_multiplier(base * ZOMBIE_TRAP_FACTOR)
-            _notify_trap("Oops, more zombies.")
+            _notify_trap(NAME, "More zombies spawned around you!")
             log(string.format("%s: %dx -> %dx for %.0fs", NAME, base,
                 base * ZOMBIE_TRAP_FACTOR, sec))
         end,

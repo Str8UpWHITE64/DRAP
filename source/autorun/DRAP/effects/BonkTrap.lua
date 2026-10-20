@@ -17,13 +17,16 @@ local PlayerReady = require("DRAP/PlayerReady")
 local M = Shared.create_module("BonkTrap")
 
 local BONK = "Bonk Trap"
+local _notify_trap = Shared.lazy_notify_trap()
 
 local function fire()
     if not Shared.is_in_game() then return false end
     if not PlayerReady.ready() then return false end
     local Knock = package.loaded["DRAP/trackers/KnockbackLink"]
         or require("DRAP/trackers/KnockbackLink")
-    return Knock.bonk("Bonk Trap") ~= false
+    local ok = Knock.bonk("Bonk Trap") ~= false
+    if ok then _notify_trap(BONK, "BONK!") end
+    return ok
 end
 
 function M.register()
@@ -35,5 +38,8 @@ function M.register()
         end,
     })
 end
+
+-- Testing: fire the trap now, toast included, bypassing the bank.
+_G.drap_bonk_trap = function() M.log("bonk trap -> " .. tostring(fire())) end
 
 return M

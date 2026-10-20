@@ -30,6 +30,8 @@ local M = Shared.create_module("SizeTraps")
 local PM_TYPE = "app.solid.PlayerManager"
 
 local TINY, GIANT = "Tiny Trap", "Giant Trap"
+local _notify_trap = Shared.lazy_notify_trap()
+local SIZE_LINE = { [TINY] = "Frank is small for %.0fs", [GIANT] = "Frank is big for %.0fs" }
 local SCALE = { [TINY] = 0.5, [GIANT] = 1.5 }
 local DURATION = 30.0
 local TICK = 0.1
@@ -110,6 +112,7 @@ local function fire(name)
     active = { name = name, scale = s, remaining = DURATION }
     M.log(string.format("%s: scale %.2f for %.0f s%s", name, s, DURATION,
         replaced and " (replaced the other size)" or ""))
+    _notify_trap(name, string.format(SIZE_LINE[name], DURATION))
     return true
 end
 

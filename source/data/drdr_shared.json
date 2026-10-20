@@ -3358,7 +3358,7 @@
       "description": {
         "location": "Security Room",
         "trigger": "Walk through the Security Room rear door",
-        "description": "Collect all bombs in the Maintenance Tunnels and return them."
+        "description": "Collect five bombs in the Maintenance Tunnels and use the ramp to Leisure Park"
       },
       "disp_flag": 2503,
       "disp_end_flag": 2549,

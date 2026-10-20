@@ -26,6 +26,7 @@ local M = Shared.create_module("InvisibleTrap")
 local PM_TYPE = "app.solid.PlayerManager"
 
 local NAME = "Invisibility Trap"
+local _notify_trap = Shared.lazy_notify_trap()
 local DURATION = 30.0
 local TICK = 0.1
 
@@ -67,6 +68,7 @@ local function fire()
     local refresh = active ~= nil
     active = { remaining = DURATION }
     M.log(string.format("hidden for %.0f s%s", DURATION, refresh and " (refreshed)" or ""))
+    _notify_trap(NAME, string.format("Frank is nowhere to be seen for %.0fs", DURATION))
     return true
 end
 

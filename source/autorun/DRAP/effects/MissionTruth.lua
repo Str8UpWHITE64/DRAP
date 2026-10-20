@@ -701,7 +701,7 @@ local function goal_target()
                 or string.format(
                     "Kill 53,594 zombies across the mall. %d of %d area%s"
                     .. " still to clear.", left, total, left == 1 and "" or "s"),
-            "Anywhere in the mall", nil)
+            left == 0 and "Security Room" or "Anywhere in the mall", nil)
     end
 
     return nil

@@ -66,7 +66,7 @@ local function dress_donut()
     if not CostumeRandomizer.set_part(PART_BODY, HEART_BOXERS) then return false end
     CostumeRandomizer.set_part(PART_FOOT, BAREFOOT)
     M.log("donut trap applied -- heart boxers, barefoot")
-    notify("Goddamnit, Donut!")
+    notify("Goddamnit, Donut! Trap", "Mongo is appalled!")
     return true
 end
 
@@ -75,7 +75,7 @@ end
 local function dress_boxers()
     if not CostumeRandomizer.set_naked() then return false end
     M.log("boxers trap applied")
-    notify("You have been stripped to your boxers.")
+    notify("Boxers Trap", "Right down to your skivvies")
     return true
 end
 
