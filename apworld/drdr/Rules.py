@@ -277,7 +277,11 @@ CAMERA_LOCATIONS = frozenset(
         "Complete Kent's day 1 photoshoot",
         "Meet Kent on day 2",
         "Complete Kent's day 2 photoshoot",
-    ])
+    ]
+    # Gun Shop Standoff waits for the Camera as well (Psycho names them Kill).
+    + [f"{_verb} {_who}" for _verb in ("Rescue", "Kill")
+       for _who in ("Brett Styles", "Jonathan Picardson", "Alyssa Laurent")]
+)
 
 
 def camera_gate(world, spot, rule):
@@ -1633,6 +1637,11 @@ def set_rules(world) -> None:
         for _n in (3, 20):
             world.multiworld.get_location(f"Photograph Extra PP Sticker {_n}",
                                           world.player).progress_type = LocationProgressType.EXCLUDED
+
+    # With the Camera as an item, Photograph 8 psychopaths only holds filler.
+    if world.options.camera_item and "Photograph 8 psychopaths" not in _dropped:
+        world.multiworld.get_location("Photograph 8 psychopaths",
+                                      world.player).progress_type = LocationProgressType.EXCLUDED
 
     if world.options.pp_stickers_filler:
         for location in world.multiworld.get_locations(world.player):

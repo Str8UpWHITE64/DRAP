@@ -510,6 +510,7 @@ local function run_slot_connect(slot_data)
     -- helicopter requirement so the soldiers still leave.
     AP.ScoopUnlocker.set_spitter_only_enabled(spitter_only_enabled)
     AP.ScoopUnlocker.set_kent_progression(type(slot_data) == "table" and slot_data.kent_progression or nil)
+    AP.ScoopUnlocker.set_camera_item(type(slot_data) == "table" and slot_data.camera_item == true)
     log("Spitter Only enabled=" .. tostring(spitter_only_enabled))
 
     -- Door Randomizer option

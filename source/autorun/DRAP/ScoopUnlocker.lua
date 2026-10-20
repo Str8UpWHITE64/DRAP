@@ -1845,6 +1845,10 @@ local function brad_still_leaving()
     return nil
 end
 
+-- Scoop name -> AP item it waits for. Filled from slot_data (set_camera_item).
+-- A field, not a local: this chunk is at Lua's 200-local limit.
+M.item_requirements = {}
+
 State.init({
     scoop_data = SCOOP_DATA,
     conflict_groups = CONFLICT_GROUPS,
@@ -1855,7 +1859,7 @@ State.init({
     -- Hideout used to wait on "Carlito's Hideout Key" by name, which does not
     -- exist under Split Keys. Its required_regions already include Carlito's
     -- Hideout, and reaching that asks the right question in every mode.
-    item_requirements = {},
+    item_requirements = M.item_requirements,
     chain_final = "The Facts",
     log = M.log,
     now = os.clock,
@@ -2590,6 +2594,14 @@ local kent_copy_day = {}    -- item index -> day number
 local kent_copies = 0
 
 --- The Kent days this seed plays, in unlock order (slot data).
+--- Camera Item: Kent's first scoop and Gun Shop Standoff wait for the Camera.
+--- Off, the Camera is not an item and nothing waits.
+function M.set_camera_item(on)
+    local need = (on == true) and "Camera" or nil
+    M.item_requirements["Cut from the Same Cloth"] = need
+    M.item_requirements["Gun Shop Standoff"] = need
+end
+
 function M.set_kent_progression(days)
     if type(days) == "table" and #days > 0 then
         kent_progression = {}
