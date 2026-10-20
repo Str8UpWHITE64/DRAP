@@ -143,16 +143,16 @@ local function get_dialog()
         cached_dlg = nil
         cached_mm = mm
     end
-    if cached_dlg ~= nil then return cached_dlg end
-
-    -- Path 2: MessageManager.MessageUIController
+    -- Path 2: MessageManager.MessageUIController. Read every time, never
+    -- cached: loading another save can replace the controller while the
+    -- MessageManager stays, and a held one then throws on every show.
     if mm then
         local ctrl = safe(function() return mm:get_field("MessageUIController") end)
         if ctrl ~= nil then
-            cached_dlg = ctrl
             return ctrl
         end
     end
+    if cached_dlg ~= nil then return cached_dlg end
 
     -- Path 3: scene-tree walk for the DialogueUI GameObject
     local sm_td = sdk.find_type_definition("via.SceneManager")
@@ -187,10 +187,32 @@ end
 local loop_installed = false
 local pending_hides = {} -- channel_int → deadline (os.clock seconds)
 
+-- DialogueUI.show throws while the camera's photo rating is up, which is
+-- exactly when a photo check's own item arrives. A refused toast is kept and
+-- retried for a while instead of being dropped.
+local RETRY_EVERY_S = 0.5
+local RETRY_FOR_S = 15
+local retry_queue = {} -- { text, opts, next_try, give_up }, oldest first
+local try_show
+
 -- Auto-hide loop registered at module load. Registering re.on_frame from
 -- within another on_frame disrupts REFramework's iteration and surfaces
 -- as "Unknown error in on_frame" the first time.
 re.on_frame(function()
+    local r = retry_queue[1]
+    if r then
+        local now = os.clock()
+        if now >= r.next_try then
+            if try_show(r.text, r.opts) then
+                table.remove(retry_queue, 1)
+            elseif now >= r.give_up then
+                table.remove(retry_queue, 1)
+                print("[Notify] gave up showing: " .. r.text:sub(1, 80))
+            else
+                r.next_try = now + RETRY_EVERY_S
+            end
+        end
+    end
     if not next(pending_hides) then return end
     local now = os.clock()
     for typ, deadline in pairs(pending_hides) do
@@ -216,34 +238,40 @@ end)
 --     channel  = "ToDo",       -- channel name from M.Channels; default "ToDo"
 -- }
 -- Returns true if the call dispatched, false if no DialogueUI was available.
-function M.send(text, opts)
-    opts = opts or {}
-    local channel_name = opts.channel or "ToDo"
-    local channel = CHANNELS[channel_name] or CHANNELS.ToDo
-    local duration = tonumber(opts.duration) or 4
-
+try_show = function(payload, opts)
+    local channel = CHANNELS[opts.channel or "ToDo"] or CHANNELS.ToDo
     local ui = get_dialog()
-    if not ui then
-        print("[Notify] send: no DialogueUI available (no scene loaded?)")
-        return false
-    end
-
-    local payload = tostring(text or "")
+    if not ui then return false end
     pcall(function()
         ui:call("hide(app.solid.gui.DialogueUI.Type)", channel)
     end)
-    local ok, err = pcall(function()
+    local ok = pcall(function()
         ui:call("show(System.String, app.solid.gui.DialogueUI.Type)",
             payload, channel)
     end)
     if not ok then
-        print("[Notify] show failed: err=" .. tostring(err) ..
-            " channel=" .. tostring(channel) ..
-            " text=" .. payload:sub(1, 80))
+        cached_dlg = nil  -- it may be stale; look it up again on the retry
         return false
     end
+    pending_hides[channel] = os.clock() + (tonumber(opts.duration) or 4)
+    return true
+end
 
-    pending_hides[channel] = os.clock() + duration
+function M.send(text, opts)
+    opts = opts or {}
+    local payload = tostring(text or "")
+
+    if not get_dialog() then
+        print("[Notify] send: no DialogueUI available (no scene loaded?)")
+        return false
+    end
+    -- Keep the order: while older toasts wait, a new one waits behind them.
+    if #retry_queue == 0 and try_show(payload, opts) then
+        return true
+    end
+    local now = os.clock()
+    retry_queue[#retry_queue + 1] = { text = payload, opts = opts,
+        next_try = now + RETRY_EVERY_S, give_up = now + RETRY_FOR_S }
     return true
 end
 
