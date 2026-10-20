@@ -22,11 +22,19 @@
 -- those functions, and nothing here reaches past them.
 --
 -- A trap the player took out of their yaml's enabled_traps is never applied.
--- Convicts Respawn and Special Forces are never mapped: one needs a scoop
--- item, the other flips the whole mall's enemy layout.
+-- Army Trap is Special Forces both ways, so another game's Army Trap brings
+-- the soldiers (only when this slot's yaml allows Special Forces).
 --
--- Names are the exact strings on the TrapLink sheet. A name that is not in
--- RECEIVE below is ignored (logged), which is the protocol's expectation.
+-- The rule: a trap goes out under a name we would take back as that same
+-- trap. W I D E Trap comes in as Giant, so Giant goes out as W I D E Trap.
+-- Nothing sends as one thing and comes back as another, so two DRAP players
+-- trade exactly the same traps. Checked at load, below.
+--
+-- Names are the exact strings on the TrapLink sheet, apart from the traps
+-- with no equal or similar trap there: those send and receive only their own
+-- item name, so they link between DRAP players and nowhere else. A name that
+-- is not in RECEIVE below is ignored (logged), which is the protocol's
+-- expectation.
 
 local Shared = require("DRAP/Shared")
 local TrapBank = require("DRAP/TrapBank")
@@ -37,10 +45,18 @@ local M = Shared.create_module("TrapLink")
 -- Mapping
 ------------------------------------------------------------
 
--- Our trap -> the standard name we send. A trap with no entry does not send.
--- Not sent: Convicts Respawn, Last Shot, Where'd Your Inventory Go?,
--- Goddamnit Donut!, Boxers, Skipped Arm Day, Giant (no honest match on the sheet).
+-- Our trap -> the name we send. Every trap sends, and each name is one RECEIVE
+-- turns back into the same trap. Own item names: no equal or similar trap on
+-- the sheet.
 M.SEND = {
+    ["Giant Trap"]              = "W I D E Trap",
+    ["Night Trap"]              = "Nightmare Trap",
+    ["Convicts Respawn Trap"]   = "Convicts Respawn Trap",
+    ["Last Shot Trap"]          = "Last Shot Trap",
+    ["Where'd Your Inventory Go? Trap"] = "Items to Bombs",
+    ["Goddamnit, Donut! Trap"]  = "Goddamnit, Donut! Trap",
+    ["Boxers Trap"]             = "Boxers Trap",
+    ["Skipped Arm Day Trap"]    = "Skipped Arm Day Trap",
     ["Stomach Ache Trap"]       = "Poison Trap",
     ["Zombait Trap"]            = "Chaser Trap",
     ["Skipped Leg Day Trap"]    = "Slowness Trap",
@@ -62,52 +78,36 @@ M.SEND = {
 
 -- Our trap -> the standard names that fire it.
 local RECEIVE_GROUPS = {
-    ["Damage Player Trap"] = {
-        "Damage Trap", "Electrocution Trap", "Burn Trap", "Fire Trap",
-        "Explosion Trap", "Bomb", "Bomb Trap", "TNT Trap", "TNT Barrel Trap",
-        "Meteor Trap", "Spike Ball Trap", "Energy Drain Trap",
-        "Mana Drain Trap", "Rockfall Trap", "Radiation Trap",
-    },
+    ["Damage Player Trap"] = { "Damage Trap", "Burn Trap" },
     ["Stomach Ache Trap"] = {
         "Poison Trap", "Poison Mushroom", "Food Poisoning Trap", "Toxin Trap",
         "Poisontoad", "Guest Vomiting Trap",
     },
     -- Frank cannot be frozen, so the freeze family becomes the slow.
     ["Skipped Leg Day Trap"] = {
-        "Slowness Trap", "Slow Trap", "Sticky Floor Trap", "Sticky Hands Trap",
-        "Tar Trap", "Tarr Trap", "Iron Boots Trap", "Sinking Trap",
-        "Underwater Trap",
-        "Freeze Trap", "Frozen Trap", "Ice Trap", "Ice Floor Trap",
-        "Frost Trap", "Paralyze Trap", "Paralysis Trap",
-        "Chaos Control Trap", "Confuse Trap",
-        "Confusion Trap", "Confound Trap",
-    },
-    ["Skipped Arm Day Trap"] = {
-        "Disarm Trap", "Resistance Trap", "No Guarding", "Double Damage",
+        "Slowness Trap", "Slow Trap", "Freeze Trap", "Frozen Trap",
+        "Paralyze Trap", "Paralysis Trap", "Sticky Floor Trap", "Tar Trap",
     },
     ["Potty Mouth Trap"] = {
-        "Yap Trap", "Laughter Trap", "Spam Trap", "Taunt Trap", "Hey! Trap",
-        "Help Trap", "Get Out Trap", "Whoops! Trap", "Text Trap", "Phone Trap",
-        "Literature Trap", "Exposition Trap", "Tutorial Trap", "Tip Trap",
-        "Trivia Trap", "Cutscene Trap",
-        "Aaa Trap", "E. Gadd Ramblings", "Wailnard",
+        "Yap Trap", "Aaa Trap", "E. Gadd Ramblings", "Exposition Trap",
+        "Hey! Trap", "Spam Trap", "Taunt Trap",
     },
     ["Oops More Zombies Trap"] = {
-        "Bee Trap", "Army Trap", "Summon Trap", "Ghost", "Spooky Time",
-        "Guest Spawn Trap",
-        "Buyon Trap", "Person Trap", "Ninja Trap", "Dead Ringer Trap",
-        "Monkey Trap", "Flint Trap", "Paratoad", "Animal Trap", "Frog Trap",
+        "Bee Trap", "Dead Ringer Trap", "Spooky Time", "Summon Trap",
     },
-    ["Zombait Trap"] = { "Chaser Trap", "Fear Trap", "Honey Trap" },
+    ["Zombait Trap"] = { "Chaser Trap", "Honey Trap" },
+    -- Everything in the inventory is swapped out for something else.
+    ["Where'd Your Inventory Go? Trap"] = {
+        "Items to Bombs", "Where'd Your Inventory Go? Trap",
+    },
+    ["Special Forces Trap"] = { "Army Trap" },
     ["Hostile NPC Trap"] = { "Police Trap" },
-    ["Butterfingers Trap"] = {
-        "Empty Item Box Trap", "Items to Bombs", "Tool Swap Trap",
-        "Gadget Shuffle Trap", "Eject Ability",
-    },
+    -- Disarm is what Butterfingers does: everything in Frank's hands drops.
+    ["Butterfingers Trap"] = { "Disarm Trap", "Eject Ability" },
     ["Bald Trap"] = { "Bald Trap", "No Hat Trap" },
     ["Bonk Trap"] = {
-        "Bonk Trap", "Banana Peel Trap", "Banana Trap", "Slip Trap",
-        "Push Trap", "Spring Trap", "Squash Trap", "Thwimp Trap", "Jump Trap",
+        "Bonk Trap", "Banana Peel Trap", "Jump Trap", "Push Trap", "Slip Trap",
+        "Spring Trap", "Squash Trap", "Thwimp Trap",
     },
     ["Tiny Trap"] = { "Tiny Trap", "Shrink Trap" },
     -- Anodyne and Noita set HP to 1 under this name. Instant Death Trap is the
@@ -135,6 +135,29 @@ for ours, names in pairs(RECEIVE_GROUPS) do
     for _, std in ipairs(names) do
         assert(M.RECEIVE[std] == nil, "TrapLink name mapped twice: " .. std)
         M.RECEIVE[std] = ours
+    end
+end
+-- Our own item names, for the traps that send under them. A trap whose name
+-- is already taken by another receive group stays unsent rather than lie.
+for ours, sent in pairs(M.SEND) do
+    if sent == ours then
+        if M.RECEIVE[ours] == nil or M.RECEIVE[ours] == ours then
+            M.RECEIVE[ours] = ours
+        else
+            M.log.warn(string.format("%s: own name already receives as %s -- not linked out",
+                ours, tostring(M.RECEIVE[ours])))
+            M.SEND[ours] = nil
+        end
+    end
+end
+-- The rule: what we send for a trap comes back as that trap. A break here is
+-- a mapping mistake (test_traplink catches it); in game that trap just stops
+-- linking out instead of taking the module down.
+for ours, sent in pairs(M.SEND) do
+    if M.RECEIVE[sent] ~= ours then
+        M.log.warn(string.format("%s sends %s but receives it as %s -- not linked out",
+            ours, sent, tostring(M.RECEIVE[sent])))
+        M.SEND[ours] = nil
     end
 end
 
