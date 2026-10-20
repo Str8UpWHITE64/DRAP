@@ -109,6 +109,13 @@ function M.stickers()
     return (data and data.stickers) or {}
 end
 
+-- Custom PP stickers (DRAP/CustomStickers): { Number, LocationName, Area, Pos = {x,y,z}, Yaw, Pitch, Roll } (radians).
+-- Absent = none.
+function M.custom_stickers()
+    ensure_loaded()
+    return (data and data.custom_stickers) or {}
+end
+
 -- Scoop -> list of survivor display names that escape to the Security Room as part
 -- of that scoop. Only includes scoops whose npcs field contains at least one
 -- name matching a "Rescue X" location in Python's Locations.py.

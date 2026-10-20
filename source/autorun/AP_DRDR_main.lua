@@ -34,6 +34,7 @@ AP.LevelTracker     = require("DRAP/trackers/LevelTracker")
 AP.EventTracker     = require("DRAP/trackers/EventTracker")
 AP.NpcTracker       = require("DRAP/trackers/NpcTracker")
 AP.PPStickerTracker = require("DRAP/trackers/PPStickerTracker")
+AP.CustomStickers = require("DRAP/CustomStickers")
 AP.AchievementTracker = require("DRAP/trackers/AchievementTracker")
 AP.KillTracker      = require("DRAP/trackers/KillTracker")
 AP.SaveSlot         = require("DRAP/SaveSlot")
@@ -300,6 +301,12 @@ end
 
 AP.PPStickerTracker.on_sticker_event_taked = function(location_name, item_number, photo_id, item_unique_no, having_event)
     log(string.format("PP sticker captured: %s", tostring(location_name)))
+    AP_BRIDGE.check(location_name)
+end
+
+-- Custom PP stickers: our own stickers, recognised by the photographed object
+AP.CustomStickers.on_check = function(location_name, number)
+    log(string.format("Custom PP sticker photographed: %s (#%s)", tostring(location_name), tostring(number)))
     AP_BRIDGE.check(location_name)
 end
 
@@ -687,6 +694,11 @@ local function run_slot_connect(slot_data)
             type(slot_data) == "table" and slot_data.car_keys == true)
     end
 
+    -- Custom PP stickers: off unless the slot asks.
+    if AP.CustomStickers then
+        AP.CustomStickers.setup(type(slot_data) == "table" and slot_data.custom_pp_stickers == true)
+    end
+
     -- Camera Item: the shutter waits on the Camera. Off plays as vanilla.
     if AP.effects.CameraLock then
         AP.effects.CameraLock.setup(
@@ -924,6 +936,7 @@ re.on_frame(function()
     safe_on_frame(AP.DeathLink,        "DeathLink")
     safe_on_frame(AP.AP_BRIDGE,        "AP_BRIDGE")
     safe_on_frame(AP.PPStickerTracker, "PPStickerTracker")
+    safe_on_frame(AP.CustomStickers,   "CustomStickers")
     safe_on_frame(AP.SaveSlot,         "SaveSlot")
     safe_on_frame(AP.SaveDiagnostics,  "SaveDiagnostics")
     safe_on_frame(AP.effects.BookGuards, "BookGuards")
