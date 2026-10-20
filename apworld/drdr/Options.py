@@ -950,6 +950,22 @@ class SplitKeys(Toggle):
     default = False
 
 
+class StartWithAllKeys(Toggle):
+    """
+    You start with every door key, so the whole mall is open from the start.
+    The keys are taken out of the item pool and filler takes their place.
+
+    Covers the area keys, or every Split Keys key when Split Keys is on, plus
+    the Maintenance Tunnel Access Key. With Door Randomizer on the keys are
+    already given at the start; with Door Locks as well, this opens the locks.
+
+    Car Keys, the Camera and the Extra Overtime Keys are not door keys and
+    stay in the pool.
+    """
+    display_name = "Start With Every Door Key"
+    default = False
+
+
 # ---------------------------------------------------------------------------
 # Location pickers without the KillSanity names (#60)
 # ---------------------------------------------------------------------------
@@ -1037,6 +1053,7 @@ class DROption(PerGameCommonOptions):
     car_keys: CarKeys
     camera_item: CameraItem
     split_keys: SplitKeys
+    start_with_all_keys: StartWithAllKeys
     overtime_progression_gating: OvertimeProgressionGating
     exclude_overpowered_items: ExcludeOverpoweredItems
     enable_skill_items: EnableSkillItems
@@ -1095,6 +1112,7 @@ dr_option_groups = [
             CarKeys,
             CameraItem,
             SplitKeys,
+            StartWithAllKeys,
             OvertimeProgressionGating,
             ExcludeOverpoweredItems,
         ],

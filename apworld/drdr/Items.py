@@ -631,7 +631,7 @@ progression_skills = {
 
 
 def BuildItemPool(multiworld, count, options, excluded_scoop_names=(),
-                  door_locks_active=False):
+                  door_locks_active=False, start_key_names=()):
     """Build the item pool for this world.
 
     excluded_scoop_names: iterable of scoop item names to omit from the pool
@@ -640,6 +640,9 @@ def BuildItemPool(multiworld, count, options, excluded_scoop_names=(),
 
     door_locks_active: keep the area keys in the pool under door
     randomization instead of dropping them as precollected.
+
+    start_key_names: keys Start With Every Door Key has precollected, left
+    out so filler takes their slots.
     """
     item_pool = []
     included_itemcount = 0
@@ -815,6 +818,8 @@ def BuildItemPool(multiworld, count, options, excluded_scoop_names=(),
         if lock.name in car_key_names and not car_keys_on:
             continue
         if lock.name == "Camera" and not camera_item_on:
+            continue
+        if lock.name in start_key_names:
             continue
         # Area keys are precollected under door randomization, and replaced by
         # the per-door keys under Split Keys

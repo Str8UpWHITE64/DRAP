@@ -503,7 +503,20 @@ class DRWorld(World):
         if self.options.split_keys:
             self.multiworld.push_precollected(self.create_item("Maintenance Tunnel Access Key"))
 
-    
+        # Start With Every Door Key: the keys this mode would otherwise put in
+        # the pool. After the Split Keys clamp, so Door Locks gets area keys.
+        # Door Randomizer without Door Locks already gave them all above.
+        self.start_key_names = set()
+        if self.options.start_with_all_keys:
+            keys = list(SPLIT_KEY_NAMES if self.options.split_keys else AREA_KEY_NAMES)
+            keys.append("Maintenance Tunnel Access Key")
+            given = {item.name for item in self.multiworld.precollected_items[self.player]}
+            for key_name in keys:
+                if key_name not in given:
+                    self.multiworld.push_precollected(self.create_item(key_name))
+            self.start_key_names = set(keys)
+
+
     # Locations whose id table is not the region they are reached in. The id
     # is positional within its table, so the row stays where it is and only
     # the region it is created in moves. Stickers 98 and 99 are photographed
@@ -889,7 +902,8 @@ class DRWorld(World):
         excluded_scoops = MAIN_SCOOP_NAMES if not self.main_scoops_enabled else ()
         foo = BuildItemPool(self.multiworld, itempoolSize, self.options,
                             excluded_scoop_names=excluded_scoops,
-                            door_locks_active=self.door_locks_active)
+                            door_locks_active=self.door_locks_active,
+                            start_key_names=self.start_key_names)
 
         for item in foo:
             itempool.append(self.create_item(item.name))
@@ -988,7 +1002,8 @@ class DRWorld(World):
         """
         # Security Room's stairs are never shuffled, so Rooftop Key is the
         # first gate under Door Locks too.
-        if not self.options.door_randomizer or self.door_locks_active:
+        if ((not self.options.door_randomizer or self.door_locks_active)
+                and "Rooftop Key" not in self.start_key_names):
             self.multiworld.early_items[self.player]["Rooftop Key"] = 1
 
         # scoop_order is empty for Savior+ScoopSanity (main scoops excluded).
