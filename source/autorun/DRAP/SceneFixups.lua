@@ -43,6 +43,44 @@ local AREA_S231 = 535   -- Rooftop (canonical "from-area" for the rescue cutscen
 -- the full retry budget. See scene_fixups.md.
 local get_escort_count
 
+-- The Security Room's door to Entrance Plaza (PREF_uOm114) reads "welded
+-- shut"; DRAP hides it. Returns true once it is hidden (or already was),
+-- false to keep waiting for the OmList.
+local function hide_sr_door()
+    local am = sdk.get_managed_singleton("app.solid.gamemastering.AreaManager")
+    if not am then return false end
+    local list
+    pcall(function() list = am:get_field("OmList") end)
+    if not list then return false end
+    local count
+    pcall(function() count = list:call("get_Count") end)
+    count = tonumber(count) or 0
+    if count == 0 then return false end
+
+    for i = 0, count - 1 do
+        local om
+        pcall(function() om = list:call("get_Item", i) end)
+        if om then
+            local td = om:get_type_definition()
+            local tname = (td and td:get_full_name()) or ""
+            if tname == "solid.MT2RE.uOm114" then
+                local go
+                pcall(function() go = om:call("get_GameObject") end)
+                if go then
+                    local shown = true
+                    pcall(function() shown = go:call("get_UpdateSelf") ~= false end)
+                    if not shown then return true end
+                    pcall(function() go:call("set_UpdateSelf", false) end)
+                    pcall(function() go:call("set_DrawSelf", false) end)
+                    log(string.format("s136: disabled uOm114 (OmList[%d])", i))
+                    return true
+                end
+            end
+        end
+    end
+    return false  -- keep waiting; OmList might not have populated yet
+end
+
 -- s136 (Security Room): disable the south-door barricade and, if the player
 -- arrived via an EP->s136 redirect with an escorted NPC, patch
 -- AreaManager.mAreaIndex/mOldAreaIndex so the rescue cutscene fires.
@@ -72,34 +110,19 @@ local function fixup_s136()
             AREA_S136, AREA_S231))
     end
 
-    -- Disable PREF_uOm114 barricade.
-    local list
-    pcall(function() list = am:get_field("OmList") end)
-    if not list then return false end
-    local count
-    pcall(function() count = list:call("get_Count") end)
-    count = tonumber(count) or 0
-    if count == 0 then return false end
+    return hide_sr_door()
+end
 
-    for i = 0, count - 1 do
-        local om
-        pcall(function() om = list:call("get_Item", i) end)
-        if om then
-            local td = om:get_type_definition()
-            local tname = (td and td:get_full_name()) or ""
-            if tname == "solid.MT2RE.uOm114" then
-                local go
-                pcall(function() go = om:call("get_GameObject") end)
-                if go then
-                    pcall(function() go:call("set_UpdateSelf", false) end)
-                    pcall(function() go:call("set_DrawSelf", false) end)
-                    log(string.format("s136: disabled uOm114 (OmList[%d])", i))
-                    return true
-                end
-            end
-        end
+-- Door-only re-run after a Security Room cutscene. A cutscene in the room
+-- builds a fresh door without a map load, so the load hook never sees it
+-- (harness SR-WELD-BASE: drawn again right after A Temporary Agreement's
+-- scene). The escort patch above belongs to arriving and must not run again.
+local function refix_s136_door()
+    local su = get_scoop_unlocker()
+    if not su or not su.is_ap_activated or not su.is_ap_activated() then
+        return true
     end
-    return false  -- keep waiting; OmList might not have populated yet
+    return hide_sr_door()
 end
 
 -- s100 (Entrance Plaza): when AP is active, register a DoorRandomizer
@@ -696,11 +719,35 @@ local function show_hideout_exit_toast()
     log("player reached the hideout exit -- told about the redirect")
 end
 
+-- A Security Room cutscene rebuilds the door without a map load. PlayerReady
+-- already polls for cutscenes and loads; when the player gets control back in
+-- s136, queue the door again. Only that edge costs a managed read.
+local SR_DOOR_PENDING = "SCN_s136 door"
+local sr_was_ready = false
+
+local function watch_sr_door()
+    local pr = package.loaded["DRAP/PlayerReady"]
+    if not (pr and pr.ready) then return end
+    local ready = pr.ready(0.5) == true
+    if ready and not sr_was_ready and not pending.SCN_s136 then
+        local am = sdk.get_managed_singleton("app.solid.gamemastering.AreaManager")
+        local path
+        pcall(function() path = am:get_field("CurrentLevelPath") end)
+        if tostring(path or "") == "SCN_s136" then
+            log("s136: control back in the Security Room -- checking the Entrance Plaza door")
+            pending[SR_DOOR_PENDING] = refix_s136_door
+            frames_waited[SR_DOOR_PENDING] = 0
+        end
+    end
+    sr_was_ready = ready
+end
+
 local function install_frame_cb()
     if frame_cb_installed then return end
     re.on_frame(function()
         check_ap_state_transition()
         show_hideout_exit_toast()
+        watch_sr_door()
         if next(pending) == nil then return end
         for scene, fn in pairs(pending) do
             frames_waited[scene] = (frames_waited[scene] or 0) + 1
