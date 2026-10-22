@@ -2,6 +2,7 @@
 -- Tracks app.solid.SolidStorage.SolidSave (mSaveWork) fields for challenge-style goals
 
 local Shared = require("DRAP/Shared")
+local VehicleKills = require("DRAP/trackers/VehicleKills")
 
 local M = Shared.create_module("ChallengeTracker")
 
@@ -45,17 +46,15 @@ local CHALLENGES = {
         targets = { 50, 100 },
         location_ids = { "Kill 50 zombies by hand", "Kill 100 zombies by hand" },
     },
-    zombieKilledVehicleTotal = {
+    vehicleKills = {
         label   = "Zombie Vehicle kills",
         targets = { 500, 1000 },
         location_ids = { "Kill 500 zombies by vehicle", "Kill 1000 zombies by vehicle" },
-        -- A lifetime total the game carries across every playthrough on the
-        -- save (44,820 on a measured save whose per-run count was 35), and
-        -- there is no per-run vehicle counter. Read against it directly,
-        -- both checks sent on the first read for anyone who had driven over
-        -- 1000 zombies before. Counted from a baseline taken at the start
-        -- of the seed instead.
-        baseline = true,
+        -- Not the save's zombieKilledVehicleTotal: that also counts the
+        -- bicycle and the skateboard, and is a lifetime total across every
+        -- playthrough on the save. VehicleKills counts cars and the
+        -- motorcycle only, per seed.
+        source = function() return VehicleKills.total() end,
     },
     changeClothNum = {
         label   = "Outfit changes",
@@ -321,7 +320,7 @@ local function ensure_challenge_fields(save_obj)
             challenge_state[field_name] = state
         end
 
-        if not state.field then
+        if not state.field and not def.source then
             state.resolve_tries = (state.resolve_tries or 0) + 1
             local f = save_td:get_field(field_name)
             if f then
@@ -336,11 +335,24 @@ local function ensure_challenge_fields(save_obj)
     return true
 end
 
-local function handle_challenge_progress(field_name, def, state, save_obj, ss)
-    if not state.field or not def.targets or #def.targets == 0 then return end
-
+--- The value a challenge is measured by: its own source when it has one,
+--- otherwise the save field.
+local function read_value(def, state, save_obj)
+    if def.source then
+        local ok, v = pcall(def.source)
+        return ok and tonumber(v) or nil
+    end
+    if not state.field then return nil end
     local ok_val, v = pcall(state.field.get_data, state.field, save_obj)
-    if not ok_val or type(v) ~= "number" then return end
+    if not ok_val or type(v) ~= "number" then return nil end
+    return v
+end
+
+local function handle_challenge_progress(field_name, def, state, save_obj, ss)
+    if not def.targets or #def.targets == 0 then return end
+
+    local v = read_value(def, state, save_obj)
+    if v == nil then return end
     if def.live_getter and ss then
         local ok_live, live = pcall(function() return ss:call(def.live_getter) end)
         live = ok_live and tonumber(live) or nil
@@ -471,9 +483,9 @@ local function dump_challenge(field_name)
         end
     end
     local cur = "?"
-    if state.field and save_obj then
-        local ok, v = pcall(state.field.get_data, state.field, save_obj)
-        if ok and type(v) == "number" then cur = tostring(v) end
+    if state.field or def.source then
+        local v = read_value(def, state, save_obj)
+        if v ~= nil then cur = tostring(v) end
     end
     local live = ""
     if def.live_getter and ss then
@@ -486,8 +498,9 @@ local function dump_challenge(field_name)
         live = live .. string.format(" baseline=%s",
             tostring(type(doc) == "table" and doc[field_name] or nil))
     end
-    M.log(string.format("[%s] field_resolved=%s save=%s%s last_value=%s",
-        field_name, tostring(state.field ~= nil), cur, live, tostring(state.last_value)))
+    M.log(string.format("[%s] field_resolved=%s %s=%s%s last_value=%s",
+        field_name, tostring(state.field ~= nil), def.source and "source" or "save",
+        cur, live, tostring(state.last_value)))
     if def.targets then
         for i, t in ipairs(def.targets) do
             local loc = (def.location_ids and def.location_ids[i]) or "?"
