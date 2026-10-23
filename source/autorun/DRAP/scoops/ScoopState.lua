@@ -266,6 +266,20 @@ function M.is_item_deferred(scoop_name)
     return poll_deferred[scoop_name] == "item"
 end
 
+--- The item a received scoop is held back for, or nil.
+---
+--- Only answers for a scoop that tried to unlock and stopped at its item
+--- requirement, so a scoop held for something else first (Meet Jessie, a
+--- running conflict) is not blamed on the item. nil again as soon as the item
+--- is in hand, even before the per-frame retry has unlocked the scoop.
+function M.deferred_item(scoop_name)
+    if poll_deferred[scoop_name] ~= "item" then return nil end
+    if M.received[scoop_name] then return nil end
+    local item = cfg.item_requirements[scoop_name]
+    if item and not cfg.has_item(item) then return item end
+    return nil
+end
+
 function M.get_poll_deferred()
     return poll_deferred
 end

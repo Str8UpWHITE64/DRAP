@@ -3022,7 +3022,11 @@ function M.draw_tab_content(debug)
 
     for _, s in ipairs(status_list) do
         local show = true
-        local is_deferred = s.ap_item_received and (s.conflict_blocked or s.main_blocked)
+        -- Held for an item (the Camera, under Camera Item): listed as
+        -- deferred like a scoop held by a running one, rather than missing.
+        local waiting_item = s.ap_item_received and State.deferred_item(s.name) or nil
+        local is_deferred = s.ap_item_received
+            and (s.conflict_blocked or s.main_blocked or waiting_item ~= nil)
         if filter_category ~= "All" and s.category ~= filter_category then show = false end
         if show_only_received and not s.received and not is_deferred then show = false end
         if hide_completed and s.completed then show = false end
@@ -3057,6 +3061,9 @@ function M.draw_tab_content(debug)
                 color = COLOR_READY
             elseif s.conflict_blocked then
                 status_str = " - deferred (" .. tostring(s.conflict_blocker) .. " active)"
+                color = COLOR_READY
+            elseif waiting_item then
+                status_str = " - deferred (waiting for " .. waiting_item .. ")"
                 color = COLOR_READY
             elseif s.received then
                 -- Unlocked and out in the world: go do it. A main in a chain
