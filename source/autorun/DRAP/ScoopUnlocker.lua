@@ -2598,7 +2598,10 @@ local kent_copies = 0
 --- Off, the Camera is not an item and nothing waits.
 function M.set_camera_item(on)
     local need = (on == true) and "Camera" or nil
+    -- Kent's first two days are photoshoots. Day 3 is a fight and needs no
+    -- Camera, so it can run before them.
     M.item_requirements["Cut from the Same Cloth"] = need
+    M.item_requirements["Photo Challenge"] = need
     M.item_requirements["Gun Shop Standoff"] = need
 end
 

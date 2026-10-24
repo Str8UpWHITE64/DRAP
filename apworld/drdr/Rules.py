@@ -258,9 +258,11 @@ REGION_LEVEL_VALUES = {
 # end up with, so a later set_rule cannot drop it.
 #
 # Meet Kent on day 2 is here because the 500 PP outtake is taken before Frank
-# talks to him. Without ScoopSanity his later days chain on these shoots
-# through CanReachLocation, so they follow on their own. Day 3 (Photographer's
-# Pride) is a fight and is taken to need no photo.
+# talks to him. Meet Kent on day 1 is here because under ScoopSanity his first
+# two days wait for the Camera before they start, like Gun Shop Standoff.
+# Without ScoopSanity his later days chain on these shoots through
+# CanReachLocation, so they follow on their own. Day 3 (Photographer's Pride)
+# is a fight and is taken to need no photo.
 CAMERA_ITEM = "Camera"
 CAMERA_LOCATIONS = frozenset(
     [f"Photograph PP Sticker {_n}" for _n in range(1, 101)]
@@ -274,6 +276,7 @@ CAMERA_LOCATIONS = frozenset(
         "Get 10000 PP in one photo",
         "Get 50 targets in one photo",
         "Photojournalist",
+        "Meet Kent on day 1",
         "Complete Kent's day 1 photoshoot",
         "Meet Kent on day 2",
         "Complete Kent's day 2 photoshoot",

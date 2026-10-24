@@ -722,7 +722,8 @@ class CameraItem(Toggle):
     Every check that needs a photo then needs the Camera: the PP Stickers and
     their milestones, the photo challenges and Kent's photoshoots. Without
     ScoopSanity, Kent's later days wait on his earlier shoots, so they need
-    it too.
+    it too. With ScoopSanity, Kent's first two days and Gun Shop Standoff
+    wait for the Camera before they start.
     """
     display_name = "Camera Item"
     default = False

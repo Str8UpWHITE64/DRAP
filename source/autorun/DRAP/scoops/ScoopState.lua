@@ -680,6 +680,14 @@ function M.poll_deferred_retries()
             if M.received[scoop_name] then poll_deferred[scoop_name] = nil end
         end
     end
+    -- In the order the multiworld granted them, so scoops waiting on the same
+    -- item start in the order they arrived (Kent's day 1 before day 2 when
+    -- the Camera comes).
+    table.sort(to_retry, function(a, b)
+        local sa, sb = ap_receipt_seq[a] or math.huge, ap_receipt_seq[b] or math.huge
+        if sa ~= sb then return sa < sb end
+        return a < b
+    end)
     for _, scoop_name in ipairs(to_retry) do
         cfg.log(string.format("Deferred condition met -- retrying '%s' activation", scoop_name))
         -- Chain scoops re-enter via the chain so ordering rules hold.
@@ -688,7 +696,13 @@ function M.poll_deferred_retries()
             poll_deferred[scoop_name] = nil
             M.try_advance_chain()
         else
-            M.request_unlock(scoop_name)
+            local _, why = M.request_unlock(scoop_name)
+            -- Held now by a running scoop of its conflict group or a running
+            -- main. Those ask again when they complete, so stop polling it
+            -- here: it would retry every frame.
+            if why == "conflict" or why == "main_block" then
+                poll_deferred[scoop_name] = nil
+            end
         end
     end
 end
