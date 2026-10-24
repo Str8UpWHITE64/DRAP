@@ -3257,39 +3257,51 @@ local function last_resort_fallback()
 end
 
 -- A psychopath's death normally comes with his scoop's FINISH/SUCCESS flags
--- (and some a TIMEOUT flag) in the same frame. Now and then the game sets
--- the death flag and skips the rest, and the psychopath stays standing at
--- zero health (Cliff 2026-09-29; Paul's double 2026-09-10). Across every
--- flag trace on record the rest never came at all in most of those. After a
--- short dwell, raise what the game should have. Pairs are measured from the
--- traces, not names. Kent is left to KentChain, and Sean to the cult
--- respawn, which clears his death and finish flags on purpose (CULT_OFF);
--- the main-scoop psychopaths get no finish flags at their deaths even in
--- vanilla.
--- `hide_body` is the EnemyKindID (Em47 = 0x47) of a body to take away after
--- a raise. Only Paul: he alone becomes a survivor after his defeat, and the
--- others' corpses are normal game behaviour.
+-- (and some a TIMEOUT flag) within a few milliseconds. The game only writes
+-- them for a scoop that holds one of its 20 SCQMove slots
+-- (SCQManager.startupQue), and with many scoops running at once every slot
+-- can be taken. Then the death flag goes on and the rest never comes, or
+-- comes minutes later when a slot frees up. Until then the scoop still reads
+-- as running, so each time the area's scoop scheduler runs (an area entry,
+-- or the end of an event, his own death scene included) it places him again,
+-- with the 0 HP saved at his death: he stands there dead. After a short wait,
+-- raise what the game should have. Pairs are measured from the traces, not
+-- names. Sean is left to the cult respawn, which clears his death and finish
+-- flags on purpose (CULT_OFF); the main-scoop psychopaths get no finish
+-- flags at their deaths even in vanilla.
+-- `wait` (seconds, default PSYCHO_FINISH_WAIT_SECONDS): Kent's and Cletus's
+-- death scenes can end, and the area place them again, about three seconds
+-- after the death, so their raise has to land well before that.
+-- `hide_body` is the EnemyKindID of a body to take away after a raise (see
+-- PSYCHO_FINISH.bodies).
 local PSYCHO_FINISH = {
     { die = 1293, flags = { 846, 2446, 1172 } },            -- Cliff
     { die = 1295, flags = { 848, 2448 } },                  -- Adam
     { die = 1296, flags = { 849, 2449 } },                  -- Jo
     { die = 1297, flags = { 850, 2450 }, hide_body = 0x47 },  -- Paul
-    { die = 1302, flags = { 874, 2474 } },                  -- Cletus
+    { die = 1302, flags = { 874, 2474 }, hide_body = 0x4F, wait = 0.5 },  -- Cletus
+    -- Kent on day 3 (his photoshoot form dies with 1290, which has no finish).
+    { die = 1292, flags = { 845, 2445, 1171 }, hide_body = 0x45, wait = 0.5 },
     { die = 453,  flags = { 872 } },                        -- the convicts, all three
 }
 local PSYCHO_FINISH_WAIT_SECONDS = 3.0
 local psycho_finish_missing_since = {}
 local psycho_finish_next_check = 0
 
--- Raising Paul's flags late does not take away his psycho body: the defeat
--- scene ends while the scoop still reads unfinished, the area puts him back
--- at his start spot at 0 HP, and he stands beside his survivor self until
--- the next area load (measured 2026-10-19). So after a raise, hide any
--- Em47 body at 0 HP for a while. Never one with health left, and survivor
--- Paul is an NPC, not an enemy, so he is never matched.
+-- A late raise does not take away a body the area has already placed again:
+-- it stands at 0 HP at his start spot until the next area load (Paul beside
+-- his survivor self, Kent beside his own corpse). So after a raise, hide any
+-- body of that kind at 0 HP for a while. Never one with health left, and
+-- survivor Paul is an NPC, not an enemy, so he is never matched.
+-- His dying body is also at 0 HP until his death scene ends and the area
+-- swaps it for the corpse on the floor. So nothing is hidden before that
+-- scene has come and gone, or, when no scene plays (a save loaded in that
+-- state), before HIDE_AFTER_SECONDS have passed since the death was seen.
 -- Kept on PSYCHO_FINISH (ipairs skips it), not a new local: this file's
 -- main chunk is at Lua's 200-local limit.
-PSYCHO_FINISH.bodies = { SWEEP_SECONDS = 120, sweep = {} }   -- sweep: kind -> until (os.clock)
+-- sweep: kind -> { expires = os.clock, since = os.clock the death was first
+-- seen, scene = a scene has played since the raise }
+PSYCHO_FINISH.bodies = { SWEEP_SECONDS = 120, HIDE_AFTER_SECONDS = 3.0, sweep = {} }
 
 function PSYCHO_FINISH.bodies.event_playing()
     local etm = sdk.get_managed_singleton("app.solid.gamemastering.EventTimelineManager")
@@ -3315,12 +3327,16 @@ end
 function PSYCHO_FINISH.bodies.hide(now)
     local sweep = PSYCHO_FINISH.bodies.sweep
     if not next(sweep) then return end
-    -- Not during a scene: the defeat scene itself may still be showing him.
-    if PSYCHO_FINISH.bodies.event_playing() then return end
+    -- Not during a scene: the death scene itself may still be showing him.
+    if PSYCHO_FINISH.bodies.event_playing() then
+        for _, s in pairs(sweep) do s.scene = true end
+        return
+    end
     for _, c in ipairs(PSYCHO_FINISH.bodies.scene_enemies()) do
         local kind = c and Shared.safe(function() return c:call("get_KindID") end)
         local kind_n = kind and tonumber(tostring(kind))
-        if kind_n and sweep[kind_n] then
+        local s = kind_n and sweep[kind_n]
+        if s and (s.scene or now - s.since >= PSYCHO_FINISH.bodies.HIDE_AFTER_SECONDS) then
             local hpc = Shared.safe(function() return c:call("get_HitPoint") end)
             local hp = hpc and Shared.safe(function()
                 return hpc:get_field("<CurrentHitPoint>k__BackingField") end)
@@ -3336,8 +3352,8 @@ function PSYCHO_FINISH.bodies.hide(now)
             end
         end
     end
-    for kind, until_t in pairs(sweep) do
-        if now >= until_t then sweep[kind] = nil end
+    for kind, s in pairs(sweep) do
+        if now >= s.expires then sweep[kind] = nil end
     end
 end
 
@@ -3357,8 +3373,9 @@ local function psycho_finish_fallback()
             psycho_finish_missing_since[row.die] = nil
         else
             -- A dwell, so the game's own finish always gets the first chance.
-            psycho_finish_missing_since[row.die] = psycho_finish_missing_since[row.die] or now
-            if now - psycho_finish_missing_since[row.die] >= PSYCHO_FINISH_WAIT_SECONDS then
+            local since = psycho_finish_missing_since[row.die] or now
+            psycho_finish_missing_since[row.die] = since
+            if now - since >= (row.wait or PSYCHO_FINISH_WAIT_SECONDS) then
                 psycho_finish_missing_since[row.die] = nil
                 M.log(string.format("psychopath death flag %d is on but the game never"
                     .. " finished its scoop -- raising %s", row.die,
@@ -3366,7 +3383,15 @@ local function psycho_finish_fallback()
                 for _, fid in ipairs(row.flags) do
                     if raw_check_flag(fid) == false then raw_set_flag_on(fid) end
                 end
-                if row.hide_body then PSYCHO_FINISH.bodies.sweep[row.hide_body] = now + PSYCHO_FINISH.bodies.SWEEP_SECONDS end
+                if row.hide_body then
+                    -- A repeat raise keeps the first sighting and any scene seen.
+                    local s = PSYCHO_FINISH.bodies.sweep[row.hide_body]
+                    if not s then
+                        s = { since = since, scene = false }
+                        PSYCHO_FINISH.bodies.sweep[row.hide_body] = s
+                    end
+                    s.expires = now + PSYCHO_FINISH.bodies.SWEEP_SECONDS
+                end
             end
         end
     end

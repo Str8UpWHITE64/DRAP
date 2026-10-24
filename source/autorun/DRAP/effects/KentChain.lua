@@ -1212,13 +1212,13 @@ function M.on_frame()
     -- record again mid-cutscene after the first clear. The clear itself is
     -- idempotent (only touches records with mBeflag set).
     --
-    -- ONLY when another Kent day is still to come. Day 3's set stays
-    -- satisfied after the kill (1292 on, 1155 cleared by the box top-up),
-    -- so the death record is the one thing keeping the engine from placing
-    -- day-3 Kent again on the next Paradise entry. With no later day
-    -- received, clearing it brought him back alive (field report
-    -- 2026-09-09). A day that arrives later gets the clear from its own
-    -- full arm.
+    -- ONLY when another Kent day is still to come. When the game skips day
+    -- 3's finish (845 off, no free SCQMove slot), the day still reads as
+    -- running and the scheduler places him again on every Paradise entry
+    -- until ScoopUnlocker's PSYCHO_FINISH raises it. A spawned Kent takes his
+    -- health from this record: kept, he comes back at 0 HP and that body is
+    -- hidden; cleared, he came back alive. A day that arrives later gets the
+    -- clear from its own full arm.
     if not death_edge_at then
         local su = unlocker()
         if su then
