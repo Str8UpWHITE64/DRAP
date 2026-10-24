@@ -3499,7 +3499,6 @@
       ],
       "completion_event": "Rescue Leah Stein",
       "disp_flag": 2524,
-      "disp_end_flag": 860,
       "guide": {
         "scq_no": 72,
         "pos_tbl": 15,
@@ -3519,7 +3518,6 @@
       ],
       "completion_event": "Rescue Leroy McKenna",
       "disp_flag": 2527,
-      "disp_end_flag": 863,
       "guide": {
         "scq_no": 75,
         "pos_tbl": 18,
@@ -3540,7 +3538,6 @@
       ],
       "completion_event": "Rescue Simone Ravendark",
       "disp_flag": 2529,
-      "disp_end_flag": 865,
       "guide": {
         "scq_no": 77,
         "pos_tbl": 20,
@@ -3560,7 +3557,6 @@
       ],
       "completion_event": "Rescue Floyd Sanders",
       "disp_flag": 2520,
-      "disp_end_flag": 856,
       "guide": {
         "scq_no": 68,
         "pos_tbl": 12,
@@ -3582,7 +3578,6 @@
       ],
       "completion_event": "Rescue Burt Thompson",
       "disp_flag": 2521,
-      "disp_end_flag": 857,
       "guide": {
         "scq_no": 69,
         "pos_tbl": 13,
@@ -3605,7 +3600,6 @@
       ],
       "completion_event": "Rescue Kindell Johnson",
       "disp_flag": 2537,
-      "disp_end_flag": 2489,
       "repurposed": true,
       "repurpose": {
         "placeholder": "Floyd the Sommelier",
@@ -3635,7 +3629,6 @@
       ],
       "completion_event": "Rescue Brett Styles",
       "disp_flag": 2540,
-      "disp_end_flag": 2492,
       "repurposed": true,
       "repurpose": {
         "placeholder": "Cheryl's Request",
@@ -3663,7 +3656,6 @@
       ],
       "completion_event": "Rescue Nick Evans",
       "disp_flag": 2538,
-      "disp_end_flag": 2490,
       "repurposed": true,
       "repurpose": {
         "placeholder": "Simone the Gunslinger",
@@ -3691,7 +3683,6 @@
       ],
       "completion_event": "Rescue Yuu Tanaka",
       "disp_flag": 2525,
-      "disp_end_flag": 861,
       "guide": {
         "scq_no": 73,
         "pos_tbl": 16,
@@ -3716,7 +3707,6 @@
       ],
       "completion_event": "Rescue Ross Folk",
       "disp_flag": 2528,
-      "disp_end_flag": 864,
       "guide": {
         "scq_no": 76,
         "pos_tbl": 19,
@@ -3739,7 +3729,6 @@
       ],
       "completion_event": "Rescue Ronald Shiner",
       "disp_flag": 2519,
-      "disp_end_flag": 855,
       "guide": {
         "scq_no": 67,
         "pos_tbl": 11,
@@ -3759,7 +3748,6 @@
       ],
       "completion_event": "Rescue David Bailey",
       "disp_flag": 2517,
-      "disp_end_flag": 853,
       "guide": {
         "scq_no": 65,
         "pos_tbl": 9,
@@ -3779,7 +3767,6 @@
       ],
       "completion_event": "Rescue Gordon Stalworth",
       "disp_flag": 2518,
-      "disp_end_flag": 854,
       "guide": {
         "scq_no": 66,
         "pos_tbl": 10,
@@ -3799,7 +3786,6 @@
       ],
       "completion_event": "Rescue Gil Jiminez",
       "disp_flag": 2534,
-      "disp_end_flag": 2470,
       "repurposed": true,
       "repurpose": {
         "placeholder": "Ronald's Appetite",
@@ -3825,7 +3811,6 @@
       ],
       "completion_event": "Rescue Susan Walsh",
       "disp_flag": 2539,
-      "disp_end_flag": 2491,
       "repurposed": true,
       "repurpose": {
         "placeholder": "Paul's Present",
@@ -3853,7 +3838,6 @@
       ],
       "completion_event": "Rescue Jolie Wu",
       "disp_flag": 2522,
-      "disp_end_flag": 858,
       "guide": {
         "scq_no": 70,
         "pos_tbl": 14,
@@ -3875,7 +3859,6 @@
       ],
       "completion_event": "Rescue Pamela Tompkins",
       "disp_flag": 2533,
-      "disp_end_flag": 2469,
       "repurposed": true,
       "repurpose": {
         "placeholder": "Kindell's Betrayal",

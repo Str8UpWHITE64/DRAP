@@ -13,6 +13,11 @@
 -- flag) are resolved deterministically by priority and LOGGED with both
 -- owners named -- once per unique conflict signature, not per tick.
 --
+-- An "off" claim on a flag ctx.never_off() names (an SCQ row's FINISH or
+-- SUCCESS, see ScoopFinish) is refused before it is counted: whatever
+-- the priority, no policy can take a finished scoop back. Refusals are
+-- logged once per flag and owner.
+--
 -- PURITY CONTRACT: no engine access. Reads/writes go through the
 -- injected io adapter { read(fid) -> true/false/nil,
 -- set(fid, on, shielded) }; logging through the injected log fn.
@@ -22,24 +27,33 @@ local M = {}
 
 -- Dedup state (per-process; reset via M.reset_log_dedup())
 local logged_conflict_sigs = {}
+local logged_refusal_sigs = {}
 local last_apply_sig = nil
 local last_shadow_sig = nil
 
 function M.reset_log_dedup()
     logged_conflict_sigs = {}
+    logged_refusal_sigs = {}
     last_apply_sig = nil
     last_shadow_sig = nil
 end
 
 -- Returns desired = { [flag_id] = { want = "on"/"off", owner, priority,
 -- unshielded } }, conflicts = list of { flag, winner, loser } where the
--- two disagreed on the value.
-function M.resolve(policies, ctx)
+-- two disagreed on the value. The "off" claims ctx.never_off turned away
+-- are appended to `refused` ({ flag, owner }) when the caller passes one.
+function M.resolve(policies, ctx, refused)
     local desired = {}
     local conflicts = {}
+    refused = refused or {}
+    local never_off = ctx and ctx.never_off
 
     for _, pol in ipairs(policies) do
         local function claim(flag_id, want)
+            if want == "off" and never_off and never_off(flag_id) then
+                table.insert(refused, { flag = flag_id, owner = pol.name })
+                return
+            end
             local cur = desired[flag_id]
             if not cur then
                 desired[flag_id] = {
@@ -81,6 +95,18 @@ function M.resolve(policies, ctx)
     return desired, conflicts
 end
 
+local function log_refusals(refused, log)
+    for _, r in ipairs(refused) do
+        local sig = string.format("%d:%s", r.flag, r.owner)
+        if not logged_refusal_sigs[sig] then
+            logged_refusal_sigs[sig] = true
+            log(string.format(
+                "REFUSED flag %d off (%s): a scoop's FINISH/SUCCESS flag is never cleared",
+                r.flag, r.owner))
+        end
+    end
+end
+
 local function log_conflicts(conflicts, log)
     for _, c in ipairs(conflicts) do
         local sig = string.format("%d:%s>%s", c.flag, c.winner.owner, c.loser.owner)
@@ -98,8 +124,10 @@ end
 -- One reconciliation pass. Returns stats: { claims, writes|mismatches,
 -- conflicts }.
 function M.tick(policies, ctx, io, mode, log)
-    local desired, conflicts = M.resolve(policies, ctx)
+    local refused = {}
+    local desired, conflicts = M.resolve(policies, ctx, refused)
     log_conflicts(conflicts, log)
+    log_refusals(refused, log)
 
     local n_claims = 0
     for _ in pairs(desired) do n_claims = n_claims + 1 end

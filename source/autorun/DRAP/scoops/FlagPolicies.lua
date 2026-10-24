@@ -429,6 +429,13 @@ function M.build(deps)
                         -- then closed through the TIMEOUT path -- FINISH and
                         -- NPC21_FIRST_TIMEOUT set together, SUCCESS never set,
                         -- "Scoop Chance Lost" on screen.
+                        -- A box whose end flag is the scoop's own FINISH or
+                        -- SUCCESS has no disp_end_flag here at all: holding
+                        -- that off made the game run the scoop again after its
+                        -- join, and it never finished a second time (the
+                        -- reconciler refuses such a claim anyway, see
+                        -- ScoopFinish). Those boxes close at the join, as in
+                        -- vanilla.
                         if data.disp_end_flag and not data.engine_owns_box then
                             claim(data.disp_end_flag, "off")
                         end
