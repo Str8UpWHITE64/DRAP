@@ -137,6 +137,34 @@ function M.set_deathlink_enabled(v)
     M.log("DeathLink enabled: " .. tostring(M.deathlink_enabled))
 end
 
+-- The name this slot goes by in the room, for the "source" of every link
+-- bounce. get_player_alias takes the slot NUMBER; given the slot name it
+-- raises. The second value says whether the name is really this slot's
+-- rather than the placeholder, which any client without a name shares.
+local FALLBACK_ALIAS = "DRDR Player"
+
+local function own_alias()
+    local c = AP_REF.APClient
+    if not c then return FALLBACK_ALIAS, false end
+    if c.get_player_number and c.get_player_alias then
+        local ok_n, n = pcall(c.get_player_number, c)
+        n = ok_n and math.tointeger(n) or nil
+        if n and n > 0 then
+            local ok_a, a = pcall(c.get_player_alias, c, n)
+            if ok_a and type(a) == "string" and a ~= "" and a ~= "Unknown" then
+                return Shared.clean_string(a), true
+            end
+        end
+    end
+    if c.get_slot then
+        local ok_s, s = pcall(c.get_slot, c)
+        if ok_s and type(s) == "string" and s ~= "" then
+            return Shared.clean_string(s), true
+        end
+    end
+    return FALLBACK_ALIAS, false
+end
+
 ------------------------------------------------------------
 -- DamageLink (protocol tag "SharedDamage")
 ------------------------------------------------------------
@@ -224,15 +252,7 @@ function M.send_shared_damage(points)
         if ok and t then now = math.floor(tonumber(t) or os.time()) end
     end
 
-    local my_alias = "DRDR Player"
-    if AP_REF.APClient.get_player_alias and AP_REF.APClient.get_slot then
-        local ok_slot, slot = pcall(AP_REF.APClient.get_slot, AP_REF.APClient)
-        if ok_slot and slot then
-            local ok_alias, alias = pcall(AP_REF.APClient.get_player_alias,
-                                          AP_REF.APClient, slot)
-            if ok_alias and alias then my_alias = Shared.clean_string(alias) end
-        end
-    end
+    local my_alias = own_alias()
 
     local payload = {
         time = now,
@@ -298,15 +318,7 @@ function M.send_knockback(x, y, z)
         if ok and t then now = math.floor(tonumber(t) or os.time()) end
     end
 
-    local my_alias = "DRDR Player"
-    if AP_REF.APClient.get_player_alias and AP_REF.APClient.get_slot then
-        local ok_slot, slot = pcall(AP_REF.APClient.get_slot, AP_REF.APClient)
-        if ok_slot and slot then
-            local ok_alias, alias = pcall(AP_REF.APClient.get_player_alias,
-                                          AP_REF.APClient, slot)
-            if ok_alias and alias then my_alias = Shared.clean_string(alias) end
-        end
-    end
+    local my_alias = own_alias()
 
     local payload = {
         time = now,
@@ -348,24 +360,15 @@ end
 
 function M.get_trap_link_tag() return TRAP_LINK_TAG end
 
-local function own_alias()
-    local alias = "DRDR Player"
-    if AP_REF.APClient and AP_REF.APClient.get_player_alias and AP_REF.APClient.get_slot then
-        local ok_slot, slot = pcall(AP_REF.APClient.get_slot, AP_REF.APClient)
-        if ok_slot and slot then
-            local ok_alias, a = pcall(AP_REF.APClient.get_player_alias,
-                                      AP_REF.APClient, slot)
-            if ok_alias and a then alias = Shared.clean_string(a) end
-        end
-    end
-    return alias
-end
-
 local function handle_trap_link(data)
     if not M.traplink_enabled then return end
     if damage_uuid and tostring(data["uuid"] or "") == damage_uuid then return end
+    -- A bounce under this slot's name is its own echo too, but only when the
+    -- name is really this slot's: the placeholder is shared by every client
+    -- that has none.
     local source = data["source"]
-    if source ~= nil and tostring(source) == own_alias() then return end
+    local me, known = own_alias()
+    if known and source ~= nil and tostring(source) == me then return end
 
     local name = data["trap_name"]
     if type(name) ~= "string" then return end
@@ -470,15 +473,7 @@ function M.send_deathlink(data)
         if ok and t then time_of_death = math.floor(tonumber(t) or os.time()) end
     end
 
-    local my_alias = "DRDR Player"
-    if AP_REF.APClient.get_player_alias and AP_REF.APClient.get_slot then
-        local ok_slot, slot = pcall(AP_REF.APClient.get_slot, AP_REF.APClient)
-        if ok_slot and slot then
-            local ok_alias, alias = pcall(AP_REF.APClient.get_player_alias, AP_REF.APClient, slot)
-            if ok_alias and alias then my_alias = Shared.clean_string(alias) end
-        end
-    end
-    my_alias = Shared.clean_string((data and data.source) or my_alias)
+    local my_alias = Shared.clean_string((data and data.source) or own_alias())
 
     local deathLinkData = {
         time = (data and data.time) or time_of_death,
