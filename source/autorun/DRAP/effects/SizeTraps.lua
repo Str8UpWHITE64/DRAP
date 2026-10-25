@@ -19,6 +19,19 @@
 -- scale. A startup guard also puts back a scale that is exactly one of ours
 -- with no trap active (a script reload mid-trap would otherwise leave Frank
 -- stuck).
+--
+-- Held weapons: a weapon in Frank's hand is a child of the player object
+-- (joint R_Weapon). The game sets its LocalScale when it goes into the hand
+-- so that its world size is its own size at Frank's scale of that moment:
+-- a weapon taken out while Frank is at 0.5 gets LocalScale 2.0, at 1.5 it
+-- gets 0.667. The game never rewrites it while the weapon stays in the hand,
+-- so once Frank is back to 1.0 that weapon is twice (or two thirds) its size.
+-- Putting it away or dropping it resets it. So the weapon in the hand is
+-- tracked with Frank's scale at the moment it went in, and on expiry its
+-- scale is corrected for Frank's restored size. With no trap running, a
+-- weapon in the hand whose LocalScale is exactly one of those leftovers is
+-- put back to 1 (covers a trap that ended without its restore: a reload or
+-- leaving play mid-trap).
 
 local Shared = require("DRAP/Shared")
 local TrapBank = require("DRAP/TrapBank")
@@ -28,6 +41,7 @@ local PlayerReady = require("DRAP/PlayerReady")
 local M = Shared.create_module("SizeTraps")
 
 local PM_TYPE = "app.solid.PlayerManager"
+local PSM_TYPE = "app.solid.PlayerStatusManager"
 
 local TINY, GIANT = "Tiny Trap", "Giant Trap"
 local _notify_trap = Shared.lazy_notify_trap()
@@ -39,6 +53,9 @@ local EPS = 0.001
 
 local active = nil      -- { name, scale, remaining }
 local base = nil        -- { x, y, z } before any trap
+local held = nil        -- { addr, ls = {x,y,z}, at } the weapon in hand and Frank's scale when it went in
+local GUARD_EVERY = 1.0
+local last_guard = 0
 local last_tick = nil
 local was_in_game = false
 
@@ -79,6 +96,85 @@ local function is_value(s, v)
     return s and math.abs(s.x - v) < EPS and math.abs(s.y - v) < EPS and math.abs(s.z - v) < EPS
 end
 
+local function same_scale(a, b)
+    return a and b and math.abs(a.x - b.x) < EPS and math.abs(a.y - b.y) < EPS and math.abs(a.z - b.z) < EPS
+end
+
+-- The LocalScale a weapon should have in the hand at Frank's scale `now`,
+-- given the LocalScale `ls` the game gave it when it went into the hand at
+-- Frank's scale `at`. The game keeps the weapon's world size at attach, so
+-- its own size is ls * at; under a parent at `now` that is ls * at / now.
+-- nil when nothing needs writing.
+function M.held_fix(ls, at, now)
+    if not (ls and at and now) or now == 0 or math.abs(at - now) < EPS then return nil end
+    local k = at / now
+    return { x = ls.x * k, y = ls.y * k, z = ls.z * k }
+end
+
+-- True for a LocalScale that can only be left over from a size trap: what
+-- the game gives a weapon of size 1 when it goes into the hand at one of
+-- the trap scales, seen with Frank at `now`.
+function M.is_leftover(ls, now)
+    if not (ls and now) then return false end
+    for _, v in pairs(SCALE) do
+        if math.abs(v - now) >= EPS and is_value(ls, now / v) then return true end
+    end
+    return false
+end
+
+-- The weapon in Frank's hand: its Transform, the object's address and its
+-- LocalScale. nil with nothing in the hand (a put-away weapon has no parent).
+local function held_weapon(player_tr)
+    if not player_tr then return nil end
+    local psm = sdk.get_managed_singleton(PSM_TYPE)
+    local inv = psm and Shared.safe(function() return psm:get_field("PlayerInventory") end)
+    local item = inv and Shared.safe(function() return inv:call("getFirstItem") end)
+    local go = item and Shared.safe(function() return item:call("get_GameObject") end)
+    local tr = go and Shared.safe(function() return go:call("get_Transform") end)
+    local parent = tr and Shared.safe(function() return tr:call("get_Parent") end)
+    if not parent then return nil end
+    local pa = Shared.safe(function() return parent:get_address() end)
+    if not pa or pa ~= Shared.safe(function() return player_tr:get_address() end) then return nil end
+    local ls = read_scale(tr)
+    if not ls then return nil end
+    return { tr = tr, addr = Shared.safe(function() return go:get_address() end), ls = ls }
+end
+
+-- Notes a weapon that has just gone into the hand, with Frank's scale now.
+local function track_held(player_tr)
+    local h = held_weapon(player_tr)
+    if not h then held = nil; return end
+    if held and held.addr == h.addr and same_scale(held.ls, h.ls) then return end
+    local cur = read_scale(player_tr)
+    if not cur then return end
+    held = { addr = h.addr, ls = h.ls, at = cur.x }
+end
+
+-- After Frank's scale went back to `now`: give the weapon in hand its own size.
+local function fix_held(player_tr, now)
+    local h = held_weapon(player_tr)
+    local rec = held
+    held = nil
+    if not (h and rec and rec.addr == h.addr and same_scale(rec.ls, h.ls)) then return end
+    local want = M.held_fix(h.ls, rec.at, now)
+    if want and write_scale(h.tr, want.x, want.y, want.z) then
+        M.log(string.format("held weapon scale %.3f -> %.3f", h.ls.x, want.x))
+    end
+end
+
+-- No trap running: put back a weapon left at a trap's compensating scale.
+local function guard_held()
+    local tr = player_transform()
+    local cur = read_scale(tr)
+    if not cur or is_ours(cur) then return end
+    local h = held_weapon(tr)
+    if h and M.is_leftover(h.ls, cur.x) then
+        if write_scale(h.tr, 1, 1, 1) then
+            M.log(string.format("guard: held weapon scale %.3f reset to 1", h.ls.x))
+        end
+    end
+end
+
 ------------------------------------------------------------
 -- Effect
 ------------------------------------------------------------
@@ -91,9 +187,10 @@ local function restore(why)
         if not cur or not is_value(cur, b.x) then
             write_scale(tr, b.x, b.y, b.z)
         end
+        fix_held(tr, b.x)
     end
     M.log(string.format("restored scale (%s)", why))
-    active, base = nil, nil
+    active, base, held = nil, nil, nil
 end
 
 local function fire(name)
@@ -107,6 +204,7 @@ local function fire(name)
         -- Never record one of our own sizes as the original.
         base = is_ours(cur) and { x = 1, y = 1, z = 1 } or cur
     end
+    track_held(tr)   -- before the write: a weapon already in hand went in at this scale
     if not write_scale(tr, s, s, s) then return false end
     local replaced = active and active.name ~= name
     active = { name = name, scale = s, remaining = DURATION }
@@ -121,7 +219,16 @@ local function tick()
     local dt = last_tick and (now - last_tick) or 0
     last_tick = now
 
-    if not active then return end
+    if not active then
+        if now - last_guard >= GUARD_EVERY then
+            last_guard = now
+            guard_held()
+        end
+        return
+    end
+    -- Followed even while not ready: a cutscene can reset Frank's scale, and
+    -- a weapon that goes into the hand then goes in at that scale.
+    track_held(player_transform())
     if not PlayerReady.ready() then return end   -- hold; clock paused
 
     active.remaining = active.remaining - dt
@@ -145,7 +252,7 @@ re.on_frame(function()
         if was_in_game and active then
             M.log("left play with " .. active.name .. " running -- dropped")
         end
-        active, base = nil, nil
+        active, base, held = nil, nil, nil
         was_in_game = false
         return
     end
