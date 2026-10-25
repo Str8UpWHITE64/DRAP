@@ -1450,7 +1450,9 @@ def set_rules(world) -> None:
     if not world.psycho_mode:
         world.set_rule(world.multiworld.get_location("Get 48 survivors to join", world.player), And(CanReachRegion("Paradise Plaza"), Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM"), Has("DAY3_11_AM"), CanReachLocation("Kill Kent on day 3"), CanReachLocation("Kill Cliff"), CanReachLocation("Kill Jo"), CanReachLocation("Kill Adam"), CanReachLocation("Kill Sean"), CanReachLocation("Kill Roger and Jack (and Thomas if you want) and chat with Wayne"), CanReachLocation("Defeat Paul"), (And(all_side_scoops_rule, ending_a_rule) if world.options.scoop_sanity else True_())))
         world.multiworld.get_location("Get 48 survivors to join", world.player).progress_type = LocationProgressType.EXCLUDED
-    world.set_rule(world.multiworld.get_location("Encounter 10 survivors", world.player), And(CanReachRegion("Paradise Plaza"), Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM"), Has("DAY3_11_AM"), CanReachLocation("Kill Kent on day 3"), CanReachLocation("Kill Cliff"), CanReachLocation("Kill Jo"), CanReachLocation("Kill Adam"), CanReachLocation("Kill Sean"), CanReachLocation("Kill Roger and Jack (and Thomas if you want) and chat with Wayne"), CanReachLocation("Defeat Paul")))
+    # Under ScoopSanity it is set with the rescue ladder below instead.
+    if not world.options.scoop_sanity:
+        world.set_rule(world.multiworld.get_location("Encounter 10 survivors", world.player), And(CanReachRegion("Paradise Plaza"), Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM"), Has("DAY3_11_AM"), CanReachLocation("Kill Kent on day 3"), CanReachLocation("Kill Cliff"), CanReachLocation("Kill Jo"), CanReachLocation("Kill Adam"), CanReachLocation("Kill Sean"), CanReachLocation("Kill Roger and Jack (and Thomas if you want) and chat with Wayne"), CanReachLocation("Defeat Paul")))
     world.set_rule(world.multiworld.get_location("Encounter 50 survivors", world.player), And(CanReachRegion("Paradise Plaza"), Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM"), Has("DAY3_11_AM"), CanReachLocation("Kill Kent on day 3"), CanReachLocation("Kill Cliff"), CanReachLocation("Kill Jo"), CanReachLocation("Kill Adam"), CanReachLocation("Kill Sean"), CanReachLocation("Kill Roger and Jack (and Thomas if you want) and chat with Wayne"), CanReachLocation("Defeat Paul"), (And(all_side_scoops_rule, ending_a_rule) if world.options.scoop_sanity else True_())))
     world.multiworld.get_location("Encounter 50 survivors", world.player).progress_type = LocationProgressType.EXCLUDED
     # The rescue ladder, or the kill ladder in its place. Only one of the two
@@ -1463,6 +1465,10 @@ def set_rules(world) -> None:
                 world.multiworld.get_location("Kill {} survivors".format(_n),
                                               world.player),
                 AtLeast(_n, *_kill_locs))
+        # Every target is met before it is killed.
+        if world.options.scoop_sanity:
+            world.set_rule(world.multiworld.get_location("Encounter 10 survivors", world.player),
+                           AtLeast(10, *_kill_locs))
     else:
         # Paul is not rescuable in Spitter Only, so he cannot count toward
         # a milestone either.
@@ -1475,6 +1481,12 @@ def set_rules(world) -> None:
                 world.multiworld.get_location("Rescue {} survivors".format(_n),
                                               world.player),
                 AtLeast(_n, *_rescue_locs))
+        # Under ScoopSanity each survivor is armed by their own scoop, so ten
+        # can be met long before the story is done. Every rescue is an
+        # encounter first.
+        if world.options.scoop_sanity:
+            world.set_rule(world.multiworld.get_location("Encounter 10 survivors", world.player),
+                           AtLeast(10, *_rescue_locs))
 
     # Challenge locations default to sphere 0 via the blanket rule above.
     # Falling far enough is awkward to arrange at the start, so this one is
