@@ -957,7 +957,9 @@ def set_rules(world) -> None:
             world.set_rule(world.multiworld.get_location("Bomb Collector - Wonderland Plaza Truck", world.player), And(CanReachLocation("Meet back at the Security Room at 11am day 3"), CanReachRegion("Maintenance Tunnel")))
             world.set_rule(world.multiworld.get_location("Bomb Collector - Seon's Food and Stuff Truck", world.player), And(CanReachLocation("Meet back at the Security Room at 11am day 3"), CanReachRegion("Maintenance Tunnel")))
 
-            world.set_rule(world.multiworld.get_location("Beat Drivin Carlito", world.player), And(CanReachLocation("Complete Bomb Collector"), CanReachRegion("Maintenance Tunnel")))
+            # He drives the tunnel from the 11am meeting on, and the mod keeps him
+            # there after the case until he is beaten (Overtime excepted).
+            world.set_rule(world.multiworld.get_location("Beat Drivin Carlito", world.player), And(CanReachLocation("Meet back at the Security Room at 11am day 3"), CanReachRegion("Maintenance Tunnel")))
 
             world.set_rule(world.multiworld.get_location("Meet back at the Security Room at 5pm day 3", world.player), Or(CanReachLocation("Complete Bomb Collector"), CanReachLocation("Beat Drivin Carlito")))
 
@@ -965,9 +967,6 @@ def set_rules(world) -> None:
                           And(CanReachLocation("Meet back at the Security Room at 5pm day 3"),
                               CanReachRegion("Carlito's Hideout"),
                               And(Has("Paradise Plaza - Warehouse Key"), Has("Leisure Park - Paradise Plaza Key"), Has("Leisure Park - North Plaza Key"), Has("Carlito's Hideout - North Plaza Key")) if world.options.split_keys else True_()))
-
-        if world.options.scoop_sanity:
-            world.multiworld.get_location("Beat Drivin Carlito", world.player).progress_type = LocationProgressType.EXCLUDED
 
         world.set_rule(world.multiworld.get_location("Complete Jessie's Discovery", world.player), CanReachLocation("Escort Isabela to Carlito's Hideout and have a chat"))
 

@@ -281,10 +281,11 @@ local CASCADE_FLAGS = {
     -- Santa Cabeza
     [295]  = "Santa Cabeza",
 
-    -- The Last Resort
+    -- The Last Resort. Not 1284 (Drivin' Carlito's death): his tunnel layout
+    -- needs it off, so clearing it would let him stand up again at the
+    -- health his save backup kept (0). See DRAP/effects/CarlitoStay.
     [296]  = "The Last Resort",
     [422]  = "The Last Resort",
-    [1284] = "The Last Resort",
     [297]  = "The Last Resort",
     [443]  = "The Last Resort",
     [298]  = "The Last Resort",

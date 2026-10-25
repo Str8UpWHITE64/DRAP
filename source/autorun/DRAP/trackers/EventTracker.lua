@@ -163,6 +163,11 @@ local TRACKED_EVENT_FLAGS = {
     -- 316 by hand fires the completion, walking the event never does.
     [316]  = 'Frank sees a sick-ass RC Drone',
 
+    -- EV_CARLITO3_DIE, written by Drivin' Carlito's own death action. His
+    -- death scene (event 38) also needs 296, which is off once The Last
+    -- Resort is over, and DRAP/effects/CarlitoStay brings him back after it.
+    [1284] = 'Beat Drivin Carlito',
+
     -- SET_FLOW680, the one marker the Generator sets whichever way it
     -- was obtained. Its pickup flags only fire when taken off the floor,
     -- never when the crashed-helicopter cutscene hands it over.

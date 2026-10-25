@@ -33,11 +33,13 @@ This is a known bug in 1.1 and is being investigated. If the AP client shows you
 2) Stop the program, restart it, and connect to the AP
 3) Start a new save file and have it continue over the existing file, similar to the despawning bug issue.
 
-## Why Is "Kill Driving Carlito"/"Rescue Simone Ravendark" Listed As A Blacklisted Check In UT?
-
-"Kill Driving Carlito" is only available during The Last Resort. It is missable. If you are playing ScoopSanity, it is automatically blacklisted, contains a filler item, and can be ignored.
+## Why Is "Rescue Simone Ravendark" Listed As A Blacklisted Check In UT?
 
 Due to technical issues in 1.1, "Rescue Simone Ravendark" is blacklisted in all game modes. This check contains a filler item instead.
+
+## Drivin' Carlito After The Last Resort
+
+"Beat Drivin Carlito" is a normal check. If you finish The Last Resort without beating him, he is back in the Maintenance Tunnel the next time you go in, until you beat him. Once the ending is reached (Overtime included) he is gone for good.
 
 ## I Grabbed The Maintenance Tunnel Access Key In The Maintenance Tunnel But I Still Logically Can't Access Another Area
 

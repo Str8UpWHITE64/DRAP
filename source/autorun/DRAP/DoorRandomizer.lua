@@ -322,6 +322,18 @@ local function ensure_area_jump_method()
     return true
 end
 
+-- Called from the areaJump pre-hook with (destination scene code, area index
+-- being left), after redirects are applied and before the new area loads.
+-- Inside the hook: a listener may only record; game calls belong on a frame.
+local jump_listeners = {}
+
+function M.add_jump_listener(fn)
+    for _, f in ipairs(jump_listeners) do
+        if f == fn then return end
+    end
+    jump_listeners[#jump_listeners + 1] = fn
+end
+
 local function install_hook()
     if hook_installed then return true end
     if hook_install_attempted then return false end
@@ -423,6 +435,15 @@ local function install_hook()
                         angle = final_angle,
                         was_redirected = final_was_redirected,
                     }
+
+                    -- Listeners that need to know where a door leads before the
+                    -- area loads. They run inside this hook, so they must stay
+                    -- plain Lua: record what they need and act on a frame.
+                    local dest_code = tostring(final_area_jump_name):gsub("^SCN_", "")
+                    for _, fn in ipairs(jump_listeners) do
+                        local ok, err = pcall(fn, dest_code, area_index)
+                        if not ok then M.log("jump listener failed: " .. tostring(err)) end
+                    end
 
                     local vanilla_area_no_old = area_index
                     local vanilla_area_no = area_jump_name_to_area_no(original_dest)
