@@ -969,8 +969,6 @@ def set_rules(world) -> None:
         if world.options.scoop_sanity:
             world.multiworld.get_location("Beat Drivin Carlito", world.player).progress_type = LocationProgressType.EXCLUDED
 
-            _survivor_location(world, "Rescue Greg Simpson").progress_type = LocationProgressType.EXCLUDED
-
         world.set_rule(world.multiworld.get_location("Complete Jessie's Discovery", world.player), CanReachLocation("Escort Isabela to Carlito's Hideout and have a chat"))
 
         world.set_rule(world.multiworld.get_location("Meet Larry", world.player), And(CanReachLocation("Complete Jessie's Discovery"), CanReachRegion("Meat Processing Area")))
@@ -1158,10 +1156,11 @@ def set_rules(world) -> None:
     world.set_rule(_survivor_location(world, "Rescue Floyd Sanders"), And(ep_shutter, (Has("Antique Lover") if world.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM")))))
 
     # Survivors in Wonderland Plaza
-    # Greg is the one Wonderland survivor with extra logic: he opens the
-    # passage. Under Split Keys the door has its own key, and without it he
-    # will not join -- reaching both areas by another route is not enough.
-    world.set_rule(_survivor_location(world, "Rescue Greg Simpson"), And(CanReachRegion("Wonderland Plaza"), CanReachRegion("Paradise Plaza"), (Has("Out of Control") if world.options.scoop_sanity else True_()), (Has("Paradise Plaza - Wonderland Plaza Key") if world.options.split_keys else True_())))
+    # Greg is the one Wonderland survivor with extra logic: he only appears
+    # once Adam is beaten, and he opens the passage. Under Split Keys the door
+    # has its own key, and without it he will not join -- reaching both areas
+    # by another route is not enough.
+    world.set_rule(_survivor_location(world, "Rescue Greg Simpson"), And(CanReachRegion("Wonderland Plaza"), CanReachRegion("Paradise Plaza"), CanReachLocation("Kill Adam"), (Has("Paradise Plaza - Wonderland Plaza Key") if world.options.split_keys else True_())))
     world.set_rule(_survivor_location(world, "Rescue Yuu Tanaka"), And(CanReachRegion("Wonderland Plaza"), (Has("Book [Japanese Conversation]") if world.options.restricted_item_mode else True_()), (Has("Japanese Tourists") if world.options.scoop_sanity else True_())))
     world.set_rule(_survivor_location(world, "Rescue Shinji Kitano"), And(CanReachRegion("Wonderland Plaza"), (Has("Book [Japanese Conversation]") if world.options.restricted_item_mode else True_()), (Has("Japanese Tourists") if world.options.scoop_sanity else True_())))
     world.set_rule(_survivor_location(world, "Rescue Tonya Waters"), And(CanReachRegion("Wonderland Plaza"), (Has("Lovers") if world.options.scoop_sanity else Has("DAY2_06_AM"))))
