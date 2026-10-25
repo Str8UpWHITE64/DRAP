@@ -788,7 +788,7 @@ location_tables = {
         DRLocationData("Change into 46 new outfits", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Encounter 10 survivors", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Encounter 50 survivors", "Milk", DRLocationCategory.CHALLENGE),
-        DRLocationData("Get 50 survivors to join", "Milk", DRLocationCategory.CHALLENGE),
+        DRLocationData("Get 48 survivors to join", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Kill 1000 zombies", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Kill 2000 zombies", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Kill 5000 zombies", "Milk", DRLocationCategory.CHALLENGE),

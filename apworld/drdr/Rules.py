@@ -1198,22 +1198,6 @@ def set_rules(world) -> None:
     world.set_rule(_survivor_location(world, "Rescue Ray Mathison"), And(CanReachRegion("Colby's Movieland"), (Has("A Strange Group") if world.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM"), CanReachLocation("Kill Sean")))))
     world.set_rule(_survivor_location(world, "Rescue Cheryl Jones"), And(CanReachRegion("Colby's Movieland"), (Has("A Strange Group") if world.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM"), CanReachLocation("Kill Sean")))))
 
-    # These survivor-count milestones are gated behind nearly every
-    # late-game scoop, so they only become reachable once most of the
-    # progression chain is already solved -- a poor place for progression
-    # or useful items, since they'd effectively be locked behind the rest
-    # of the run. Mark them filler-only.
-    for _name in (
-        "Get 50 survivors to join",
-        "Encounter 10 survivors",
-        "Encounter 50 survivors",
-    ):
-        # "Get 50 survivors to join" does not exist under Psycho -- nobody
-        # joins a psychopath -- so ask rather than assume.
-        if _name in world.PSYCHO_EXCLUDED_LOCATIONS and world.psycho_mode:
-            continue
-        world.multiworld.get_location(_name, world.player).progress_type = LocationProgressType.EXCLUDED
-
     # Each higher count also needs the one below it, so 2000 is never in logic
     # before 1000.
     # With Restricted Items or Car Keys the Tunnel alone is not enough to kill a
@@ -1460,12 +1444,17 @@ def set_rules(world) -> None:
     all_side_scoops = [_s for _s in SURVIVOR_SCOOP_NAMES + PSYCHOPATH_SCOOP_NAMES
                        if _s not in KENT_DAYS]
     all_side_scoops_rule = And(HasAll(*all_side_scoops), Has(PROGRESSIVE_KENT, len(KENT_DAYS)))
-    # Needs survivors alive and willing to follow, which Psycho does
-    # not allow. create_region drops these, so do not rule them either.
+    # The survivor-count milestones need nearly every late-game scoop. The
+    # two big ones are kept to filler, since they only open once most of the
+    # run is solved.
+    # Joining needs survivors alive and willing to follow, which Psycho does
+    # not allow. create_region drops that one, so do not rule it either.
     if not world.psycho_mode:
-        world.set_rule(world.multiworld.get_location("Get 50 survivors to join", world.player), And(CanReachRegion("Paradise Plaza"), Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM"), Has("DAY3_11_AM"), CanReachLocation("Kill Kent on day 3"), CanReachLocation("Kill Cliff"), CanReachLocation("Kill Jo"), CanReachLocation("Kill Adam"), CanReachLocation("Kill Sean"), CanReachLocation("Kill Roger and Jack (and Thomas if you want) and chat with Wayne"), CanReachLocation("Defeat Paul"), (And(all_side_scoops_rule, ending_a_rule) if world.options.scoop_sanity else True_())))
+        world.set_rule(world.multiworld.get_location("Get 48 survivors to join", world.player), And(CanReachRegion("Paradise Plaza"), Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM"), Has("DAY3_11_AM"), CanReachLocation("Kill Kent on day 3"), CanReachLocation("Kill Cliff"), CanReachLocation("Kill Jo"), CanReachLocation("Kill Adam"), CanReachLocation("Kill Sean"), CanReachLocation("Kill Roger and Jack (and Thomas if you want) and chat with Wayne"), CanReachLocation("Defeat Paul"), (And(all_side_scoops_rule, ending_a_rule) if world.options.scoop_sanity else True_())))
+        world.multiworld.get_location("Get 48 survivors to join", world.player).progress_type = LocationProgressType.EXCLUDED
     world.set_rule(world.multiworld.get_location("Encounter 10 survivors", world.player), And(CanReachRegion("Paradise Plaza"), Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM"), Has("DAY3_11_AM"), CanReachLocation("Kill Kent on day 3"), CanReachLocation("Kill Cliff"), CanReachLocation("Kill Jo"), CanReachLocation("Kill Adam"), CanReachLocation("Kill Sean"), CanReachLocation("Kill Roger and Jack (and Thomas if you want) and chat with Wayne"), CanReachLocation("Defeat Paul")))
     world.set_rule(world.multiworld.get_location("Encounter 50 survivors", world.player), And(CanReachRegion("Paradise Plaza"), Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM"), Has("DAY3_11_AM"), CanReachLocation("Kill Kent on day 3"), CanReachLocation("Kill Cliff"), CanReachLocation("Kill Jo"), CanReachLocation("Kill Adam"), CanReachLocation("Kill Sean"), CanReachLocation("Kill Roger and Jack (and Thomas if you want) and chat with Wayne"), CanReachLocation("Defeat Paul"), (And(all_side_scoops_rule, ending_a_rule) if world.options.scoop_sanity else True_())))
+    world.multiworld.get_location("Encounter 50 survivors", world.player).progress_type = LocationProgressType.EXCLUDED
     # The rescue ladder, or the kill ladder in its place. Only one of the two
     # sets of locations exists in a seed, and both count to the same numbers.
     if world.psycho_mode:

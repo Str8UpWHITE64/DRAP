@@ -68,8 +68,8 @@ local CHALLENGES = {
     },
     NpcJoinCount = {
         label   = "Survivors joined (ever)",
-        targets = { 50 },
-        location_ids = { "Get 50 survivors to join" },
+        targets = { 48 },
+        location_ids = { "Get 48 survivors to join" },
     },
     zombieKill_1Play = {
         label   = "Zombies killed",
