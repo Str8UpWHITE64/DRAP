@@ -13,6 +13,11 @@
 -- which is the vanilla state for a survivor who fell behind at a door.
 --
 -- It holds (declines, stays banked) while:
+--   * Frank is on the way to Ending S: Isabela's departure scene has played
+--     (flag 151, EV_EVENT56) or he is in the Clock Tower Tunnel (sb00-sb04).
+--     The tunnel has no door back in, so a jump out of it strands the run
+--     short of Ending S. Read straight from the game rather than from the
+--     Overtime state, so it holds even if that state is late or wrong;
 --   * PlayerReady says no (loading, door, cutscene, vehicle, settling);
 --   * Jessie has not been met, or the flag cannot be read -- before her the
 --     Security Room is reached by cutscene only;
@@ -40,6 +45,12 @@ local HOME_POS = { x = 153.19, y = 9.32, z = 216.92 }
 local HOME_ANGLE = { x = 0.0, y = 0.93, z = 0.0 }
 
 local LIVE_STATE_ESCORT = 8
+
+-- EV_EVENT56: the Overtime scene in which Frank leaves Isabela's hideout with
+-- her for the tunnel. The event table puts him in sb00 straight after it.
+local FLAG_TUNNEL_DEPARTURE = 151
+
+local EFM_TYPE = "app.solid.gamemastering.EventFlagsManager"
 
 local NPC_MGR_TYPE = "app.solid.gamemastering.NpcManager"
 local AM_TYPE = "app.solid.gamemastering.AreaManager"
@@ -81,6 +92,20 @@ local function current_scene()
     local am = sdk.get_managed_singleton(AM_TYPE)
     local p = am and Shared.safe(function() return am:get_field("CurrentLevelPath") end)
     return p and tostring(p) or nil
+end
+
+local function flag_on(id)
+    local efm = sdk.get_managed_singleton(EFM_TYPE)
+    if not efm then return false end
+    return Shared.safe(function() return efm:call("evFlagCheck", id) end) == true
+end
+
+--- On the Ending S route: the departure scene has played, or Frank is
+--- standing in one of the Clock Tower Tunnel scenes.
+local function ending_s_route()
+    local scene = current_scene()
+    if scene and scene:find("sb0%d") then return true end
+    return flag_on(FLAG_TUNNEL_DEPARTURE)
 end
 
 --- A loaded NPC whose record is ESCORT. searchNpc answers a live controller
@@ -129,6 +154,7 @@ end
 --- Why it cannot fire right now, or nil when it can.
 function M.blocked_by()
     if not Shared.is_in_game() then return "not in game" end
+    if ending_s_route() then return "on the way to Ending S (Clock Tower Tunnel)" end
     if not PlayerReady.ready() then return "player not ready (" .. tostring(PlayerReady.blocked_by()) .. ")" end
     if not met_jessie() then return "Jessie not met yet" end
     if in_overtime() then return "Overtime" end
