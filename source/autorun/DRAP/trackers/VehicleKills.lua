@@ -38,8 +38,8 @@ local LEDGER_SECTION = "vehicle_kills"
 
 -- Writes to the ledger: at most this often while kills are coming in.
 local SAVE_EVERY_S = 5
--- Vehicle kills are logged in one line per this many seconds.
-local LOG_EVERY_S = 2
+-- Counted vehicle kills are summed into one log line per this many seconds.
+local LOG_EVERY_S = 60
 -- A cached ride older than this is not trusted (the frame loop stopped:
 -- a load, the title screen, no slot).
 local STALE_S = 1.0
@@ -74,6 +74,7 @@ local install_tries = 0
 
 local pending = 0           -- credited kills not yet in the ledger
 local seen = {}             -- ride name -> addZombieVehicleKillNum calls since the last log line
+local noted = {}            -- uncounted ride names already logged once this session
 local last_save = 0
 local last_log = 0
 local session = { counted = 0, skipped = 0 }
@@ -206,13 +207,21 @@ end
 
 local function log_seen()
     if next(seen) == nil then return end
+    -- Counted kills are always summed; an uncounted ride (on foot, a
+    -- skateboard, the bicycle) is named once a session, so routine kills
+    -- don't fill the log. drap_vehicle_kills() still shows every count.
     local parts = {}
     for name, n in pairs(seen) do
-        parts[#parts + 1] = string.format("%s x%d (%s)", name, n,
-            M.counts(name ~= "unknown" and name or nil) and "counted" or "not counted")
+        if M.counts(name ~= "unknown" and name or nil) then
+            parts[#parts + 1] = string.format("%s x%d (counted)", name, n)
+        elseif not noted[name] then
+            noted[name] = true
+            parts[#parts + 1] = string.format("%s x%d (not counted)", name, n)
+        end
     end
-    table.sort(parts)
     seen = {}
+    if #parts == 0 then return end
+    table.sort(parts)
     M.log(string.format("vehicle kill: %s; car and motorcycle kills this seed: %s",
         table.concat(parts, ", "), tostring(M.total())))
 end
