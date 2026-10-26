@@ -1502,9 +1502,23 @@ def set_rules(world) -> None:
                                Or(Has("Novelty Mask (Bear)"), Has("Novelty Mask (Servbot)"), Has("Novelty Mask (Horse)"))))
                         if world.options.restricted_item_mode
                         else Or(CanReachRegion("Entrance Plaza"), CanReachRegion("Paradise Plaza"))))
+    # The bullet counts also want the player out in the mall with Jessie met.
+    # A gun item alone used to put both in logic from the Rooftop, which left
+    # nothing to do there but shoot at the sky for minutes on end.
     if "Fire 30 bullets" not in _dropped:
-        world.set_rule(world.multiworld.get_location("Fire 30 bullets", world.player), Or(CanReachLocation("Fire 300 bullets"), And(Has("Handgun"), Or(CanReachRegion("North Plaza"), CanReachRegion("Wonderland Plaza"), CanReachRegion("Paradise Plaza"), CanReachRegion("Al Fresca Plaza"))) if world.options.restricted_item_mode else Or(CanReachRegion("North Plaza"), CanReachRegion("Wonderland Plaza"), CanReachRegion("Paradise Plaza"), CanReachRegion("Al Fresca Plaza"))))
-        world.set_rule(world.multiworld.get_location("Fire 300 bullets", world.player), (And(CanReachRegion("North Plaza"), Or(*[Has(g) for g in (("Handgun", "Shotgun", "Sniper Rifle") if world.options.door_randomizer else ("Handgun", "Submachine Gun", "Shotgun", "Sniper Rifle"))])) if world.options.restricted_item_mode else Or(CanReachRegion("North Plaza"), And(Or(*[Has(g) for g in ("Handgun", "Submachine Gun", "Shotgun", "Sniper Rifle", "Heavy Machinegun", "Machinegun")]), CanReachRegion("Rooftop")))))
+        _bullets_open = And(CanReachLocation("Meet Jessie in the Warehouse"),
+                            Or(CanReachRegion("Paradise Plaza"), CanReachRegion("Entrance Plaza")))
+        world.set_rule(world.multiworld.get_location("Fire 30 bullets", world.player),
+                       And(_bullets_open,
+                           Or(CanReachLocation("Fire 300 bullets"),
+                              And(Has("Handgun"), Or(CanReachRegion("North Plaza"), CanReachRegion("Wonderland Plaza"), CanReachRegion("Paradise Plaza"), CanReachRegion("Al Fresca Plaza")))
+                              if world.options.restricted_item_mode
+                              else Or(CanReachRegion("North Plaza"), CanReachRegion("Wonderland Plaza"), CanReachRegion("Paradise Plaza"), CanReachRegion("Al Fresca Plaza")))))
+        world.set_rule(world.multiworld.get_location("Fire 300 bullets", world.player),
+                       And(_bullets_open,
+                           And(CanReachRegion("North Plaza"), Or(*[Has(g) for g in (("Handgun", "Shotgun", "Sniper Rifle") if world.options.door_randomizer else ("Handgun", "Submachine Gun", "Shotgun", "Sniper Rifle"))]))
+                           if world.options.restricted_item_mode
+                           else Or(CanReachRegion("North Plaza"), Or(*[Has(g) for g in ("Handgun", "Submachine Gun", "Shotgun", "Sniper Rifle", "Heavy Machinegun", "Machinegun")]))))
     # "Ride zombies for 50 feet" requires Zombie Ride only when that
     # skill is actually in the AP item pool. BuildItemPool adds skills
     # only when enable_skill_items is on AND vanilla_progression is
