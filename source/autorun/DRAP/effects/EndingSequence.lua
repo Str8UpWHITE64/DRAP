@@ -28,9 +28,10 @@
 -- BACKLOG for why set_mdate is not an option -- mDate is derived and the write
 -- evaporates.
 --
--- VICTORY GOES OUT AFTER THE ENDING, not when the goal is met. Flag 147
--- (EV_EVS25B) is Ending B and is confirmed not to be set by Ending A, so it
--- is a safe signal that this ending in particular has played.
+-- VICTORY GOES OUT AFTER THE ENDING, not when the goal is met. The jump asks
+-- for Ending B, but the game picks the ending from the save's own state, so
+-- the goal goes out on any of the four 72 hour endings (EV_EVS25A-D), or when
+-- the results screen opens after the jump if none of those flags is on.
 
 local Shared = require("DRAP/Shared")
 
@@ -93,6 +94,16 @@ local FLAG_SF_EXCLUDE = 311
 
 -- EV_EVS25B. Set when Ending B plays, and confirmed NOT set by Ending A.
 local FLAG_ENDING_B = 147
+
+-- The four 72 hour endings, EV_EVS25A-D. The results screen's own table
+-- (GR_Result_UD clearBonusTbl) lists these four as one ending type with the
+-- same clear bonus. Any of them coming on means the run has ended.
+local ENDING_FLAGS = {
+    373,  -- EV_EVS25A  Ending A
+    FLAG_ENDING_B,  -- EV_EVS25B  Ending B
+    148,  -- EV_EVS25C  Ending C
+    149,  -- EV_EVS25D  Ending D
+}
 
 -- EV_EVS13, set when the Special Forces capture begins -- watched during the
 -- capture trace. It is what confirms the Psycho ending; 147 never arrives for
@@ -184,11 +195,17 @@ local pending_goal_location = nil
 local pending_manual = false      -- replay: the goal check is already sent
 local deferred_request = nil       -- request_ending made before the ledger loaded
 local arm_ending
--- Which ending the pending goal wants, and the flag that says it has played.
+-- Which ending the pending goal wants, and the flags that say it has played.
 local pending_ending = "b"
-local pending_done_flag = FLAG_ENDING_B
+local pending_done_flags = ENDING_FLAGS
 -- Set once the jump has been made, so it is not made twice.
 local jumped = false
+-- Set by the results screen hook once the jump has been made. The results
+-- screen only opens once an ending has finished, so it is the fallback signal
+-- when no ending flag reads on.
+local results_shown = false
+-- The last area the ending watch logged, so each scene change is logged once.
+local watch_area = nil
 -- When the player was first seen in the Security Room, for the settle wait.
 local in_room_since = nil
 -- Psycho runs as a small sequence: which stage, and its deadline.
@@ -404,7 +421,7 @@ local function advance_psycho()
             psycho_stage = nil
             psycho_at = nil
             pending_ending = "b"
-            pending_done_flag = FLAG_ENDING_B
+            pending_done_flags = ENDING_FLAGS
             M.jump_to_ending_b()
             return
         end
@@ -551,10 +568,12 @@ arm_ending = function(goal_location, opts, manual)
     pending_goal_location = goal_location
     pending_manual = manual == true
     pending_ending = opts.ending or "b"
-    pending_done_flag = (pending_ending == "psycho")
-        and FLAG_PSYCHO_CAPTURE or FLAG_ENDING_B
+    pending_done_flags = (pending_ending == "psycho")
+        and { FLAG_PSYCHO_CAPTURE } or ENDING_FLAGS
     jumped = false
     in_room_since = nil
+    results_shown = false
+    watch_area = nil
     if opts.clear_mall then pcall(M.clear_the_mall) end
     M.log(string.format(
         "goal reached -- head to the Security Room and the run will finish"
@@ -578,7 +597,15 @@ function M.is_jumping()
     return (pending_goal_location ~= nil and jumped) or psycho_stage ~= nil
 end
 
-local function send_pending_goal()
+--- The first of the pending goal's done flags that is on, or nil.
+local function done_flag_on()
+    for _, id in ipairs(pending_done_flags) do
+        if flag_is_on(id) == true then return id end
+    end
+    return nil
+end
+
+local function send_pending_goal(flag)
     local name = pending_goal_location
     pending_goal_location = nil
     if not name then return end
@@ -587,7 +614,8 @@ local function send_pending_goal()
         M.log("ending played -- goal already sent, not re-sending " .. name)
         return
     end
-    M.log(string.format("ending played -- sending %s", name))
+    M.log(string.format("ending played (flag %s) -- sending %s",
+        tostring(flag), name))
     if AP and AP.AP_BRIDGE and AP.AP_BRIDGE.check then
         AP.AP_BRIDGE.check(name)
     end
@@ -631,12 +659,20 @@ function M.on_frame()
     if os.clock() - in_room_since < SETTLE_SECONDS then return end
 
     jumped = true
+    results_shown = false
     -- Manual replay: clear the leftover done flag so the watcher sees this
     -- ending set it, not the win that came before. Game flag only; the goal
     -- and ledger are untouched.
     if pending_manual then
-        flag_off(pending_done_flag)
-        M.log("manual ending: cleared done flag " .. tostring(pending_done_flag))
+        local cleared = {}
+        for _, id in ipairs(pending_done_flags) do
+            if flag_is_on(id) == true then
+                flag_off(id)
+                table.insert(cleared, tostring(id))
+            end
+        end
+        M.log("manual ending: cleared done flag "
+            .. (#cleared > 0 and table.concat(cleared, ", ") or "(none on)"))
     end
     if pending_ending == "psycho" then
         M.jump_to_ending_psycho()
@@ -652,9 +688,11 @@ function M.reset()
     deferred_request = nil
     jessie_wait_logged = false
     pending_ending = "b"
-    pending_done_flag = FLAG_ENDING_B
+    pending_done_flags = ENDING_FLAGS
     jumped = false
     in_room_since = nil
+    results_shown = false
+    watch_area = nil
 end
 
 ------------------------------------------------------------
@@ -666,10 +704,10 @@ _G.drap_ending_b = function() M.jump_to_ending_b() end
 
 _G.drap_ending_status = function()
     M.log(string.format(
-        "pending=%s jumped=%s area=%s (security room is %d) flag %d=%s",
+        "pending=%s jumped=%s area=%s (security room is %d) ending flags on=%s",
         tostring(pending_goal_location), tostring(jumped),
         tostring(current_area()), SECURITY_ROOM_AREA,
-        FLAG_ENDING_B, tostring(flag_is_on(FLAG_ENDING_B))))
+        tostring(done_flag_on())))
 end
 
 --- Test the Psycho ending without a Psycho seed.
@@ -690,15 +728,61 @@ end
 -- runs to a game-over screen and then the menu. Waiting for the confirming
 -- flag there would mean the goal check never goes out and the player never
 -- wins, having done everything right.
+--- One line per scene change while an ending is under way: which area, and
+--- which ending flags read on. Cheap, and the only record of how far an ending
+--- got when it does not finish.
+local function log_watch()
+    local area = current_area()
+    if area == nil or area == watch_area then return end
+    watch_area = area
+    local on = {}
+    for _, id in ipairs(ENDING_FLAGS) do
+        if flag_is_on(id) == true then table.insert(on, tostring(id)) end
+    end
+    M.log(string.format("ending watch: area %d, ending flags on: %s",
+        area, #on > 0 and table.concat(on, ", ") or "none"))
+end
+
 re.on_frame(function()
     if not pending_goal_location then return end
     -- A manual replay starts with the done flag possibly already on (a won
     -- save keeps it); only count it once this replay has jumped.
     if pending_manual and not jumped then return end
-    if flag_is_on(pending_done_flag) == true then
-        send_pending_goal()
+    if jumped then pcall(log_watch) end
+    local flag = done_flag_on()
+    if flag then
+        send_pending_goal(flag)
+        return
+    end
+    -- The Psycho sequence has its own capture flag and is not finished by a
+    -- results screen alone.
+    if jumped and results_shown and pending_ending ~= "psycho" then
+        send_pending_goal("none, results screen")
     end
 end)
+
+-- The results screen after an ending. The hooks only record that it opened;
+-- the goal itself is sent from the frame loop above. open and openForNormal
+-- each have their own native address (not folded with other methods), so
+-- hooking them touches nothing else.
+do
+    local td = sdk.find_type_definition and sdk.find_type_definition("app.solid.gui.ResultUI")
+    local hooked = 0
+    for _, name in ipairs({ "open", "openForNormal" }) do
+        local m = td and td:get_method(name)
+        if m then
+            local ok, err = pcall(sdk.hook, m, function()
+                if jumped and pending_goal_location then results_shown = true end
+            end, function(retval) return retval end)
+            if ok then
+                hooked = hooked + 1
+            else
+                M.log("results screen hook on " .. name .. " failed: " .. tostring(err))
+            end
+        end
+    end
+    if hooked == 0 then M.log("results screen hook: ResultUI not found") end
+end
 
 re.on_frame(function()
     if not psycho_stage then return end
