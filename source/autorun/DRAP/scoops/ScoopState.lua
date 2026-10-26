@@ -467,6 +467,9 @@ function M.activate_main_scoop(scoop_name)
     end
     cfg.log(string.format("Starting '%s' by player choice", scoop_name))
     M.request_unlock(scoop_name)
+    -- Saved now, not at the next completion: a restart before then would
+    -- otherwise forget which mission is running.
+    cfg.on_state_changed()
     return true, nil
 end
 
@@ -987,6 +990,21 @@ function M.serialize()
     local order = {}
     for i, name in ipairs(M.scoop_order) do order[i] = name end
 
+    -- Any Order: the main scoop the player started. Nothing else brings it
+    -- back after the game restarts, so without it the running mission reads
+    -- as "ready to start" again and its flags are held off. A chain run
+    -- re-derives its current scoop from the order instead.
+    local running_list = {}
+    if cfg.any_order then
+        for name in pairs(M.received) do
+            local data = cfg.scoop_data[name]
+            if data and data.category == "Main" and not M.completed[name] then
+                table.insert(running_list, name)
+            end
+        end
+        table.sort(running_list)
+    end
+
     return {
         version = 2,
         ap_activated = ap_activated,
@@ -995,6 +1013,7 @@ function M.serialize()
         scoop_order = order,
         completed_scoops = completed_list,
         ap_received = ap_received_list,
+        running_mains = running_list,
     }
 end
 
@@ -1036,6 +1055,19 @@ function M.restore(data)
             M.ap_received[name] = true
         end
         cfg.log(string.format("Restored %d AP received scoops", #data.ap_received))
+    end
+
+    -- After completed and ap_received, so a main finished or never held is
+    -- not brought back as running.
+    if data.running_mains then
+        for _, name in ipairs(data.running_mains) do
+            local scoop = cfg.scoop_data[name]
+            if scoop and scoop.category == "Main" and not M.completed[name]
+                and M.ap_received[name] then
+                M.received[name] = true
+                cfg.log(string.format("Restored running main scoop '%s'", name))
+            end
+        end
     end
 
     return true
