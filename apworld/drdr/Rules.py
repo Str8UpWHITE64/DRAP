@@ -957,8 +957,10 @@ def set_rules(world) -> None:
             world.set_rule(world.multiworld.get_location("Bomb Collector - Wonderland Plaza Truck", world.player), And(CanReachLocation("Meet back at the Security Room at 11am day 3"), CanReachRegion("Maintenance Tunnel")))
             world.set_rule(world.multiworld.get_location("Bomb Collector - Seon's Food and Stuff Truck", world.player), And(CanReachLocation("Meet back at the Security Room at 11am day 3"), CanReachRegion("Maintenance Tunnel")))
 
-            # He drives the tunnel from the 11am meeting on, and the mod keeps him
-            # there after the case until he is beaten (Overtime excepted).
+            # He drives the tunnel from the 11am meeting until the case ends, as
+            # in the vanilla game. Without ScoopSanity the mod leaves him alone,
+            # so he can be missed: the location is excluded (no progression).
+            world.multiworld.get_location("Beat Drivin Carlito", world.player).progress_type = LocationProgressType.EXCLUDED
             world.set_rule(world.multiworld.get_location("Beat Drivin Carlito", world.player), And(CanReachLocation("Meet back at the Security Room at 11am day 3"), CanReachRegion("Maintenance Tunnel")))
 
             world.set_rule(world.multiworld.get_location("Meet back at the Security Room at 5pm day 3", world.player), Or(CanReachLocation("Complete Bomb Collector"), CanReachLocation("Beat Drivin Carlito")))

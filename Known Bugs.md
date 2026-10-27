@@ -39,7 +39,9 @@ Due to technical issues in 1.1, "Rescue Simone Ravendark" is blacklisted in all 
 
 ## Drivin' Carlito After The Last Resort
 
-"Beat Drivin Carlito" is a normal check. If you finish The Last Resort without beating him, he is back in the Maintenance Tunnel the next time you go in, until you beat him. Once the ending is reached (Overtime included) he is gone for good.
+With ScoopSanity on, "Beat Drivin Carlito" is a normal check. If you finish The Last Resort without beating him, he is back in the Maintenance Tunnel the next time you go in, until you beat him, also after Save and Start Over or loading an older save. Once the ending is reached (Overtime included) he is gone for good.
+
+With ScoopSanity off, Drivin' Carlito works as in the normal game: he is only in the tunnel during The Last Resort. "Beat Drivin Carlito" is an excluded location there, so it never holds anything important, and it is still sent if you do beat him.
 
 ## I Grabbed The Maintenance Tunnel Access Key In The Maintenance Tunnel But I Still Logically Can't Access Another Area
 

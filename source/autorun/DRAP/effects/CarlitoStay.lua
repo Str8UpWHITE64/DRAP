@@ -11,8 +11,15 @@
 -- the case is over. His save backup keeps the health he had, so a Carlito
 -- left alive comes back at full health.
 --
+-- ScoopSanity only. Without it Drivin' Carlito is left exactly as the game
+-- has him (gone once the case is over) and "Beat Drivin Carlito" is an
+-- excluded location, so nothing here runs.
+--
 -- What this module does: on a door or warp into the tunnel, when
---   * The Last Resort has finished (839 EV_SCQ_FINISH07 on),
+--   * ScoopSanity is on,
+--   * he has been in reach in this slot: The Last Resort has finished in this
+--     world (839 EV_SCQ_FINISH07 on), or DRAP remembers the 11am meeting or
+--     the case being done from any world,
 --   * he is not dead (1284 off) and the check has not been sent,
 --   * the ending has not been reached (no Overtime, 312 off, flow under 1000),
 -- the game flow is set to 320 before the tunnel loads, and the flow it had is
@@ -23,6 +30,15 @@
 -- the hook. The flow it
 -- replaced is kept in the location ledger, so a reload inside the tunnel
 -- still gives it back on leaving.
+--
+-- Why not 839 alone: Save and Start Over, or loading a save from before the
+-- case, gives a world where 839 is off and his layout is gone again, while
+-- the check is still unsent. A completed main is not handed out again after
+-- a Start Over, so the case never replays; ScoopFinish's repair of the case
+-- row does raise 839 again (measured 2026-10-26), but only once it runs.
+-- The ledger (Complete Bomb Collector) and ScoopState's completed mains are
+-- per slot and outlive both, so he is brought back whenever the case was
+-- done once.
 --
 -- The check itself comes from 1284 (EventTracker's flag table): after the case
 -- his death scene does not play, because it also waits on 296, which the case
@@ -40,6 +56,9 @@ local CARLITO_DEAD_FLAG = 1284        -- EV_CARLITO3_DIE
 local ENDING_FLAG = 312
 local OVERTIME_FLOW = 1000            -- Overtime and later flows run from here up
 local CHECK_NAME = "Beat Drivin Carlito"
+local MEETING_CHECK = "Meet back at the Security Room at 11am day 3"
+local CASE_CHECK = "Complete Bomb Collector"
+local CASE_SCOOP = "The Last Resort"
 local SECTION = "carlito_stay"
 local LEAVE_GRACE_S = 60              -- an entry that never lands is undone after this
 
@@ -47,13 +66,22 @@ local LEAVE_GRACE_S = 60              -- an entry that never lands is undone aft
 -- Pure rules (tested without the game)
 ------------------------------------------------------------
 
+--- Whether he has been in reach in this slot: the case finished in this
+--- world, or the ledger / ScoopState remember the meeting or the case from
+--- any world (a Start Over or an older save keeps those).
+function M.was_reached(s)
+    return s.case_done == true or s.meeting_seen == true or s.case_seen == true
+end
+
 --- Whether entering the tunnel now should bring him back.
---- s: { active, case_done, dead, check_sent, endgame, ending_flag, flow }
+--- s: { active, scoop_sanity, case_done, meeting_seen, case_seen, dead,
+---      check_sent, endgame, ending_flag, flow }
 --- Returns ok, reason.
 function M.should_hold(s)
     if not s.active then return false, "no slot connected" end
+    if s.scoop_sanity ~= true then return false, "ScoopSanity off" end
     if s.endgame or s.ending_flag then return false, "ending reached" end
-    if not s.case_done then return false, "The Last Resort not finished" end
+    if not M.was_reached(s) then return false, "11am meeting and The Last Resort not reached" end
     if s.dead then return false, "already beaten" end
     if s.check_sent then return false, "check already sent" end
     if type(s.flow) ~= "number" then return false, "game flow unreadable" end
@@ -108,6 +136,14 @@ end
 local function ledger() return package.loaded["DRAP/LocationLedger"] end
 local function state() return package.loaded["DRAP/scoops/ScoopState"] end
 local function activation() return package.loaded["DRAP/Activation"] end
+local function unlocker() return package.loaded["DRAP/ScoopUnlocker"] end
+
+local function scoop_sanity_on()
+    local U = unlocker()
+    if not (U and U.is_scoop_sanity_enabled) then return false end
+    local ok, on = pcall(U.is_scoop_sanity_enabled)
+    return ok and on == true
+end
 
 local record = nil          -- { old = flow } while the tunnel is held at 320
 local entering_at = nil     -- os.clock() of the jump that set it
@@ -130,11 +166,17 @@ end
 
 local function snapshot()
     local A, S, L = activation(), state(), ledger()
+    local ledger_ok = L ~= nil and L.is_init ~= nil and L.is_init()
+    local function sent(name) return ledger_ok and L.is_checked(name) == true end
     return {
         active = A ~= nil and A.is_active ~= nil and A.is_active() == true,
+        scoop_sanity = scoop_sanity_on(),
         case_done = flag(CASE_FINISH_FLAG),
+        meeting_seen = sent(MEETING_CHECK),
+        case_seen = sent(CASE_CHECK)
+            or (S ~= nil and S.is_completed ~= nil and S.is_completed(CASE_SCOOP) == true),
         dead = flag(CARLITO_DEAD_FLAG),
-        check_sent = L ~= nil and L.is_init ~= nil and L.is_init() and L.is_checked(CHECK_NAME) == true,
+        check_sent = sent(CHECK_NAME),
         endgame = S ~= nil and S.is_endgame_reached ~= nil and S.is_endgame_reached() == true,
         ending_flag = flag(ENDING_FLAG),
         flow = get_flow(),
