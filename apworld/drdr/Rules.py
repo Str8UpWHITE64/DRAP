@@ -231,14 +231,18 @@ def _kill_weapon_rule(region):
 
 
 # Determines the value of the region towards levels
-# The point for the first tier past the Security Room belongs to the Warehouse,
-# not the Rooftop. Both are reached at the same moment, but the Warehouse has
-# zombies to level on and the Rooftop has none -- so logic used to consider
-# levels 7-9 reachable from a roof with nothing to kill. Under Psycho, where
-# the 10,000 PP rooftop photo is gone as well, that left the early spheres
-# short of any PP at all.
+# The Security Room is worth nothing. It is open right after the intro, and
+# the only PP before the Rooftop Key is the opening's, so a point there put
+# levels 2-6 in logic for a player who would have to replay the intro to
+# get them. The first point is the Rooftop's: the 10,000 PP sticker photo
+# and Jeff and Natalie pay for that tier (under Psycho, killing them does).
+# The second belongs to the Warehouse, not the Rooftop. Both are reached at
+# the same moment, but the Warehouse has zombies to level on and the Rooftop
+# has none -- so logic used to consider levels 7-9 reachable from a roof with
+# nothing to kill. Under Psycho, where the 10,000 PP rooftop photo is gone as
+# well, that left the early spheres short of any PP at all.
 REGION_LEVEL_VALUES = {
-    "Security Room": 1,
+    "Rooftop": 1,
     "Warehouse": 1,
     "Paradise Plaza": 3,
     "Entrance Plaza": 2,
