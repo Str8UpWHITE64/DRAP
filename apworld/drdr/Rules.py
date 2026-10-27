@@ -253,6 +253,39 @@ REGION_LEVEL_VALUES = {
     "Colby's Movieland": 1,
 }
 
+# Region points each "Reach Level N" needs: (first level, last level, points).
+LEVEL_POINT_TIERS = (
+    (2, 6, 1), (7, 9, 2), (10, 11, 4), (12, 12, 5), (13, 15, 7), (16, 18, 10),
+    (19, 21, 13), (22, 25, 17), (26, 30, 22), (31, 40, 23), (41, 50, 25),
+)
+LEVEL_POINTS = {level: points for first, last, points in LEVEL_POINT_TIERS
+                for level in range(first, last + 1)}
+
+# Total PP to reach each level, 1-50: PlayerLvUpUserData.PlayerLevelScoreData,
+# read from the game (entry i is the PP for level i + 1).
+LEVEL_PP = (
+    0, 5000, 10000, 15000, 20000, 30000, 40000, 50000, 60000, 70000,
+    100000, 130000, 160000, 190000, 220000, 280000, 340000, 400000, 460000, 520000,
+    610000, 700000, 790000, 880000, 970000, 1090000, 1210000, 1330000, 1450000, 1570000,
+    1710000, 1850000, 1990000, 2130000, 2270000, 2430000, 2590000, 2750000, 2910000, 3070000,
+    3250000, 3430000, 3610000, 3790000, 3970000, 4170000, 4370000, 4570000, 4770000, 5000000,
+)
+
+
+def _no_camera_points(level):
+    """Camera Item, before the Camera: photos are most of the PP, so assume
+    about half. Level N then needs what the first level worth twice its PP
+    normally needs, or level 50's when that is past the cap. Never less
+    than one point over the normal rule -- the 10,000 PP rooftop photo that
+    pays for the opening levels is a photo too."""
+    total = sum(REGION_LEVEL_VALUES.values())
+    doubled = next((LEVEL_POINTS[up] for up in range(level, 51)
+                    if LEVEL_PP[up - 1] >= 2 * LEVEL_PP[level - 1]), LEVEL_POINTS[50])
+    return min(total, max(doubled, LEVEL_POINTS[level] + 1))
+
+
+LEVEL_POINTS_NO_CAMERA = {level: _no_camera_points(level) for level in LEVEL_POINTS}
+
 # Camera Item: the shutter is locked until the Camera arrives, so every check
 # that takes a photo needs it. DRWorld.set_rule adds it to whatever rule these
 # end up with, so a later set_rule cannot drop it.
@@ -713,62 +746,17 @@ def set_rules(world) -> None:
     # --------------------------------------------------------------------
     # Level-up checks
     # --------------------------------------------------------------------
-    # Region-Based Levels
-    #
-    # The Security Room's point is the PP the opening hands over without a
-    # fight, which is the 10,000 PP rooftop photo of Jeff and Natalie. With
-    # the Camera shuffled that photo waits on the item, so the point only
-    # counts once the Camera is in hand. The Security Room is always
-    # reachable, so without the Camera it is the same count one higher.
-    def _level_points(count):
+    # Region-Based Levels. The Camera Item's half-PP table is LEVEL_POINTS_NO_CAMERA.
+    def _level_points(level):
+        count = LEVEL_POINTS[level]
         if not world.options.camera_item:
             return RegionPointsAtLeast(count)
         return Or(And(Has(CAMERA_ITEM), RegionPointsAtLeast(count)),
-                  RegionPointsAtLeast(count + REGION_LEVEL_VALUES["Security Room"]))
+                  RegionPointsAtLeast(LEVEL_POINTS_NO_CAMERA[level]))
 
-    for level in range(2, 7):      # Levels 2-6
+    for level in range(2, 51):
         world.set_rule(world.multiworld.get_location(f"Reach Level {level}", world.player),
-                      _level_points(1))
-
-    for level in range(7, 10):     # Levels 7-9
-        world.set_rule(world.multiworld.get_location(f"Reach Level {level}", world.player),
-                      _level_points(2))
-
-    for level in range(10, 12):    # Levels 10-11
-        world.set_rule(world.multiworld.get_location(f"Reach Level {level}", world.player),
-                      _level_points(4))
-
-    for level in range(12, 13):    # Levels 12
-        world.set_rule(world.multiworld.get_location(f"Reach Level {level}", world.player),
-                      _level_points(5))
-
-    for level in range(13, 16):    # Levels 13-15
-        world.set_rule(world.multiworld.get_location(f"Reach Level {level}", world.player),
-                      _level_points(7))
-
-    for level in range(16, 19):    # Levels 16-18
-        world.set_rule(world.multiworld.get_location(f"Reach Level {level}", world.player),
-                      _level_points(10))
-
-    for level in range(19, 22):    # Levels 19-21
-        world.set_rule(world.multiworld.get_location(f"Reach Level {level}", world.player),
-                      _level_points(13))
-
-    for level in range(22, 26):    # Levels 22-25
-        world.set_rule(world.multiworld.get_location(f"Reach Level {level}", world.player),
-                      _level_points(17))
-
-    for level in range(26, 31):    # Levels 26-30
-        world.set_rule(world.multiworld.get_location(f"Reach Level {level}", world.player),
-                      _level_points(22))
-
-    for level in range(31, 41):    # Levels 31-40
-        world.set_rule(world.multiworld.get_location(f"Reach Level {level}", world.player),
-                      _level_points(23))
-
-    for level in range(41, 51):    # Levels 41-50
-        world.set_rule(world.multiworld.get_location(f"Reach Level {level}", world.player),
-                      _level_points(25))
+                      _level_points(level))
 
     # Zombie kill checks. They sit in their own region, so every one needs its
     # rule spelled out -- see the note in Locations.py.
