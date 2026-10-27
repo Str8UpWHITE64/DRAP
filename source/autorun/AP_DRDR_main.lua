@@ -130,6 +130,7 @@ AP.effects.SaviorGoalEffects          = require("DRAP/effects/SaviorGoalEffects"
 AP.effects.EndingSequence             = require("DRAP/effects/EndingSequence")
 AP.effects.EscortVoice                = require("DRAP/effects/EscortVoice")
 AP.effects.PsychoGoalEffects          = require("DRAP/effects/PsychoGoalEffects")
+AP.effects.PsychoKillPP               = require("DRAP/effects/PsychoKillPP")
 AP.effects.PsychoHostility            = require("DRAP/effects/PsychoHostility")
 AP.effects.BookSkills                 = require("DRAP/effects/BookSkills")
 AP.effects.BookGuards                 = require("DRAP/effects/BookGuards")
@@ -273,6 +274,10 @@ AP.NpcTracker.on_survivor_killed_by_player = function(npc_id, friendly_name)
     end
     log(string.format("Survivor killed: %s", tostring(friendly_name)))
     AP_BRIDGE.check(string.format("Kill %s", friendly_name))
+    -- Nobody can be rescued under Psycho, so the kill pays the rescue PP.
+    if AP.effects.PsychoKillPP then
+        pcall(AP.effects.PsychoKillPP.on_survivor_killed, npc_id, friendly_name)
+    end
     if AP.effects.PsychoGoalEffects then
         AP.effects.PsychoGoalEffects.on_survivor_killed(friendly_name)
     end
