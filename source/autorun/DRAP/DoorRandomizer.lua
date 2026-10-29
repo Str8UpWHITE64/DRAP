@@ -266,6 +266,12 @@ local function dismount_vehicle()
     end
 end
 
+local function player_in_vehicle()
+    local pm = sdk.get_managed_singleton("app.solid.PlayerManager")
+    local v = pm and Shared.safe(function() return pm:get_field("<VehicleType>k__BackingField") end)
+    return v ~= nil and Shared.to_int(v) ~= 0
+end
+
 ------------------------------------------------------------
 -- Hook Installation
 ------------------------------------------------------------
@@ -828,6 +834,14 @@ end
 function M.warp_to(area_name, pos, angle, label, opts)
     if not ensure_area_jump_method() then return false end
     opts = opts or {}
+
+    -- The HIT_DATA made below has no vehicle list, and areaJump looks the
+    -- ride up in it: a warp while driving took the game down. A list could
+    -- not be made from Lua, so the warp waits until the player gets out.
+    if player_in_vehicle() then
+        M.log("Cannot warp while in a vehicle -- get out first")
+        return false
+    end
 
     -- Bring the party. A warp skips the engine's door path, so
     -- checkCarryOverNpc never runs and NpcCarryover never sees the crossing --
