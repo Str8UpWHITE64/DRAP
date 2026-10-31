@@ -19,6 +19,8 @@
 --     short of Ending S. Read straight from the game rather than from the
 --     Overtime state, so it holds even if that state is late or wrong;
 --   * PlayerReady says no (loading, door, cutscene, vehicle, settling);
+--   * a psychopath fight is on (BossFight): a warp out of one can leave the
+--     boss despawned and the fight unwinnable;
 --   * Jessie has not been met, or the flag cannot be read -- before her the
 --     Security Room is reached by cutscene only;
 --   * Overtime, or an ending sequence is pending -- a Security Room warp may
@@ -34,6 +36,7 @@ local Shared = require("DRAP/Shared")
 local ItemEffects = require("DRAP/ItemEffects")
 local TrapBank = require("DRAP/TrapBank")
 local PlayerReady = require("DRAP/PlayerReady")
+local BossFight = require("DRAP/BossFight")
 
 local M = Shared.create_module("TeleportTrap")
 
@@ -156,6 +159,8 @@ function M.blocked_by()
     if not Shared.is_in_game() then return "not in game" end
     if ending_s_route() then return "on the way to Ending S (Clock Tower Tunnel)" end
     if not PlayerReady.ready() then return "player not ready (" .. tostring(PlayerReady.blocked_by()) .. ")" end
+    local boss = BossFight.blocked_by()
+    if boss then return boss end
     if not met_jessie() then return "Jessie not met yet" end
     if in_overtime() then return "Overtime" end
     if ending_busy() then return "ending sequence" end

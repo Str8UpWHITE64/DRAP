@@ -4,6 +4,7 @@
 
 local Shared = require("DRAP/Shared")
 local Activation = require("DRAP/Activation")
+local BossFight = require("DRAP/BossFight")
 
 local M = Shared.create_module("DoorRandomizer")
 
@@ -830,7 +831,8 @@ end
 --- @param angle table|nil {x,y,z}
 --- @param label string|nil name for the log line
 --- @param opts table|nil { leave_party = true } leaves followers where they
----   stand (Teleport Trap); { no_redirect = true } ignores door redirects.
+---   stand (Teleport Trap); { no_redirect = true } ignores door redirects;
+---   { boss_ok = true } warps during a psychopath fight (test tooling).
 function M.warp_to(area_name, pos, angle, label, opts)
     if not ensure_area_jump_method() then return false end
     opts = opts or {}
@@ -840,6 +842,17 @@ function M.warp_to(area_name, pos, angle, label, opts)
     -- not be made from Lua, so the warp waits until the player gets out.
     if player_in_vehicle() then
         M.log("Cannot warp while in a vehicle -- get out first")
+        return false
+    end
+
+    -- A warp out of a psychopath fight can leave the boss despawned and the
+    -- fight unwinnable. boss_ok is for test tooling only.
+    local boss = BossFight.blocked_by()
+    if boss and not opts.boss_ok then
+        M.log("Cannot warp during a " .. boss .. " -- finish the fight first")
+        -- The warp buttons give no other sign they did nothing.
+        local Notify = package.loaded["DRAP/Notify"]
+        if Notify and Notify.warn then pcall(Notify.warn, "No warping during a boss fight") end
         return false
     end
 
