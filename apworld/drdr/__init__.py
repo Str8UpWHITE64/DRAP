@@ -238,6 +238,10 @@ class DRWorld(World):
     location_name_groups = kill_sanity_location_groups
     item_name_groups = {}
     item_descriptions = item_descriptions
+    # Universal Tracker collects this into a copy of the player's state and
+    # shows whatever opens up as glitched logic. It is never in the pool, so
+    # a real generation never sees it.
+    glitches_item_name: ClassVar[str] = Rules.UT_GLITCHED
 
     def __init__(self, multiworld: MultiWorld, player: int):
         super().__init__(multiworld, player)
@@ -528,14 +532,27 @@ class DRWorld(World):
         "Photograph PP Sticker 99": "Paradise Plaza",
     }
 
+    # Stickers 15-17 can be photographed from Paradise Plaza through the
+    # theatre front (glitched logic only), so they are created there and
+    # their rule still asks for Colby's. Only while Paradise is the one way
+    # into Colby's: under Door Locks it is not, and the move would add a
+    # requirement.
+    COLBYS_FROM_PARADISE = ("Photograph PP Sticker 15", "Photograph PP Sticker 16",
+                            "Photograph PP Sticker 17")
+
+    def _region_of(self, loc_name, default):
+        if loc_name in self.COLBYS_FROM_PARADISE and not self.door_locks_active:
+            return "Paradise Plaza"
+        return self.REGION_OVERRIDES.get(loc_name, default)
+
     def _region_table(self, region_name):
         rows = [loc for loc in location_tables[region_name]
-                if self.REGION_OVERRIDES.get(loc.name, region_name) == region_name]
+                if self._region_of(loc.name, region_name) == region_name]
         for table_name, table in location_tables.items():
             if table_name == region_name:
                 continue
             rows.extend(loc for loc in table
-                        if self.REGION_OVERRIDES.get(loc.name) == region_name)
+                        if self._region_of(loc.name, None) == region_name)
         return rows
 
     def create_regions(self):
@@ -925,6 +942,10 @@ class DRWorld(World):
 
 
     def create_item(self, name: str) -> Item:
+        # Universal Tracker asks for its glitched-logic token by name. It has
+        # no id and only ever lives in the tracker's own state.
+        if name == self.glitches_item_name:
+            return DRItem(name, ItemClassification.progression, None, self.player)
         # Skills and stat-upgrade items get Useful classification — guaranteed
         # in the multiworld pool (when enabled) but not part of progression
         # logic. Buffs go to filler. Traps stay trap-classified.

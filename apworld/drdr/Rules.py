@@ -324,6 +324,32 @@ CAMERA_LOCATIONS = frozenset(
 )
 
 
+# Universal Tracker's glitched logic. The tracker collects this item into a
+# copy of the player's state; nothing else ever does, so a real generation
+# evaluates every wrapped rule exactly as before.
+UT_GLITCHED = "UT Glitched Logic"
+
+
+def or_glitched(rule, loose):
+    """The normal rule, or `loose` once the tracker asks what is possible.
+
+    `loose` must only drop what the logic adds for pacing. Anything the mod
+    enforces -- keys, the clock, scoop items, Restricted pickups, the Camera
+    -- stays out of it, or the tracker shows checks that cannot be done.
+    """
+    return Or(rule, And(Has(UT_GLITCHED), loose))
+
+
+def _glitched_level_points(level):
+    """Region points for a level when the player grinds twice the PP out of
+    what is open -- the same halving the Camera Item table makes, the other
+    way round. Never under one point: Security Room PP means replaying the
+    intro."""
+    half = LEVEL_PP[level - 1] / 2
+    below = [up for up in range(2, level + 1) if LEVEL_PP[up - 1] <= half]
+    return max(1, LEVEL_POINTS[below[-1]] if below else 1)
+
+
 def camera_gate(world, spot, rule):
     """The rule a location really gets once the Camera Item is accounted for."""
     if not (world.options.camera_item and isinstance(spot, Location)
@@ -751,16 +777,36 @@ def set_rules(world) -> None:
     # Level-up checks
     # --------------------------------------------------------------------
     # Region-Based Levels. The Camera Item's half-PP table is LEVEL_POINTS_NO_CAMERA.
+    # Glitched: PP is earned wherever there is something to kill, so a player
+    # who grinds twice as hard levels with half the mall open. Before the
+    # Camera, that makes the normal table the glitched one.
     def _level_points(level):
         count = LEVEL_POINTS[level]
+        loose = _glitched_level_points(level)
         if not world.options.camera_item:
-            return RegionPointsAtLeast(count)
-        return Or(And(Has(CAMERA_ITEM), RegionPointsAtLeast(count)),
-                  RegionPointsAtLeast(LEVEL_POINTS_NO_CAMERA[level]))
+            rule = RegionPointsAtLeast(count)
+            if loose < count:
+                rule = or_glitched(rule, RegionPointsAtLeast(loose))
+            return rule
+        return or_glitched(
+            Or(And(Has(CAMERA_ITEM), RegionPointsAtLeast(count)),
+               RegionPointsAtLeast(LEVEL_POINTS_NO_CAMERA[level])),
+            Or(And(Has(CAMERA_ITEM), RegionPointsAtLeast(loose)),
+               RegionPointsAtLeast(count)))
 
     for level in range(2, 51):
         world.set_rule(world.multiworld.get_location(f"Reach Level {level}", world.player),
                       _level_points(level))
+
+    # A car crossing between the two areas has to take the ramp, so the
+    # ramp's own door is required on top of reaching the far side. Region
+    # access alone is not enough: Leisure Park also opens from North Plaza
+    # and Paradise, and neither of those is drivable.
+    def _drive_from(key_name):
+        home = CAR_HOME[key_name]
+        if home == "Maintenance Tunnel":
+            return And(Has(key_name), CanReachRegion(home), _ramp_to_park)
+        return And(Has(key_name), CanReachRegion(home), _ramp_to_tunnel)
 
     # Zombie kill checks. They sit in their own region, so every one needs its
     # rule spelled out -- see the note in Locations.py.
@@ -774,17 +820,25 @@ def set_rules(world) -> None:
 
         # Applies in both item modes: it is about progress through the run,
         # not about pickups.
+        # Glitched: zombies come back on every visit, so any count can be
+        # ground in the area itself once it is open.
         _points = KILL_POINT_GATES.get(_threshold)
         if _points:
-            _parts.append(RegionPointsAtLeast(_points))
+            _parts.append(or_glitched(RegionPointsAtLeast(_points), True_()))
 
         # A car for the areas that have one, once the count is past what is
         # reasonable on foot. Independent of item mode.
         if world.options.car_keys:
             _car_from = KILL_CAR_FROM.get(_kill_region)
             if _car_from is not None and _threshold >= _car_from:
-                _parts.append(Or(*[Has(k)
-                                   for k in KILL_CAR_KEYS[_kill_region]]))
+                _car = Or(*[Has(k) for k in KILL_CAR_KEYS[_kill_region]])
+                # Glitched: the other area's cars, driven over the ramp. Not
+                # under Door Randomizer, where cars stay in their own area.
+                if not world.options.door_randomizer:
+                    _car = or_glitched(_car, Or(*[
+                        _drive_from(k) for k, home in CAR_HOME.items()
+                        if home != _kill_region]))
+                _parts.append(_car)
 
         # Something to kill with, and the Queen on top from 2000.
         #
@@ -1385,16 +1439,6 @@ def set_rules(world) -> None:
         # anywhere, and only collecting them is region-bound.
         _cars_travel = not world.options.door_randomizer
 
-        # A car crossing between the two areas has to take the ramp, so the
-        # ramp's own door is required on top of reaching the far side. Region
-        # access alone is not enough: Leisure Park also opens from North Plaza
-        # and Paradise, and neither of those is drivable.
-        def _drive_from(key_name):
-            home = CAR_HOME[key_name]
-            if home == "Maintenance Tunnel":
-                return And(Has(key_name), CanReachRegion(home), _ramp_to_park)
-            return And(Has(key_name), CanReachRegion(home), _ramp_to_tunnel)
-
         # The ramp is in Leisure Park and only these two can take it.
         _jump_alts = [And(Has("Sports Car Key"), CanReachRegion("Leisure Park"))]
         if _cars_travel:
@@ -1527,7 +1571,12 @@ def set_rules(world) -> None:
         _ride_rule = And(_ride_rule, Has("Zombie Ride"))
     world.set_rule(world.multiworld.get_location("Ride zombies for 50 feet", world.player),
                   _ride_rule)
-    world.set_rule(world.multiworld.get_location("Change into 46 new outfits", world.player), And(CanReachRegion("Leisure Park"), CanReachRegion("Al Fresca Plaza"), CanReachRegion("Wonderland Plaza"), CanReachRegion("North Plaza"), CanReachRegion("Entrance Plaza"), CanReachRegion("Food Court"), CanReachRegion("Paradise Plaza"), CanReachRegion("Seon's Food and Stuff"), CanReachRegion("Crislip's Home Saloon"), CanReachRegion("Colby's Movieland")))
+    # Glitched: the clothing layouts give Entrance, Paradise and Wonderland
+    # Plaza exactly 46 different pieces between them. Entrance Plaza's are in
+    # its stores, so the shutter has to be open.
+    world.set_rule(world.multiworld.get_location("Change into 46 new outfits", world.player), or_glitched(
+        And(CanReachRegion("Leisure Park"), CanReachRegion("Al Fresca Plaza"), CanReachRegion("Wonderland Plaza"), CanReachRegion("North Plaza"), CanReachRegion("Entrance Plaza"), CanReachRegion("Food Court"), CanReachRegion("Paradise Plaza"), CanReachRegion("Seon's Food and Stuff"), CanReachRegion("Crislip's Home Saloon"), CanReachRegion("Colby's Movieland")),
+        And(ep_shutter, CanReachRegion("Paradise Plaza"), CanReachRegion("Wonderland Plaza"))))
     world.set_rule(world.multiworld.get_location("Change into 5 new outfits", world.player), Or(CanReachRegion("Paradise Plaza"), CanReachRegion("Entrance Plaza"), CanReachRegion("Wonderland Plaza")))
 
     # --------------------------------------------------------------------
@@ -1695,10 +1744,12 @@ def set_rules(world) -> None:
     world.set_rule(world.multiworld.get_location("Photograph PP Sticker 13", world.player), CanReachRegion("Paradise Plaza"))
     world.set_rule(world.multiworld.get_location("Photograph PP Sticker 14", world.player), CanReachRegion("Paradise Plaza"))
 
-    # PP Stickers in Colby's Movieland
-    world.set_rule(world.multiworld.get_location("Photograph PP Sticker 15", world.player), CanReachRegion("Colby's Movieland"))
-    world.set_rule(world.multiworld.get_location("Photograph PP Sticker 16", world.player), CanReachRegion("Colby's Movieland"))
-    world.set_rule(world.multiworld.get_location("Photograph PP Sticker 17", world.player), CanReachRegion("Colby's Movieland"))
+    # PP Stickers in Colby's Movieland. Glitched: these three can be shot from
+    # Paradise Plaza through the theatre front (they are created in Paradise
+    # Plaza for that, see DRWorld.COLBYS_FROM_PARADISE).
+    for _n in (15, 16, 17):
+        world.set_rule(world.multiworld.get_location(f"Photograph PP Sticker {_n}", world.player),
+                       or_glitched(CanReachRegion("Colby's Movieland"), CanReachRegion("Paradise Plaza")))
     world.set_rule(world.multiworld.get_location("Photograph PP Sticker 18", world.player), CanReachRegion("Colby's Movieland"))
     world.set_rule(world.multiworld.get_location("Photograph PP Sticker 19", world.player), CanReachRegion("Colby's Movieland"))
     world.set_rule(world.multiworld.get_location("Photograph PP Sticker 20", world.player), CanReachRegion("Colby's Movieland"))
