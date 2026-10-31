@@ -254,6 +254,16 @@ class DRWorld(World):
         self.scoop_order = []
 
     def generate_early(self):
+        # ItemSanity leaves pickups as the game has them, which is what
+        # Restricted Item Mode takes away; Spitter Only turns that on.
+        self.item_sanity = bool(self.options.item_sanity.value)
+        if self.item_sanity and (self.options.restricted_item_mode
+                                 or self.options.spitter_only):
+            raise OptionError(
+                f"{self.player_name}: item_sanity cannot be combined with "
+                "restricted_item_mode or spitter_only. ItemSanity needs items "
+                "to be picked up as normal.")
+
         # Spitter Only turns two other options on, and both are read below, so
         # it has to come first.
         self.spitter_only = bool(self.options.spitter_only.value)
@@ -362,6 +372,8 @@ class DRWorld(World):
             self.enabled_location_categories.add(DRLocationCategory.KILL_SANITY)
         if self.options.pp_bonus_locations:
             self.enabled_location_categories.add(DRLocationCategory.PP_BONUS)
+        if self.item_sanity:
+            self.enabled_location_categories.add(DRLocationCategory.ITEM_SANITY)
 
         # PP-bonus entries whose requires_location predecessor isn't enabled
         # this seed (e.g. First Aid Kit needs "Clean up... Register 6!" which
@@ -580,7 +592,8 @@ class DRWorld(World):
             "Level Ups",
             "Challenges",
             "Zombie Kills",
-            "Kill Sanity"
+            "Kill Sanity",
+            "Item Sanity"
         ]})
 
         # Area pairs that a real door joins in the vanilla table. Under Door
@@ -714,6 +727,7 @@ class DRWorld(World):
         # written out in Rules.py so the prologue ones can skip the area.
         create_connection("Menu", "Zombie Kills")
         create_connection("Menu", "Kill Sanity")
+        create_connection("Menu", "Item Sanity")
 
 
     GOAL_LOCATIONS = {
@@ -1351,6 +1365,7 @@ class DRWorld(World):
                 "enabled_traps": enabled_traps,
                 "restricted_item_mode": restricted_item_mode_enabled,
                 "spitter_only": self.spitter_only,
+                "item_sanity": self.item_sanity,
                 "door_randomizer": door_randomizer_enabled,
                 "door_randomizer_mode": door_randomizer_mode,
                 "scoop_sanity": scoop_sanity_enabled,
@@ -1405,6 +1420,7 @@ class DRWorld(World):
             "enabled_traps": enabled_traps,
             "restricted_item_mode": restricted_item_mode_enabled,
             "spitter_only": self.spitter_only,
+            "item_sanity": self.item_sanity,
             "door_randomizer": door_randomizer_enabled,
             "door_randomizer_mode": door_randomizer_mode,  # For Lua: 0 = chaos, 1 = paired
             "door_redirects": self.door_redirects if door_randomizer_enabled else {},

@@ -18,7 +18,7 @@ from rule_builder.rules import (
 from .DoorRandomization import AREA_NAMES, EMBEDDED_DOOR_DATA
 from .Locations import (DRLocationCategory, location_tables,
                         ZOMBIE_KILL_REGION_OF, ZOMBIE_KILL_TIERS, SURVIVOR_MILESTONES,
-                        kill_sanity_location_name)
+                        kill_sanity_location_name, ITEM_SANITY_REGIONS)
 from .shared_data import (
     AREA_KEY_NAMES, AP_TRIGGER_LOCATIONS,
     SCOOP_COMPLETION_MAP, SCOOP_EVENTS, SCOOP_REGION_REQUIREMENTS,
@@ -510,6 +510,13 @@ def _survivor_location(world, rescue_name):
                                          world.player)
 
 
+def item_sanity_rule(regions):
+    """Reach any of the areas an item type is placed in."""
+    if len(regions) == 1:
+        return CanReachRegion(regions[0])
+    return Or(*[CanReachRegion(r) for r in regions])
+
+
 def set_rules(world) -> None:
 
     # Locations this seed never created. Spitter Only drops every check that
@@ -879,6 +886,14 @@ def set_rules(world) -> None:
                 world.multiworld.get_location(
                     kill_sanity_location_name(_n, _region), world.player),
                 _rule)
+
+    # ItemSanity: the first pickup of an item type needs any area whose
+    # default layouts place it. Those files load all through the 72 hours,
+    # so reaching the area is all it takes.
+    if getattr(world, "item_sanity", False):
+        for _name, _regions in ITEM_SANITY_REGIONS.items():
+            world.set_rule(world.multiworld.get_location(_name, world.player),
+                           item_sanity_rule(_regions))
 
     # Zombie Genocider: the top threshold in every area, which is the same
     # 53,594 kills as clearing all 99 checks and twelve rules instead of 99.

@@ -37,6 +37,24 @@ class RestrictedItemMode(Toggle):
     default = False
 
 
+class ItemSanity(Toggle):
+    """
+    Picking up each kind of item for the first time is a check: the first
+    chair, the first Katana, the first carton of milk off a shelf, and so on.
+    About 160 checks. Each one only needs an area where that item is lying
+    around.
+
+    Items are left as they are in the game: anything lying around can be
+    picked up as normal, and none are sent to you to spawn. Weapons and food
+    leave the item pool. Books and buffs stay, and the rest of the filler is
+    KillSanity's (Zombie Guts, Brains and Rotten Flesh).
+
+    Cannot be combined with Restricted Item Mode or Spitter Only.
+    """
+    display_name = "ItemSanity"
+    default = False
+
+
 class KillSanity(Toggle):
     """
     Every zombie kill in each area is its own check, up to the number
@@ -1051,6 +1069,7 @@ class DROption(PerGameCommonOptions):
     door_locks: DoorLocks
     randomize_rooftop_service_hallway_doors: RandomizeRooftopServiceHallwayDoors
     restricted_item_mode: RestrictedItemMode
+    item_sanity: ItemSanity
     car_keys: CarKeys
     camera_item: CameraItem
     split_keys: SplitKeys
@@ -1110,6 +1129,7 @@ dr_option_groups = [
         "Item and Key Settings",
         [
             RestrictedItemMode,
+            ItemSanity,
             CarKeys,
             CameraItem,
             SplitKeys,

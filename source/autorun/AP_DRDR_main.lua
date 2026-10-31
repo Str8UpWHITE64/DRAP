@@ -38,6 +38,7 @@ AP.CustomStickers = require("DRAP/CustomStickers")
 AP.AchievementTracker = require("DRAP/trackers/AchievementTracker")
 AP.KillTracker      = require("DRAP/trackers/KillTracker")
 AP.VehicleKills     = require("DRAP/trackers/VehicleKills")
+AP.ItemSanity       = require("DRAP/trackers/ItemSanity")
 AP.SaveSlot         = require("DRAP/SaveSlot")
 AP.SaveDiagnostics  = require("DRAP/SaveDiagnostics")
 AP.SteamStore       = require("DRAP/SteamStore")
@@ -438,10 +439,16 @@ local function run_slot_connect(slot_data)
     AP.ItemRestriction.set_enabled(restricted_item_mode_enabled)
     log("Restricted Item Mode enabled=" .. tostring(restricted_item_mode_enabled))
 
+    -- ItemSanity: pickups are the checks, and nothing is spawned. The apworld
+    -- refuses it together with Restricted Item Mode.
+    local item_sanity_enabled = (type(slot_data) == "table" and slot_data.item_sanity == true)
+    AP.ItemSanityEnabled = item_sanity_enabled
+    AP.ItemSanity.set_enabled(item_sanity_enabled)
+
     -- If hard mode is enabled, disable the item spawner's spawn functionality
-    if restricted_item_mode_enabled and AP.ItemSpawner.set_spawning_disabled then
+    if (restricted_item_mode_enabled or item_sanity_enabled) and AP.ItemSpawner.set_spawning_disabled then
         AP.ItemSpawner.set_spawning_disabled(true)
-        log("Item spawning disabled due to hard mode")
+        log("Item spawning disabled (" .. (item_sanity_enabled and "ItemSanity" or "hard mode") .. ")")
     end
 
     -- DamageLink. The tag went on at ConnectUpdate; this arms the detection
@@ -937,6 +944,7 @@ re.on_frame(function()
     safe_on_frame(AP.DamageLink,       "DamageLink")
     safe_on_frame(AP.KnockbackLink,    "KnockbackLink")
     safe_on_frame(AP.VehicleKills,     "VehicleKills")
+    safe_on_frame(AP.ItemSanity,       "ItemSanity")
     safe_on_frame(AP.ChallengeTracker, "ChallengeTracker")
     safe_on_frame(AP.LevelTracker,     "LevelTracker")
     safe_on_frame(AP.AchievementTracker, "AchievementTracker")

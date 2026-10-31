@@ -93,6 +93,11 @@ COMPLETION_FLAGS: List[Dict[str, Any]] = _DATA.get("completion_flags", [])
 # EventSetCookingEquipment.CookInfos.
 OVERTIME_ITEMS: List[Dict[str, Any]] = _DATA.get("overtime_items", [])
 
+# ItemSanity: one "Pick up <item>" location per item type, with the game
+# ITEM_NOs that count as that type and the areas whose default item layouts
+# place it. The order is the location id order, so entries are appended only.
+ITEM_SANITY: List[Dict[str, Any]] = _DATA.get("item_sanity", [])
+
 if SCHEMA_VERSION >= 2 and not SCOOPS:
     raise ValueError(
         "drdr_shared.json declares schema_version >= 2 but has no 'scoops' "

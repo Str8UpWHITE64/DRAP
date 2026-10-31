@@ -4,9 +4,12 @@ from typing import Optional, NamedTuple, Dict, List
 from BaseClasses import Location, Region
 from .Items import DRItem
 from .shared_data import ZOMBIE_KILL_TIERS as SHARED_ZOMBIE_KILL_TIERS
+from .shared_data import ITEM_SANITY
 
 
 KILL_SANITY_BASE_ID = 1251000
+# After the last KillSanity id (1304593). Frozen like the KillSanity base.
+ITEM_SANITY_BASE_ID = 1310000
 
 
 class DRLocationCategory(IntEnum):
@@ -42,6 +45,9 @@ class DRLocationCategory(IntEnum):
     # (drdr_shared.json custom_stickers). Only with the Extra PP Stickers
     # option.
     CUSTOM_STICKER = 16
+    # ItemSanity: the first pickup of each item type (drdr_shared.json
+    # item_sanity). Only with the ItemSanity option.
+    ITEM_SANITY = 17
 
 
 class DRLocationData(NamedTuple):
@@ -115,6 +121,9 @@ class DRLocation(Location):
         output.update({location_data.name: id for id, location_data in
                        enumerate(location_tables["Kill Sanity"],
                                  KILL_SANITY_BASE_ID)})
+        output.update({location_data.name: id for id, location_data in
+                       enumerate(location_tables["Item Sanity"],
+                                 ITEM_SANITY_BASE_ID)})
 
         return output
 
@@ -1045,6 +1054,17 @@ for _loc in location_tables["Kill Sanity"]:
     _area = _loc.name.split(" in ", 1)[1]
     kill_sanity_location_groups.setdefault(kill_sanity_group_name(_area), set()).add(_loc.name)
     kill_sanity_location_groups[KILL_SANITY_GROUP_ALL].add(_loc.name)
+
+# ItemSanity: one location per item type, in drdr_shared.json order so the
+# ids stay put. Like the kills it sits in a neutral region; Rules.py asks for
+# any of the areas that place the item.
+location_tables["Item Sanity"] = [
+    DRLocationData(_entry["location_name"], "Milk", DRLocationCategory.ITEM_SANITY)
+    for _entry in ITEM_SANITY
+]
+ITEM_SANITY_REGIONS: Dict[str, List[str]] = {
+    _entry["location_name"]: list(_entry["regions"]) for _entry in ITEM_SANITY
+}
 
 # The area each kill location counts for. The region above is a neutral one,
 # so the name is the only place the area survives -- Rules.py needs it back.

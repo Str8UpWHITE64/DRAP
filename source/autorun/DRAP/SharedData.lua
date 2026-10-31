@@ -116,6 +116,13 @@ function M.custom_stickers()
     return (data and data.custom_stickers) or {}
 end
 
+-- ItemSanity (DRAP/trackers/ItemSanity): { location_name, item_numbers = {...}, regions = {...} }, one per item type.
+-- Absent = none.
+function M.item_sanity()
+    ensure_loaded()
+    return (data and data.item_sanity) or {}
+end
+
 -- Scoop -> list of survivor display names that escape to the Security Room as part
 -- of that scoop. Only includes scoops whose npcs field contains at least one
 -- name matching a "Rescue X" location in Python's Locations.py.

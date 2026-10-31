@@ -16,7 +16,7 @@ class DRItemCategory(IntEnum):
     SKILL = 8,         # 21 player-skill items (Useful)
     UPGRADE = 9,       # 6 progressive stat upgrades (Useful)
     BUFF = 10,         # 7 filler buff items (juice effects + Heal/Berserker/PP)
-    KILL_FILLER = 11,  # KillSanity's own filler; never in the ordinary pool
+    KILL_FILLER = 11,  # KillSanity's filler; in the ordinary pool only under ItemSanity
 
 
 class DRItemData(NamedTuple):
@@ -771,6 +771,15 @@ def BuildItemPool(multiworld, count, options, excluded_scoop_names=(),
                          if it.category != DRItemCategory.WEAPON
                          or it.name in spitter_kept_weapons]
 
+    # ItemSanity: nothing is spawned, so weapons and food would be dead
+    # items. Books and buffs act straight away and stay, once each; every
+    # other filler slot gets KillSanity's filler instead (see below).
+    item_sanity = bool(getattr(getattr(options, "item_sanity", None), "value", 0))
+    if item_sanity:
+        nonTrapFiller = [it for it in nonTrapFiller
+                         if it.category == DRItemCategory.BUFF
+                         or it.name.startswith("Book [")]
+
     # Strip overpowered filler entries when the option is on. Guaranteed
     # Items (added unconditionally above) and Restricted-mode specialty items
     # are unaffected -- this only filters the filler list.
@@ -953,7 +962,16 @@ def BuildItemPool(multiworld, count, options, excluded_scoop_names=(),
     # Non-trap filler slots: shuffle once, walk in order, reshuffle on
     # wrap-around. This keeps the existing "unique-first, then duplicates"
     # property of the original algorithm.
-    if non_trap_slot_count > 0 and nonTrapFiller:
+    if item_sanity and non_trap_slot_count > 0:
+        shuffled_filler = list(nonTrapFiller)
+        multiworld.random.shuffle(shuffled_filler)
+        once = shuffled_filler[:non_trap_slot_count]
+        item_pool.extend(once)
+        kill_filler = [item for item in _all_items
+                       if item.category == DRItemCategory.KILL_FILLER]
+        for i in range(non_trap_slot_count - len(once)):
+            item_pool.append(kill_filler[i % len(kill_filler)])
+    elif non_trap_slot_count > 0 and nonTrapFiller:
         shuffled_filler = list(nonTrapFiller)
         multiworld.random.shuffle(shuffled_filler)
         filler_index = 0
