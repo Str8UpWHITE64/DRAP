@@ -41,10 +41,10 @@ end
 -- Module-level state. Declared up front so every function in the file
 -- can reference them, regardless of source position. (Lua module-level
 -- locals are only visible to code that follows their declaration; an
--- earlier version of this file had `clear_redirects` reset
--- `vehicle_blocked_doors` and `player_was_in_vehicle` before they were
--- declared, which silently set globals instead of clearing the locals.
--- Same hazard pattern as Bridge.lua's pre-fix scoping bug.)
+-- earlier version of this file had `clear_redirects` reset two locals
+-- before they were declared, which silently set globals instead of
+-- clearing the locals. Same hazard pattern as Bridge.lua's pre-fix
+-- scoping bug.)
 ------------------------------------------------------------
 
 local hook_installed = false
@@ -74,10 +74,42 @@ local redirect_count = 0
 -- that door had been randomized to.
 local bypass_redirects = false
 
--- Vehicle door-blocking state. While in a vehicle with door randomization
--- active, every area-jump HIT_DATA is set Disabled=true. Restored on dismount.
-local vehicle_blocked_doors = {}   -- layout_info -> Disabled state before the vehicle block
-local player_was_in_vehicle = false
+-- Vehicle arrival data. A door's HIT_DATA carries _VehicleJumpDatas: per
+-- vehicle type, where that vehicle is put in the area the door leads to.
+-- The engine takes the vehicle through any door and uses that entry when it
+-- has one, else the door's own arrival point. A redirect rewrites the arrival
+-- point but not these entries, so a motorcycle through a redirected Leisure
+-- Park -> Paradise door was put at the Paradise position inside North Plaza
+-- and fell out of the world. The entries are moved to the redirect's arrival
+-- point for the jump and put back when the door is used unredirected.
+local vehicle_jump_saved = {}      -- HIT_DATA address -> { { entry, pos }, ... }
+
+-- Height above the arrival point for a vehicle, by the door whose arrival is
+-- used. Only the ramp down into the Tunnel needs one: its walking arrival is
+-- on the slope, and the game's own entries lift cars 0.69 and the Humvee 2.75.
+local VEHICLE_LIFT = {
+    ["SCN_s700|s600|door0"] = { default = 0.69, [4] = 2.75 },
+}
+
+-- Heading after a door while riding. The game works out the arrival rotation
+-- from the door's angle and records it, but only turns the vehicle's
+-- transform, which its physics overwrites on the next step, so the vehicle
+-- keeps the heading it had and can arrive facing a wall. Set by the areaJump
+-- hook, applied on the first frame in the new area.
+local vehicle_face_pending = nil   -- { from, area_no, yaw, at }
+
+-- Mall doors while riding. The game offers no door prompt in a vehicle and a
+-- mall door is a solid wall to one, so only the Tunnel ramp takes a vehicle
+-- across. Driving into a mall door between these open areas now takes the
+-- door as if it had been used on foot. Small rooms, the Security Room side
+-- and the Tunnel are left alone.
+local VEHICLE_DOOR_SCENES = {
+    s100 = true, s200 = true, s300 = true, s400 = true,
+    s700 = true, s900 = true, sa00 = true,
+}
+local VEHICLE_DOOR_REACH = 3.0     -- metres beyond the door's own prompt radius
+local VEHICLE_DOOR_FACING = 0.6    -- cos of the widest angle to the door that counts
+local vehicle_door = { next_check = 0, last_pos = nil }
 
 ------------------------------------------------------------
 -- Singleton Managers
@@ -85,7 +117,6 @@ local player_was_in_vehicle = false
 
 local ahlm_mgr = M:add_singleton("ahlm", "app.solid.gamemastering.AreaHitLayoutManager")
 local am_mgr   = M:add_singleton("am", "app.solid.gamemastering.AreaManager")
-local pm_mgr   = M:add_singleton("pm", "app.solid.PlayerManager")
 
 ------------------------------------------------------------
 -- Helper Functions
@@ -250,27 +281,236 @@ local function get_current_area_info()
 end
 
 ------------------------------------------------------------
--- Vehicle Dismount Helper
+-- Vehicle Arrival Data
 ------------------------------------------------------------
 
-local function dismount_vehicle()
-    local pm = pm_mgr:get()
-    if not pm then return end
-
-    local vtype_field = pm_mgr:get_field("<VehicleType>k__BackingField", false)
-    if not vtype_field then return end
-
-    local cur = Shared.safe_get_field(pm, vtype_field)
-    if cur and cur ~= 0 then
-        pcall(function() vtype_field:set_data(pm, 0) end)
-        M.log("Dismounted player from vehicle for door transition")
+local function vehicle_jump_entries(hit_data_obj)
+    local out = {}
+    local list = Shared.safe(function() return hit_data_obj:get_field("_VehicleJumpDatas") end)
+    if not list then return out end
+    for _, e in Shared.iter_collection(list) do
+        if e then out[#out + 1] = e end
     end
+    return out
+end
+
+local function hit_data_key(hit_data_obj)
+    return Shared.safe(function() return hit_data_obj:get_address() end)
+end
+
+-- Moves every vehicle entry on the door to the redirect's arrival point.
+local function retarget_vehicle_jumps(hit_data_obj, redirect)
+    if not (redirect and redirect.target_pos) then return 0 end
+    local entries = vehicle_jump_entries(hit_data_obj)
+    if #entries == 0 then return 0 end
+    local key = hit_data_key(hit_data_obj)
+    if key and not vehicle_jump_saved[key] then
+        local saved = {}
+        for _, e in ipairs(entries) do
+            local p = Shared.safe(function() return e:get_field("VehiclePos") end)
+            saved[#saved + 1] = { entry = e, pos = p and extract_vec3(p) or nil }
+        end
+        vehicle_jump_saved[key] = saved
+    end
+    local target = extract_vec3(redirect.target_pos) or redirect.target_pos
+    local lift = VEHICLE_LIFT[redirect.template_door_id or ""]
+    local n = 0
+    for _, e in ipairs(entries) do
+        local vtype = Shared.safe(function() return e:get_field("VehicleType") end)
+        local dy = lift and (lift[Shared.to_int(vtype) or -1] or lift.default) or 0
+        local v = to_vector3f({ x = target.x, y = target.y + dy, z = target.z })
+        if v and pcall(function() e:set_field("VehiclePos", v) end) then n = n + 1 end
+    end
+    return n
+end
+
+-- Puts a door's vehicle entries back after a redirect moved them.
+local function restore_vehicle_jumps(hit_data_obj)
+    local key = hit_data_key(hit_data_obj)
+    local saved = key and vehicle_jump_saved[key]
+    if not saved then return end
+    for _, s in ipairs(saved) do
+        local v = s.pos and to_vector3f(s.pos)
+        if v then pcall(function() s.entry:set_field("VehiclePos", v) end) end
+    end
+    vehicle_jump_saved[key] = nil
 end
 
 local function player_in_vehicle()
     local pm = sdk.get_managed_singleton("app.solid.PlayerManager")
     local v = pm and Shared.safe(function() return pm:get_field("<VehicleType>k__BackingField") end)
     return v ~= nil and Shared.to_int(v) ~= 0
+end
+
+local function read_yaw(q)
+    local x, y, z, w = q.x, q.y, q.z, q.w
+    return math.atan(2 * (w * y + x * z), 1 - 2 * (x * x + y * y))
+end
+
+-- The open doors of this area a vehicle may take: { hd, to, x, z, radius }.
+-- A wide doorway has one entry per leaf, and some leaves carry no arrival
+-- point (one of three in Paradise and in the Food Court to Leisure Park);
+-- such a leaf is taken with a sibling entry's data so every leaf works.
+local function vehicle_doors_here(here)
+    local out, blank, by_to = {}, {}, {}
+    local ahlm = ahlm_mgr:get()
+    local res_list = ahlm and Shared.get_field_value(ahlm, { "mAreaHitResource", "<mAreaHitResource>k__BackingField" })
+    if not res_list then return out end
+    for _, res in Shared.iter_collection(res_list) do
+        local pres = res and Shared.get_field_value(res, { "pResource", "<pResource>k__BackingField" })
+        local td = pres and Shared.safe(function() return pres:get_type_definition():get_full_name() end)
+        if td == "app.solid.gamemastering.rAreaHitLayout" then
+            local infos = Shared.get_field_value(pres, { "mpLayoutInfoList", "<mpLayoutInfoList>k__BackingField" })
+            for _, li in Shared.iter_collection(infos) do
+                local hd = li and Shared.get_field_value(li, { "mHitData", "<mHitData>k__BackingField" })
+                local to = hd and tostring(Shared.safe(function() return hd:get_field("mAreaJumpName") end) or ""):gsub("^SCN_", "")
+                local ev = hd and tostring(Shared.safe(function() return hd:get_field("mEventName") end) or "")
+                if to and to ~= here and VEHICLE_DOOR_SCENES[to] and ev == ""
+                    and Shared.safe(function() return hd:get_field("Disabled") end) ~= true then
+                    local c = Shared.safe(function() return hd:get_field("mCursorWorldPos") end)
+                    local cx, cz
+                    pcall(function() cx = c.x; cz = c.z end)
+                    local jp = Shared.safe(function() return hd:get_field("mAreaJumpPos") end)
+                    local jx, jz
+                    pcall(function() jx = jp.x; jz = jp.z end)
+                    if cx and not (cx == 0 and cz == 0) then
+                        local d = { hd = hd, to = to, x = cx, z = cz,
+                            radius = tonumber(Shared.safe(function() return hd:get_field("mRadius") end)) or 0 }
+                        if jx and not (jx == 0 and jz == 0) then
+                            out[#out + 1] = d
+                            by_to[to] = by_to[to] or hd
+                        else
+                            -- taking this one as it is dropped the bike at the
+                            -- area's origin
+                            blank[#blank + 1] = d
+                        end
+                    end
+                end
+            end
+        end
+    end
+    for _, d in ipairs(blank) do
+        if by_to[d.to] then
+            d.hd = by_to[d.to]
+            out[#out + 1] = d
+        end
+    end
+    return out
+end
+
+-- Takes a mall door when the ridden vehicle drives into it: inside the
+-- door's prompt radius plus VEHICLE_DOOR_REACH, facing it and moving toward
+-- it. The jump goes through areaJump on the door's own data, so redirects,
+-- locks (a locked door is Disabled and skipped) and the arrival heading all
+-- apply as for a door used on foot.
+local function vehicle_door_check()
+    if not area_jump_method then return end
+    local now = os.clock()
+    if now < vehicle_door.next_check then return end
+    vehicle_door.next_check = now + 0.2
+    if vehicle_face_pending or (M.last_jump_at and now - M.last_jump_at < 4) then
+        vehicle_door.last_pos = nil
+        return
+    end
+    if not player_in_vehicle() then vehicle_door.last_pos = nil; return end
+    local _, level_path = get_current_area_info()
+    local here = level_path and tostring(level_path):gsub("^SCN_", "")
+    if not (here and VEHICLE_DOOR_SCENES[here]) then vehicle_door.last_pos = nil; return end
+
+    local pm = sdk.get_managed_singleton("app.solid.PlayerManager")
+    local vc = pm and Shared.safe(function() return pm:call("get_VehicleControl") end)
+    local tr = vc and Shared.safe(function() return vc:call("get_GameObject"):call("get_Transform") end)
+    local pos = tr and Shared.safe(function() return tr:call("get_Position") end)
+    local rot = tr and Shared.safe(function() return tr:call("get_Rotation") end)
+    if not (pos and rot) then vehicle_door.last_pos = nil; return end
+    local px, pz, yaw = pos.x, pos.z, read_yaw(rot)
+    local prev = vehicle_door.last_pos
+    vehicle_door.last_pos = { x = px, z = pz, area = here }
+    if not (prev and prev.area == here) then return end
+
+    local fx, fz = math.sin(yaw), math.cos(yaw)
+    for _, d in ipairs(vehicle_doors_here(here)) do
+        local dx, dz = d.x - px, d.z - pz
+        local dist = math.sqrt(dx * dx + dz * dz)
+        if dist <= d.radius + VEHICLE_DOOR_REACH and dist > 0.01 then
+            local facing = (fx * dx + fz * dz) / dist
+            local closing = ((px - prev.x) * dx + (pz - prev.z) * dz) / dist
+            if facing >= VEHICLE_DOOR_FACING and closing > 0.05 then
+                local ahlm = ahlm_mgr:get()
+                M.log(string.format("Vehicle drove into the door %s -> %s (%.1f m, radius %.1f)", here, d.to, dist, d.radius))
+                vehicle_door.last_pos = nil
+                vehicle_door.next_check = now + 5
+                local ok, err = pcall(area_jump_method.call, area_jump_method, ahlm, d.hd)
+                if not ok then M.log("Vehicle door jump failed: " .. tostring(err)) end
+                return
+            end
+        end
+    end
+end
+
+-- Turns the ridden vehicle to the arrival angle once the new area is in.
+-- setRotation(Quaternion) goes to the physics body, the route the game itself
+-- uses to warp a vehicle; turning the transform alone does nothing. On the
+-- first frame in the area the turn does not always take as given (the
+-- motorcycle came out at its old heading plus the new one), so the heading is
+-- read back a few frames later and the turn repeated until it holds. After a
+-- door the motorcycle reads every turn offset by the heading it jumped with,
+-- for as long as it stays in that area; the offset is taken from the first
+-- turn that moved it and the next turn asks for the target less that offset.
+local FACE_RECHECK_FRAMES = 5
+local FACE_MAX_TRIES = 6
+
+local function vehicle_yaw(vc)
+    local rot = Shared.safe(function() return vc:call("get_GameObject"):call("get_Transform"):call("get_Rotation") end)
+    return rot and read_yaw(rot) or nil
+end
+
+local function wrap_angle(a)
+    return ((a + math.pi) % (2 * math.pi)) - math.pi
+end
+
+local function face_vehicle_on_arrival()
+    local p = vehicle_face_pending
+    if not p then return end
+    if os.clock() - p.at > 120 then vehicle_face_pending = nil; return end
+    if not p.tries then
+        local idx = get_current_area_info()
+        if idx == nil or (idx == p.from and idx ~= p.area_no) then return end
+        if not (p.yaw and player_in_vehicle()) then vehicle_face_pending = nil; return end
+        p.tries, p.wait, p.cmd = 0, 0, p.yaw
+    end
+    if p.wait > 0 then p.wait = p.wait - 1; return end
+
+    local pm = sdk.get_managed_singleton("app.solid.PlayerManager")
+    local vc = pm and Shared.safe(function() return pm:call("get_VehicleControl") end)
+    if not vc then vehicle_face_pending = nil; return end
+    local yaw = vehicle_yaw(vc)
+    p.seen = p.seen or {}
+    if p.tries > 0 then p.seen[#p.seen + 1] = string.format("%.2f", yaw or 0) end
+    local off = yaw and math.abs(wrap_angle(yaw - p.yaw)) or nil
+    if p.tries > 0 and off and off < 0.1 then
+        vehicle_face_pending = nil
+        M.log(string.format("Vehicle turned to the arrival heading (%.2f, %d tr%s: %s)", p.yaw, p.tries,
+            p.tries == 1 and "y" or "ies", table.concat(p.seen, " ")))
+        return
+    end
+    if p.tries >= FACE_MAX_TRIES then
+        vehicle_face_pending = nil
+        M.log(string.format("Vehicle could not be turned to the arrival heading (%.2f; read %s)", p.yaw, table.concat(p.seen, " ")))
+        return
+    end
+    -- A turn that moved the vehicle but missed shows the offset it applies;
+    -- one that did not move it yet is simply asked for again.
+    if p.tries > 0 and yaw and p.last_read and math.abs(wrap_angle(yaw - p.last_read)) > 0.02 then
+        p.cmd = wrap_angle(p.yaw - wrap_angle(yaw - p.cmd))
+    end
+    p.last_read = yaw
+    p.tries = p.tries + 1
+    p.wait = FACE_RECHECK_FRAMES
+    local c = p.cmd
+    pcall(function()
+        vc:call("setRotation(via.Quaternion)", Quaternion.new(math.cos(c / 2), 0.0, math.sin(c / 2), 0.0))
+    end)
 end
 
 ------------------------------------------------------------
@@ -412,10 +652,14 @@ local function install_hook()
                         if mod_ok then
                             was_redirected = true
                             redirect_count = redirect_count + 1
-                            dismount_vehicle()
-                            M.log(string.format("Redirected %s -> %s (was: %s)",
-                                door_id, get_scene_name(redirect_target), get_scene_name(original_dest)))
+                            local moved = retarget_vehicle_jumps(hit_data_mo, active_redirect)
+                            M.log(string.format("Redirected %s -> %s (was: %s)%s",
+                                door_id, get_scene_name(redirect_target), get_scene_name(original_dest),
+                                moved > 0 and string.format(", %d vehicle arrival(s) moved", moved) or ""))
                         end
+                    end
+                    if not was_redirected then
+                        restore_vehicle_jumps(hit_data_mo)
                     end
 
                     -- Store final destination for NPC carry-over
@@ -433,6 +677,13 @@ local function install_hook()
                             if active_redirect.target_angle then final_angle = extract_vec3(active_redirect.target_angle) end
                         end
                     end
+
+                    vehicle_face_pending = {
+                        from = area_index,
+                        area_no = area_jump_name_to_area_no(final_area_jump_name),
+                        yaw = final_angle and final_angle.y or nil,
+                        at = os.clock(),
+                    }
 
                     M.last_final_destination = {
                         door_id = door_id,
@@ -601,8 +852,6 @@ function M.clear_redirects()
     DOOR_REDIRECTS = {}
     randomization_enabled = false
     redirect_count = 0
-    vehicle_blocked_doors = {}
-    player_was_in_vehicle = false
     M.log("Door redirects cleared")
 end
 
@@ -670,104 +919,9 @@ function M.is_hook_installed()
     return hook_installed
 end
 
-------------------------------------------------------------
--- Vehicle Door Blocking
--- While in a vehicle, all area-jump doors are Disabled=true so the player
--- can't transition through one. Each door's prior Disabled state is saved and
--- put back on dismount, so DoorSceneLock's locks survive the ride.
-------------------------------------------------------------
-
-local function is_player_in_vehicle()
-    local pm = pm_mgr:get()
-    if not pm then return false end
-
-    local vtype_field = pm_mgr:get_field("<VehicleType>k__BackingField", false)
-    if not vtype_field then return false end
-
-    local cur = Shared.safe_get_field(pm, vtype_field)
-    return cur ~= nil and cur ~= 0
-end
-
-local function scan_and_set_doors_disabled(disabled)
-    local ahlm = ahlm_mgr:get()
-    if not ahlm then return 0 end
-
-    local res_field = ahlm_mgr:get_field("mAreaHitResource", false)
-                   or ahlm_mgr:get_field("<mAreaHitResource>k__BackingField", false)
-    if not res_field then return 0 end
-
-    local res_list = Shared.safe_get_field(ahlm, res_field)
-    if not res_list then return 0 end
-
-    local count = 0
-
-    for _, res in Shared.iter_collection(res_list) do
-        if res then
-            local pResource_val = Shared.get_field_value(res, {"pResource", "<pResource>k__BackingField"})
-            if pResource_val then
-                local pRes_td = pResource_val:get_type_definition()
-                if pRes_td and pRes_td:get_full_name() == "app.solid.gamemastering.rAreaHitLayout" then
-                    local layout_list = Shared.get_field_value(pResource_val,
-                        {"mpLayoutInfoList", "<mpLayoutInfoList>k__BackingField"})
-
-                    if layout_list then
-                        for _, li in Shared.iter_collection(layout_list) do
-                            if li then
-                                local jump_name = Shared.get_field_value(li,
-                                    {"AREA_JUMP_NAME", "<AREA_JUMP_NAME>k__BackingField"})
-                                jump_name = jump_name and tostring(jump_name) or ""
-
-                                local mHitData = Shared.get_field_value(li,
-                                    {"mHitData", "<mHitData>k__BackingField"})
-
-                                if mHitData and jump_name ~= "" then
-                                    if disabled then
-                                        -- Remember what Door Locks had set, so the get-off
-                                        -- can put back exactly that. Re-deriving it from the
-                                        -- vanilla jump_name was wrong: Door Locks decides by
-                                        -- the redirected destination, so doors it had locked
-                                        -- came back open.
-                                        local ok_get, was = pcall(mHitData.get_field, mHitData, "Disabled")
-                                        local ok_set = pcall(mHitData.set_field, mHitData, "Disabled", true)
-                                        if ok_set then
-                                            vehicle_blocked_doors[li] = (ok_get and was == true) or false
-                                            count = count + 1
-                                        end
-                                    elseif vehicle_blocked_doors[li] ~= nil then
-                                        -- Only doors WE blocked: restore their prior state.
-                                        pcall(mHitData.set_field, mHitData, "Disabled",
-                                              vehicle_blocked_doors[li])
-                                        vehicle_blocked_doors[li] = nil
-                                        count = count + 1
-                                    end
-                                end
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end
-
-    return count
-end
-
 -- Debug area tracing. Off unless drap_trace_areas turns it on.
 local trace_areas = false
 local last_traced_area = nil
-
-local function update_vehicle_door_blocking()
-    if not randomization_enabled or suppressed then return end
-
-    local in_vehicle = is_player_in_vehicle()
-    if in_vehicle == player_was_in_vehicle then return end
-    player_was_in_vehicle = in_vehicle
-
-    local action = in_vehicle and "disabled" or "re-enabled"
-    local count = scan_and_set_doors_disabled(in_vehicle)
-    M.log(string.format("Player %s vehicle -- %s %d door(s)",
-        in_vehicle and "entered" or "exited", action, count))
-end
 
 ------------------------------------------------------------
 -- Existing HIT_DATA Borrowing (for warp)
@@ -1141,7 +1295,8 @@ function M.on_frame()
         install_hook()
     end
 
-    update_vehicle_door_blocking()
+    face_vehicle_on_arrival()
+    vehicle_door_check()
 
     if trace_areas then
         local idx = get_current_area_info()
@@ -1170,10 +1325,6 @@ re.on_draw_ui(function()
             .. (suppressed and " (SUPPRESSED)" or ""))
         imgui.text("Redirects Configured: " .. tostring(M.get_redirect_config_count()))
         imgui.text("Redirects Applied: " .. tostring(redirect_count))
-        imgui.text("Player In Vehicle: " .. tostring(player_was_in_vehicle))
-        local vbd_count = 0
-        for _ in pairs(vehicle_blocked_doors) do vbd_count = vbd_count + 1 end
-        imgui.text("Vehicle-Blocked Doors: " .. tostring(vbd_count))
 
         if imgui.button("Warp to Security Room") then
             M.warp_to_security_room()
