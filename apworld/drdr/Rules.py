@@ -510,11 +510,27 @@ def _survivor_location(world, rescue_name):
                                          world.player)
 
 
-def item_sanity_rule(regions):
-    """Reach any of the areas an item type is placed in."""
-    if len(regions) == 1:
-        return CanReachRegion(regions[0])
-    return Or(*[CanReachRegion(r) for r in regions])
+# drdr_shared.json item_sanity: an item placed only inside the Entrance Plaza
+# storefronts lists this instead of "Entrance Plaza". The storefronts are
+# shuttered until the shutter cutscene, so reaching EP is not enough.
+ITEM_SANITY_EP_STOREFRONTS = "Entrance Plaza Storefronts"
+
+
+# Meeting Jessie is what moves the game flow on. An item type placed in the
+# Security Room or on the Rooftop can be picked up before that, so it does
+# not wait for her; every other type does.
+ITEM_SANITY_BEFORE_JESSIE = ("Security Room", "Rooftop")
+
+
+def item_sanity_rule(regions, ep_shutter, jessie):
+    """Reach any of the areas an item type is placed in, after meeting Jessie
+    unless one of them is the Security Room or the Rooftop."""
+    parts = [ep_shutter if r == ITEM_SANITY_EP_STOREFRONTS else CanReachRegion(r)
+             for r in regions]
+    rule = parts[0] if len(parts) == 1 else Or(*parts)
+    if any(r in ITEM_SANITY_BEFORE_JESSIE for r in regions):
+        return rule
+    return And(jessie, rule)
 
 
 def set_rules(world) -> None:
@@ -889,11 +905,14 @@ def set_rules(world) -> None:
 
     # ItemSanity: the first pickup of an item type needs any area whose
     # default layouts place it. Those files load all through the 72 hours,
-    # so reaching the area is all it takes.
+    # whatever the game flow, so reaching the area is all it takes -- except
+    # inside the EP storefronts, which need the shutters open, and anywhere
+    # past the Rooftop, which waits for Jessie.
     if getattr(world, "item_sanity", False):
+        _jessie = CanReachLocation("Meet Jessie in the Warehouse")
         for _name, _regions in ITEM_SANITY_REGIONS.items():
             world.set_rule(world.multiworld.get_location(_name, world.player),
-                           item_sanity_rule(_regions))
+                           item_sanity_rule(_regions, ep_shutter, _jessie))
 
     # Zombie Genocider: the top threshold in every area, which is the same
     # 53,594 kills as clearing all 99 checks and twelve rules instead of 99.
