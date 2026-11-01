@@ -111,6 +111,30 @@ local VEHICLE_DOOR_REACH = 3.0     -- metres beyond the door's own prompt radius
 local VEHICLE_DOOR_FACING = 0.6    -- cos of the widest angle to the door that counts
 local vehicle_door = { next_check = 0, last_pos = nil }
 
+-- Rooms a vehicle is never taken into. Any door can be redirected to one of
+-- them under Door Randomizer, and the game carries the ridden vehicle through
+-- any door, so a car could otherwise end up inside the Security Room or the
+-- Hideout. A door into one of these, taken while riding, is held: the player
+-- is put out of the vehicle, then the same door is taken on foot. s138 is the
+-- Security Room's entrance from Entrance Plaza.
+local NO_VEHICLE_AREAS = {
+    s135 = "the Heliport",
+    s136 = "the Security Room",
+    s138 = "the Security Room",
+    s401 = "Carlito's Hideout",
+}
+local VEHICLE_GETOUT_WAIT = 8.0    -- seconds for the get-out before the door is given up
+local vehicle_room = nil           -- { hd, dest, area, at, asked, out_at }
+local vehicle_getout_request = nil -- true while a get-out waits for the update thread
+local vehicle_getout_next = 0      -- next time a vehicle found inside one of those rooms is emptied
+
+-- How high each car's origin sits above the floor when it stands on its
+-- wheels. A door with no arrival entry for the vehicle puts it at the walking
+-- arrival point, on the floor, and the tall ones (sedan, box truck) stay
+-- sunk to the axles. Motorcycle and bicycle arrive fine at floor height.
+local VEHICLE_REST_HEIGHT = { [1] = 1.0, [2] = 0.45, [3] = 1.0 }
+local vehicle_lift_pending = nil   -- { from, area_no, base, rest, at, tries, wait }
+
 ------------------------------------------------------------
 -- Singleton Managers
 ------------------------------------------------------------
@@ -336,10 +360,23 @@ local function restore_vehicle_jumps(hit_data_obj)
     vehicle_jump_saved[key] = nil
 end
 
-local function player_in_vehicle()
+-- RIDE_CAR_TYPE of the vehicle the player is in, 0 on foot.
+local function ridden_type()
     local pm = sdk.get_managed_singleton("app.solid.PlayerManager")
     local v = pm and Shared.safe(function() return pm:get_field("<VehicleType>k__BackingField") end)
-    return v ~= nil and Shared.to_int(v) ~= 0
+    return (v ~= nil and Shared.to_int(v)) or 0
+end
+
+local function player_in_vehicle()
+    return ridden_type() ~= 0
+end
+
+local function door_has_vehicle_entry(hit_data_obj, vtype)
+    for _, e in ipairs(vehicle_jump_entries(hit_data_obj)) do
+        local t = Shared.safe(function() return e:get_field("VehicleType") end)
+        if Shared.to_int(t) == vtype then return true end
+    end
+    return false
 end
 
 local function read_yaw(q)
@@ -513,6 +550,131 @@ local function face_vehicle_on_arrival()
     end)
 end
 
+-- Raises a car that came through a door lower than it stands on its wheels.
+-- The arrival point is on the floor; the car is put back at its resting
+-- height there and settles. Read back a few frames later and repeated, as the
+-- first frames in a new area can still be overwritten by the game's own
+-- placement.
+local LIFT_RECHECK_FRAMES = 5
+local LIFT_MAX_TRIES = 4
+
+local function lift_vehicle_on_arrival()
+    local p = vehicle_lift_pending
+    if not p then return end
+    local now = os.clock()
+    if now - p.at > 60 then vehicle_lift_pending = nil; return end
+    local idx = get_current_area_info()
+    if idx == nil or (idx == p.from and idx ~= p.area_no) then return end
+    p.arrived = p.arrived or now
+    if p.wait > 0 then p.wait = p.wait - 1; return end
+
+    local pm = sdk.get_managed_singleton("app.solid.PlayerManager")
+    local vc = pm and Shared.safe(function() return pm:call("get_VehicleControl") end)
+    if not vc then vehicle_lift_pending = nil; return end
+    local pos = Shared.safe(function() return vc:call("get_GameObject"):call("get_Transform"):call("get_Position") end)
+    if not pos then return end
+    local dx, dz = pos.x - p.base.x, pos.z - p.base.z
+    if dx * dx + dz * dz > 16 then
+        -- not placed at the arrival yet
+        if now - p.arrived > 10 then vehicle_lift_pending = nil end
+        return
+    end
+    local want = p.base.y + p.rest
+    if pos.y >= want - 0.2 then
+        if p.tries > 0 then
+            M.log(string.format("Vehicle lifted onto its wheels (%.2f above the arrival point, %d tr%s)",
+                pos.y - p.base.y, p.tries, p.tries == 1 and "y" or "ies"))
+        end
+        vehicle_lift_pending = nil
+        return
+    end
+    if p.tries >= LIFT_MAX_TRIES then
+        M.log(string.format("Vehicle could not be lifted (%.2f above the arrival point)", pos.y - p.base.y))
+        vehicle_lift_pending = nil
+        return
+    end
+    p.tries = p.tries + 1
+    p.wait = LIFT_RECHECK_FRAMES
+    local x, y, z = pos.x, want + 0.05, pos.z
+    pcall(function() vc:call("setPosition", Vector3f.new(x, y, z)) end)
+end
+
+local function notify(text)
+    local Notify = package.loaded["DRAP/Notify"]
+    if Notify and Notify.send then pcall(Notify.send, text, { duration = 5.0 }) end
+end
+
+-- The driver's own get-off, the route the Exit button takes:
+-- VehicleDriverPlayer.startForceOut(PlayerCondition, false). Run from the
+-- update thread; the get-off motion then plays out over a second or two.
+local function run_vehicle_getout()
+    if not vehicle_getout_request then return end
+    vehicle_getout_request = nil
+    local pm = sdk.get_managed_singleton("app.solid.PlayerManager")
+    local vc = pm and Shared.safe(function() return pm:call("get_VehicleControl") end)
+    local drv = vc and Shared.safe(function() return vc:get_field("<Driver>k__BackingField") end)
+    local cond = pm and Shared.safe(function() return pm:get_field("_CurrentPlayerCondition") end)
+    if not (drv and cond) then
+        M.log("Vehicle get-out: no driver or player condition")
+        return
+    end
+    local ok, err = pcall(function() drv:call("startForceOut", cond, false) end)
+    if not ok then M.log("Vehicle get-out failed: " .. tostring(err)) end
+end
+
+if re and re.on_pre_application_entry then
+    re.on_pre_application_entry("UpdateBehavior", function()
+        local ok, err = pcall(run_vehicle_getout)
+        if not ok then M.log("Vehicle get-out failed: " .. tostring(err)) end
+    end)
+end
+
+-- A door into a room in NO_VEHICLE_AREAS, taken while riding, was held by the
+-- areaJump hook. Gets the player out, then takes the same door on foot. If the
+-- player is still aboard after VEHICLE_GETOUT_WAIT the door is given up and
+-- the player told to get out first. Also empties a vehicle found inside one of
+-- those rooms however it got there, so the player is never stuck in one.
+local function vehicle_room_step()
+    local now = os.clock()
+    local r = vehicle_room
+    if not r then
+        if now < vehicle_getout_next or not player_in_vehicle() then return end
+        local _, level_path = get_current_area_info()
+        local here = level_path and tostring(level_path):gsub("^SCN_", "")
+        if here and NO_VEHICLE_AREAS[here] then
+            vehicle_getout_next = now + 3
+            M.log("In a vehicle inside " .. NO_VEHICLE_AREAS[here] .. ": getting out")
+            vehicle_getout_request = true
+        end
+        return
+    end
+    local idx = get_current_area_info()
+    if idx and idx ~= r.area then
+        vehicle_room = nil
+        return
+    end
+    if player_in_vehicle() then
+        if not r.asked then
+            r.asked = now
+            M.log("Vehicle door into " .. NO_VEHICLE_AREAS[r.dest] .. " held: getting out first")
+            notify("Vehicles can't go into " .. NO_VEHICLE_AREAS[r.dest] .. ". Getting out first.")
+            vehicle_getout_request = true
+        elseif now - r.asked > VEHICLE_GETOUT_WAIT then
+            M.log("Vehicle door into " .. NO_VEHICLE_AREAS[r.dest] .. " given up: still in the vehicle")
+            notify("Get out of the vehicle to go into " .. NO_VEHICLE_AREAS[r.dest] .. ".")
+            vehicle_room = nil
+        end
+        return
+    end
+    r.out_at = r.out_at or now
+    if now - r.out_at < 0.5 then return end
+    vehicle_room = nil
+    if not area_jump_method then return end
+    M.log("On foot: taking the door into " .. NO_VEHICLE_AREAS[r.dest])
+    local ok, err = pcall(area_jump_method.call, area_jump_method, ahlm_mgr:get(), r.hd)
+    if not ok then M.log("Door after get-out failed: " .. tostring(err)) end
+end
+
 ------------------------------------------------------------
 -- Hook Installation
 ------------------------------------------------------------
@@ -604,6 +766,7 @@ local function install_hook()
                 -- When a door was last used, so anything that must not land
                 -- mid-load (PlayerReady) can tell a load screen is coming.
                 M.last_jump_at = os.clock()
+                local hold_for_vehicle = false
                 pcall(function()
                     local hit_data_arg = args[3]
                     if not hit_data_arg then return end
@@ -637,6 +800,18 @@ local function install_hook()
                     if type(active_redirect) == "function" then
                         local ok, resolved = pcall(active_redirect, door_id, door_data)
                         active_redirect = (ok and type(resolved) == "table") and resolved or nil
+                    end
+
+                    -- No vehicle into the rooms in NO_VEHICLE_AREAS: hold the
+                    -- door untouched; vehicle_room_step gets the player out
+                    -- and takes it again on foot.
+                    local dest_code = (tostring(active_redirect and active_redirect.target_area or original_dest):gsub("^SCN_", ""))
+                    if NO_VEHICLE_AREAS[dest_code] and player_in_vehicle() then
+                        hold_for_vehicle = true
+                        if not vehicle_room then
+                            vehicle_room = { hd = hit_data_mo, dest = dest_code, area = area_index, at = os.clock() }
+                        end
+                        return
                     end
 
                     if active_redirect then
@@ -685,6 +860,22 @@ local function install_hook()
                         at = os.clock(),
                     }
 
+                    -- A car that will arrive at the walking arrival point (no
+                    -- entry of its own on the door, or one just moved there
+                    -- by a redirect) is raised onto its wheels after the jump.
+                    local vtype = ridden_type()
+                    local rest = VEHICLE_REST_HEIGHT[vtype]
+                    if rest and final_pos and final_pos.y
+                        and (was_redirected or not door_has_vehicle_entry(hit_data_mo, vtype)) then
+                        vehicle_lift_pending = {
+                            from = area_index,
+                            area_no = area_jump_name_to_area_no(final_area_jump_name),
+                            base = final_pos, rest = rest, at = os.clock(), tries = 0, wait = 0,
+                        }
+                    else
+                        vehicle_lift_pending = nil
+                    end
+
                     M.last_final_destination = {
                         door_id = door_id,
                         area_jump_name = final_area_jump_name,
@@ -730,6 +921,7 @@ local function install_hook()
                     }
                 end)
 
+                if hold_for_vehicle then return sdk.PreHookResult.SKIP_ORIGINAL end
                 return args
             end,
             -- Post-hook
@@ -1295,7 +1487,9 @@ function M.on_frame()
         install_hook()
     end
 
+    vehicle_room_step()
     face_vehicle_on_arrival()
+    lift_vehicle_on_arrival()
     vehicle_door_check()
 
     if trace_areas then
