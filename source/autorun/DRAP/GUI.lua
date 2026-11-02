@@ -188,9 +188,10 @@ re.on_draw_ui(function()
     local dbg_changed, dbg_val = imgui.checkbox("Debug Mode", debug_mode)
     if dbg_changed then
         debug_mode = dbg_val
-        -- DEBUG records always reach the file; this decides whether they also
-        -- appear in the script console while debugging live.
+        -- DEBUG lines reach the log file and the script console only while
+        -- Debug Mode is ticked.
         Logger.set_console_level(debug_mode and "DEBUG" or "INFO")
+        Logger.set_debug(debug_mode)
         -- Arm the mod so the frame loop actually runs its modules. Without
         -- this, offline testing sees a dormant mod: no trackers, no deaths
         -- observed, no checks. Deliberately not undone when debug goes back

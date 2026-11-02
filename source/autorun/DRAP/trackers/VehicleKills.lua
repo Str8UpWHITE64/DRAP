@@ -118,6 +118,13 @@ local function read_ride()
     return M.ride_name(v, ride_names)
 end
 
+--- The RIDE_CAR_TYPE name the player is on right now (RIDE_NONE on foot), for
+--- the session log's state line.
+--- @return string|nil
+function M.current_ride()
+    return read_ride()
+end
+
 ------------------------------------------------------------
 -- The hook
 ------------------------------------------------------------

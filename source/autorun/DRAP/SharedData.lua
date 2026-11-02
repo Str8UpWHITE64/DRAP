@@ -89,6 +89,19 @@ function M.area_graph()
     return (data and data.area_graph) or {}
 end
 
+-- Scene code -> readable name and engine area index (Shared.SCENE_INFO is
+-- built from this same section).
+function M.scenes()
+    ensure_loaded()
+    return (data and data.scenes) or {}
+end
+
+-- RIDE_CAR_TYPE enum name -> the vehicle's readable name.
+function M.vehicles()
+    ensure_loaded()
+    return (data and data.vehicles) or {}
+end
+
 function M.time_keys()
     ensure_loaded()
     return (data and data.time_keys) or {}

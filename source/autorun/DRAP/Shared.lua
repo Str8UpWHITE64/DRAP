@@ -150,52 +150,35 @@ end
 -- Scene Metadata
 ------------------------------------------------------------
 
---- Engine scene-code → {name, index} lookup, where index is the AreaManager
+--- Engine scene-code -> {name, index} lookup, where index is the AreaManager
 --- mAreaIndex value. Lets door modules translate between the scene path string
---- ("SCN_s100") and the engine's numeric index (256). Lua-only because the
---- index field isn't carried in drdr_shared.json (only scene_code + name).
-Shared.SCENE_INFO = {
-    s140 = { name = "Title Screen",          index = 292  },
-    s135 = { name = "Heliport",              index = 287  },
-    s136 = { name = "Security Room",         index = 288  },
-    s231 = { name = "Rooftop",               index = 535  },
-    s230 = { name = "Warehouse",             index = 534  },
-    s200 = { name = "Paradise Plaza",        index = 512  },
-    s503 = { name = "Colby's Movieland",     index = 1283 },
-    s700 = { name = "Leisure Park",          index = 1792 },
-    s400 = { name = "North Plaza",           index = 1024 },
-    s501 = { name = "Crislip's Home Saloon", index = 1281 },
-    sa00 = { name = "Food Court",            index = 2560 },
-    s300 = { name = "Wonderland Plaza",      index = 768  },
-    s900 = { name = "Al Fresca Plaza",       index = 2304 },
-    s100 = { name = "Entrance Plaza",        index = 256  },
-    s500 = { name = "Seon's Food and Stuff", index = 1280 },
-    s600 = { name = "Maintenance Tunnel",    index = 1536 },
-    s401 = { name = "Carlito's Hideout",     index = 1025 },
-    s601 = { name = "Meat Processing Area",  index = 1537 },
-    -- Where the raincoats take you. Not in the area graph: it is entered
-    -- by cutscene, not through a door.
-    s504 = { name = "Cultists' Hideout",     index = 1284 },
+--- ("SCN_s100") and the engine's numeric index (256), and gives every log line
+--- the area's readable name. The rows live in the "scenes" section of
+--- drdr_shared.json, the one name table; nothing here is kept by hand.
+---
+--- The indices were read in game rather than derived: the code looks like hex
+--- and mostly is, but s135 is 287 rather than 309, so the pattern cannot be
+--- trusted. A scene with no index has never been entered. The Clock Tower
+--- Tunnel scenes are entered by cutscene, never through a door; sb01 and sb02
+--- are joined by a load zone, so no areaJump fires between them.
+Shared.SCENE_INFO = {}
 
-    -- The Clock Tower Tunnel, in the order it is played. No door anywhere
-    -- leads here -- it is entered from Isabela's departure cutscene -- so
-    -- these never appear in the area graph and are not lockable. Named so
-    -- area readouts say where the player is instead of a raw index.
-    --
-    -- Indices read in game with drap_player_pos(), not derived: the code looks
-    -- like hex and here it happens to be, but s135 is 287 rather than 309, so
-    -- the pattern cannot be trusted.
-    --
-    -- sb01 and sb02 are joined by a load zone rather than a door, so no
-    -- areaJump fires between them and the door capture never sees it.
-    -- The tank fight and Brock are both sb03; sb04 has never been entered and
-    -- has no index or confirmed contents.
-    sb00 = { name = "Clock Tower Tunnel - Entrance",     index = 2816 },
-    sb01 = { name = "Clock Tower Tunnel - Middle",       index = 2817 },
-    sb02 = { name = "Clock Tower Tunnel - Exit",         index = 2818 },
-    sb03 = { name = "Clock Tower Tunnel - Battleground", index = 2819 },
-    sb04 = { name = "Clock Tower Tunnel - Unvisited"     },
-}
+do
+    local rows
+    if type(json) == "table" or type(json) == "userdata" then
+        local ok, data = pcall(json.load_file, "drdr_shared.json")
+        if ok and type(data) == "table" then rows = data.scenes end
+    end
+    if type(rows) ~= "table" then
+        Logger.error("shared", "drdr_shared.json has no scenes section; areas will log as unknown")
+    else
+        for _, row in ipairs(rows) do
+            if row.code and row.name then
+                Shared.SCENE_INFO[row.code] = { name = row.name, index = row.index }
+            end
+        end
+    end
+end
 
 --- Reverse map: engine area index → scene code. Built once at module load.
 Shared.INDEX_TO_SCENE = {}

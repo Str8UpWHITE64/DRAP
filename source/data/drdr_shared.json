@@ -1,5 +1,40 @@
 {
   "schema_version": 2,
+  "scenes": [
+    {"code": "s140", "name": "Title Screen", "index": 292},
+    {"code": "s135", "name": "Heliport", "index": 287},
+    {"code": "s136", "name": "Security Room", "index": 288},
+    {"code": "s231", "name": "Rooftop", "index": 535},
+    {"code": "s230", "name": "Warehouse", "index": 534},
+    {"code": "s200", "name": "Paradise Plaza", "index": 512},
+    {"code": "s503", "name": "Colby's Movieland", "index": 1283},
+    {"code": "s700", "name": "Leisure Park", "index": 1792},
+    {"code": "s400", "name": "North Plaza", "index": 1024},
+    {"code": "s501", "name": "Crislip's Home Saloon", "index": 1281},
+    {"code": "sa00", "name": "Food Court", "index": 2560},
+    {"code": "s300", "name": "Wonderland Plaza", "index": 768},
+    {"code": "s900", "name": "Al Fresca Plaza", "index": 2304},
+    {"code": "s100", "name": "Entrance Plaza", "index": 256},
+    {"code": "s500", "name": "Seon's Food and Stuff", "index": 1280},
+    {"code": "s600", "name": "Maintenance Tunnel", "index": 1536},
+    {"code": "s401", "name": "Carlito's Hideout", "index": 1025},
+    {"code": "s601", "name": "Meat Processing Area", "index": 1537},
+    {"code": "s504", "name": "Cultists' Hideout", "index": 1284},
+    {"code": "sb00", "name": "Clock Tower Tunnel - Entrance", "index": 2816},
+    {"code": "sb01", "name": "Clock Tower Tunnel - Middle", "index": 2817},
+    {"code": "sb02", "name": "Clock Tower Tunnel - Exit", "index": 2818},
+    {"code": "sb03", "name": "Clock Tower Tunnel - Battleground", "index": 2819},
+    {"code": "sb04", "name": "Clock Tower Tunnel - Unvisited"}
+  ],
+  "vehicles": {
+    "RIDE_4DOOR": "White Sedan",
+    "RIDE_2DOOR": "Sports Car",
+    "RIDE_TRUCK": "Box Truck",
+    "RIDE_HAMMER": "Humvee",
+    "RIDE_BIKE": "Motorcycle",
+    "RIDE_BIYCYCLE": "Bicycle",
+    "RIDE_RIDECART": "Ride Cart"
+  },
   "areas": [
     {
       "name": "Heliport",

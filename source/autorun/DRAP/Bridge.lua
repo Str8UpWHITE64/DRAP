@@ -6,6 +6,7 @@ local AP_REF = require("AP_REF/core")
 local ItemEffects = require("DRAP/ItemEffects")
 local Ledger = require("DRAP/LocationLedger")
 local Activation = require("DRAP/Activation")
+local GameLog = require("DRAP/GameLog")
 
 local M = Shared.create_module("Bridge")
 
@@ -106,7 +107,7 @@ function M.send_goal_complete()
     if type(AP_REF.APClient.StatusUpdate) == "function" then
         local ok, err = pcall(AP_REF.APClient.StatusUpdate, AP_REF.APClient, CLIENT_GOAL)
         if ok then
-            M.log("Goal completion sent successfully!")
+            GameLog.goal_complete((_G.AP and _G.AP.GoalName) or "goal")
             return true
         else
             M.log.error("StatusUpdate failed: " .. tostring(err))
@@ -453,7 +454,7 @@ local function handle_bounced(json_rows)
     local source = data["source"] or data["player"] or "Unknown"
     local cause = data["cause"] or ("DeathLink from " .. tostring(source))
 
-    M.log("DeathLink received: " .. tostring(cause))
+    GameLog.deathlink("received", source, cause)
 
     if _G.AP and _G.AP.DeathLink and _G.AP.DeathLink.receive then
         pcall(_G.AP.DeathLink.receive, "DeathLink: " .. tostring(cause))
@@ -485,7 +486,7 @@ function M.send_deathlink(data)
     if type(AP_REF.APClient.Bounce) == "function" then
         local ok, err = pcall(AP_REF.APClient.Bounce, AP_REF.APClient, deathLinkData, nil, nil, { "DeathLink" })
         if ok then
-            M.log("Sent DeathLink: " .. tostring(deathLinkData.cause))
+            GameLog.deathlink("sent", nil, deathLinkData.cause)
             return true
         end
         M.log.error("DeathLink send failed: " .. tostring(err))
@@ -567,7 +568,7 @@ function M.check(loc_name)
         return false
     end
 
-    M.log("Sending location check: " .. tostring(loc_name))
+    M.log.debug("Sending location check: " .. tostring(loc_name))
 
     -- Record every check for resend-on-reconnect, even if the send fails
     if loc_name and Ledger.is_init() then
@@ -604,8 +605,8 @@ function M.check(loc_name)
 
     loc_id = tonumber(loc_id) or loc_id
     local ok, ret = pcall(AP_REF.APClient.LocationChecks, AP_REF.APClient, { loc_id })
-    M.log("LocationChecks ok=" .. tostring(ok))
-    if not ok then sync_needed = true end
+    M.log.debug("LocationChecks ok=" .. tostring(ok))
+    if ok then GameLog.checked(loc_name) else sync_needed = true end
     return ok
 end
 
@@ -1320,6 +1321,20 @@ local kill_filler_counts = {}   -- name -> received, for the status command
 local kill_filler_batch = {}    -- name -> received this batch
 local received_dirty = false    -- received-items file needs writing
 
+--- The location an item came from, by name, for the "Received" line. Empty
+--- when the client cannot name it (a location from another game that the data
+--- package has not described).
+local function location_label(net_item, sender)
+    if not (AP_REF.APClient and net_item.location) then return nil end
+    local game = Shared.safe(function() return AP_REF.APClient:get_player_game(sender) end)
+    local name = Shared.safe(function()
+        return AP_REF.APClient:get_location_name(net_item.location, game)
+    end)
+    name = Shared.clean_string(name)
+    if name == "" or name:match("^Unknown") or name:match("^Location %d+$") then return nil end
+    return name
+end
+
 local function handle_net_item(net_item, is_replay)
     local item_id = net_item.item
     local sender = net_item.player
@@ -1339,7 +1354,8 @@ local function handle_net_item(net_item, is_replay)
         return
     end
 
-    M.log("Applying item index=" .. tostring(index) .. " id=" .. tostring(item_id) .. " (" .. item_name .. ") from " .. sender_name .. " (replay=" .. tostring(is_replay) .. ")")
+    M.log.debug("Applying item index=" .. tostring(index) .. " id=" .. tostring(item_id) .. " (" .. item_name .. ") from " .. sender_name .. " (replay=" .. tostring(is_replay) .. ")")
+    GameLog.received(item_name, sender_name, location_label(net_item, sender), is_replay)
 
     -- Look up the game item number from our registered mappings
     local game_item_no = ITEM_NAME_TO_GAME_NO[item_name]
@@ -1366,6 +1382,8 @@ local function handle_net_item(net_item, is_replay)
     local handled = ItemEffects.dispatch(net_item, item_name, sender_name, is_replay)
     if not handled then
         M.default_item_handler(net_item, item_name, sender_name)
+    else
+        GameLog.applied(item_name, is_replay)
     end
 
     -- Native in-game toast for the item-receive (skip replays -- those are

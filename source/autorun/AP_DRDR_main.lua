@@ -14,14 +14,13 @@ end
 -- First, so the session log is open before any module can log into it and the
 -- banner below is genuinely the first DRAP line in the file.
 local Logger = require("DRAP/Logger")
-Logger.info("DRAP", string.format("DRAP %s starting -- session log: %s",
-    Logger.VERSION, Logger.get_path() or "console only (file open failed)"))
 
 local Activation = require("DRAP/Activation")
 local AP_BRIDGE = require("DRAP/Bridge")
 
 AP = AP or {}
 AP.Activation       = Activation
+AP.GameLog          = require("DRAP/GameLog")
 AP.AP_BRIDGE        = AP_BRIDGE
 AP.ItemSpawner      = require("DRAP/ItemSpawner")
 AP.ItemRestriction  = require("DRAP/ItemRestriction")
@@ -389,7 +388,12 @@ local function run_slot_connect(slot_data)
     local slot = Shared.clean_string(AP_BRIDGE.AP_REF.APSlot or "unknown")
     local seed = extract_seed(slot_data)
 
-    log("Slot connected: slot=" .. slot .. " seed=" .. seed)
+    do
+        local client = AP_BRIDGE.AP_REF.APClient
+        local number = client and Shared.safe(function() return client:get_player_number() end)
+        local players = client and Shared.safe(function() return client:get_players() end)
+        AP.GameLog.connected(seed, slot, number, type(players) == "table" and #players or nil)
+    end
 
     -- Another slot in the same session is another world: what NpcTracker
     -- remembers of the last one (kills above all) must not leak into it. A
@@ -581,7 +585,8 @@ local function run_slot_connect(slot_data)
     AP.Goal = goal
     local goal_names = { [0] = "Ending S", [1] = "Ending A", [2] = "Savior",
                          [3] = "Zombie Genocider", [4] = "Psycho" }
-    log("Goal: " .. (goal_names[goal] or tostring(goal)))
+    AP.GoalName = goal_names[goal] or tostring(goal)
+    log("Goal: " .. AP.GoalName)
 
     -- Overtime suppressant gating. Ending S only, because that is the only
     -- goal whose seed carries the eight items -- and every Ending S seed,
@@ -807,6 +812,14 @@ local function run_slot_connect(slot_data)
 
     -- (Bridge persistence — received items, completed checks, sticker save
     -- file — is initialized at the TOP of this handler, before any consumer.)
+
+    AP.GameLog.config(AP_BRIDGE.AP_REF.APHost, slot, string.format(
+        "goal %s, DeathLink %s, DamageLink %s, TrapLink %s, ScoopSanity %s",
+        AP.GoalName, deathlink_enabled and "on" or "off",
+        damage_link_enabled and "on" or "off", trap_link_enabled and "on" or "off",
+        scoop_sanity_enabled and "on" or "off"))
+    AP.GameLog.reset_watch()
+    AP.GameLog.state()
 end
 
 --- The AP callback proper: capture the slot data and get off the client's
@@ -826,6 +839,7 @@ local new_game_checked = false
 
 local function on_enter_game()
     log("Entered gameplay")
+    AP.GameLog.reset_watch()
     pending_reapply = true
     new_game_checked = false
 end
@@ -848,6 +862,7 @@ local function try_reapply_if_ready()
         local ng = AP.ScoopUnlocker.is_new_game()
         if ng ~= nil then
             new_game_checked = true
+            AP.GameLog.session_entered(ng == true)
             if ng then
                 log("New game detected -- resetting side scoop progress")
                 AP.ScoopUnlocker.reset_for_new_game()
@@ -883,6 +898,7 @@ local function try_reapply_if_ready()
     end
 
     pending_reapply = false
+    AP.GameLog.state()
 end
 
 ------------------------------------------------------------
@@ -933,6 +949,7 @@ re.on_frame(function()
     end
 
     -- Update all modules
+    safe_on_frame(AP.GameLog,          "GameLog")
     safe_on_frame(AP.ItemSpawner,      "ItemSpawner")
     safe_on_frame(AP.ItemRestriction,  "ItemRestriction")
     safe_on_frame(AP.DoorSceneLock,    "DoorSceneLock")
