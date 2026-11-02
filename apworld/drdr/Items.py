@@ -630,7 +630,7 @@ progression_skills = {
 }
 
 
-def BuildItemPool(multiworld, count, options, excluded_scoop_names=(),
+def BuildItemPool(random, count, options, excluded_scoop_names=(),
                   door_locks_active=False, start_key_names=()):
     """Build the item pool for this world.
 
@@ -956,7 +956,7 @@ def BuildItemPool(multiworld, count, options, excluded_scoop_names=(),
         for _ in range(trap_slot_count):
             if not trap_cycle:
                 trap_cycle = list(trapList)
-                multiworld.random.shuffle(trap_cycle)
+                random.shuffle(trap_cycle)
             item_pool.append(trap_cycle.pop())
 
     # Non-trap filler slots: shuffle once, walk in order, reshuffle on
@@ -964,7 +964,7 @@ def BuildItemPool(multiworld, count, options, excluded_scoop_names=(),
     # property of the original algorithm.
     if item_sanity and non_trap_slot_count > 0:
         shuffled_filler = list(nonTrapFiller)
-        multiworld.random.shuffle(shuffled_filler)
+        random.shuffle(shuffled_filler)
         once = shuffled_filler[:non_trap_slot_count]
         item_pool.extend(once)
         kill_filler = [item for item in _all_items
@@ -973,14 +973,14 @@ def BuildItemPool(multiworld, count, options, excluded_scoop_names=(),
             item_pool.append(kill_filler[i % len(kill_filler)])
     elif non_trap_slot_count > 0 and nonTrapFiller:
         shuffled_filler = list(nonTrapFiller)
-        multiworld.random.shuffle(shuffled_filler)
+        random.shuffle(shuffled_filler)
         filler_index = 0
         for _ in range(non_trap_slot_count):
             if filler_index >= len(shuffled_filler):
-                multiworld.random.shuffle(shuffled_filler)
+                random.shuffle(shuffled_filler)
                 filler_index = 0
             item_pool.append(shuffled_filler[filler_index])
             filler_index += 1
 
-    multiworld.random.shuffle(item_pool)
+    random.shuffle(item_pool)
     return item_pool

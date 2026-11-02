@@ -931,7 +931,7 @@ class DRWorld(World):
         # their locations don't exist and their completion would only advance
         # story state the goal doesn't need.
         excluded_scoops = MAIN_SCOOP_NAMES if not self.main_scoops_enabled else ()
-        foo = BuildItemPool(self.multiworld, itempoolSize, self.options,
+        foo = BuildItemPool(self.random, itempoolSize, self.options,
                             excluded_scoop_names=excluded_scoops,
                             door_locks_active=self.door_locks_active,
                             start_key_names=self.start_key_names)
@@ -1069,14 +1069,17 @@ class DRWorld(World):
                   if getattr(w, "kill_fill_items", None)]
         if not worlds:
             return
+        # The first Dead Rising world's own random drives the shuffle, so a
+        # seed with a single Dead Rising slot never depends on other games.
+        rng = worlds[0].random
         items, slots, backup = [], [], []
         for w in worlds:
             items.extend(w.kill_fill_items)
             slots.extend(w.kill_fill_locations)
             backup.extend(w.kill_backup_locations)
-        multiworld.random.shuffle(items)
-        multiworld.random.shuffle(slots)
-        multiworld.random.shuffle(backup)
+        rng.shuffle(items)
+        rng.shuffle(slots)
+        rng.shuffle(backup)
         for item in items:
             placed = False
             while slots and not placed:
