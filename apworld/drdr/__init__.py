@@ -7,7 +7,7 @@ from Options import OptionError, item_and_loc_options
 
 from worlds.AutoWorld import World, WebWorld
 
-from .Items import DRItem, DRItemCategory, item_dictionary, key_item_names, item_descriptions, BuildItemPool, specialty_items, overpowered_items, progression_skills, microwave_food_items, challenge_tool_items, kill_filler_items, KENT_DAYS, PROGRESSIVE_KENT
+from .Items import DRItem, DRItemCategory, item_dictionary, key_item_names, item_descriptions, BuildItemPool, specialty_items, overpowered_items, progression_skills, microwave_food_items, challenge_tool_items, kill_filler_items
 from .Locations import kill_sanity_location_groups
 from .Locations import (DRLocation, DRLocationCategory, location_tables,
                         location_dictionary, ZOMBIE_KILL_TIERS,
@@ -77,9 +77,7 @@ def _validate_shared_scoops() -> None:
             s.get("category") in ("Survivor", "Psychopath")
             or (s.get("category") == "Main" and s.get("chain_eligible"))
         )
-        # Kent's days arrive as Progressive Kent Scoop copies instead.
-        item = PROGRESSIVE_KENT if name in KENT_DAYS else name
-        if needs_item and item not in all_items:
+        if needs_item and name not in all_items:
             problems.append(f"scoop '{name}' is not an item in Items.py")
         event = s.get("completion_event")
         if event and event not in all_locations:
@@ -1455,7 +1453,8 @@ class DRWorld(World):
             "zombie_kill_thresholds": zombie_kill_thresholds,
             "scoop_order": self.scoop_order if scoop_sanity_enabled else {},
             # The Kent day each Progressive Kent Scoop copy unlocks, in order.
-            "kent_progression": KENT_DAYS if scoop_sanity_enabled else [],
+            # Empty: this seed sends each day as its own item.
+            "kent_progression": [],
             # Player-stats slot data (read by Lua on slot connect)
             "vanilla_progression": vanilla_progression_value,
             "trap_percentage": trap_percentage,

@@ -3465,6 +3465,10 @@ function SCOOP_FINISH.tick()
         active = true,
         loop_running = SCOOP_FINISH.loop_running(now),
         is_completed = State.is_completed,
+        held = function(scq)
+            local kc = _G.AP and _G.AP.effects and _G.AP.effects.KentChain
+            return kc ~= nil and kc.holds_row ~= nil and kc.holds_row(scq) == true
+        end,
     })
     for _, f in ipairs(finish) do
         local row = f.row

@@ -347,8 +347,11 @@ _all_items = [DRItemData(row[0], row[1], row[2]) for row in [
     ("The Woman Left Behind", 3115, DRItemCategory.SCOOP),
     ("A Woman in Despair", 3116, DRItemCategory.SCOOP),
 
-    # Psychopath Scoops. 3200-3202 were Kent's three days, now Progressive
-    # Kent Scoop below; the ids stay retired.
+    # Psychopath Scoops. Kent's three days are one item each, with the ids
+    # they had before Progressive Kent Scoop.
+    ("Cut from the Same Cloth", 3200, DRItemCategory.SCOOP),
+    ("Photo Challenge", 3201, DRItemCategory.SCOOP),
+    ("Photographer's Pride", 3202, DRItemCategory.SCOOP),
     ("Cletus", 3203, DRItemCategory.SCOOP),
     ("The Convicts", 3204, DRItemCategory.SCOOP),
     ("Out of Control", 3205, DRItemCategory.SCOOP),
@@ -358,8 +361,8 @@ _all_items = [DRItemData(row[0], row[1], row[2]) for row in [
     ("Long Haired Punk", 3209, DRItemCategory.SCOOP),
     ("Mark of the Sniper", 3210, DRItemCategory.SCOOP),
     ("The Cult", 3211, DRItemCategory.SCOOP),
-    # Kent's three days come as copies of this under ScoopSanity: the Nth
-    # copy unlocks day N, so the days always arrive in order.
+    # Seeds made before the days were separate items carry three copies of
+    # this instead: the Nth copy unlocks day N. New seeds never place it.
     ("Progressive Kent Scoop", 3212, DRItemCategory.SCOOP),
 
     # Player skills (21) — handled by DRAP/effects/PlayerStats.lua
@@ -571,7 +574,8 @@ spitter_kept_weapons = {
     "Queen",
 }
 
-# Kent's days, in the order the Progressive Kent Scoop copies unlock them.
+# Kent's days. Each is its own item; older seeds unlock them in this order
+# with Progressive Kent Scoop copies.
 PROGRESSIVE_KENT = "Progressive Kent Scoop"
 KENT_DAYS = ["Cut from the Same Cloth", "Photo Challenge", "Photographer's Pride"]
 
@@ -854,8 +858,8 @@ def BuildItemPool(random, count, options, excluded_scoop_names=(),
     if options.scoop_sanity:
         excluded = set(excluded_scoop_names)
         for scoop in scoopList:
-            # Kent's days go in below as Progressive Kent Scoop copies.
-            if scoop.name in KENT_DAYS or scoop.name == PROGRESSIVE_KENT:
+            # Only seeds from older versions use the progressive Kent item.
+            if scoop.name == PROGRESSIVE_KENT:
                 continue
             # Skip "Out of Control" if door randomizer is also enabled (it's precollected for softlock prevention)
             if options.door_randomizer and scoop.name == "Out of Control":
@@ -866,12 +870,6 @@ def BuildItemPool(random, count, options, excluded_scoop_names=(),
                 continue
             item = item_dictionary[scoop.name]
             item_pool.append(item)
-            remaining_count = remaining_count - 1
-            included_itemcount = included_itemcount + 1
-        for day in KENT_DAYS:
-            if day in excluded:
-                continue
-            item_pool.append(item_dictionary[PROGRESSIVE_KENT])
             remaining_count = remaining_count - 1
             included_itemcount = included_itemcount + 1
 

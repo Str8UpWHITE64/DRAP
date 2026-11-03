@@ -126,6 +126,7 @@ local FAMILY = {
     342, 352, 343,          -- EVB battle records (343 = EVB07, day-3 fight)
     1155, 1171, 1292,       -- third-appear / day-3 lost / enemy-set trigger
     346, 1290, 1291,        -- enemy-set members (sets 0/1)
+    2183,                   -- MESSAGE_RAIVAL_VS2: day 2's homework asked (events 116/118 wait on it)
 }
 
 -- EmSaveParam slots, identity-indexed by app.solid.enumEmSaveParam:
@@ -160,6 +161,7 @@ local KEEP_WHEN_COMPLETED = {
     ["Photo Challenge"] = {                  -- day-2 completion footprint
         780, 844, 2444, 2508, 2542,          -- start/finish/success, box
         386, 387, 389, 345,                  -- EM45 set-2 records
+        2183,                                -- homework asked
         -- 1225 deliberately NOT kept: it is day 2's appear INPUT, not a
         -- record. Keeping it dressed the freshly placed Kent as day-2
         -- (his behavior asserted EM45_SET2, untalkable) -- measured
@@ -595,6 +597,11 @@ local function apply_day(name)
             end
         end
     end
+    -- Day 2's picture record (389) is not kept when day 1 arms after day 2. With it on,
+    -- the game drops day-1 Kent's record right after the meet and never places him again.
+    -- 2183 goes with it: events 116 (the homework album) and 118 (day 2 lost) wait on
+    -- 2183 on and 389 off, so 389 alone off replays the album on the next Paradise entry.
+    if name == "Cut from the Same Cloth" then keep[389] = nil; keep[2183] = nil end
 
     -- A day this arm RETIRES (its FINISH flag is in the start set -- day 3
     -- carries 843 and 844) keeps its scheduler records too, exactly as a
@@ -1421,6 +1428,15 @@ function M.on_frame()
         moved_at = nil
         last_pos = nil
     end
+end
+
+--- True while KentChain is holding one of Kent's photoshoot rows (scoop 32 =
+--- day 1, 33 = day 2), so the scoop-finish fallback leaves it alone: during a
+--- wipe or arm, and day 1 for as long as day 2 keeps its flags pinned off.
+function M.holds_row(scq)
+    if edge_pending then return true end
+    if scq == 32 then return pinned_day ~= nil end
+    return false
 end
 
 ------------------------------------------------------------

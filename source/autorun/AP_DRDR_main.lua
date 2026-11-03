@@ -226,6 +226,9 @@ end
 -- Hook Wiring: Event Tracker
 ------------------------------------------------------------
 
+-- Locations already sent by a scoop completion this session (see on_tracked_location)
+local COMPLETION_SENT = {}
+
 AP.EventTracker.on_tracked_location = function(desc, source, raw_id, extra)
     -- Don't send checks if ScoopUnlocker is currently enabling flags
     -- (This prevents false completions when we unlock a mission)
@@ -234,8 +237,14 @@ AP.EventTracker.on_tracked_location = function(desc, source, raw_id, extra)
         return
     end
 
-    log(string.format("Tracked location: %s", tostring(desc)))
-    AP.AP_BRIDGE.check(desc)
+    -- A psycho kill is seen twice: ScoopUnlocker's die flag (e.g. 1292) and the defeat
+    -- scene's event number (event 70 for Kent) a moment later. Send it once.
+    if COMPLETION_SENT[desc] then
+        log.debug(string.format("Tracked location: %s (already sent by its scoop completion)", tostring(desc)))
+    else
+        log(string.format("Tracked location: %s", tostring(desc)))
+        AP.AP_BRIDGE.check(desc)
+    end
 
     -- Forward events to ScoopUnlocker for milestone/chain tracking
     if AP.ScoopUnlocker and AP.ScoopUnlocker.on_event_tracked then
@@ -327,6 +336,7 @@ end
 AP.ScoopUnlocker.set_completion_callback(function(event_desc, flag_id, scoop_name)
     log(string.format("Scoop completion detected: '%s' (flag %d, scoop '%s')",
         tostring(event_desc), flag_id or 0, tostring(scoop_name)))
+    if event_desc then COMPLETION_SENT[event_desc] = true end
     AP_BRIDGE.check(event_desc)
 end)
 

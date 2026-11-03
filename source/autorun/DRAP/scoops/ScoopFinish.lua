@@ -172,9 +172,11 @@ local ATTR_ENEMY = 0x40     -- mFinishParam indexes ENEMY_SETS
 
 local MEMBER_SUCCESS, MEMBER_FAIL, MEMBER_END = 1, 2, 3
 
--- KentChain arms and retires Kent's first two days itself, and holds day 1's
--- FINISH off on purpose while day 2 runs. Day 3 ends in a fight and is
--- finished like any psychopath.
+-- Kent's first two days end in a photoshoot. Their rows are finished only on
+-- their success member (342 for day 1, 352 for day 2), never on a failure,
+-- and not while KentChain holds them: it keeps day 1's FINISH off on purpose
+-- while day 2 runs, and it rewrites both rows when it arms a day
+-- (ctx.held). Day 3 ends in a fight and is finished like any psychopath.
 local KENTCHAIN_ROWS = { [32] = true, [33] = true }
 
 local PROTECTED = {}   -- flag -> row
@@ -227,8 +229,6 @@ function M.configure(deps)
             EXCLUDED[row.scq] = "other game modes"
         elseif exempt[row.finish] or exempt[row.success] then
             EXCLUDED[row.scq] = "cleared on purpose by the cult respawn"
-        elseif KENTCHAIN_ROWS[row.scq] then
-            EXCLUDED[row.scq] = "KentChain finishes it"
         end
     end
 
@@ -295,6 +295,12 @@ end
 function M.why_due(row, ctx)
     local check = ctx.check
     if check(row.finish) ~= false then return nil end   -- finished, or unreadable
+    if KENTCHAIN_ROWS[row.scq] then
+        if ctx.held and ctx.held(row.scq) then return nil end
+        if check(row.start) ~= true then return nil end
+        if M.outcome(row, check) == "success" then return "photoshoot succeeded", true end
+        return nil
+    end
     if writes_both(row) and check(row.success) == true then
         return "SUCCESS on, FINISH off", true
     end
@@ -326,6 +332,7 @@ end
 ---                world stable)
 ---   loop_running the game's SCQ loop is running (a main case waits otherwise)
 ---   is_completed(name) -> bool, DRAP's view
+---   held(scq) -> bool, optional: KentChain is holding that Kent row
 --- Returns the rows to finish now: { row, success, reason, since, attempt }.
 --- attempt counts the calls since the row's FINISH was last seen on.
 function M.tick(ctx)

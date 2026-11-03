@@ -24,7 +24,6 @@ from .shared_data import (
     SCOOP_COMPLETION_MAP, SCOOP_EVENTS, SCOOP_REGION_REQUIREMENTS,
     SCOOP_SPLIT_KEY_DOORS as SPLIT_KEY_SCOOP_DOORS,
 )
-from .Items import KENT_DAYS, PROGRESSIVE_KENT
 
 
 # Level requirements for each main scoop position (0-indexed) in the shuffled order.
@@ -542,10 +541,9 @@ def set_rules(world) -> None:
     _dropped = (world.SPITTER_EXCLUDED_LOCATIONS if world.spitter_only
                 else frozenset())
 
-    # Kent's days come as copies of Progressive Kent Scoop: day N needs N of
-    # them.
+    # Each of Kent's days is its own item, and the days can come in any order.
     def _kent_day(day):
-        return Has(PROGRESSIVE_KENT, KENT_DAYS.index(day) + 1)
+        return Has(day)
 
     # --------------------------------------------------------------------
     # Shared gates
@@ -1339,9 +1337,9 @@ def set_rules(world) -> None:
     world.set_rule(world.multiworld.get_location("Meet Paul", world.player), And(CanReachRegion("Wonderland Plaza"), (Has("Long Haired Punk") if world.options.scoop_sanity else And(Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM")))))
     world.set_rule(world.multiworld.get_location("Defeat Paul", world.player), CanReachLocation("Meet Paul"))
 
-    # Kent's days arrive in order under ScoopSanity, as copies of Progressive
-    # Kent Scoop, so each day's locations need that many copies and Paradise
-    # Plaza. Without ScoopSanity the vanilla schedule applies, so the days stay
+    # Under ScoopSanity each of Kent's days needs only its own item and
+    # Paradise Plaza: the mod plays them in whatever order they arrive.
+    # Without ScoopSanity the vanilla schedule applies, so the days stay
     # chained on each other and on their time keys.
     world.set_rule(world.multiworld.get_location("Meet Kent on day 1", world.player), And(CanReachRegion("Paradise Plaza"), (_kent_day("Cut from the Same Cloth") if world.options.scoop_sanity else True_())))
     world.set_rule(world.multiworld.get_location("Complete Kent's day 1 photoshoot", world.player), CanReachLocation("Meet Kent on day 1"))
@@ -1510,10 +1508,7 @@ def set_rules(world) -> None:
     world.set_rule(world.multiworld.get_location("Reach max level", world.player), CanReachLocation("Reach Level 50"))
     world.set_rule(world.multiworld.get_location("Kill 500 zombies by vehicle", world.player), _kill_rule)
     world.set_rule(world.multiworld.get_location("Kill 1000 zombies by vehicle", world.player), _kill_rule)
-    # Kent's days are Progressive Kent Scoop copies, one per day.
-    all_side_scoops = [_s for _s in SURVIVOR_SCOOP_NAMES + PSYCHOPATH_SCOOP_NAMES
-                       if _s not in KENT_DAYS]
-    all_side_scoops_rule = And(HasAll(*all_side_scoops), Has(PROGRESSIVE_KENT, len(KENT_DAYS)))
+    all_side_scoops_rule = HasAll(*(SURVIVOR_SCOOP_NAMES + PSYCHOPATH_SCOOP_NAMES))
     # The survivor-count milestones need nearly every late-game scoop. The
     # two big ones are kept to filler, since they only open once most of the
     # run is solved.
