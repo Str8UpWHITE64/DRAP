@@ -357,8 +357,13 @@ function M.tick(ctx)
                 if ctx.now - since >= wait then
                     state.due[scq] = nil
                     state.attempts[scq] = n + 1
+                    -- A survivor row is finished by the caller freeing its
+                    -- SCQMove slot and then writing its FINISH flag. Ending the
+                    -- row with the slot still held sets the health of survivors
+                    -- who are already delivered to 0.
                     finish[#finish + 1] = { row = row, success = success, reason = reason,
-                                            since = since, attempt = n + 1 }
+                                            since = since, attempt = n + 1,
+                                            direct = row.attr == ATTR_NPC }
                 end
             end
         end

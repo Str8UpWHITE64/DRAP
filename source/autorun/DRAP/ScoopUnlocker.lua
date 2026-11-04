@@ -3296,6 +3296,31 @@ function SCOOP_FINISH.finish(scq_no, success)
     end)
 end
 
+--- Gives back the SCQMove slot a row holds, if it holds one. A survivor row in
+--- a slot whose END goes on is read by the game's SCQ loop as "you met them,
+--- left them and the scoop ran out": it sets the health of a survivor who is
+--- not with Frank (and not JOIN, RESTRAINT or CONFINE) to 0, the Security
+--- Room's included. A load gives the old half-finished rows their slots again,
+--- so ending one with its slot still held empties the health of everyone
+--- already delivered. With END on, a row without a slot never takes one.
+--- @return number how many slot entries were freed
+function SCOOP_FINISH.free_slot(tbl)
+    local mgr = M:get_singleton("scq")
+    local scq = mgr and mgr:get()
+    if not scq then return 0 end
+    local list = Shared.safe(function() return scq:get_field("mScqMoveList") end)
+    if not list then return 0 end
+    local freed = 0
+    for _, m in Shared.iter_collection(list) do
+        local rno = m and Shared.safe(function() return m:get_field("rno") end)
+        local at = m and Shared.safe(function() return m:get_field("tblNo") end)
+        if m and tonumber(rno) and tonumber(rno) ~= 0 and tonumber(at) == tbl then
+            if pcall(function() m:set_field("rno", 0) end) then freed = freed + 1 end
+        end
+    end
+    return freed
+end
+
 -- The Last Resort finishes on 839 (EV_SCQ_FINISH07), which the game raises
 -- with the cutscene on leaving the tunnels for Leisure Park. Sometimes it
 -- plays the cutscene and never raises 839: measured 2026-09-25, all five
@@ -3472,7 +3497,16 @@ function SCOOP_FINISH.tick()
     })
     for _, f in ipairs(finish) do
         local row = f.row
-        local ok = SCOOP_FINISH.finish(row.scq, f.success)
+        local ok
+        if f.direct then
+            local freed = SCOOP_FINISH.free_slot(row.tbl)
+            if freed > 0 then
+                M.log(string.format("Scoop finish: scoop %d held a slot -- freed it first", row.scq))
+            end
+            ok = raw_set_flag_on(row.finish)
+        else
+            ok = SCOOP_FINISH.finish(row.scq, f.success)
+        end
         -- A finish that keeps not taking is retried quietly after the first
         -- few, with one line to say so.
         if f.attempt <= ScoopFinish.MAX_QUICK_ATTEMPTS then
@@ -3480,7 +3514,8 @@ function SCOOP_FINISH.tick()
                 "Scoop finish: scoop %d (FINISH %d%s) still unfinished after %.1f s (%s) -- %s",
                 row.scq, row.finish,
                 (f.success and row.success ~= 0) and (", SUCCESS " .. row.success) or "",
-                now - f.since, f.reason, ok and "finished it through finishSCQ" or "finishSCQ failed"))
+                now - f.since, f.reason, ok and (f.direct and "set its FINISH flag" or "finished it through finishSCQ")
+                    or "finishSCQ failed"))
         elseif f.attempt == ScoopFinish.MAX_QUICK_ATTEMPTS + 1 then
             M.log(string.format(
                 "Scoop finish: scoop %d (FINISH %d) is still unfinished after %d finishSCQ calls"
