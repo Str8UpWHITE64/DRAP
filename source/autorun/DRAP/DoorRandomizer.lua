@@ -129,6 +129,12 @@ local NO_VEHICLE_AREAS = {
     s138 = "the Security Room",
     s401 = "Carlito's Hideout",
 }
+-- Rooms only the motorcycle and the bicycle are taken into. Cars, the box
+-- truck and the Humvees are held at the door the same way.
+local NO_CAR_AREAS = {
+    s230 = "the Warehouse",
+}
+local CAR_TYPES = { [1] = true, [2] = true, [3] = true, [4] = true }  -- 4door, 2door, truck, Humvee
 local VEHICLE_GETOUT_WAIT = 8.0    -- seconds for the get-out before the door is given up
 local vehicle_room = nil           -- { hd, dest, area, at, asked, out_at }
 local vehicle_getout_request = nil -- true while a get-out waits for the update thread
@@ -375,6 +381,16 @@ end
 
 local function player_in_vehicle()
     return ridden_type() ~= 0
+end
+
+-- The room's name and who is kept out, when the ridden vehicle may not go
+-- into the area `code`; nil on foot or when it may.
+local function barred_area(code)
+    local vtype = ridden_type()
+    if vtype == 0 or not code then return nil end
+    if NO_VEHICLE_AREAS[code] then return NO_VEHICLE_AREAS[code], "Vehicles" end
+    if CAR_TYPES[vtype] and NO_CAR_AREAS[code] then return NO_CAR_AREAS[code], "Cars" end
+    return nil
 end
 
 local function door_has_vehicle_entry(hit_data_obj, vtype)
@@ -649,7 +665,7 @@ if re and re.on_pre_application_entry then
     end)
 end
 
--- A door into a room in NO_VEHICLE_AREAS, taken while riding, was held by the
+-- A door into a room in NO_VEHICLE_AREAS (or NO_CAR_AREAS, in a car), taken while riding, was held by the
 -- areaJump hook. Gets the player out, then takes the same door on foot. If the
 -- player is still aboard after VEHICLE_GETOUT_WAIT the door is given up and
 -- the player told to get out first. Also empties a vehicle found inside one of
@@ -661,9 +677,10 @@ local function vehicle_room_step()
         if now < vehicle_getout_next or not player_in_vehicle() then return end
         local _, level_path = get_current_area_info()
         local here = level_path and tostring(level_path):gsub("^SCN_", "")
-        if here and NO_VEHICLE_AREAS[here] then
+        local name = barred_area(here)
+        if name then
             vehicle_getout_next = now + 3
-            M.log("In a vehicle inside " .. NO_VEHICLE_AREAS[here] .. ": getting out")
+            M.log("In a vehicle inside " .. name .. ": getting out")
             vehicle_getout_request = true
         end
         return
@@ -676,12 +693,12 @@ local function vehicle_room_step()
     if player_in_vehicle() then
         if not r.asked then
             r.asked = now
-            M.log("Vehicle door into " .. NO_VEHICLE_AREAS[r.dest] .. " held: getting out first")
-            notify("Vehicles can't go into " .. NO_VEHICLE_AREAS[r.dest] .. ". Getting out first.")
+            M.log("Vehicle door into " .. r.name .. " held: getting out first")
+            notify(r.who .. " can't go into " .. r.name .. ". Getting out first.")
             vehicle_getout_request = true
         elseif now - r.asked > VEHICLE_GETOUT_WAIT then
-            M.log("Vehicle door into " .. NO_VEHICLE_AREAS[r.dest] .. " given up: still in the vehicle")
-            notify("Get out of the vehicle to go into " .. NO_VEHICLE_AREAS[r.dest] .. ".")
+            M.log("Vehicle door into " .. r.name .. " given up: still in the vehicle")
+            notify("Get out of the vehicle to go into " .. r.name .. ".")
             vehicle_room = nil
         end
         return
@@ -690,7 +707,7 @@ local function vehicle_room_step()
     if now - r.out_at < 0.5 then return end
     vehicle_room = nil
     if not area_jump_method then return end
-    M.log("On foot: taking the door into " .. NO_VEHICLE_AREAS[r.dest])
+    M.log("On foot: taking the door into " .. r.name)
     local ok, err = pcall(area_jump_method.call, area_jump_method, ahlm_mgr:get(), r.hd)
     if not ok then M.log("Door after get-out failed: " .. tostring(err)) end
 end
@@ -822,14 +839,17 @@ local function install_hook()
                         active_redirect = (ok and type(resolved) == "table") and resolved or nil
                     end
 
-                    -- No vehicle into the rooms in NO_VEHICLE_AREAS: hold the
-                    -- door untouched; vehicle_room_step gets the player out
-                    -- and takes it again on foot.
+                    -- No vehicle into the rooms in NO_VEHICLE_AREAS, and no car
+                    -- into those in NO_CAR_AREAS: hold the door untouched;
+                    -- vehicle_room_step gets the player out and takes it
+                    -- again on foot.
                     local dest_code = (tostring(active_redirect and active_redirect.target_area or original_dest):gsub("^SCN_", ""))
-                    if NO_VEHICLE_AREAS[dest_code] and player_in_vehicle() then
+                    local barred, barred_who = barred_area(dest_code)
+                    if barred then
                         hold_for_vehicle = true
                         if not vehicle_room then
-                            vehicle_room = { hd = hit_data_mo, dest = dest_code, area = area_index, at = os.clock() }
+                            vehicle_room = { hd = hit_data_mo, dest = dest_code, name = barred, who = barred_who,
+                                area = area_index, at = os.clock() }
                         end
                         return
                     end
