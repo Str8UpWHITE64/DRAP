@@ -96,7 +96,13 @@ local VEHICLE_LIFT = {
 -- transform, which its physics overwrites on the next step, so the vehicle
 -- keeps the heading it had and can arrive facing a wall. Set by the areaJump
 -- hook, applied on the first frame in the new area.
+-- Only a door the vehicle was not built for gets the turn: a redirected door,
+-- or a mall door taken by driving into it. The ramp between Leisure Park and
+-- the Tunnel is the game's own vehicle door, and a vehicle driven through it
+-- keeps the heading it came in with; the walking arrival angle there would
+-- leave it sideways at the top of the ramp.
 local vehicle_face_pending = nil   -- { from, area_no, yaw, at }
+local vehicle_door_jump = false    -- true while vehicle_door_check fires areaJump
 
 -- Mall doors while riding. The game offers no door prompt in a vehicle and a
 -- mall door is a solid wall to one, so only the Tunnel ramp takes a vehicle
@@ -477,7 +483,9 @@ local function vehicle_door_check()
                 M.log(string.format("Vehicle drove into the door %s -> %s (%.1f m, radius %.1f)", here, d.to, dist, d.radius))
                 vehicle_door.last_pos = nil
                 vehicle_door.next_check = now + 5
+                vehicle_door_jump = true
                 local ok, err = pcall(area_jump_method.call, area_jump_method, ahlm, d.hd)
+                vehicle_door_jump = false
                 if not ok then M.log("Vehicle door jump failed: " .. tostring(err)) end
                 return
             end
@@ -487,14 +495,19 @@ end
 
 -- Turns the ridden vehicle to the arrival angle once the new area is in.
 -- setRotation(Quaternion) goes to the physics body, the route the game itself
--- uses to warp a vehicle; turning the transform alone does nothing. On the
--- first frame in the area the turn does not always take as given (the
--- motorcycle came out at its old heading plus the new one), so the heading is
--- read back a few frames later and the turn repeated until it holds. After a
--- door the motorcycle reads every turn offset by the heading it jumped with,
--- for as long as it stays in that area; the offset is taken from the first
--- turn that moved it and the next turn asks for the target less that offset.
-local FACE_RECHECK_FRAMES = 5
+-- uses to warp a vehicle; turning the transform alone does nothing. The
+-- heading it gives is the one asked for plus a reference heading the body
+-- keeps, measured per vehicle: none on the cars; on the box
+-- truck the heading it was parked at, and on the truck and the motorcycle
+-- after a door the heading they jumped with. That reference cannot be read,
+-- so the first turn asks for the target, the heading is read back once the
+-- turn has had time to land, and a turn that moved the vehicle but missed
+-- gives the reference (read less asked) for the next one.
+-- The read is only trusted once it holds: the turn can land later than the
+-- first read, and a truck that drove up the ramp already faced the target, so
+-- an early read matched and the late turn then left it sideways.
+local FACE_RECHECK_FRAMES = 30
+local FACE_CONFIRM_FRAMES = 30
 local FACE_MAX_TRIES = 6
 
 local function vehicle_yaw(vc)
@@ -526,22 +539,29 @@ local function face_vehicle_on_arrival()
     if p.tries > 0 then p.seen[#p.seen + 1] = string.format("%.2f", yaw or 0) end
     local off = yaw and math.abs(wrap_angle(yaw - p.yaw)) or nil
     if p.tries > 0 and off and off < 0.1 then
-        vehicle_face_pending = nil
-        M.log(string.format("Vehicle turned to the arrival heading (%.2f, %d tr%s: %s)", p.yaw, p.tries,
-            p.tries == 1 and "y" or "ies", table.concat(p.seen, " ")))
+        if p.confirmed then
+            vehicle_face_pending = nil
+            M.log(string.format("Vehicle turned to the arrival heading (%.2f, %d tr%s: %s)", p.yaw, p.tries,
+                p.tries == 1 and "y" or "ies", table.concat(p.seen, " ")))
+            return
+        end
+        -- on target: read once more before calling it done
+        p.confirmed = true
+        p.wait = FACE_CONFIRM_FRAMES
         return
     end
+    p.confirmed = nil
     if p.tries >= FACE_MAX_TRIES then
         vehicle_face_pending = nil
         M.log(string.format("Vehicle could not be turned to the arrival heading (%.2f; read %s)", p.yaw, table.concat(p.seen, " ")))
         return
     end
-    -- A turn that moved the vehicle but missed shows the offset it applies;
+    -- A turn that moved the vehicle but missed shows the reference it adds;
     -- one that did not move it yet is simply asked for again.
-    if p.tries > 0 and yaw and p.last_read and math.abs(wrap_angle(yaw - p.last_read)) > 0.02 then
+    if p.tries > 0 and yaw and p.before and math.abs(wrap_angle(yaw - p.before)) > 0.02 then
         p.cmd = wrap_angle(p.yaw - wrap_angle(yaw - p.cmd))
     end
-    p.last_read = yaw
+    p.before = yaw
     p.tries = p.tries + 1
     p.wait = FACE_RECHECK_FRAMES
     local c = p.cmd
@@ -853,12 +873,16 @@ local function install_hook()
                         end
                     end
 
-                    vehicle_face_pending = {
-                        from = area_index,
-                        area_no = area_jump_name_to_area_no(final_area_jump_name),
-                        yaw = final_angle and final_angle.y or nil,
-                        at = os.clock(),
-                    }
+                    if was_redirected or vehicle_door_jump then
+                        vehicle_face_pending = {
+                            from = area_index,
+                            area_no = area_jump_name_to_area_no(final_area_jump_name),
+                            yaw = final_angle and final_angle.y or nil,
+                            at = os.clock(),
+                        }
+                    else
+                        vehicle_face_pending = nil
+                    end
 
                     -- A car that will arrive at the walking arrival point (no
                     -- entry of its own on the door, or one just moved there
