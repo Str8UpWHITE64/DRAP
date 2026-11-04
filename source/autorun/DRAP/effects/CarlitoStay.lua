@@ -18,8 +18,9 @@
 -- What this module does: on a door or warp into the tunnel, when
 --   * ScoopSanity is on,
 --   * he has been in reach in this slot: The Last Resort has finished in this
---     world (839 EV_SCQ_FINISH07 on), or DRAP remembers the 11am meeting or
---     the case being done from any world,
+--     world (839 EV_SCQ_FINISH07 on), DRAP remembers the 11am meeting or
+--     the case being done from any world, or the case was received and opened
+--     (294 on) before the meeting,
 --   * he is not dead (1284 off) and the check has not been sent,
 --   * the ending has not been reached (no Overtime, 312 off, flow under 1000),
 -- the game flow is set to 320 before the tunnel loads, and the flow it had is
@@ -51,6 +52,7 @@ local M = Shared.create_module("CarlitoStay")
 local TUNNEL = "s600"
 local CARLITO_FLOW = 320
 local DEATH_SCENE_FLOW = 330          -- his death scene's own write
+local CASE_START_FLAG = 294           -- EV_EVENT33_0, The Last Resort opened
 local CASE_FINISH_FLAG = 839          -- EV_SCQ_FINISH07, The Last Resort
 local CARLITO_DEAD_FLAG = 1284        -- EV_CARLITO3_DIE
 local ENDING_FLAG = 312
@@ -67,10 +69,14 @@ local LEAVE_GRACE_S = 60              -- an entry that never lands is undone aft
 ------------------------------------------------------------
 
 --- Whether he has been in reach in this slot: the case finished in this
---- world, or the ledger / ScoopState remember the meeting or the case from
---- any world (a Start Over or an older save keeps those).
+--- world, the ledger / ScoopState remember the meeting or the case from any
+--- world (a Start Over or an older save keeps those), or The Last Resort has
+--- been received and started (its first flag, 294, is on). The last one is a
+--- case opened out of order, before the 11am meeting: the game flow is still
+--- low there and his layout would never load.
 function M.was_reached(s)
     return s.case_done == true or s.meeting_seen == true or s.case_seen == true
+        or s.case_started == true
 end
 
 --- Whether entering the tunnel now should bring him back.
@@ -172,6 +178,8 @@ local function snapshot()
         active = A ~= nil and A.is_active ~= nil and A.is_active() == true,
         scoop_sanity = scoop_sanity_on(),
         case_done = flag(CASE_FINISH_FLAG),
+        case_started = S ~= nil and S.received ~= nil and S.received[CASE_SCOOP] ~= nil
+            and S.received[CASE_SCOOP] ~= false and flag(CASE_START_FLAG),
         meeting_seen = sent(MEETING_CHECK),
         case_seen = sent(CASE_CHECK)
             or (S ~= nil and S.is_completed ~= nil and S.is_completed(CASE_SCOOP) == true),
