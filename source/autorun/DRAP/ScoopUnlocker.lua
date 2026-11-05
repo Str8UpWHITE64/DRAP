@@ -102,7 +102,7 @@ local function build_scoop_data()
                 chain_managed = e.chain_managed,  -- KentChain owns the flags
                 extra_disp_flags = e.extra_disp_flags,  -- 2nd box for pairs
                 description = e.description,   -- MissionTruth box text
-                guide = e.guide,              -- MissionTruth pin redirect
+                guide = e.guide,              -- MissionTruth directions
                 repurpose = e.repurpose,      -- borrowed-box text swap
             }
             if e.completion_event and e.lua_event_tracking ~= false then

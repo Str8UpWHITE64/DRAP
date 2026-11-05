@@ -169,13 +169,6 @@ function M.overtime_items()
     return (data and data.overtime_items) or {}
 end
 
--- Main-case objective-pin indices (case -> scq_no/pos_tbl), the
--- redirect-FROM set MissionTruth rewrites at getSCQPosData.
-function M.main_case_guides()
-    ensure_loaded()
-    return (data and data.main_case_guides) or {}
-end
-
 -- Bundled survivor spawn positions (stype-string -> {name, x, y, z, area,
 -- state, hp}).
 function M.survivor_positions()

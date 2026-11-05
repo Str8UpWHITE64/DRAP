@@ -3967,6 +3967,14 @@
     },
     {
       "name": "Cletus",
+      "box": {
+        "goal": "North Plaza",
+        "text": "Some drunk guy is getting aggressive and hoarding all the guns!  Get to the Gun Shop and try to talk some sense into him.",
+        "area": 1024,
+        "x": 24.7,
+        "y": 5.0,
+        "z": -199.97
+      },
       "category": "Psychopath",
       "flags": [
         810
@@ -4131,6 +4139,14 @@
     },
     {
       "name": "The Convicts",
+      "box": {
+        "goal": "Leisure Park",
+        "text": "Prisoners in a jeep are loose in Leisure Park.  Go stop them!",
+        "area": 1792,
+        "x": 13.49,
+        "y": 0.13,
+        "z": -30.34
+      },
       "category": "Psychopath",
       "flags": [
         807,
@@ -4144,6 +4160,14 @@
     },
     {
       "name": "The Cult",
+      "box": {
+        "goal": "Paradise Plaza",
+        "text": "A Strange group of people wearing raincoats is gathered in Paradise Plaza.  Go check it out.",
+        "area": 512,
+        "x": 115.19,
+        "y": 0.0,
+        "z": -53.54
+      },
       "category": "Psychopath",
       "flags": [
         787,
