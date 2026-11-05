@@ -9,6 +9,7 @@
 local M = {}
 
 local Shared = require("DRAP/Shared")
+local Activation = require("DRAP/Activation")
 local log = Shared.create_logger("SceneFixups")
 M.log = log
 
@@ -542,6 +543,57 @@ local function fixup_s100()
     return true
 end
 
+-- Entrance Plaza's store fences are two meshes run by one GameFlowSwitcher
+-- (SCN_s100_FlowShutterDoors): every frame a mesh shows while flow <= its
+-- _EndFlow. Most stores end at 110. Everyone Luvs Books ends at 160, which the
+-- story passes at Rescue the Professor's Entrance Plaza scene (flow 170), and
+-- out-of-order missions drag flow back under it. The AP logic counts that store
+-- as open with the others, and four books are only placed there, so its fence
+-- ends at 110 as well. Flow itself stays put: enemy sets and layouts read it.
+-- Any connected slot, ScoopSanity or not: the logic says the same in both.
+-- The switcher is rebuilt on every load of the area, so this runs on each one.
+local BOOKSTORE_FENCE_END = 160
+local STORE_FENCE_END = 110
+
+local function open_bookstore_fence()
+    if not Activation.is_active() then return true end
+
+    local sm = sdk.get_native_singleton("via.SceneManager")
+    local smt = sdk.find_type_definition("via.SceneManager")
+    local scene
+    pcall(function() scene = sdk.call_native_func(sm, smt, "get_CurrentScene()") end)
+    local arr
+    pcall(function()
+        arr = scene:call("findComponents(System.Type)", sdk.typeof("app.solid.GameFlowSwitcher"))
+    end)
+    local n = 0
+    pcall(function() n = arr:get_size() end)
+    if n == 0 then return false end
+
+    for i = 0, n - 1 do
+        local list
+        pcall(function() list = arr:get_element(i):get_field("GameFlowParams") end)
+        local count = 0
+        pcall(function() count = tonumber(list:call("get_Count")) or 0 end)
+        if count == 0 then return false end
+        for j = 0, count - 1 do
+            pcall(function()
+                local param = list:call("get_Item", j)
+                if tonumber(param:get_field("_EndFlow")) == BOOKSTORE_FENCE_END then
+                    param:set_field("_EndFlow", STORE_FENCE_END)
+                    log("s100: Everyone Luvs Books fence now follows the other stores")
+                end
+            end)
+        end
+    end
+    return true
+end
+
+local function fixup_s100_all()
+    local fence_done = open_bookstore_fence()
+    return fixup_s100() and fence_done
+end
+
 --- ScoopSanity plus an activated session (connect or drap_activate_debug).
 local function hideout_redirect_wanted()
     local su = get_scoop_unlocker()
@@ -581,7 +633,7 @@ end
 
 local FIXUPS = {
     SCN_s136 = fixup_s136,
-    SCN_s100 = fixup_s100,
+    SCN_s100 = fixup_s100_all,
     SCN_s504 = fixup_s504,
 }
 
@@ -830,6 +882,9 @@ function M.apply_for_current_scene()
         log("Queued fixup for current scene: " .. cur)
     end
 end
+
+-- A slot connected while already standing in a fixup scene.
+Activation.on_activate(function() M.apply_for_current_scene() end)
 
 -- Console shortcuts for live debugging.
 _G.drap_list_s136_targets = function() return M.list_s136_targets() end
