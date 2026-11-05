@@ -102,20 +102,54 @@ local VEHICLE_LIFT = {
 -- keeps the heading it came in with; the walking arrival angle there would
 -- leave it sideways at the top of the ramp.
 local vehicle_face_pending = nil   -- { from, area_no, yaw, at }
-local vehicle_door_jump = false    -- true while vehicle_door_check fires areaJump
+local vehicle_door_jump = false    -- true while the door prompt fires areaJump
 
--- Mall doors while riding. The game offers no door prompt in a vehicle and a
--- mall door is a solid wall to one, so only the Tunnel ramp takes a vehicle
--- across. Driving into a mall door between these open areas now takes the
--- door as if it had been used on foot. Small rooms, the Security Room side
--- and the Tunnel are left alone.
+-- Mall doors while riding. The game offers no door prompt to a car at a mall
+-- door and a mall door is a solid wall to one, so only the Tunnel ramp takes a
+-- vehicle across. For a ridden vehicle close to a mall door between these open
+-- areas, the game's own door prompt and sign are let through; the door button
+-- then takes the vehicle across. Driving into a door does nothing. Small rooms,
+-- the Security Room side and the Tunnel are left alone. A door the game already
+-- offers the vehicle (the motorcycle and bicycle) keeps the game's own action.
 local VEHICLE_DOOR_SCENES = {
     s100 = true, s200 = true, s300 = true, s400 = true,
     s700 = true, s900 = true, sa00 = true,
 }
 local VEHICLE_DOOR_REACH = 3.0     -- metres beyond the door's own prompt radius
-local VEHICLE_DOOR_FACING = 0.6    -- cos of the widest angle to the door that counts
-local vehicle_door = { next_check = 0, last_pos = nil }
+-- a hit this wide is no door leaf: Wonderland has a 15 m one behind its Food
+-- Court door
+local VEHICLE_DOOR_MAX_RADIUS = 5.0
+-- extra reach for a long vehicle, whose centre stays further from the glass
+-- when its nose is against it (RIDE_CAR_TYPE: 1 sedan, 3 box truck, 4 Humvee)
+local VEHICLE_REACH_EXTRA = { [1] = 0.5, [3] = 2.5, [4] = 1.5 }
+local VEHICLE_DOOR_FACING = 0.5    -- cos of the widest angle to the door that counts
+local VEHICLE_DOOR_BUTTON = 16384  -- InputDefine.Kind.ACTION_INTERACT, the button a door uses on foot
+-- true: the game's own door prompt and action serve the vehicle; false: DRAP's
+-- toast and its own jump
+local VEHICLE_GAME_PROMPT = true
+local VEHICLE_PROMPT_EVERY = 3.5   -- seconds between refreshes of the on-screen prompt
+local vehicle_door = { next_check = 0, shown = false, shown_at = 0, was_down = false,
+    block = false, block_until = 0, refused = 0, force = false, offered = nil,
+    targets = {}, inter_hit = nil, signed = 0, arrived = {} }
+
+-- How far past the walking arrival point, in the direction Frank walks out,
+-- a vehicle is put after the prompt, so it stands clear of the door and the
+-- wall around it. Keyed "<from>|<to>" with a default.
+local VEHICLE_ARRIVAL_AHEAD = {
+    default = 4.0,
+    -- a planter stands a few metres ahead of these arrivals; closer in, the
+    -- vehicle has room to drive off or turn
+    ["s100|s200"] = 1.5,
+    ["sa00|s900"] = 1.0,
+    ["s900|s100"] = 2.0,
+    ["s100|s900"] = 7.0,
+}
+-- Metres to the right of that line (negative: left), where a planter stands on
+-- the line itself. Al Fresca has two in a row in front of the Entrance Plaza
+-- door, too close together for a vehicle to stand between them.
+local VEHICLE_ARRIVAL_SIDE = {
+    ["s100|s900"] = -4.0,
+}
 
 -- Rooms a vehicle is never taken into. Any door can be redirected to one of
 -- them under Door Randomizer, and the game carries the ridden vehicle through
@@ -436,6 +470,7 @@ local function vehicle_doors_here(here)
                         local d = { hd = hd, to = to, x = cx, z = cz,
                             radius = tonumber(Shared.safe(function() return hd:get_field("mRadius") end)) or 0 }
                         if jx and not (jx == 0 and jz == 0) then
+                            d.leaf = hd
                             out[#out + 1] = d
                             by_to[to] = by_to[to] or hd
                         else
@@ -450,6 +485,7 @@ local function vehicle_doors_here(here)
     end
     for _, d in ipairs(blank) do
         if by_to[d.to] then
+            d.leaf = d.hd
             d.hd = by_to[d.to]
             out[#out + 1] = d
         end
@@ -457,56 +493,356 @@ local function vehicle_doors_here(here)
     return out
 end
 
--- Takes a mall door when the ridden vehicle drives into it: inside the
--- door's prompt radius plus VEHICLE_DOOR_REACH, facing it and moving toward
--- it. The jump goes through areaJump on the door's own data, so redirects,
--- locks (a locked door is Disabled and skipped) and the arrival heading all
--- apply as for a door used on foot.
+-- Does the game itself offer this door to a ridden vehicle of this type? Mall
+-- doors list the motorcycle and bicycle as allowed. The game takes them through
+-- itself, with Frank aboard or on foot depending on the door, and DRAP leaves
+-- that alone.
+local function door_game_offers(hd, vtype)
+    local list = Shared.safe(function() return hd:get_field("_EventInteractableVehicleType") end)
+    if not list then return false end
+    for _, v in Shared.iter_collection(list) do
+        if Shared.to_int(v) == vtype then return true end
+    end
+    return false
+end
+
+-- Where a door leads right now, redirects included: { area, pos, angle, id }.
+local function door_destination(hd, level_path)
+    local data = extract_hit_data(hd)
+    if not data then return nil end
+    local id = generate_door_id(data, level_path)
+    local redirect = STATIC_REDIRECTS[id]
+    if (not redirect) and randomization_enabled and not suppressed then redirect = DOOR_REDIRECTS[id] end
+    if type(redirect) == "function" then
+        local ok, r = pcall(redirect, id, data)
+        redirect = (ok and type(r) == "table") and r or nil
+    end
+    local area = tostring((redirect and redirect.target_area) or data.mAreaJumpName or ""):gsub("^SCN_", "")
+    local pos = (redirect and redirect.target_pos and extract_vec3(redirect.target_pos)) or data.mAreaJumpPos_vec
+    local angle = (redirect and redirect.target_angle and extract_vec3(redirect.target_angle)) or data.mAreaJumpAngle_vec
+    -- the arrival spots are per arrival door, so a redirect uses the door it lands at
+    local tf, tt = tostring((redirect and redirect.template_door_id) or ""):match("^SCN_(%w+)|(%w+)|")
+    return { area = area, pos = pos, angle = angle, id = id, arrival_key = tf and (tf .. "|" .. tt) or nil }
+end
+
+-- Puts the vehicle arrival entry of the ridden type on the door at a spot
+-- ahead of the walking arrival point, facing the way Frank walks out. The jump
+-- then lands the vehicle there instead of on top of the far door.
+local function set_vehicle_arrival(hd, vtype, dest, from)
+    if not (dest.pos and dest.pos.y and dest.angle) then return false end
+    local list = Shared.safe(function() return hd:get_field("_VehicleJumpDatas") end)
+    if not list then return false end
+    local yaw = dest.angle.y or 0
+    local key = dest.arrival_key or (from .. "|" .. dest.area)
+    local ahead = VEHICLE_ARRIVAL_AHEAD[key] or VEHICLE_ARRIVAL_AHEAD.default
+    local rest = VEHICLE_REST_HEIGHT[vtype] or 1.0
+    local side = VEHICLE_ARRIVAL_SIDE[key] or 0
+    local pos = to_vector3f({ x = dest.pos.x + math.sin(yaw) * ahead + math.cos(yaw) * side, y = dest.pos.y + rest,
+        z = dest.pos.z + math.cos(yaw) * ahead - math.sin(yaw) * side })
+    local rot = Quaternion.new(math.cos(yaw / 2), 0.0, math.sin(yaw / 2), 0.0)
+    if not pos then return false end
+    local entry
+    for _, e in ipairs(vehicle_jump_entries(hd)) do
+        local t = Shared.safe(function() return e:get_field("VehicleType") end)
+        if Shared.to_int(t) == vtype then entry = e; break end
+    end
+    if entry then
+        local key = hit_data_key(hd)
+        if key and not vehicle_jump_saved[key] then
+            local saved = {}
+            for _, e in ipairs(vehicle_jump_entries(hd)) do
+                local p = Shared.safe(function() return e:get_field("VehiclePos") end)
+                saved[#saved + 1] = { entry = e, pos = p and extract_vec3(p) or nil }
+            end
+            vehicle_jump_saved[key] = saved
+        end
+    else
+        entry = Shared.safe(function() return sdk.create_instance("app.solid.gamemastering.VehicleJumpData") end)
+        if not entry then return false end
+        entry = Shared.safe(function() return entry:add_ref() end) or entry
+        if not pcall(function() entry:set_field("VehicleType", vtype) end) then return false end
+    end
+    local ok = pcall(function()
+        entry:set_field("VehiclePos", pos)
+        entry:set_field("VehicleRot", rot)
+        if not door_has_vehicle_entry(hd, vtype) then list:call("Add", entry) end
+    end)
+    return ok and door_has_vehicle_entry(hd, vtype)
+end
+
+-- The door button is also the button that gets Frank out of the vehicle, so
+-- a press at the prompt would take the door and put him on the road. While the
+-- prompt is up, and for a second after it was taken, the player's get-off is
+-- refused. The hook only reads plain Lua state.
+local getoff_hooked = false
+local function install_getoff_block()
+    if getoff_hooked then return end
+    getoff_hooked = true
+    -- The button runs VehicleDriverPlayer.startForceOut, which starts the
+    -- get-off and later calls requestGetOffCar; blocking only the latter let
+    -- the started get-off finish after the new area had loaded.
+    for _, h in ipairs({
+        { "app.solid.Vehicle.VehicleDriverPlayer", "startForceOut(app.solid.survivor.player.PlayerCondition, System.Boolean)" },
+        { "app.solid.Vehicle.VehicleController", "requestGetOffCar(via.GameObject, System.Boolean)" },
+        { "app.solid.Vehicle.VehicleController", "requestGetOffCar(app.solid.Vehicle.VehicleController.VehicleSeat, via.GameObject, System.Boolean, System.Boolean)" },
+    }) do
+        local td = sdk.find_type_definition(h[1])
+        local fn = td and td:get_method(h[2])
+        if fn then
+            pcall(function()
+                sdk.hook(fn,
+                    function(args)
+                        if vehicle_door.block or os.clock() < vehicle_door.block_until then
+                            vehicle_door.refused = vehicle_door.refused + 1
+                            return sdk.PreHookResult.SKIP_ORIGINAL
+                        end
+                    end,
+                    function(retval) return retval end)
+            end)
+        end
+    end
+end
+
+-- The game checks a ridden vehicle's contact with a door in checkAreaHit, and
+-- that check also sets the door's sign (its name and the button). When the
+-- door's collision is not marked interactable, a sight line from Frank to the
+-- door decides; seated in a car at the glass the line is blocked, so the game
+-- deletes the sign and refuses the door, and only "Get Out" is left. For the
+-- offered door only, its collision reads as interactable, so the sight line is
+-- skipped and the game passes the door, draws its own sign and button, and
+-- takes the vehicle through on the button, as at the Tunnel ramp. Everything
+-- else the check asks (the door's own flags, a shutter still down) still
+-- decides, so a door that is shut on foot stays shut to a vehicle. The hook
+-- compares one pointer with the doors in vehicle_door.targets and calls
+-- nothing managed.
+local hit_hooked = false
+local function install_hit_override()
+    if hit_hooked then return end
+    hit_hooked = true
+    local cd = sdk.find_type_definition(AHLM_TYPE_NAME .. ".AreaHitCollisionData")
+    local inter = cd and cd:get_method("get_Interactable")
+    if inter then
+        pcall(function()
+            sdk.hook(inter,
+                function(args)
+                    vehicle_door.inter_hit = nil
+                    if not vehicle_door.force then return end
+                    local obj = sdk.to_managed_object(args[2])
+                    vehicle_door.inter_hit = obj and obj:read_qword(0x10) or nil
+                end,
+                function(retval)
+                    local hit = vehicle_door.inter_hit
+                    vehicle_door.inter_hit = nil
+                    if hit and vehicle_door.targets[hit] then
+                        vehicle_door.signed = vehicle_door.signed + 1
+                        return sdk.to_ptr(1)
+                    end
+                    return retval
+                end)
+        end)
+    end
+end
+
+local function interact_down()
+    local is = sdk.get_managed_singleton("app.solid.InputSystem")
+    if not is then return false end
+    local d = Shared.safe(function() return is:call("isDown(app.solid.InputDefine.Kind)", VEHICLE_DOOR_BUTTON) end)
+    local o = Shared.safe(function() return is:call("isOn(app.solid.InputDefine.Kind)", VEHICLE_DOOR_BUTTON) end)
+    return d == true or o == true
+end
+
+local function hide_vehicle_prompt()
+    vehicle_door.block = false
+    vehicle_door.force = false
+    vehicle_door.offered = nil
+    if next(vehicle_door.arrived) then vehicle_door.arrived = {} end
+    if vehicle_door.signed > 0 then
+        M.log(string.format("Vehicle door: door read as interactable x%d", vehicle_door.signed))
+        vehicle_door.signed = 0
+    end
+    if not vehicle_door.shown then return end
+    vehicle_door.shown = false
+    local Notify = package.loaded["DRAP/Notify"]
+    if Notify and Notify.hide then pcall(Notify.hide) end
+end
+
+local function show_vehicle_prompt(dest_area, blocks_getoff)
+    local now = os.clock()
+    vehicle_door.block = blocks_getoff
+    if vehicle_door.shown and now - vehicle_door.shown_at < VEHICLE_PROMPT_EVERY then return end
+    if not vehicle_door.shown then M.log("Vehicle door prompt shown: " .. dest_area) end
+    vehicle_door.shown, vehicle_door.shown_at = true, now
+    local Notify = package.loaded["DRAP/Notify"]
+    if Notify and Notify.send then
+        pcall(Notify.send, "<BOLD>Go through</BOLD> to " .. get_scene_name("SCN_" .. dest_area)
+            .. "  (door button)", { duration = VEHICLE_PROMPT_EVERY + 1.0 })
+    end
+end
+
+-- Facing a door: toward its prompt point, or along the way the door leads
+-- (its walking arrival heading). A vehicle stopped against the glass beside a
+-- leaf has that leaf's point off to one side, so the first test alone drops
+-- the prompt the moment the vehicle comes to rest.
+local function facing_door(d, fx, fz, dx, dz, dist)
+    if (fx * dx + fz * dz) / dist >= VEHICLE_DOOR_FACING then return true end
+    local a = Shared.safe(function() return d.hd:get_field("mAreaJumpAngle") end)
+    local ay
+    pcall(function() ay = a.y end)
+    if not ay or ay == 0 then return false end
+    return fx * math.sin(ay) + fz * math.cos(ay) >= VEHICLE_DOOR_FACING
+end
+
+-- Every leaf of a door within reach. A leaf can be two hit datas at nearly the
+-- same spot, each with its own story flags, so only one of them is live; the
+-- nearer one is often the dead twin (Wonderland to the Food Court, 9 cm apart).
+-- The door the game touches has to be among them, so none is singled out.
+local function door_leaves_near(doors, to, px, pz, reach)
+    local targets, hds = {}, {}
+    for _, d in ipairs(doors) do
+        local dx, dz = d.x - px, d.z - pz
+        if d.to == to and d.radius <= VEHICLE_DOOR_MAX_RADIUS
+            and math.sqrt(dx * dx + dz * dz) <= d.radius + reach then
+            for _, h in ipairs({ d.hd, d.leaf }) do
+                local a = hit_data_key(h)
+                if a and not targets[a] then
+                    targets[a] = true
+                    hds[#hds + 1] = h
+                end
+            end
+        end
+    end
+    return targets, hds
+end
+
+-- The prompt for a ridden vehicle at a mall door. Close to an open door
+-- between the areas in VEHICLE_DOOR_SCENES, facing it, the door button takes
+-- the door. The jump goes through areaJump on the door's own data, so
+-- redirects, locks (a locked door is Disabled and skipped), the rooms a
+-- vehicle is held out of and the arrival heading all apply as for a door
+-- used on foot.
 local function vehicle_door_check()
     if not area_jump_method then return end
+    install_getoff_block()
+    if vehicle_door.refused > 0 then
+        M.log(string.format("Vehicle door: get-off refused x%d", vehicle_door.refused))
+        vehicle_door.refused = 0
+    end
     local now = os.clock()
-    if now < vehicle_door.next_check then return end
-    vehicle_door.next_check = now + 0.2
-    if vehicle_face_pending or (M.last_jump_at and now - M.last_jump_at < 4) then
-        vehicle_door.last_pos = nil
+    local down = interact_down()
+    local pressed = down and not vehicle_door.was_down
+    vehicle_door.was_down = down
+    if now < vehicle_door.next_check and not pressed then return end
+    vehicle_door.next_check = now + 0.1
+    if vehicle_face_pending or vehicle_room or (M.last_jump_at and now - M.last_jump_at < 4) then
+        hide_vehicle_prompt()
         return
     end
-    if not player_in_vehicle() then vehicle_door.last_pos = nil; return end
+    local vtype = ridden_type()
+    if vtype == 0 then hide_vehicle_prompt(); return end
     local _, level_path = get_current_area_info()
     local here = level_path and tostring(level_path):gsub("^SCN_", "")
-    if not (here and VEHICLE_DOOR_SCENES[here]) then vehicle_door.last_pos = nil; return end
+    if not (here and VEHICLE_DOOR_SCENES[here]) then hide_vehicle_prompt(); return end
 
     local pm = sdk.get_managed_singleton("app.solid.PlayerManager")
     local vc = pm and Shared.safe(function() return pm:call("get_VehicleControl") end)
     local tr = vc and Shared.safe(function() return vc:call("get_GameObject"):call("get_Transform") end)
     local pos = tr and Shared.safe(function() return tr:call("get_Position") end)
     local rot = tr and Shared.safe(function() return tr:call("get_Rotation") end)
-    if not (pos and rot) then vehicle_door.last_pos = nil; return end
+    if not (pos and rot) then hide_vehicle_prompt(); return end
     local px, pz, yaw = pos.x, pos.z, read_yaw(rot)
-    local prev = vehicle_door.last_pos
-    vehicle_door.last_pos = { x = px, z = pz, area = here }
-    if not (prev and prev.area == here) then return end
-
     local fx, fz = math.sin(yaw), math.cos(yaw)
-    for _, d in ipairs(vehicle_doors_here(here)) do
+
+    local best, best_dist, best_dest
+    local doors = vehicle_doors_here(here)
+    local reach = VEHICLE_DOOR_REACH + (VEHICLE_REACH_EXTRA[vtype] or 0)
+    for _, d in ipairs(doors) do
         local dx, dz = d.x - px, d.z - pz
         local dist = math.sqrt(dx * dx + dz * dz)
-        if dist <= d.radius + VEHICLE_DOOR_REACH and dist > 0.01 then
-            local facing = (fx * dx + fz * dz) / dist
-            local closing = ((px - prev.x) * dx + (pz - prev.z) * dz) / dist
-            if facing >= VEHICLE_DOOR_FACING and closing > 0.05 then
-                local ahlm = ahlm_mgr:get()
-                M.log(string.format("Vehicle drove into the door %s -> %s (%.1f m, radius %.1f)", here, d.to, dist, d.radius))
-                vehicle_door.last_pos = nil
-                vehicle_door.next_check = now + 5
-                vehicle_door_jump = true
-                local ok, err = pcall(area_jump_method.call, area_jump_method, ahlm, d.hd)
-                vehicle_door_jump = false
-                if not ok then M.log("Vehicle door jump failed: " .. tostring(err)) end
-                return
+        if d.radius <= VEHICLE_DOOR_MAX_RADIUS and dist <= d.radius + reach and dist > 0.01
+            and facing_door(d, fx, fz, dx, dz, dist)
+            and (not best_dist or dist < best_dist) then
+            local dest = door_destination(d.hd, level_path)
+            if dest and (VEHICLE_DOOR_SCENES[dest.area] or NO_VEHICLE_AREAS[dest.area]) then
+                best, best_dist, best_dest = d, dist, dest
             end
         end
     end
+    if not best then hide_vehicle_prompt(); return end
+    local door_key = here .. "|" .. best.to
+    local leaves
+    vehicle_door.targets, leaves = door_leaves_near(doors, best.to, px, pz, reach)
+
+    -- A door the game lists for this vehicle (the motorcycle and the bicycle
+    -- at every mall door) keeps the game's own action, which may put Frank
+    -- through on foot; only the sight line is opened, so the game's sign shows
+    -- for a rider stopped at the glass. The get-off is not refused there.
+    if door_game_offers(best.hd, vtype) then
+        install_hit_override()
+        if vehicle_door.offered ~= door_key then
+            vehicle_door.offered = door_key
+            M.log(string.format("Vehicle door left to the game's own action: %s -> %s (%.1f m)",
+                here, best_dest.area, best_dist))
+        end
+        vehicle_door.force = true
+        vehicle_door.block = false
+        return
+    end
+
+    local held = NO_VEHICLE_AREAS[best_dest.area] ~= nil
+    if VEHICLE_GAME_PROMPT and not held then
+        -- the game's own prompt and door action: its arrival spot is set first
+        install_hit_override()
+        -- whichever leaf the button takes, the vehicle lands at its own spot
+        local set = true
+        for _, h2 in ipairs(leaves) do
+            local a = hit_data_key(h2)
+            if not vehicle_door.arrived[a] then
+                vehicle_door.arrived[a] = true
+                local dest = door_destination(h2, level_path)
+                if not (dest and dest.pos and not (dest.pos.x == 0 and dest.pos.z == 0)) then dest = best_dest end
+                set = set_vehicle_arrival(h2, vtype, dest, here) and set
+            end
+        end
+        if vehicle_door.offered ~= door_key then
+            vehicle_door.offered = door_key
+            M.log(string.format("Vehicle door offered to the game's prompt: %s -> %s (%.1f m), arrival spot %s",
+                here, best_dest.area, best_dist, set and "set" or "not set"))
+            if set and best_dest.pos then
+                M.log(string.format("Vehicle arrival spot: walking point (%.1f, %.1f) angle %.2f, vehicle %.1f m ahead",
+                    best_dest.pos.x, best_dest.pos.z, (best_dest.angle and best_dest.angle.y) or 0,
+                    VEHICLE_ARRIVAL_AHEAD[best_dest.arrival_key or (here .. "|" .. best_dest.area)] or VEHICLE_ARRIVAL_AHEAD.default))
+            end
+        end
+        vehicle_door.force = true
+        vehicle_door.block = true
+        if pressed then
+            M.log(string.format("Vehicle door button at the door %s -> %s (%.1f m, radius %.1f)",
+                here, best_dest.area, best_dist, best.radius))
+            vehicle_door.block_until = now + 1.0
+        end
+        return
+    end
+    vehicle_door.force = false
+    show_vehicle_prompt(best_dest.area, not held)
+    if not pressed then return end
+
+    M.log(string.format("Vehicle door button at the door %s -> %s (%.1f m, radius %.1f)",
+        here, best_dest.area, best_dist, best.radius))
+    hide_vehicle_prompt()
+    if not held then vehicle_door.block_until = now + 1.0 end
+    vehicle_door.next_check = now + 5
+    -- a door into a room no vehicle enters is held by the jump hook: no spot needed
+    local arrival = NO_VEHICLE_AREAS[best_dest.area] or set_vehicle_arrival(best.hd, vtype, best_dest, here)
+    if not arrival then M.log("Vehicle door: no arrival spot set, the walking spot is used")
+    elseif not NO_VEHICLE_AREAS[best_dest.area] and best_dest.pos then
+        M.log(string.format("Vehicle arrival spot: walking point (%.1f, %.1f) angle %.2f, vehicle %.1f m ahead",
+            best_dest.pos.x, best_dest.pos.z, (best_dest.angle and best_dest.angle.y) or 0,
+            VEHICLE_ARRIVAL_AHEAD[best_dest.arrival_key or (here .. "|" .. best_dest.area)] or VEHICLE_ARRIVAL_AHEAD.default))
+    end
+    vehicle_door_jump = true
+    local ok, err = pcall(area_jump_method.call, area_jump_method, ahlm_mgr:get(), best.hd)
+    vehicle_door_jump = false
+    if not ok then M.log("Vehicle door jump failed: " .. tostring(err)) end
 end
 
 -- Turns the ridden vehicle to the arrival angle once the new area is in.
@@ -867,13 +1203,14 @@ local function install_hook()
                         if mod_ok then
                             was_redirected = true
                             redirect_count = redirect_count + 1
-                            local moved = retarget_vehicle_jumps(hit_data_mo, active_redirect)
+                            -- a prompt jump has put its own arrival spot on the door
+                            local moved = (vehicle_door_jump or vehicle_door.force) and 0 or retarget_vehicle_jumps(hit_data_mo, active_redirect)
                             M.log(string.format("Redirected %s -> %s (was: %s)%s",
                                 door_id, get_scene_name(redirect_target), get_scene_name(original_dest),
                                 moved > 0 and string.format(", %d vehicle arrival(s) moved", moved) or ""))
                         end
                     end
-                    if not was_redirected then
+                    if not was_redirected and not (vehicle_door_jump or vehicle_door.force) then
                         restore_vehicle_jumps(hit_data_mo)
                     end
 
@@ -893,7 +1230,7 @@ local function install_hook()
                         end
                     end
 
-                    if was_redirected or vehicle_door_jump then
+                    if was_redirected or (vehicle_door_jump or vehicle_door.force) then
                         vehicle_face_pending = {
                             from = area_index,
                             area_no = area_jump_name_to_area_no(final_area_jump_name),
@@ -909,7 +1246,7 @@ local function install_hook()
                     -- by a redirect) is raised onto its wheels after the jump.
                     local vtype = ridden_type()
                     local rest = VEHICLE_REST_HEIGHT[vtype]
-                    if rest and final_pos and final_pos.y
+                    if rest and final_pos and final_pos.y and not (vehicle_door_jump or vehicle_door.force)
                         and (was_redirected or not door_has_vehicle_entry(hit_data_mo, vtype)) then
                         vehicle_lift_pending = {
                             from = area_index,
