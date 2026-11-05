@@ -114,6 +114,15 @@ local function install_hooks()
             if not enabled then return end
             local item = Shared.safe(sdk.to_managed_object, args[3])
             pick_no = item_number_of(item)
+            -- Restricted Item Mode refuses what was not sent, and its answer
+            -- must decide the check whichever hook ran first (a skipped call
+            -- leaves no reliable return value to read afterwards).
+            local r = _G.AP and _G.AP.ItemRestriction
+            if pick_no and r and r.is_enabled and r.is_enabled()
+                and r.is_allowed and not r.is_allowed(pick_no) then
+                stats.picks_refused = stats.picks_refused + 1
+                pick_no = nil
+            end
         end,
         function(retval)
             -- False is a pickup someone refused, so it is not counted.

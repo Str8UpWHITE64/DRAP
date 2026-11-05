@@ -909,8 +909,13 @@ def set_rules(world) -> None:
     if getattr(world, "item_sanity", False):
         _jessie = CanReachLocation("Meet Jessie in the Warehouse")
         for _name, _regions in ITEM_SANITY_REGIONS.items():
+            _rule = item_sanity_rule(_regions, ep_shutter, _jessie)
+            # Restricted Item Mode refuses a pickup of anything not sent yet
+            # (ItemRestriction.lua), so the check needs the item as well.
+            if world.options.restricted_item_mode:
+                _rule = And(_rule, Has(_name[len("Pick up "):]))
             world.set_rule(world.multiworld.get_location(_name, world.player),
-                           item_sanity_rule(_regions, ep_shutter, _jessie))
+                           _rule)
 
     # Zombie Genocider: the top threshold in every area, which is the same
     # 53,594 kills as clearing all 99 checks and twelve rules instead of 99.

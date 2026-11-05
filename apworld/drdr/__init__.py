@@ -7,7 +7,7 @@ from Options import OptionError, item_and_loc_options
 
 from worlds.AutoWorld import World, WebWorld
 
-from .Items import DRItem, DRItemCategory, item_dictionary, key_item_names, item_descriptions, BuildItemPool, specialty_items, overpowered_items, progression_skills, microwave_food_items, challenge_tool_items, kill_filler_items
+from .Items import DRItem, DRItemCategory, item_dictionary, key_item_names, item_descriptions, BuildItemPool, specialty_items, overpowered_items, progression_skills, microwave_food_items, challenge_tool_items, kill_filler_items, item_sanity_item_names
 from .Locations import kill_sanity_location_groups
 from .Locations import (DRLocation, DRLocationCategory, location_tables,
                         location_dictionary, ZOMBIE_KILL_TIERS,
@@ -252,15 +252,14 @@ class DRWorld(World):
         self.scoop_order = []
 
     def generate_early(self):
-        # ItemSanity leaves pickups as the game has them, which is what
-        # Restricted Item Mode takes away; Spitter Only turns that on.
+        # ItemSanity needs something to pick up. Restricted Item Mode is fine
+        # (a pickup check then waits for its item to be sent), but Spitter
+        # Only takes every weapon away.
         self.item_sanity = bool(self.options.item_sanity.value)
-        if self.item_sanity and (self.options.restricted_item_mode
-                                 or self.options.spitter_only):
+        if self.item_sanity and self.options.spitter_only:
             raise OptionError(
                 f"{self.player_name}: item_sanity cannot be combined with "
-                "restricted_item_mode or spitter_only. ItemSanity needs items "
-                "to be picked up as normal.")
+                "spitter_only. ItemSanity needs items to be picked up.")
 
         # Spitter Only turns two other options on, and both are read below, so
         # it has to come first.
@@ -969,6 +968,10 @@ class DRWorld(World):
         elif item_dictionary[name].category == DRItemCategory.SCOOP and self.options.scoop_sanity:
             item_classification = ItemClassification.progression
         elif name in specialty_items and self.options.restricted_item_mode:
+            item_classification = ItemClassification.progression
+        elif (name in item_sanity_item_names and self.item_sanity
+              and self.options.restricted_item_mode):
+            # Its "Pick up" check waits for it.
             item_classification = ItemClassification.progression
         elif name == "Queen" and self.options.scoop_sanity:
             # Gates queen spawning, so state.has must be able to see it.

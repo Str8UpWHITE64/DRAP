@@ -46,10 +46,15 @@ class ItemSanity(Toggle):
 
     Items are left as they are in the game: anything lying around can be
     picked up as normal, and none are sent to you to spawn. Weapons and food
-    leave the item pool. Books and buffs stay, and the rest of the filler is
-    KillSanity's (Zombie Guts, Brains and Rotten Flesh).
+    leave the item pool (unless Restricted Item Mode is on, see below).
+    Books and buffs stay, and the rest of the filler is KillSanity's
+    (Zombie Guts, Brains and Rotten Flesh).
 
-    Cannot be combined with Restricted Item Mode or Spitter Only.
+    With Restricted Item Mode, every one of those items is back in the item
+    pool and a pickup check only counts once that item has been sent to you:
+    the game still refuses to let you pick up anything you have not received.
+
+    Cannot be combined with Spitter Only.
     """
     display_name = "ItemSanity"
     default = False

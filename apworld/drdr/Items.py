@@ -2,6 +2,7 @@ from enum import IntEnum
 from typing import NamedTuple
 from BaseClasses import Item
 from Options import OptionError
+from .shared_data import ITEM_SANITY
 
 
 class DRItemCategory(IntEnum):
@@ -213,6 +214,10 @@ _all_items = [DRItemData(row[0], row[1], row[2]) for row in [
     # could register it and it was never obtainable -- while "Kill 100
     # zombies with an RPG" has always been a location.
     ("Rocket Launcher", 205, DRItemCategory.WEAPON),
+    # ItemSanity's two types the game lists but the pool never had: with
+    # Restricted Item Mode a pickup waits for its item, so they need one.
+    ("Potted Plant", 206, DRItemCategory.WEAPON),
+    ("Stepladder", 207, DRItemCategory.WEAPON),
     ("TV", 165, DRItemCategory.WEAPON),
     ("Vase", 166, DRItemCategory.WEAPON),
     ("Water Gun", 167, DRItemCategory.WEAPON),
@@ -564,6 +569,14 @@ specialty_items = {
     "Small Chainsaw",
 }
 
+# ItemSanity with Restricted Item Mode: each "Pick up <item>" check waits for
+# that item to have been sent, so every item type with a check is in the pool
+# (and progression, which is what lets state.has see it).
+_PICK_UP = "Pick up "
+item_sanity_item_names = frozenset(
+    _e["location_name"][len(_PICK_UP):] for _e in ITEM_SANITY
+    if _e["location_name"].startswith(_PICK_UP))
+
 # DRItemCategory.WEAPON means "anything Frank can hold", not "weapon" -- the
 # frying pan, Kent's masks and Paul's fire extinguisher all sit in it. Spitter
 # Only drops the category, so anything in it that a check still needs has to be
@@ -729,6 +742,22 @@ def BuildItemPool(random, count, options, excluded_scoop_names=(),
             remaining_count = remaining_count - 1
             included_itemcount = included_itemcount + 1
 
+    # ItemSanity + Restricted: a pickup check needs its item sent first, so
+    # every item type that has a check goes in the pool, once. Names already
+    # added above (specialty items, guaranteed items) are not doubled.
+    _item_sanity_restricted = (
+        bool(getattr(getattr(options, "item_sanity", None), "value", 0))
+        and bool(options.restricted_item_mode.value))
+    if _item_sanity_restricted:
+        _have = {it.name for it in item_pool}
+        for item_name in sorted(item_sanity_item_names):
+            if item_name in _have or item_name not in item_dictionary:
+                continue
+            item_pool.append(item_dictionary[item_name])
+            _have.add(item_name)
+            remaining_count = remaining_count - 1
+            included_itemcount = included_itemcount + 1
+
     itemList = [item for item in _all_items]
     lockList = [item for item in _all_items if item.category == DRItemCategory.LOCK]
     scoopList = [item for item in _all_items if item.category == DRItemCategory.SCOOP]
@@ -780,9 +809,12 @@ def BuildItemPool(random, count, options, excluded_scoop_names=(),
     # other filler slot gets KillSanity's filler instead (see below).
     item_sanity = bool(getattr(getattr(options, "item_sanity", None), "value", 0))
     if item_sanity:
+        # With Restricted every book is already in the pool above, so only
+        # the buffs are left to add.
         nonTrapFiller = [it for it in nonTrapFiller
                          if it.category == DRItemCategory.BUFF
-                         or it.name.startswith("Book [")]
+                         or (it.name.startswith("Book [")
+                             and not _item_sanity_restricted)]
 
     # Strip overpowered filler entries when the option is on. Guaranteed
     # Items (added unconditionally above) and Restricted-mode specialty items
