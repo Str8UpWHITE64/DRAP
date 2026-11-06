@@ -426,9 +426,10 @@ end
 
 local function raw_set_flag_off(flag_id)
     -- A scoop's FINISH or SUCCESS flag is never taken back: a cleared FINISH
-    -- makes the game run the scoop again, and it never finishes a second time
-    -- (see DRAP/scoops/ScoopFinish). Every clear in this file comes through
-    -- here, so it is refused here.
+    -- makes the game run the scoop again (see DRAP/scoops/ScoopFinish). Every
+    -- clear in this file comes through here, so it is refused here. The only
+    -- way round is SCOOP_FINISH.reopen, for the two rows ScoopFinish.HELD_FOR
+    -- names.
     if ScoopFinish.never_off(flag_id) then
         if ScoopFinish.first_refusal(flag_id, "ScoopUnlocker") then
             M.log(string.format(
@@ -3326,6 +3327,21 @@ function SCOOP_FINISH.finish(scq_no, success)
     end)
 end
 
+--- Opens a held case row for the mission running on it (ScoopFinish.HELD_FOR
+--- says why that's allowed). Deliberately not raw_set_flag_off, which keeps
+--- refusing these flags for everything else.
+function SCOOP_FINISH.reopen(row, mission)
+    local efm = efm_mgr:get()
+    if not efm then return false end
+    local ok = pcall(function()
+        efm:call("evFlagOff", row.success)
+        efm:call("evFlagOff", row.finish)
+    end)
+    M.log(string.format("Scoop finish: scoop %d reopened for '%s' (FINISH %d, SUCCESS %d off) -- %s",
+        row.scq, mission, row.finish, row.success, ok and "ok" or "failed"))
+    return ok
+end
+
 --- Gives back the SCQMove slot a row holds, if it holds one. A survivor row in
 --- a slot whose END goes on is read by the game's SCQ loop as "you met them,
 --- left them and the scoop ran out": it sets the health of a survivor who is
@@ -3484,11 +3500,52 @@ function SCOOP_FINISH.bodies.hide(now)
     end
 end
 
--- Called from on_frame (never from a hook).
+-- Hideout's scene starts from door 517's own code: uOm111.excepDoorSearchTrg
+-- does nothing but check that case 8 is running and start event 41, with no
+-- check that it has already played, so each time the door opens after a room
+-- load the scene plays again. Flag 2321 (EV_CASE_8_2) comes on with the scene
+-- and stays on. Skipping the method once it's on leaves the door itself alone:
+-- opening and closing are handled elsewhere. The address is not folded. The
+-- hook only reads a value the frame tick keeps, and calls nothing managed.
+SCOOP_FINISH.door = { SCENE_FLAG = 2321, played = false, skipped = 0, logged = 0 }
+
+function SCOOP_FINISH.door.install()
+    local door = SCOOP_FINISH.door
+    if door.hooked then return end
+    door.hooked = true
+    local td = sdk.find_type_definition("solid.MT2RE.uOm111")
+    local m = td and td:get_method("excepDoorSearchTrg")
+    local ok = m ~= nil and pcall(sdk.hook, m,
+        function()
+            if door.played then
+                door.skipped = door.skipped + 1
+                return sdk.PreHookResult.SKIP_ORIGINAL
+            end
+        end,
+        function(retval) return retval end)
+    if not ok then
+        M.log("Hideout door: could not watch door 517 -- its scene can play again")
+    end
+end
+
+--- Frame side: what the hook reads, and the log line it can't write itself.
+function SCOOP_FINISH.door.tick()
+    local door = SCOOP_FINISH.door
+    door.install()
+    local v = raw_check_flag(door.SCENE_FLAG)
+    if v ~= nil then door.played = scoop_sanity_enabled and v end
+    if door.skipped ~= door.logged then
+        door.logged = door.skipped
+        M.log("Hideout door: scene already played, left as a plain door")
+    end
+end
+
+--- Called from on_frame (never from a hook).
 function SCOOP_FINISH.tick()
     local now = os.clock()
     if now < SCOOP_FINISH.next_check then return end
     SCOOP_FINISH.next_check = now + SCOOP_FINISH.INTERVAL
+    SCOOP_FINISH.door.tick()
     local active = scoop_sanity_enabled and State.is_activated()
         and not State.is_endgame_reached() and world_stable()
     if not active then
@@ -3512,6 +3569,16 @@ function SCOOP_FINISH.tick()
         end
         if v == "?" then return nil end
         return v
+    end
+
+    for _, row in ipairs(ScoopFinish.rows_to_reopen({
+        check = check,
+        is_running = function(name)
+            return State.has_received(name) and not State.is_completed(name)
+        end,
+    })) do
+        SCOOP_FINISH.reopen(row, ScoopFinish.HELD_FOR[row.scq])
+        seen[row.finish], seen[row.success] = false, false
     end
 
     local finish = ScoopFinish.tick({

@@ -14,9 +14,11 @@
 --
 -- Three rules, applied from DRAP's frame tick:
 --   1. DRAP never clears a row's FINISH or SUCCESS flag (never_off). A cleared
---      FINISH makes the row run again, take a slot back and never finish again.
---      The one exception is the cult respawn, which clears its rows' flags on
---      purpose; those rows are left alone here.
+--      FINISH makes the row run again and take a slot back, and the game's own
+--      loop may never finish it again; only finishSCQ reliably does. There are
+--      two exceptions. The cult respawn clears its rows' flags on purpose, and
+--      those rows are left alone here. A row in HELD_FOR is reopened for the
+--      mission that needs it (see below).
 --   2. A row whose own finish rule holds (its success flag, or for a few rows
 --      its finish flag) is finished through the game's own
 --      SCQManager.finishSCQ once it has stayed unfinished for DWELL_SECONDS,
@@ -184,7 +186,37 @@ local EXCLUDED = {}    -- scq -> why the rules leave it alone
 local OWNED_BY = {}    -- scq -> psychopath scoops whose start set starts it
 local CASE_OF = {}     -- scq -> main scoop whose completion ends that case
 
-local state = { enabled = true, due = {}, attempts = {}, refused = {} }
+-- Case rows another mission still needs, by scq: the mission named here can
+-- only start while the row is open. Its scene's box (SQOOP_QUE) and, for
+-- Hideout, door 517 check SCQManager.isActive, which is START on and FINISH off.
+-- The row's closing main can come first in any mission order: The Butcher ends
+-- case 8 and Medicine Run ends case 2. So the row stays open until this mission
+-- is done too.
+--
+-- A save from before this rule already has the row closed, and that mission
+-- could never start in it. rows_to_reopen clears the row's FINISH and SUCCESS
+-- for it, the only clear of a case row anywhere. It is safe because of how
+-- narrow it is, unlike clearing a finish the game keeps writing:
+--   * only these two rows, only while their mission runs, and only once per
+--     session (a load starts a new one) or once that mission starts;
+--   * the result is the state the mission normally runs in: START on, FINISH
+--     off, the row's rule flag off (it waits while that flag is on, or the game
+--     would close the row straight away);
+--   * the row closes again when the mission is done, through finishSCQ;
+--   * these are case rows, so the health rule for survivor rows doesn't apply.
+M.HELD_FOR = {
+    [2] = "Image in the Monitor",
+    [8] = "Hideout",
+}
+
+local state = { enabled = true, due = {}, attempts = {}, refused = {}, reopen = {} }
+
+local function all_held()
+    local t = {}
+    for scq in pairs(M.HELD_FOR) do t[scq] = true end
+    return t
+end
+state.reopen = all_held()
 
 --- The row's own finish rule, read from flags only: "success" (the game writes
 --- FINISH and SUCCESS), "end" (a flag finish without the success bit: FINISH
@@ -295,6 +327,8 @@ end
 function M.why_due(row, ctx)
     local check = ctx.check
     if check(row.finish) ~= false then return nil end   -- finished, or unreadable
+    local held_for = M.HELD_FOR[row.scq]
+    if held_for and not ctx.is_completed(held_for) then return nil end
     if KENTCHAIN_ROWS[row.scq] then
         if ctx.held and ctx.held(row.scq) then return nil end
         if check(row.start) ~= true then return nil end
@@ -371,6 +405,25 @@ function M.tick(ctx)
     return finish
 end
 
+--- The held rows to open now for the mission running on them. ctx: check,
+--- is_running(name). Each row is looked at until its mission has run with the
+--- row's rule flag off, then not again until the next session. The caller
+--- clears the returned rows' FINISH and SUCCESS.
+function M.rows_to_reopen(ctx)
+    local out = {}
+    if not state.enabled then return out end
+    for _, row in ipairs(M.ROWS) do
+        if state.reopen[row.scq] and ctx.is_running(M.HELD_FOR[row.scq]) then
+            local finish, rule = ctx.check(row.finish), ctx.check(row.param)
+            if finish ~= nil and rule == false then
+                state.reopen[row.scq] = nil
+                if finish then out[#out + 1] = row end
+            end
+        end
+    end
+    return out
+end
+
 --- Off, DRAP neither guards these flags nor finishes any row: the behaviour
 --- before this module, for comparison.
 function M.set_enabled(on)
@@ -384,6 +437,7 @@ function M.is_enabled() return state.enabled end
 --- A new session (a load or a new game): forget waits, attempts and refusals.
 function M.reset()
     state.due, state.attempts, state.refused = {}, {}, {}
+    state.reopen = all_held()
 end
 
 function M.status()
