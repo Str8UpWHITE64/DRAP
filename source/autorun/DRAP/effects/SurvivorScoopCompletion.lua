@@ -71,7 +71,9 @@ local function check_scoops(triggered_by_survivor)
         if AP.ScoopUnlocker.is_scoop_completed
                 and AP.ScoopUnlocker.is_scoop_completed(scoop_name) then
             -- already complete; skip
-        elseif all_survivors_rescued(scoop_name) then
+        elseif all_survivors_rescued(scoop_name)
+                and (not AP.ScoopUnlocker.rescue_completes_scoop
+                    or AP.ScoopUnlocker.rescue_completes_scoop(scoop_name)) then
             log(string.format("All survivors rescued for '%s' -- marking complete", scoop_name))
             AP.ScoopUnlocker.complete_scoop(scoop_name)
         end

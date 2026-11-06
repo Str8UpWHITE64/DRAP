@@ -1295,6 +1295,8 @@ local function build_reconciler_ctx()
         area = get_current_area_index(),
         hideout_area = HIDEOUT_AREA_INDEX,
         north_plaza_area = NORTH_PLAZA_AREA_INDEX,
+        paradise_area = PARADISE_PLAZA_AREA_INDEX,
+        world_stable = M.is_world_stable and M.is_world_stable() or false,
         check_flag = raw_check_flag,
         never_off = ScoopFinish.never_off,
         in_grace = is_in_completion_grace,
@@ -1960,6 +1962,7 @@ local function world_stable()
     return world_stable_since ~= nil
         and (os.clock() - world_stable_since) >= WORLD_STABLE_SECONDS
 end
+M.is_world_stable = world_stable
 
 function M.unlock_scoop(scoop_name)
     if not world_stable() then
@@ -2051,7 +2054,23 @@ end
 function M.complete_scoop(scoop_name)
     -- Chain advance, conflict-group advance, blocked-side retries, and
     -- persistence all happen inside the state machine.
-    return State.complete(scoop_name)
+    local done = State.complete(scoop_name)
+    -- Sean's death is what lets a rescued Jennifer finish The Cult.
+    if scoop_name == STRANGE_GROUP_SCOOP then
+        local ssc = AP and AP.effects and AP.effects.SurvivorScoopCompletion
+        if ssc then ssc.reapply() end
+    end
+    return done
+end
+
+--- The Cult is its cutscene: Jennifer can be rescued before it plays, and
+--- completing the scoop then would take the cutscene's check away. Once Sean
+--- is dead the cutscene can't play, and her rescue is what is left of it.
+function M.rescue_completes_scoop(scoop_name)
+    if scoop_name == CULT_SCOOP then
+        return State.is_completed(STRANGE_GROUP_SCOOP)
+    end
+    return true
 end
 
 local ENDGAME_EVENTS = {

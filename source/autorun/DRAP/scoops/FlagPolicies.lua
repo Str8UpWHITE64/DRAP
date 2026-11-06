@@ -15,6 +15,7 @@
 --    90 blacklist
 --    85 pre-activation side suppression
 --    80 post-jessie    (unshielded: writes stay visible to the evFlagOn hook)
+--    71 cult cutscene retry
 --    70 cult respawn
 --    60 area toggle 355
 --    56 active side-scoop flags          (> 55/54: active flags beat a
@@ -29,7 +30,8 @@
 --
 -- ctx fields (built per tick by ScoopUnlocker):
 --   activated, endgame, scoop_sanity, cult_limited, scene, goal_mode,
---   door_randomizer, area, hideout_area, north_plaza_area,
+--   door_randomizer, area, hideout_area, north_plaza_area, paradise_area,
+--   world_stable,
 --   check_flag(fid) -> true/false/nil,
 --   in_grace(name), is_active(name), is_completed(name),
 --   is_conflict_blocked(name), is_blocked_by_active_main(name),
@@ -158,6 +160,27 @@ function M.build(deps)
             else
                 for _, fid in ipairs(D.cult_on) do claim(fid, "on") end
                 for _, fid in ipairs(D.cult_off) do claim(fid, "off") end
+            end
+        end,
+    }
+
+    ----------------------------------------------------------------
+    -- The raincoat cutscene comes from a scheduler row (Paradise Plaza, scoop
+    -- 164, event 67) that turns 1166 on as it asks for the event and only
+    -- runs with 1166 off. A waiting event checked later in the same area load
+    -- replaces the request, as Kent's day 3 does. The cutscene never plays
+    -- and its row never runs again, with 1166 on and 326, which the cutscene
+    -- sets, still off. Clearing 1166 away from Paradise Plaza gives the row
+    -- its next entry. Sean's death ends the scoop, so that is left alone.
+    policy{
+        name = "cult-cutscene-retry", priority = 71,
+        collect = function(ctx, claim)
+            if ctx.endgame or not ctx.activated or not ctx.world_stable then return end
+            if not ctx.area or ctx.area == ctx.paradise_area then return end
+            if ctx.is_completed("A Strange Group") then return end
+            if ctx.check_flag(1166) and not ctx.check_flag(326)
+                    and ctx.check_flag(811) and not ctx.check_flag(875) then
+                claim(1166, "off")
             end
         end,
     }
