@@ -557,8 +557,9 @@ local pending_triggers = {}
 -- ScoopSanity-only: hold the EP shutters open by flooring GAME FLOW.
 --
 -- The shutters are a function of game flow, the number cutscenes advance to
--- describe the mall's state. Measured: flow 130 opens them, and flow 150 keeps
--- them open while leaving Entrance Plaza's zombie density alone -- 130..140
+-- describe the mall's state. The stores' fence shows up to flow 110 (Everyone
+-- Luvs Books has its own, see SceneFixups), and flow 150 keeps them open while
+-- leaving Entrance Plaza's zombie density alone -- 130..140
 -- selects a sparse enemy set, 140..159 matches no flow-specific row so the
 -- normal day/night ladder applies.
 --

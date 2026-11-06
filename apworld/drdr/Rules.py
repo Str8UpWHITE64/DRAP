@@ -510,8 +510,10 @@ def _survivor_location(world, rescue_name):
 
 
 # drdr_shared.json item_sanity: an item placed only inside the Entrance Plaza
-# storefronts lists this instead of "Entrance Plaza". The storefronts are
-# shuttered until the shutter cutscene, so reaching EP is not enough.
+# storefronts lists this instead of "Entrance Plaza". Without ScoopSanity the
+# storefronts stay shut until Backup for Brad completes, so reaching EP is not
+# enough. Under ScoopSanity both need EP and Meet Jessie, so the split changes
+# nothing there.
 ITEM_SANITY_EP_STOREFRONTS = "Entrance Plaza Storefronts"
 
 
@@ -566,25 +568,23 @@ def set_rules(world) -> None:
     SPHERE_0_REGIONS = {"Menu", "Heliport", "Security Room", "Level Ups", "Challenges"}
 
     # EP shutter gate. Entrance Plaza's storefronts stay closed until the
-    # shutter cutscene plays, so anything inside them is unreachable even
-    # once EP itself is. Defined here because both the PP-bonus rules below
-    # and the sticker/survivor rules further down need it.
-    # Vanilla: the shutters open during the Brad escort.
-    # ScoopSanity: the EP trigger spot opens them once the player has
-    # met Jessie (Warehouse reach) -- except when Backup for Brad is
-    # first in the chain, where the runtime holds the trigger until the
-    # Brad escort completes (the mission fires the cutscene itself).
-    # Under ScoopSanity the trigger spot always answers, whoever leads. It is
-    # only held shut while Backup for Brad is running, and that scoop cannot
+    # shutters open, so anything inside them is unreachable even once EP
+    # itself is. Defined here because both the PP-bonus rules below and the
+    # sticker/survivor rules further down need it.
+    # Without ScoopSanity: the shutters open when Backup for Brad completes.
+    # ScoopSanity: the runtime floors game flow at 150 from Meet Jessie on,
+    # which opens them (hold_ep_shutter_flow in ScoopUnlocker). The floor only
+    # leaves flow alone while Backup for Brad is running, and that scoop cannot
     # start until the Food Court and Entrance Plaza are reachable -- which is
-    # exactly what completing it needs. So either the trigger opens them or
-    # the mission can be finished.
+    # exactly what completing it needs. So either the floor opens them or the
+    # mission can be finished.
+    # Everyone Luvs Books opens with the others in both modes (SceneFixups).
     if not world.options.scoop_sanity:
         _shutter = CanReachLocation("Escort Brad to see Dr Barnaby")
     else:
-        # Meeting Jessie by name, not Warehouse reach. The trigger spot only
-        # answers once AP is activated, which is that milestone; reaching the
-        # Warehouse merely coincides with it during the prologue. The scoop
+        # Meeting Jessie by name, not Warehouse reach. The flow floor only
+        # starts once her flag is on; reaching the Warehouse merely coincides
+        # with it during the prologue. The scoop
         # loop already words the same condition this way.
         _shutter = CanReachLocation("Meet Jessie in the Warehouse")
     ep_shutter = And(CanReachRegion("Entrance Plaza"), _shutter)
@@ -904,8 +904,9 @@ def set_rules(world) -> None:
     # ItemSanity: the first pickup of an item type needs any area whose
     # default layouts place it. Those files load all through the 72 hours,
     # whatever the game flow, so reaching the area is all it takes -- except
-    # inside the EP storefronts, which need the shutters open, and anywhere
-    # past the Rooftop, which waits for Jessie.
+    # inside the EP storefronts, which need the shutters open (under
+    # ScoopSanity that is Meet Jessie, so no more than the plaza asks), and
+    # anywhere past the Rooftop, which waits for Jessie.
     if getattr(world, "item_sanity", False):
         _jessie = CanReachLocation("Meet Jessie in the Warehouse")
         for _name, _regions in ITEM_SANITY_REGIONS.items():

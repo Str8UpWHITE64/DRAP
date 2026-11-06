@@ -499,10 +499,10 @@ class DRWorld(World):
                         self.early_scoop = self.random.choice(self.scoop_order)
                 else:
                     # Backup for Brad may lead. It used to be swapped out of
-                    # the first slot because its mission holds the EP shutter
-                    # trigger shut, but the scoop can no longer start before
-                    # its regions are reachable, and until it starts the
-                    # trigger spot opens the shutters on its own.
+                    # the first slot because its mission kept the EP shutters
+                    # shut, but the scoop can no longer start before its
+                    # regions are reachable, and until it starts the flow
+                    # floor opens the shutters on its own.
                     scoop_order = list(MAIN_SCOOP_NAMES)
                     self.random.shuffle(scoop_order)
                     self.scoop_order = scoop_order
