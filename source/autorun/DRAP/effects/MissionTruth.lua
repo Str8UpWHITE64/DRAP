@@ -73,6 +73,9 @@ local target = nil               -- the main box: { title, hint, combined, area,
 
 local WAITING_TITLE = "Waiting for Mission"
 local WAITING_INFO = "Next mission will unlock once it is sent to you."
+local STUCK_INFO = "Missions you have received cannot be started until you can reach them."
+local JESSIE_TITLE = "Meet Jessie in the Warehouse"
+local JESSIE_INFO = "Head to the Warehouse and talk to Jessie."
 local START_TITLE = "Start a Mission"
 local START_WHERE = "Archipelago window, Scoops tab"
 
@@ -105,6 +108,9 @@ local GAME_TEXT = {
     ["Hideout"]              = { title = { 1057, 2 }, info = { 1067, 2 }, hint = { 1422, 2 } },
     ["Jessie's Discovery"]   = { title = { 1057, 3 }, info = { 1067, 3 }, hint = { 1422, 3 } },
     ["The Butcher"]          = { title = { 1057, 4 }, info = { 1067, 4 }, hint = { 1422, 4 } },
+    -- The opening, before Jessie is met: the game's three prologue rows.
+    ["Prologue: Start"]      = { title = { 1386, 1 }, info = { 1387, 1 }, hint = { 1388, 1 } },
+    ["Prologue: Barricade"]  = { title = { 1389, 1 }, info = { 1390, 1 }, hint = { 1391, 1 } },
 }
 local game_text = {}              -- mission -> { title, info, hint }, read on the frame thread
 
@@ -328,6 +334,50 @@ local function directed(guide)
     return { area = scene_index(scene), x = door.x, y = door.y or 0, z = door.z }
 end
 
+local EFM_FLAGS = "app.solid.gamemastering.EventFlagsManager"
+local PROLOGUE_STEP_DONE = 263     -- the opening's Entrance Plaza part is over
+local PROLOGUE_BARRICADE = 3655    -- the game queued "Something's wrong..."
+
+local function ev_flag(id)
+    local efm = sdk.get_managed_singleton(EFM_FLAGS)
+    return efm ~= nil and pc(function() return efm:call("evFlagCheck", id) end) == true
+end
+
+--- The box before Jessie is met: the game's own opening text while the
+--- opening runs, then a line of DRAP's own (the game has none) until Jessie.
+--- nil when Jessie has been met, or the flag cannot be read yet.
+local function prologue_target()
+    local met = scoop_unlocker.has_met_jessie and scoop_unlocker.has_met_jessie()
+    if met ~= false then return nil end
+    local key
+    if not ev_flag(PROLOGUE_STEP_DONE) then
+        key = ev_flag(PROLOGUE_BARRICADE) and "Prologue: Barricade" or "Prologue: Start"
+    else
+        return make_target(JESSIE_TITLE, JESSIE_INFO, "Warehouse", { area = scene_index("s230") })
+    end
+    local g = game_text[key]
+    if not g then return nil end
+    return { title = g.title, hint = g.hint, combined = g.info, area = scene_index("s100") }
+end
+
+--- Received main missions and none can be started: the Scoops tab's "stuck"
+--- (Any Order) and its blocked colour (chain), both from ScoopState.
+local function received_but_stuck()
+    if not State.is_activated() then return false end
+    if State.is_any_order() then
+        local ao = State.any_order_status()
+        return not ao.running and #ao.startable == 0 and #ao.stuck > 0
+    end
+    local current = scoop_unlocker.get_current_chain_scoop()
+    return current ~= nil and State.has_ap_received(current) and not State.completed[current]
+        and not State.main_scoop_reachable(current)
+end
+
+local function waiting_target()
+    if received_but_stuck() then return make_target(WAITING_TITLE, STUCK_INFO, nil, nil) end
+    return make_target(WAITING_TITLE, WAITING_INFO, nil, nil)
+end
+
 -- Under ScoopSanity the main box never shows the vanilla story objective:
 -- the running mission, else the goal or a placeholder. The endgame leaves the
 -- box to the engine (the finale plays normally).
@@ -335,6 +385,8 @@ local function main_target()
     if not scoop_unlocker then return nil end
     if State.is_endgame_reached() then return nil end
     if facts_running() then return facts_target() end
+    local pro = prologue_target()
+    if pro then return pro end
     if State.is_any_order() then
         local ao = State.any_order_status()
         if ao.running then return target_for_main(ao.running) end
@@ -349,7 +401,7 @@ local function main_target()
                 .. " Scoops tab of the Archipelago window.", #ao.startable),
                 START_WHERE, nil)
         end
-        return goal_target() or make_target(WAITING_TITLE, WAITING_INFO, nil, nil)
+        return goal_target() or waiting_target()
     end
     -- Received only: a story flag the game switches on (or DRAP holds on, as
     -- 272 is held to clear Brad out) does not make a mission the player's.
@@ -360,7 +412,7 @@ local function main_target()
     end
     local active_main = find_active_main()
     if active_main then return target_for_main(active_main) end
-    return goal_target() or make_target(WAITING_TITLE, WAITING_INFO, nil, nil)
+    return goal_target() or waiting_target()
 end
 
 local function compute_target()
