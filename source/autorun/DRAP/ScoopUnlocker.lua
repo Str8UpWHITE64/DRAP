@@ -813,6 +813,7 @@ end
 local CULT_ON = { 326, 811, 1166, 2063 }
 local CULT_SCOOP = "The Cult"
 local STRANGE_GROUP_SCOOP = "A Strange Group"
+local CULT_CUTSCENE_CHECK = "Witness Sean in Paradise Plaza"
 local JENNIFER_START_FLAG = 2699   -- EV_SCQ_STARTBE, Jennifer Gorman's start
 local CULT_OFF = {
     783,                                      -- scoop start flags
@@ -2059,6 +2060,16 @@ function M.complete_scoop(scoop_name)
     if scoop_name == STRANGE_GROUP_SCOOP then
         local ssc = AP and AP.effects and AP.effects.SurvivorScoopCompletion
         if ssc then ssc.reapply() end
+        -- The cutscene is the only thing that sends this check, and it can't
+        -- play once Sean is dead. Send just the check if the player hasn't had
+        -- it: going through the tracker would also complete The Cult.
+        local bridge = AP and AP.AP_BRIDGE
+        if done and bridge and bridge.has_local_check
+                and not bridge.has_local_check(CULT_CUTSCENE_CHECK) then
+            M.log("Sean's scoop ended before the raincoat cutscene -- sending '"
+                .. CULT_CUTSCENE_CHECK .. "'")
+            bridge.check(CULT_CUTSCENE_CHECK)
+        end
     end
     return done
 end
