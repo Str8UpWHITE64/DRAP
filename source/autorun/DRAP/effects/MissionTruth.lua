@@ -469,14 +469,17 @@ local main_tables = {}            -- queue table index -> true
 local rows_known = false
 
 -- The four scoops the game gives no box. Each takes a spare row, shown through a
--- table nothing runs, with text on two messages the game has retired (real GUIDs,
+-- table no scheduler reads, with text on two messages the game has retired (real GUIDs,
 -- no row uses them) and a case set that goes unread while the main tables share
 -- theirs. Rows 49 and 48 are Overtime's Cold Spray and Perfume Bottle; their own
 -- tables and the row's own fields go back at the endgame, and only then, because
 -- a row cannot change under a queued entry. All of it is memory; the entry flags
 -- are spare ones Overtime never reads.
+-- A scoop's queue table also holds its clock window, and rewriting that stops its
+-- survivor rows from firing, so a spare table is one whose scoop no scheduler row
+-- reads. Table 57 is Bill Brenton's; the Convicts use 66.
 local OWN_BOXES = {
-    { scoop = "The Convicts",   row = 19, table = 57, own_table = 25, entry = 2516, set = 24, pos = 26, title = 296, info = 297 },
+    { scoop = "The Convicts",   row = 19, table = 66, own_table = 25, entry = 2516, set = 24, pos = 26, title = 296, info = 297 },
     { scoop = "The Cult",       row = 26, table = 65, entry = 2523, set = 25, pos = 31, title = 298, info = 302 },
     { scoop = "Cletus",         row = 49, table = 67, own_table = 75, entry = 2515, set = 26, pos = 32, title = 303, info = 307 },
     { scoop = "Special Forces", row = 48, table = 76, own_table = 74, entry = 2536, set = 27, pos = 34, title = 308, info = 309 },
