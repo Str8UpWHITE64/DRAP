@@ -215,7 +215,7 @@ AP.SceneFixups.register()
 -- Achievement pop-ups are their own event, not a counted save field, so they
 -- arrive already resolved to a location name.
 AP.AchievementTracker.on_location_earned = function(loc_name)
-    AP_BRIDGE.check(loc_name)
+    return AP_BRIDGE.check(loc_name)
 end
 
 AP.LevelTracker.on_level_changed = function(old_level, new_level)

@@ -170,6 +170,12 @@ function M.is_checked(name)
     return L ~= nil and L.locations[name] ~= nil
 end
 
+--- Has the server confirmed this location?
+function M.is_acked(name)
+    local entry = L and L.locations[name]
+    return entry ~= nil and entry.acked == true
+end
+
 --- Did THIS runtime detect it, rather than the server telling us about it?
 ---
 --- The server's checked list includes locations collected on the player's
