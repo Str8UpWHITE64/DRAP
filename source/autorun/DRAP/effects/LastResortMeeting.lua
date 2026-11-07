@@ -20,7 +20,10 @@
 -- ScoopSanity only. Without it the case runs on the game's own schedule.
 --
 -- Also logs what the tunnel holds on every entry, whatever the case is doing:
--- 296, the five "bomb placed" flags and the game flow.
+-- 296, the number of bombs standing in it, the five "picked up" flags and the
+-- game flow. The bombs are counted from the objects in the scene, not from the
+-- "placed" flags: other code clears 3329 while the Cult is out, so that flag
+-- says nothing about whether the first bomb is there.
 
 local Shared = require("DRAP/Shared")
 local PlayerReady = require("DRAP/PlayerReady")
@@ -35,7 +38,9 @@ local TUNNEL_AREA = 1536
 local CASE_START_FLAG = 294           -- EV_EVENT33_0
 local CASE_QUEUE_FLAG = 775           -- EV_SCQ_START07
 local MEETING_FLAG = 296              -- EV_EVENT35
-local BOMB_PLACED_FLAGS = { 3329, 3330, 3331, 3332, 3333 }
+local BOMB_PICKED_FLAGS = { 2066, 2067, 2068, 2069, 2070 }
+local BOMB_OBJECT = "PREF_uOmfc"      -- the truck bomb's prefab
+local BOMB_COUNT_DELAY_S = 3.0        -- the objects appear a little after the player is free
 
 -- The monitor room. Door 517 is at z 230.65 and everything behind it (the hall,
 -- the stairs, the way to the Entrance Plaza and the Heliport) is further along z.
@@ -228,17 +233,45 @@ end
 ------------------------------------------------------------
 
 local tunnel_logged = false
+local tunnel_ready_at = nil
 
 local function onoff(v) return v == true and "on" or (v == false and "off" or "?") end
 
-local function check_tunnel()
-    if area_index() ~= TUNNEL_AREA then tunnel_logged = false; return end
+--- How many truck bombs stand in the loaded scene, or nil when it can't be
+--- told (no scene, no component list, or nothing scanned).
+local function count_bombs()
+    local ok, n = pcall(function()
+        local sm = sdk.get_native_singleton("via.SceneManager")
+        local td = sdk.find_type_definition("via.SceneManager")
+        local scene = sm and td and sdk.call_native_func(sm, td, "get_CurrentScene")
+        local list = scene and scene:call("findComponents(System.Type)",
+            sdk.typeof("app.solid.character.SolidModelAttribute"))
+        if not list then return nil end
+        local total = tonumber(list:call("get_Count")) or 0
+        if total <= 0 then return nil end
+        local found = 0
+        for i = 0, total - 1 do
+            local c = list:call("get_Item", i)
+            local go = c and c:call("get_GameObject")
+            if go and tostring(go:call("get_Name")) == BOMB_OBJECT then found = found + 1 end
+        end
+        return found
+    end)
+    return ok and n or nil
+end
+
+local function check_tunnel(now)
+    if area_index() ~= TUNNEL_AREA then tunnel_logged = false; tunnel_ready_at = nil; return end
     if tunnel_logged or not PlayerReady.ready(SETTLE_S) then return end
+    tunnel_ready_at = tunnel_ready_at or now
+    if now < tunnel_ready_at + BOMB_COUNT_DELAY_S then return end
     tunnel_logged = true
-    local placed = {}
-    for _, id in ipairs(BOMB_PLACED_FLAGS) do placed[#placed + 1] = onoff(flag(id)) end
-    M.log(string.format("Tunnel entry: 296 %s, bombs placed (3329-3333) %s, game flow %s",
-        onoff(flag(MEETING_FLAG)), table.concat(placed, " "), tostring(game_flow())))
+    local bombs = count_bombs()
+    local picked = {}
+    for _, id in ipairs(BOMB_PICKED_FLAGS) do picked[#picked + 1] = onoff(flag(id)) end
+    M.log(string.format("Tunnel entry: 296 %s, bombs standing %s, picked up (2066-2070) %s, game flow %s",
+        onoff(flag(MEETING_FLAG)), bombs and tostring(bombs) or "unknown", table.concat(picked, " "),
+        tostring(game_flow())))
 end
 
 ------------------------------------------------------------
@@ -252,7 +285,7 @@ function M.on_frame()
     if now < next_check then return end
     next_check = now + CHECK_EVERY
     if not Shared.is_in_game() then return end
-    check_tunnel()
+    check_tunnel(now)
     if M:should_run() then check_meeting(now) end
 end
 
