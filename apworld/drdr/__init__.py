@@ -7,7 +7,7 @@ from Options import OptionError, item_and_loc_options
 
 from worlds.AutoWorld import World, WebWorld
 
-from .Items import DRItem, DRItemCategory, item_dictionary, key_item_names, item_descriptions, BuildItemPool, specialty_items, overpowered_items, progression_skills, microwave_food_items, challenge_tool_items, kill_filler_items, item_sanity_item_names
+from .Items import DRItem, DRItemCategory, item_dictionary, key_item_names, item_descriptions, BuildItemPool, specialty_items, overpowered_items, progression_skills, microwave_food_items, challenge_tool_items, kill_filler_items, item_sanity_item_names, KENT_DAYS, PROGRESSIVE_KENT, kent_is_progressive
 from .Locations import kill_sanity_location_groups
 from .Locations import (DRLocation, DRLocationCategory, location_tables,
                         location_dictionary, ZOMBIE_KILL_TIERS,
@@ -1457,7 +1457,7 @@ class DRWorld(World):
             "scoop_order": self.scoop_order if scoop_sanity_enabled else {},
             # The Kent day each Progressive Kent Scoop copy unlocks, in order.
             # Empty: this seed sends each day as its own item.
-            "kent_progression": [],
+            "kent_progression": KENT_DAYS if kent_is_progressive(self.options) else [],
             # Player-stats slot data (read by Lua on slot connect)
             "vanilla_progression": vanilla_progression_value,
             "trap_percentage": trap_percentage,

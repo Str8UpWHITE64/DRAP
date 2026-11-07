@@ -587,10 +587,15 @@ spitter_kept_weapons = {
     "Queen",
 }
 
-# Kent's days. Each is its own item; older seeds unlock them in this order
-# with Progressive Kent Scoop copies.
+# Kent's days. With Kent Scoop Order on progressive, the Nth Progressive Kent
+# Scoop copy unlocks day N; on random, each day is its own item.
 PROGRESSIVE_KENT = "Progressive Kent Scoop"
 KENT_DAYS = ["Cut from the Same Cloth", "Photo Challenge", "Photographer's Pride"]
+
+
+def kent_is_progressive(options) -> bool:
+    """True when Kent's days come as Progressive Kent Scoop copies."""
+    return bool(options.scoop_sanity) and options.kent_scoop_order.value == 0
 
 
 # Upgrades with nothing to improve once the weapons are gone. Melee is meant
@@ -889,9 +894,13 @@ def BuildItemPool(random, count, options, excluded_scoop_names=(),
 
     if options.scoop_sanity:
         excluded = set(excluded_scoop_names)
+        kent_progressive = kent_is_progressive(options)
         for scoop in scoopList:
-            # Only seeds from older versions use the progressive Kent item.
+            # Kent's days are added below, as three Progressive Kent Scoop
+            # copies or as their own items, per the Kent Scoop Order option.
             if scoop.name == PROGRESSIVE_KENT:
+                continue
+            if scoop.name in KENT_DAYS and kent_progressive:
                 continue
             # Skip "Out of Control" if door randomizer is also enabled (it's precollected for softlock prevention)
             if options.door_randomizer and scoop.name == "Out of Control":
@@ -904,6 +913,13 @@ def BuildItemPool(random, count, options, excluded_scoop_names=(),
             item_pool.append(item)
             remaining_count = remaining_count - 1
             included_itemcount = included_itemcount + 1
+        if kent_progressive:
+            for day in KENT_DAYS:
+                if day in excluded:
+                    continue
+                item_pool.append(item_dictionary[PROGRESSIVE_KENT])
+                remaining_count = remaining_count - 1
+                included_itemcount = included_itemcount + 1
 
 
     # Useful items: skills + stat upgrades. Quantity per stat depends on

@@ -492,6 +492,31 @@ class SpecialForcesMode(Choice):
     default = 0
 
 
+class KentScoopOrder(Choice):
+    """
+    How Kent's three psychopath scoops (Cut from the Same Cloth, Photo
+    Challenge and Photographer's Pride) reach you. This only matters with
+    ScoopSanity.
+
+    progressive: the default. Three copies of Progressive Kent Scoop are in
+                 the item pool. The first unlocks Kent's day 1, the second
+                 day 2 and the third day 3, so you always play his days in
+                 order.
+    separate:    each of Kent's days is its own item, so they reach you in
+                 whatever order the seed places them. Day 3 can come before
+                 day 1, for example, and each day plays whenever you receive
+                 it. Day 2 needs an Outtake photo worth 500 PP whichever
+                 order you get it in.
+
+    With the Camera Item on, either choice keeps day 1 and day 2 waiting for
+    the Camera, then starts them in the order you received them.
+    """
+    display_name = "Kent Scoop Order"
+    option_progressive = 0
+    option_separate = 1
+    default = 0
+
+
 class EnableSkillItems(DefaultOnToggle):
     """
     When enabled, Frank's 21 combat skills (Jump Kick, Suplex, etc.) become AP
@@ -1091,6 +1116,7 @@ class DROption(PerGameCommonOptions):
     hostile_survivor_count_max: HostileSurvivorCountMax
     cult_limited: CultLimited
     special_forces_mode: SpecialForcesMode
+    kent_scoop_order: KentScoopOrder
     spitter_only: SpitterOnly
     night_mode_enabled: NightModeEnabled
     hardcore_zombies_enabled: HardcoreZombiesEnabled
@@ -1111,6 +1137,7 @@ dr_option_groups = [
             NumberOfKills,
             ScoopSanity,
             ScoopsanityOrder,
+            KentScoopOrder,
             ZombieKillTiers,
             KillSanity,
             PpBonusLocations,

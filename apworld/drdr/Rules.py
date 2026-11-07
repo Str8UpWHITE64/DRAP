@@ -24,6 +24,7 @@ from .shared_data import (
     SCOOP_COMPLETION_MAP, SCOOP_EVENTS, SCOOP_REGION_REQUIREMENTS,
     SCOOP_SPLIT_KEY_DOORS as SPLIT_KEY_SCOOP_DOORS,
 )
+from .Items import KENT_DAYS, PROGRESSIVE_KENT, kent_is_progressive
 
 
 # Level requirements for each main scoop position (0-indexed) in the shuffled order.
@@ -543,8 +544,13 @@ def set_rules(world) -> None:
     _dropped = (world.SPITTER_EXCLUDED_LOCATIONS if world.spitter_only
                 else frozenset())
 
-    # Each of Kent's days is its own item, and the days can come in any order.
+    # Kent's days are Progressive Kent Scoop copies (day N needs N of them)
+    # or their own items, per the Kent Scoop Order option.
+    _kent_progressive = kent_is_progressive(world.options)
+
     def _kent_day(day):
+        if _kent_progressive:
+            return Has(PROGRESSIVE_KENT, KENT_DAYS.index(day) + 1)
         return Has(day)
 
     # --------------------------------------------------------------------
@@ -1514,7 +1520,12 @@ def set_rules(world) -> None:
     world.set_rule(world.multiworld.get_location("Reach max level", world.player), CanReachLocation("Reach Level 50"))
     world.set_rule(world.multiworld.get_location("Kill 500 zombies by vehicle", world.player), _kill_rule)
     world.set_rule(world.multiworld.get_location("Kill 1000 zombies by vehicle", world.player), _kill_rule)
-    all_side_scoops_rule = HasAll(*(SURVIVOR_SCOOP_NAMES + PSYCHOPATH_SCOOP_NAMES))
+    if _kent_progressive:
+        all_side_scoops = [_s for _s in SURVIVOR_SCOOP_NAMES + PSYCHOPATH_SCOOP_NAMES
+                           if _s not in KENT_DAYS]
+        all_side_scoops_rule = And(HasAll(*all_side_scoops), Has(PROGRESSIVE_KENT, len(KENT_DAYS)))
+    else:
+        all_side_scoops_rule = HasAll(*(SURVIVOR_SCOOP_NAMES + PSYCHOPATH_SCOOP_NAMES))
     # The survivor-count milestones need nearly every late-game scoop. The
     # two big ones are kept to filler, since they only open once most of the
     # run is solved.
