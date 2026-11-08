@@ -144,8 +144,11 @@ local function drain_queue()
     local batch = queued
     queued = {}
     for _, loc in ipairs(batch) do
-        -- The ledger knows the server already has it (e.g. after a reload).
+        -- The server already has it (after a reload, or a collect). Nothing
+        -- to send, but the player did earn it now: record it as theirs, or
+        -- a scoop that completes on it never sees it done.
         if not sent[loc] and Ledger.is_init() and Ledger.is_acked(loc) then
+            Ledger.record(loc, "check")
             sent[loc] = true
         end
         if not sent[loc] and M.on_location_earned then
