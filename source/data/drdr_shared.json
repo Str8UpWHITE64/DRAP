@@ -5238,6 +5238,7 @@
     {"location_name": "Pick up Zucchini", "item_numbers": [145], "regions": ["Food Court", "Seon's Food and Stuff"]},
     {"location_name": "Pick up Nightstick", "item_numbers": [139], "regions": ["Warehouse", "Paradise Plaza", "Colby's Movieland", "Leisure Park", "North Plaza", "Crislip's Home Saloon", "Food Court", "Wonderland Plaza", "Al Fresca Plaza", "Seon's Food and Stuff", "Maintenance Tunnel", "Meat Processing Area"]},
     {"location_name": "Pick up Ceremonial Sword", "item_numbers": [195], "regions": ["Colby's Movieland After Sean"]},
-    {"location_name": "Pick up Book [Brainwashing Tips]", "item_numbers": [68], "regions": ["Colby's Movieland After Sean"]}
+    {"location_name": "Pick up Book [Brainwashing Tips]", "item_numbers": [68], "regions": ["Colby's Movieland After Sean"]},
+    {"location_name": "Pick up Hunk of Meat", "item_numbers": [257], "regions": ["Paradise Plaza", "Entrance Plaza", "Al Fresca Plaza", "Leisure Park", "Wonderland Plaza", "North Plaza", "Food Court"]}
   ]
 }
