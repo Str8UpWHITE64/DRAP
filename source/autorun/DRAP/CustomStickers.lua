@@ -24,7 +24,12 @@
 --   * Collected = the location is checked in the ledger. Collected stickers are not spawned again.
 --   * Never move a spawned sticker by its transform; spawn it where it belongs.
 --
--- Off unless the slot asks (slot_data.extra_pp_stickers). Camera Item needs nothing here: no Camera, no photo.
+-- One more sticker is always on, on every slot: a visible marker on the Rooftop vent (photo id 174, "Photograph
+-- PP Sticker 100"). It is a visual only: it keeps vanilla id 174 as its scoop id, so the game's own count makes it glow
+-- until the vent is photographed and grey after, reloads included. Its hit list is emptied, so it is no second photo
+-- target; the vanilla vent object stays the one that credits 174.
+--
+-- The extra stickers are off unless the slot asks (slot_data.extra_pp_stickers). Camera Item needs nothing here: no Camera, no photo.
 -- Console (testing): drap_extra_pp_stickers(true) / drap_extra_pp_stickers_reset() (offline, no seed or server),
 -- drap_cstick_enable(true), drap_cstick_add("s231", x, y, z, yaw, n), drap_cstick_status().
 -- Test spots (drap_cstick_spot, drap_cstick_remove) are test stickers: they work without a slot or test
@@ -53,6 +58,12 @@ local MAINT_INTERVAL_S = 0.5
 -- fully in frame and scored 5000 where the vanilla stand-in scored 2294). The minimum size is the one difference:
 -- the game uses 0.4096 for ids 128..227 and 0.0256 for ours (ratingSub), which only matters for far, tiny shots.
 local RADIUS_SCALE = 1.0
+
+-- the vent marker (see above): Visual = the vanilla photo id it stands for
+local VISUAL_ROWS = {
+    -- on the vent opening's outer face, where the Security Room vent door lands the player, facing them
+    { Number = 174001, Visual = 174, Area = "s231", Pos = { x = 171.21, y = 10.84, z = 111.21 }, Yaw = 0.9035, Pitch = 0, Roll = 0 },
+}
 
 local enabled = false
 local debug_enabled = nil        -- console override
@@ -116,8 +127,12 @@ local function table_on()
     local Activation = package.loaded["DRAP/Activation"]
     return Activation ~= nil and Activation.is_active ~= nil and Activation.is_active() == true
 end
+local function visual_on()
+    local Activation = package.loaded["DRAP/Activation"]
+    return Activation ~= nil and Activation.is_active ~= nil and Activation.is_active() == true
+end
 -- test spots run on their own, with the table off
-local function is_on() return table_on() or #debug_rows > 0 or next(doomed) ~= nil end
+local function is_on() return table_on() or visual_on() or #debug_rows > 0 or next(doomed) ~= nil end
 
 ------------------------------------------------------------
 -- the table
@@ -128,6 +143,9 @@ local function rows()
     local out = {}
     if table_on() then
         for _, r in ipairs(SharedData.custom_stickers and SharedData.custom_stickers() or {}) do out[#out + 1] = r end
+    end
+    if visual_on() then
+        for _, r in ipairs(VISUAL_ROWS) do out[#out + 1] = r end
     end
     for _, r in ipairs(debug_rows) do out[#out + 1] = r end
     return out
@@ -153,6 +171,7 @@ local function test_save()
 end
 
 local function is_collected(r)
+    if r.Visual then return false end    -- the game's own count greys it
     if (debug_enabled or r.Test) and test_load()[tostring(r.Number)] then return true end
     local Ledger = package.loaded["DRAP/LocationLedger"]
     if r.LocationName and Ledger and Ledger.is_init and Ledger.is_init() and Ledger.is_checked then
@@ -277,6 +296,24 @@ local function own_hits(attr)
     return #now == #elems and num(fld(now[1], "mScoopId")) == SPARE_ID and num(fld(elems[1], "mScoopId")) == first
 end
 
+-- a visual marker takes part in no photo: its own hit list, with no entries (never the shared one)
+local function no_hits(attr)
+    local src = fld(attr, "mPhotoHitObjList")
+    if not src then return true end
+    if #items(src) == 0 then return true end
+    local list = pc(function() return src:call("MemberwiseClone") end)
+    local backing = fld(src, "_items")
+    local arr = backing and pc(function() return backing:call("Clone") end)
+    if not list or not arr then return false end
+    list = pc(function() return list:add_ref() end) or list
+    arr = pc(function() return arr:add_ref() end) or arr
+    pc(function() list:set_field("_items", arr) end)
+    pc(function() list:set_field("_size", 0) end)
+    pc(function() attr:set_field("mPhotoHitObjList", list) end)
+    pc(function() attr:set_field("mPhotoHitObjCount", 0) end)
+    return #items(fld(attr, "mPhotoHitObjList")) == 0
+end
+
 ------------------------------------------------------------
 -- spawning
 ------------------------------------------------------------
@@ -353,11 +390,12 @@ end
 local function finish_spawn(n, e, om, go)
     local attr = comp(go, "app.solid.character.SolidModelAttribute")
     if not attr then return false end
-    attr:set_field("mPhotoId", SPARE_ID)
+    local visual = e.row.Visual
+    attr:set_field("mPhotoId", visual or SPARE_ID)
     attr:set_field("HavingUniqueEvent", 0)
     e.om, e.go, e.attr, e.addr = om, go, attr, addr(go)
     e.state, e.t = "live", os.clock()
-    go_to_number[e.addr] = n
+    if not visual then go_to_number[e.addr] = n end
     stats.spawned = stats.spawned + 1
     return true
 end
@@ -366,6 +404,20 @@ end
 -- mMaxCount held (uncollected) or 0 (collected)
 local function settle(n, e)
     local om, attr = e.om, e.attr
+    local vis = e.row.Visual
+    if vis then
+        if num(fld(om, "mMyScoopId")) ~= vis then pc(function() om:set_field("mMyScoopId", vis) end) end
+        -- every tick, as below: a late setup puts the vanilla hit list back
+        e.hits_ok = no_hits(attr)
+        local r = e.row
+        local a = fld(om, "mStartAngle")
+        local px, py, pz = num(r.Pitch) or 0, num(r.Yaw) or 0, num(r.Roll) or 0
+        if not a or math.abs(a.x - px) > 1e-3 or math.abs(a.y - py) > 1e-3 or math.abs(a.z - pz) > 1e-3 then
+            pc(function() om:set_field("mStartAngle", Vector3f.new(px, py, pz)) end)
+            pc(function() om:set_field("mRotAngY", 0.0) end)
+        end
+        return    -- mMaxCount stays the game's: its own count decides glow or grey
+    end
     if num(fld(om, "mMyScoopId")) ~= SPARE_ID then
         pc(function() om:set_field("mMyScoopId", SPARE_ID) end)
         pc(function() attr:call("setSMAdd(System.Int32)", SPARE_ID) end)
@@ -419,7 +471,9 @@ local function maintain()
     end
     if os.clock() - area_since < RESPAWN_SETTLE_S then return end
     if pc(function() return am:call("isOmSetLoading") end) == true then return end
-    if next(live) ~= nil then verify_scoop_points() end
+    local extras = false
+    for _, e in pairs(live) do if not e.row.Visual then extras = true; break end end
+    if extras then verify_scoop_points() end
 
     for _, r in ipairs(rows()) do
         if r.Number and r.Pos and area_index_of(r.Area) == idx then
@@ -432,7 +486,7 @@ local function maintain()
             elseif e.state == "pending" then
                 local om, go = find_spawned(e)
                 if om then
-                    if finish_spawn(r.Number, e, om, go) and not (seal_ready and scoop_ready) then ensure_seal_row(e.attr) end
+                    if finish_spawn(r.Number, e, om, go) and not r.Visual and not (seal_ready and scoop_ready) then ensure_seal_row(e.attr) end
                     M.log(string.format("Custom sticker %d spawned in %s (folder: %s)", r.Number, tostring(r.Area), e.folder))
                 elseif os.clock() - e.t > FIND_TIMEOUT_S then
                     M.log("Custom sticker " .. tostring(r.Number) .. " never appeared; retrying")
@@ -444,7 +498,7 @@ local function maintain()
                     live[r.Number] = nil
                     stats.respawned = stats.respawned + 1
                 else
-                    if not (seal_ready and scoop_ready) then ensure_seal_row(e.attr) end
+                    if not r.Visual and not (seal_ready and scoop_ready) then ensure_seal_row(e.attr) end
                     settle(r.Number, e)
                 end
             end
@@ -526,7 +580,7 @@ local function watch_photo()
             local fp = go_pos(pgo)
             local best, bd
             for n2, e2 in pairs(live) do
-                if e2.state == "live" and not e2.collected and e2.go and fp then
+                if e2.state == "live" and not e2.collected and not e2.row.Visual and e2.go and fp then
                     local gp = go_pos(e2.go)
                     local d = gp and dist(gp, fp)
                     if d and d < 15 and (not bd or d < bd) then best, bd = n2, d end
@@ -573,7 +627,7 @@ end
 
 function M.on_frame()
     if not is_on() then return end
-    if next(live) ~= nil then pcall(watch_photo) end
+    if next(live) ~= nil then pcall(watch_photo) end   -- a marker alone gives it no rows to match
     local now = os.clock()
     if now < next_maint then return end
     next_maint = now + MAINT_INTERVAL_S
