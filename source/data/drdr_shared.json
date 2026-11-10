@@ -1025,6 +1025,11 @@
       "item_number": 116
     },
     {
+      "name": "Step Ladder",
+      "game_id": "ITEM_NO_STEPLADDER",
+      "item_number": 117
+    },
+    {
       "name": "Stepladder",
       "game_id": "ITEM_NO_STEPLADDER",
       "item_number": 117
@@ -1713,6 +1718,11 @@
       "name": "Stool",
       "game_id": "ITEM_NO_STOOL",
       "item_number": 294
+    },
+    {
+      "name": "Chair (White)",
+      "game_id": "ITEM_NO_CHAIR_5",
+      "item_number": 295
     },
     {
       "name": "Chair",
@@ -5151,7 +5161,7 @@
     {"location_name": "Pick up Grapefruit", "item_numbers": [216], "regions": ["Entrance Plaza", "Seon's Food and Stuff"]},
     {"location_name": "Pick up Gumball Machine", "item_numbers": [105], "regions": ["Colby's Movieland", "Wonderland Plaza", "Entrance Plaza Storefronts"]},
     {"location_name": "Pick up Handbag", "item_numbers": [17], "regions": ["Paradise Plaza", "Wonderland Plaza", "Al Fresca Plaza", "Entrance Plaza Storefronts"]},
-    {"location_name": "Pick up Handgun", "item_numbers": [75], "regions": ["Warehouse", "Paradise Plaza", "Colby's Movieland", "Leisure Park", "North Plaza", "Crislip's Home Saloon", "Food Court", "Wonderland Plaza", "Al Fresca Plaza", "Seon's Food and Stuff", "Maintenance Tunnel"]},
+    {"location_name": "Pick up Handgun", "item_numbers": [75], "regions": ["Paradise Plaza", "Colby's Movieland", "Leisure Park", "North Plaza", "Crislip's Home Saloon", "Food Court", "Wonderland Plaza", "Al Fresca Plaza", "Seon's Food and Stuff", "Maintenance Tunnel"]},
     {"location_name": "Pick up Hanger", "item_numbers": [55], "regions": ["Paradise Plaza", "Wonderland Plaza", "Al Fresca Plaza", "Entrance Plaza Storefronts"]},
     {"location_name": "Pick up HDTV", "item_numbers": [108], "regions": ["Wonderland Plaza", "Entrance Plaza"]},
     {"location_name": "Pick up Hedge Trimmer", "item_numbers": [74], "regions": ["Leisure Park", "Crislip's Home Saloon", "Al Fresca Plaza"]},
@@ -5181,14 +5191,14 @@
     {"location_name": "Pick up Orange Juice", "item_numbers": [218], "regions": ["Paradise Plaza", "Wonderland Plaza", "Al Fresca Plaza", "Seon's Food and Stuff"]},
     {"location_name": "Pick up Paint Can", "item_numbers": [14], "regions": ["Warehouse", "Colby's Movieland", "North Plaza", "Crislip's Home Saloon", "Al Fresca Plaza"]},
     {"location_name": "Pick up Painting", "item_numbers": [67, 200, 243, 248, 255], "regions": ["Colby's Movieland", "Wonderland Plaza", "Entrance Plaza Storefronts"]},
-    {"location_name": "Pick up Parasol", "item_numbers": [48], "regions": ["Crislip's Home Saloon", "Wonderland Plaza", "Al Fresca Plaza", "Entrance Plaza", "Entrance Plaza Storefronts"]},
+    {"location_name": "Pick up Parasol", "item_numbers": [48], "regions": ["Crislip's Home Saloon", "Wonderland Plaza", "Al Fresca Plaza", "Entrance Plaza"]},
     {"location_name": "Pick up Perfume Prop", "item_numbers": [269], "regions": ["Wonderland Plaza", "Entrance Plaza Storefronts"]},
     {"location_name": "Pick up Pet Food", "item_numbers": [229], "regions": ["Seon's Food and Stuff"]},
-    {"location_name": "Pick up Pickaxe", "item_numbers": [33], "regions": ["Entrance Plaza", "Entrance Plaza Storefronts"]},
+    {"location_name": "Pick up Pickaxe", "item_numbers": [33], "regions": ["Entrance Plaza"]},
     {"location_name": "Pick up Pie", "item_numbers": [113], "regions": ["Paradise Plaza", "Colby's Movieland", "Al Fresca Plaza"]},
     {"location_name": "Pick up Plywood Panel", "item_numbers": [260], "regions": ["Colby's Movieland", "North Plaza"]},
     {"location_name": "Pick up Potted Plant", "item_numbers": [57, 99, 100], "regions": ["Paradise Plaza", "Wonderland Plaza", "Al Fresca Plaza", "Entrance Plaza"]},
-    {"location_name": "Pick up Potted Plant Bamboo", "item_numbers": [95], "regions": ["Entrance Plaza", "Entrance Plaza Storefronts"]},
+    {"location_name": "Pick up Potted Plant Bamboo", "item_numbers": [95], "regions": ["Entrance Plaza"]},
     {"location_name": "Pick up Potted Plant Small Fern", "item_numbers": [98], "regions": ["Wonderland Plaza", "Al Fresca Plaza"]},
     {"location_name": "Pick up Potted Plant Tall Bush", "item_numbers": [96], "regions": ["North Plaza", "Food Court", "Wonderland Plaza", "Al Fresca Plaza"]},
     {"location_name": "Pick up Propane Tank", "item_numbers": [77, 154], "regions": ["Rooftop", "Warehouse", "Colby's Movieland", "Leisure Park", "Crislip's Home Saloon", "Al Fresca Plaza", "Entrance Plaza Storefronts"]},
@@ -5208,7 +5218,7 @@
     {"location_name": "Pick up Shovel", "item_numbers": [7], "regions": ["North Plaza", "Crislip's Home Saloon", "Al Fresca Plaza"]},
     {"location_name": "Pick up Shower Head", "item_numbers": [184], "regions": ["Crislip's Home Saloon"]},
     {"location_name": "Pick up Sickle", "item_numbers": [64], "regions": ["Leisure Park", "Crislip's Home Saloon", "Al Fresca Plaza"]},
-    {"location_name": "Pick up Sign", "item_numbers": [80, 256], "regions": ["Paradise Plaza", "North Plaza", "Entrance Plaza", "Entrance Plaza Storefronts"]},
+    {"location_name": "Pick up Sign", "item_numbers": [80, 256], "regions": ["Paradise Plaza", "North Plaza", "Entrance Plaza"]},
     {"location_name": "Pick up Skateboard", "item_numbers": [20], "regions": ["Paradise Plaza", "Wonderland Plaza", "Entrance Plaza Storefronts"]},
     {"location_name": "Pick up Skylight", "item_numbers": [246], "regions": ["Crislip's Home Saloon"]},
     {"location_name": "Pick up Sledgehammer", "item_numbers": [50], "regions": ["Warehouse", "Crislip's Home Saloon", "Al Fresca Plaza", "Maintenance Tunnel", "Meat Processing Area"]},
@@ -5223,8 +5233,8 @@
     {"location_name": "Pick up Store Display", "item_numbers": [24, 25, 28], "regions": ["North Plaza"]},
     {"location_name": "Pick up Stuffed Bear", "item_numbers": [251], "regions": ["Paradise Plaza", "Leisure Park", "Wonderland Plaza", "Entrance Plaza Storefronts"]},
     {"location_name": "Pick up Stun Gun", "item_numbers": [72], "regions": ["Colby's Movieland"]},
-    {"location_name": "Pick up Submachine Gun", "item_numbers": [82], "regions": ["Paradise Plaza", "Leisure Park", "Food Court", "Wonderland Plaza", "Al Fresca Plaza", "Entrance Plaza", "Maintenance Tunnel"]},
-    {"location_name": "Pick up Sword", "item_numbers": [168], "regions": ["North Plaza"]},
+    {"location_name": "Pick up Submachine Gun", "item_numbers": [82], "regions": ["Paradise Plaza", "Leisure Park", "Food Court", "Al Fresca Plaza", "Entrance Plaza", "Maintenance Tunnel"]},
+    {"location_name": "Pick up Sword", "item_numbers": [168], "regions": ["North Plaza", "Cultists' Hideout"]},
     {"location_name": "Pick up Toolbox", "item_numbers": [118], "regions": ["Warehouse", "Leisure Park", "North Plaza", "Crislip's Home Saloon", "Al Fresca Plaza"]},
     {"location_name": "Pick up Toy Cube", "item_numbers": [21], "regions": ["Wonderland Plaza"]},
     {"location_name": "Pick up Toy Laser Sword", "item_numbers": [32], "regions": ["Paradise Plaza", "Entrance Plaza Storefronts"]},

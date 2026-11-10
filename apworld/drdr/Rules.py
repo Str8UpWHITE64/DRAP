@@ -517,11 +517,21 @@ def _survivor_location(world, rescue_name):
 # nothing there.
 ITEM_SANITY_EP_STOREFRONTS = "Entrance Plaza Storefronts"
 
+# The Cultists' Hideout is not a region. An item placed there is reached by
+# being taken, which is the "Get grabbed by the raincoats" check.
+ITEM_SANITY_HIDEOUT = "Cultists' Hideout"
+
 
 # Meeting Jessie is what moves the game flow on. An item type placed in the
 # Security Room or on the Rooftop can be picked up before that, so it does
 # not wait for her; every other type does.
 ITEM_SANITY_BEFORE_JESSIE = ("Security Room", "Rooftop")
+
+# Saw Blades come from breaking a Toolbox, except the one on the shelf in
+# Crislip's. Restricted refuses the Toolbox pickup, so the blades behind it
+# need the Toolbox item too.
+ITEM_SANITY_SAW_BLADE = "Pick up Saw Blade"
+ITEM_SANITY_SAW_BLADE_SHELF = ("Crislip's Home Saloon",)
 
 
 # Sean's sword and the Brainwashing Tips book lie in Colby's once he is down
@@ -538,6 +548,8 @@ def item_sanity_rule(regions, ep_shutter, jessie, after_sean=None):
     def _part(r):
         if r == ITEM_SANITY_EP_STOREFRONTS:
             return ep_shutter
+        if r == ITEM_SANITY_HIDEOUT:
+            return CanReachLocation("Get grabbed by the raincoats")
         if r == ITEM_SANITY_AFTER_SEAN:
             return And(CanReachRegion("Colby's Movieland"), after_sean)
         return CanReachRegion(r)
@@ -936,6 +948,10 @@ def set_rules(world) -> None:
                            CanReachLocation("Kill Sean")))
         for _name, _regions in ITEM_SANITY_REGIONS.items():
             _rule = item_sanity_rule(_regions, ep_shutter, _jessie, _after_sean)
+            if world.options.restricted_item_mode and _name == ITEM_SANITY_SAW_BLADE:
+                _boxes = [r for r in _regions if r not in ITEM_SANITY_SAW_BLADE_SHELF]
+                _rule = Or(item_sanity_rule(list(ITEM_SANITY_SAW_BLADE_SHELF), ep_shutter, _jessie, _after_sean),
+                           And(Has("Toolbox"), item_sanity_rule(_boxes, ep_shutter, _jessie, _after_sean)))
             # Restricted Item Mode refuses a pickup of anything not sent yet
             # (ItemRestriction.lua), so the check needs the item as well.
             if world.options.restricted_item_mode:
