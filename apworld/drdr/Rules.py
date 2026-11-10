@@ -524,11 +524,24 @@ ITEM_SANITY_EP_STOREFRONTS = "Entrance Plaza Storefronts"
 ITEM_SANITY_BEFORE_JESSIE = ("Security Room", "Rooftop")
 
 
-def item_sanity_rule(regions, ep_shutter, jessie):
+# Sean's sword and the Brainwashing Tips book lie in Colby's once he is down
+# and stay there (the mod keeps their layout loading), so they are in logic in
+# Colby's after Sean and not before.
+ITEM_SANITY_AFTER_SEAN = "Colby's Movieland After Sean"
+
+
+def item_sanity_rule(regions, ep_shutter, jessie, after_sean=None):
+    if after_sean is None:
+        after_sean = True_()
     """Reach any of the areas an item type is placed in, after meeting Jessie
     unless one of them is the Security Room or the Rooftop."""
-    parts = [ep_shutter if r == ITEM_SANITY_EP_STOREFRONTS else CanReachRegion(r)
-             for r in regions]
+    def _part(r):
+        if r == ITEM_SANITY_EP_STOREFRONTS:
+            return ep_shutter
+        if r == ITEM_SANITY_AFTER_SEAN:
+            return And(CanReachRegion("Colby's Movieland"), after_sean)
+        return CanReachRegion(r)
+    parts = [_part(r) for r in regions]
     rule = parts[0] if len(parts) == 1 else Or(*parts)
     if any(r in ITEM_SANITY_BEFORE_JESSIE for r in regions):
         return rule
@@ -915,8 +928,14 @@ def set_rules(world) -> None:
     # anywhere past the Rooftop, which waits for Jessie.
     if getattr(world, "item_sanity", False):
         _jessie = CanReachLocation("Meet Jessie in the Warehouse")
+        # Sean is down: the scoop item under ScoopSanity, otherwise the kill
+        # itself with the days that bring him out (as the survivors in the
+        # theater ask).
+        _after_sean = (Has("A Strange Group") if world.options.scoop_sanity else
+                       And(Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM"),
+                           CanReachLocation("Kill Sean")))
         for _name, _regions in ITEM_SANITY_REGIONS.items():
-            _rule = item_sanity_rule(_regions, ep_shutter, _jessie)
+            _rule = item_sanity_rule(_regions, ep_shutter, _jessie, _after_sean)
             # Restricted Item Mode refuses a pickup of anything not sent yet
             # (ItemRestriction.lua), so the check needs the item as well.
             if world.options.restricted_item_mode:
