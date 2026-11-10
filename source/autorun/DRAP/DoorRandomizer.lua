@@ -1559,7 +1559,9 @@ end
 --- @param label string|nil name for the log line
 --- @param opts table|nil { leave_party = true } leaves followers where they
 ---   stand (Teleport Trap); { no_redirect = true } ignores door redirects;
----   { boss_ok = true } warps during a psychopath fight (test tooling).
+---   { boss_ok = true } warps during a psychopath fight (test tooling);
+---   { carry_escort = true } carries the party even with an escort loaded.
+---   A loaded escort (Brad) leaves the party behind without being asked.
 function M.warp_to(area_name, pos, angle, label, opts)
     if not ensure_area_jump_method() then return false end
     opts = opts or {}
@@ -1588,7 +1590,19 @@ function M.warp_to(area_name, pos, angle, label, opts)
     -- escorts were left behind in the old area. Done BEFORE the player moves,
     -- because members are matched against the area they are standing in.
     local carryover = _G.AP and _G.AP.NpcCarryover
-    if opts.leave_party then
+    -- The engine carries the whole party or none of it, so a scripted escort
+    -- (Brad) on the field means the party stays: he must not be taken out of
+    -- his scene. carry_escort is for test tooling.
+    local leave_party = opts.leave_party
+    if not leave_party and not opts.carry_escort and carryover
+        and type(carryover.escort_loaded) == "function" then
+        local ok, here = pcall(carryover.escort_loaded)
+        if ok and here then
+            leave_party = true
+            M.log("warp: an escort is loaded -- the party stays behind")
+        end
+    end
+    if leave_party then
         -- Nothing is rewritten: followers keep their JOIN records in the area
         -- they are in, the vanilla "left behind at a door" state. The engine
         -- can still accept the pair from the Rooftop or Entrance Plaza (both

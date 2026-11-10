@@ -562,6 +562,30 @@ function M.begin_warp_strand()
     warp_strand_until = os.clock() + WARP_CARRY_SECONDS
 end
 
+--- True while a loaded survivor's record is ESCORT (Brad). A warp must not
+--- take a scripted escort out of the area his scene is running in.
+--- @return boolean
+function M.escort_loaded()
+    local mgr = npc_mgr:get()
+    if not mgr then return false end
+    local list = Shared.safe(function() return mgr:get_field("NpcInfoList") end)
+    if not list then return false end
+    local count = Shared.get_collection_count(list) or 0
+    for i = 0, count - 1 do
+        local info = Shared.get_collection_item(list, i)
+        if info then
+            local state = Shared.safe(function() return Shared.to_int(info:get_field("mLiveState")) end)
+            if state == 8 and not record_is_dead(info) then
+                local stype = Shared.safe(function()
+                    return Shared.to_int(info:get_field("<Name>k__BackingField")) end)
+                local npc = stype and Shared.safe(function() return mgr:call("searchNpc", stype) end)
+                if npc ~= nil then return true end
+            end
+        end
+    end
+    return false
+end
+
 function M.carry_party_to(area, pos)
     local area_no = tonumber(area)
     if not area_no and type(area) == "string" then
