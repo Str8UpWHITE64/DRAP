@@ -483,6 +483,25 @@ local OWN_BOXES = {
     { scoop = "The Cult",       row = 26, table = 65, entry = 2523, set = 25, pos = 31, title = 298, info = 302 },
     { scoop = "Cletus",         row = 49, table = 67, own_table = 75, entry = 2515, set = 26, pos = 32, title = 303, info = 307 },
     { scoop = "Special Forces", row = 48, table = 76, own_table = 74, entry = 2536, set = 27, pos = 34, title = 308, info = 309 },
+    -- Boxes for the free survivors: no scoop, no item, only text and directions.
+    -- They sit on Overtime item rows whose own table is the box's table (the
+    -- item's scoop has no scheduler row), with their own sets and entry flags.
+    { scoop = "Love Lasts a Lifetime", row = 46, table = 72, entry = 2794, set = 21, title = 310, info = 313 },
+    { scoop = "Man in a Bind",         row = 47, table = 73, entry = 2795, set = 22, title = 314, info = 315 },
+}
+
+-- What each free-survivor box says, where it points, and who it waits for.
+local FREE_BOXES = {
+    ["Love Lasts a Lifetime"] = {
+        region = "s231", people = { "Jeff Meyer", "Natalie Meyer" },
+        box = { goal = "Rooftop", area = 535, x = 200.0, y = 8.0, z = 80.0,
+                text = "It looks like Jeff and Jeff's wife got separated. Help reunite them and bring them back to the Security Room." },
+    },
+    ["Man in a Bind"] = {
+        region = "s100", people = { "Bill Brenton" },
+        box = { goal = "Entrance Plaza", area = 256, x = 130.06, y = 8.67, z = 153.65,
+                text = "Someone is trapped inside In The Closet. Get him out and bring him to the Security Room." },
+    },
 }
 local OWN_TIME_TBL = 48           -- table 65's time entry: the whole 72 hours
 local own_saved = nil             -- what the boxes changed, until it goes back
@@ -1093,8 +1112,44 @@ local function set_if(o, k, v)
 end
 
 --- Save the fields a box will change, once.
+--- A position entry no set refers to, for a box with no entry of its own:
+--- the sets' stock values plus what they hold now.
+local function free_pos_entries(scq, count)
+    local pt = param_table(scq)
+    local used = {}
+    local sets = list_items(pt and pc(function() return pt:get_field("mScqPosInfoSets") end))
+    for si, set in ipairs(sets) do
+        for i, r in ipairs(list_items(set and pc(function() return set:get_field("mSCQPosInfos") end))) do
+            local o = set_orig[si - 1] and set_orig[si - 1][i]
+            local ty = o and o.mPosType or (r and num(pc(function() return r:get_field("mPosType") end)))
+            local pa = o and o.mPosParam or (r and num(pc(function() return r:get_field("mPosParam") end)))
+            if ty == POS_SPOT and pa then used[pa] = true end
+            if r then
+                local ty2 = num(pc(function() return r:get_field("mPosType") end))
+                local pa2 = num(pc(function() return r:get_field("mPosParam") end))
+                if ty2 == POS_SPOT and pa2 then used[pa2] = true end
+            end
+        end
+    end
+    for _, b in ipairs(OWN_BOXES) do if b.pos then used[b.pos] = true end end
+    used[MAIN_POS] = true
+    local n = #list_items(pt and pc(function() return pt:get_field("mScqPosTbl") end))
+    local out = {}
+    for i = n - 1, 0, -1 do
+        if not used[i] then out[#out + 1] = i; if #out == count then break end end
+    end
+    return out
+end
+
 local function save_own(scq, rows, tables)
     if own_saved then return end
+    local need = {}
+    for _, b in ipairs(OWN_BOXES) do if not b.pos then need[#need + 1] = b end end
+    if #need > 0 then
+        local free = free_pos_entries(scq, #need)
+        for i, b in ipairs(need) do b.pos = free[i] end
+        log("free-survivor boxes use position entries " .. table.concat(free, ","))
+    end
     local saved = {}
     for _, b in ipairs(OWN_BOXES) do
         local row, qt, own = rows[b.row + 1], tables[b.table + 1], b.own_table and tables[b.own_table + 1]
@@ -1114,7 +1169,24 @@ local function on_flag(efm)
 end
 
 --- Whether a scoop's box should be up: the same test the side boxes' own has.
+local function free_box_wanted(f)
+    local met = scoop_unlocker and scoop_unlocker.has_met_jessie and scoop_unlocker.has_met_jessie()
+    if met ~= true then return false end
+    local dsl = AP and AP.DoorSceneLock
+    if not (dsl and dsl.can_reach_area and dsl.can_reach_area(f.region)) then return false end
+    local bridge = AP and AP.AP_BRIDGE
+    if not (bridge and bridge.has_local_check) then return false end
+    for _, n in ipairs(f.people) do
+        local done = pc(function()
+            return bridge.has_local_check("Rescue " .. n) or bridge.has_local_check("Kill " .. n)
+        end)
+        if not done then return true end
+    end
+    return false
+end
+
 local function own_box_wanted(name)
+    if FREE_BOXES[name] then return free_box_wanted(FREE_BOXES[name]) end
     return State.is_active(name) and not State.is_conflict_blocked(name)
         and not State.is_blocked_by_active_main(name) and State.has_prerequisites_met(name)
 end
@@ -1377,6 +1449,7 @@ function M.init(deps)
             for _, f in ipairs(s.extra_disp_flags or {}) do side_by_flag[f] = s.name end
         end
     end
+    for name, f in pairs(FREE_BOXES) do own_data[name] = { box = f.box } end
     rows_known = false
     side_times = {}
     if not frame_installed then
