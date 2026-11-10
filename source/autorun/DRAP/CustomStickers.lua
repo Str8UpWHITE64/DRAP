@@ -58,6 +58,13 @@ local MAINT_INTERVAL_S = 0.5
 -- fully in frame and scored 5000 where the vanilla stand-in scored 2294). The minimum size is the one difference:
 -- the game uses 0.4096 for ids 128..227 and 0.0256 for ours (ratingSub), which only matters for far, tiny shots.
 local RADIUS_SCALE = 1.0
+-- Photo zone direction (PhotoRating.getPpScoreRate): a hit scores only when the camera sits inside a cone around the
+-- hit's WorldVector, which is the sticker's own face direction (its Z axis, so it follows turn, tilt and roll) turned
+-- further by the hit's mRotX / mRotY. With fan = mFanRate the score is full within acos(cos^2(fan / 4)) of that
+-- direction, falls off linearly, and is 0 past fan / 2. The template's fan is 1.0: full within 20 degrees, 0 past 29,
+-- so a ceiling sticker, seen 40 to 60 degrees off its face from where a player stands, never rated. Every copy gets
+-- PHOTO_FAN instead: full within 58 degrees, 0 past 86.
+local PHOTO_FAN = 3.0
 
 -- the vent marker (see above): Visual = the vanilla photo id it stands for
 local VISUAL_ROWS = {
@@ -265,8 +272,9 @@ local function copy_hit(e)
 end
 
 -- a list of our own hit objects for this sticker: a shallow copy of its list with a cloned backing array whose
--- slots point at copies carrying the spare id (creating a List<photoHitObj> directly returns nil)
-local function own_hits(attr)
+-- slots point at copies carrying the spare id (creating a List<photoHitObj> directly returns nil). Each copy faces
+-- the sticker's own way (no extra rotation unless the row asks: PhotoPitch / PhotoYaw, radians) with the wide fan.
+local function own_hits(attr, r)
     local src = fld(attr, "mPhotoHitObjList")
     local elems = items(src)
     if #elems == 0 then return false end
@@ -287,6 +295,9 @@ local function own_hits(attr)
         pc(function() c:set_field("mScoopId", SPARE_ID) end)
         local rad = num(fld(e, "mRadius"))
         if rad then pc(function() c:set_field("mRadius", rad * RADIUS_SCALE) end) end
+        pc(function() c:set_field("mFanRate", PHOTO_FAN) end)
+        pc(function() c:set_field("mRotX", num(r and r.PhotoPitch) or 0.0) end)
+        pc(function() c:set_field("mRotY", num(r and r.PhotoYaw) or 0.0) end)
         local put = pc(function() arr:call("SetValue(System.Object, System.Int32)", c, i - 1); return true end)
         if not put then return false end
     end
@@ -423,7 +434,7 @@ local function settle(n, e)
         pc(function() attr:call("setSMAdd(System.Int32)", SPARE_ID) end)
     end
     -- every tick: a late setup (setSMAdd) puts the shared template list back, which would credit 164
-    e.hits_ok = own_hits(attr)
+    e.hits_ok = own_hits(attr, e.row)
     -- the sticker re-applies uOm13f.mStartAngle (Euler radians x = pitch, y = yaw, z = roll) whenever it changes
     -- collected state, so the row's orientation has to live there too, or it snaps to the default facing
     local r = e.row
@@ -510,6 +521,65 @@ end
 -- detection
 ------------------------------------------------------------
 
+-- The last photo's result, for a tool to show on screen (drap_cstick_last_photo): { seq, hit, number, text }.
+M.last_photo = nil
+local function photo_result(hit, n, text)
+    M.last_photo = { seq = ((M.last_photo and M.last_photo.seq) or 0) + 1, hit = hit, number = n, text = text }
+    M.log(text)
+end
+local function cam_view()
+    local cam = pc(function() return sdk.get_primary_camera() end)
+    local tr = go_tr(cam and pc(function() return cam:call("get_GameObject") end))
+    local p = tr and pc(function() return tr:call("get_Position") end)
+    local m = tr and pc(function() return tr:call("get_WorldMatrix") end)
+    local z = m and pc(function() return m[2] end)
+    if not p or not z then return nil end
+    -- RE Engine cameras look down -Z
+    return { pos = { x = p.x, y = p.y, z = p.z }, fwd = { x = -z.x, y = -z.y, z = -z.z } }
+end
+local function unit(v)
+    local l = math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z)
+    if l < 1e-6 then return nil end
+    return { x = v.x / l, y = v.y / l, z = v.z / l }, l
+end
+local function angle(a, b) return math.deg(math.acos(math.max(-1, math.min(1, a.x * b.x + a.y * b.y + a.z * b.z)))) end
+-- where the camera stood against sticker e at the shot: distance, degrees off its face, degrees off the view centre,
+-- and the zone's full / zero limits from its fan
+local function shot_geometry(e, cam)
+    local gp = e.go and go_pos(e.go)
+    local tr = go_tr(e.go)
+    local m = tr and pc(function() return tr:call("get_WorldMatrix") end)
+    local z = m and pc(function() return m[2] end)
+    if not gp or not z or not cam then return nil end
+    local face = unit({ x = z.x, y = z.y, z = z.z })
+    local to_cam, d = unit({ x = cam.pos.x - gp.x, y = cam.pos.y - gp.y, z = cam.pos.z - gp.z })
+    local fwd = unit(cam.fwd)
+    if not face or not to_cam or not fwd then return nil end
+    local h = items(fld(e.attr, "mPhotoHitObjList"))[1]
+    local fan = num(fld(h, "mFanRate")) or PHOTO_FAN
+    local full, zero = 90, 180
+    if fan > 0 and fan < 2 * math.pi then
+        local c = math.cos(fan / 4)
+        full, zero = math.deg(math.acos(c * c)), math.deg(fan / 2)
+    end
+    return { dist = d, off_face = angle(face, to_cam), full = full, zero = zero,
+             off_centre = angle(fwd, { x = -to_cam.x, y = -to_cam.y, z = -to_cam.z }) }
+end
+local function describe_shot(g)
+    if not g then return "" end
+    return string.format("%.1f m away, %d deg off its face (full up to %d, none past %d), %d deg off centre", g.dist,
+        math.floor(g.off_face + 0.5), math.floor(g.full + 0.5), math.floor(g.zero + 0.5), math.floor(g.off_centre + 0.5))
+end
+local function miss_hint(g, rate)
+    if not g then return "" end
+    if g.off_centre > 15 then return "off centre: put it in the middle of the frame" end
+    if g.off_face > g.zero then return "too steep: stand more in front of its face" end
+    if g.off_face > g.full then return "steep: only part marks, stand more in front of its face" end
+    if (rate or 0) <= 0 and g.dist > 6 then return "too far: move closer" end
+    if (rate or 0) <= 0 then return "zero camera percentage: something in the way, or too far" end
+    return "angle and distance look fine: something in the way?"
+end
+
 local function on_detect(n, game_score)
     local e = live[n]
     if not e or e.collected then return end
@@ -518,11 +588,13 @@ local function on_detect(n, game_score)
     stats.detected = stats.detected + 1
     local r = e.row
     local test = debug_enabled or r.Test
+    local how = describe_shot(shot_geometry(e, photo.cam))
     if r.Spot then
-        M.log(string.format("Placement spot %s photographed: camera %.0f%% (custom sticker %d)", tostring(r.Spot),
-            (photo.rate_at_shot or 0) * 100, n))
+        photo_result(true, n, string.format("Placement spot %s photographed: camera %.0f%% (custom sticker %d; %s)",
+            tostring(r.Spot), (photo.rate_at_shot or 0) * 100, n, how))
     else
-        M.log(string.format("Custom sticker %d photographed (%s)", n, tostring(r.LocationName)))
+        photo_result(true, n, string.format("Custom sticker %d photographed (%s): camera %.0f%% (%s)", n,
+            tostring(r.LocationName), (photo.rate_at_shot or 0) * 100, how))
     end
     pc(function() e.om:set_field("mMaxCount", 0) end)
     if test then
@@ -560,6 +632,7 @@ local function watch_photo()
     if mode == 1 then photo.rate = num(fld(pr, "mPPSealRate")) or 0 end
     if mode == 2 and photo.mode ~= 2 then
         photo.rate_at_shot = photo.rate or 0
+        photo.cam = cam_view()
         photo.armed = true
         stats.photos = stats.photos + 1
         photo.stale = {}
@@ -572,23 +645,21 @@ local function watch_photo()
     end
     if mode ~= 2 and photo.mode == 2 then
         photo.armed = false
-        -- a photo with none of ours in it while one is close: say which, to help find stickers that won't rate
-        -- (an early offline test: 3, 20 and 31 never collected)
-        if not photo.got_one then
-            local pgo = sdk.get_managed_singleton("app.solid.PlayerManager")
-            pgo = pgo and pc(function() return pgo:call("get_CurrentPlayer") end)
-            local fp = go_pos(pgo)
-            local best, bd
+        -- a photo with none of ours in it while one is close: say which, and why it may not have rated.
+        -- The one meant: the uncollected sticker within 15 m nearest the middle of the frame
+        if not photo.got_one and photo.cam then
+            local best, bg
             for n2, e2 in pairs(live) do
-                if e2.state == "live" and not e2.collected and not e2.row.Visual and e2.go and fp then
-                    local gp = go_pos(e2.go)
-                    local d = gp and dist(gp, fp)
-                    if d and d < 15 and (not bd or d < bd) then best, bd = n2, d end
+                if e2.state == "live" and not e2.collected and not e2.row.Visual and e2.go then
+                    local g = shot_geometry(e2, photo.cam)
+                    if g and g.dist < 15 and (not bg or g.off_centre < bg.off_centre) then best, bg = n2, g end
                 end
             end
             if best then
-                M.log(string.format("Photo rated none of the extra stickers; nearest uncollected is %d, %.1f m away (camera %.0f%%)",
-                    best, bd, (photo.rate_at_shot or 0) * 100))
+                local rb = live[best].row
+                local name = rb.Spot and ("placement spot " .. tostring(rb.Spot)) or ("custom sticker " .. tostring(best))
+                photo_result(false, best, string.format("Missed %s: camera %.0f%%, %s (%s)", name,
+                    (photo.rate_at_shot or 0) * 100, miss_hint(bg, photo.rate_at_shot), describe_shot(bg)))
             end
         end
         photo.got_one = false
@@ -679,6 +750,7 @@ rawset(_G, "drap_cstick_add", function(area, x, y, z, yaw, n, name, pitch, roll)
     return n
 end)
 rawset(_G, "drap_cstick_status", function() return M.status() end)
+rawset(_G, "drap_cstick_last_photo", function() return M.last_photo end)
 -- take a spawned (or still spawning) sticker away; the area owns it, so it is hidden and dropped under the map
 local function despawn(n)
     local e = live[n]
@@ -696,7 +768,8 @@ rawset(_G, "drap_cstick_remove", function(n)
 end)
 -- Add or replace test sticker n at a spot. A replaced one is despawned and spawned afresh where
 -- the spot now is, and is photographable again (its test-file mark is cleared).
-rawset(_G, "drap_cstick_spot", function(n, area, x, y, z, yaw, pitch, roll, spot)
+-- photo_pitch / photo_yaw (radians, optional): turn the photo zone off the sticker's face (rows: PhotoPitch, PhotoYaw).
+rawset(_G, "drap_cstick_spot", function(n, area, x, y, z, yaw, pitch, roll, spot, photo_pitch, photo_yaw)
     n = num(n)
     if not n then return nil end
     despawn(n)
@@ -705,7 +778,8 @@ rawset(_G, "drap_cstick_spot", function(n, area, x, y, z, yaw, pitch, roll, spot
     if tc[tostring(n)] then tc[tostring(n)] = nil; test_save() end
     debug_rows[#debug_rows + 1] = { Number = n, Test = true, Spot = spot, LocationName = "Placement spot " .. tostring(spot or n),
                                     Area = area, Pos = { x = num(x), y = num(y), z = num(z) }, Yaw = num(yaw) or 0.0,
-                                    Pitch = num(pitch) or 0.0, Roll = num(roll) or 0.0 }
+                                    Pitch = num(pitch) or 0.0, Roll = num(roll) or 0.0,
+                                    PhotoPitch = num(photo_pitch), PhotoYaw = num(photo_yaw) }
     return n
 end)
 rawset(_G, "drap_cstick_radius_scale", function(x) RADIUS_SCALE = num(x) or RADIUS_SCALE; return RADIUS_SCALE end)
