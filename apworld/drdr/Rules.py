@@ -1603,19 +1603,13 @@ def set_rules(world) -> None:
             # and driving it over the ramp.
             _jump_alts.append(_drive_from("Sedan Key"))
         _jump_rule = Or(*_jump_alts) if len(_jump_alts) > 1 else _jump_alts[0]
-        # Glitched: a motorcycle from North Plaza, ridden down to Leisure
-        # Park's ramp. Cars cannot take that road under Door Randomizer.
-        if _cars_travel:
-            if world.options.split_keys:
-                _np_to_park = Or(Has("Leisure Park - North Plaza Key"),
-                                 And(Has("Food Court - Leisure Park Key"),
-                                     Has("Food Court - Wonderland Plaza Key"),
-                                     Has("North Plaza - Wonderland Plaza Key")))
-            else:
-                _np_to_park = And(Has("Leisure Park Key"), Has("North Plaza Key"))
-            _jump_rule = or_glitched(_jump_rule,
-                                     And(Has("Motorcycle Key"), CanReachRegion("North Plaza"),
-                                         CanReachRegion("Leisure Park"), _np_to_park))
+        # Glitched: the North Plaza motorcycle off one of North Plaza's own
+        # ramps. It never leaves the area, so Door Randomizer does not matter.
+        # The mod puts the bike there from Meeting Jessie on; that is named
+        # because shuffled Rooftop/Warehouse doors can open North Plaza first.
+        _jump_rule = or_glitched(_jump_rule,
+                                 And(Has("Motorcycle Key"), CanReachRegion("North Plaza"),
+                                     CanReachLocation("Meet Jessie in the Warehouse")))
 
         # Counts this high are only practical in the Tunnel, so it stays
         # required either way. What can satisfy it is what differs: any car
