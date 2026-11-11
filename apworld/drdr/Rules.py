@@ -540,6 +540,13 @@ ITEM_SANITY_SAW_BLADE_SHELF = ("Crislip's Home Saloon",)
 ITEM_SANITY_AFTER_SEAN = "Colby's Movieland After Sean"
 
 
+# ItemSanity types whose opening-sequence pickup glitched logic allows.
+ITEM_SANITY_OPENING = frozenset(
+    "Pick up " + _n for _n in (
+        "HDTV", "Bench", "2 x 4", "Baseball Bat", "Garbage Can", "Snack", "Shotgun",
+        "Lead Pipe", "Potted Plant Bamboo", "Sign", "Potted Plant"))
+
+
 def item_sanity_rule(regions, ep_shutter, jessie, after_sean=None):
     if after_sean is None:
         after_sean = True_()
@@ -860,6 +867,17 @@ def set_rules(world) -> None:
             return And(Has(key_name), CanReachRegion(home), _ramp_to_park)
         return And(Has(key_name), CanReachRegion(home), _ramp_to_tunnel)
 
+    def _vehicle_in(area):
+        """A vehicle to drive in `area` (the Tunnel or Leisure Park). A car
+        parked there, or under Car Keys a key for one -- or another area's car
+        driven over the ramp, which Door Randomizer rules out."""
+        if not world.options.car_keys:
+            return CanReachRegion(area)
+        _alts = [And(CanReachRegion(area), Or(*[Has(k) for k in KILL_CAR_KEYS[area]]))]
+        if not world.options.door_randomizer:
+            _alts += [_drive_from(k) for k, home in CAR_HOME.items() if home != area]
+        return Or(*_alts)
+
     # Zombie kill checks. They sit in their own region, so every one needs its
     # rule spelled out -- see the note in Locations.py.
     #
@@ -898,13 +916,30 @@ def set_rules(world) -> None:
         # the threshold rests on how much of the mall is open instead. Grinding
         # a thousand zombies that way is slow, which suits the mode. The Queen
         # is still in the pool and still required.
+        #
+        # Glitched: in the two areas with vehicles, running zombies over takes
+        # no weapon and no Queen.
         if world.options.restricted_item_mode and _threshold >= KILL_WEAPON_FROM:
+            _armed = []
             if not world.spitter_only:
                 _weapon = _kill_weapon_rule(_kill_region)
                 if _weapon is not None:
-                    _parts.append(_weapon)
+                    _armed.append(_weapon)
             if _threshold >= KILL_QUEEN_FROM:
-                _parts.append(Has("Queen"))
+                _armed.append(Has("Queen"))
+            if _armed:
+                _armed = _armed[0] if len(_armed) == 1 else And(*_armed)
+                _loose = []
+                if _kill_region in KILL_CAR_KEYS:
+                    _loose.append(_vehicle_in(_kill_region))
+                # The Machete Cliff carries can be blended in Paradise Plaza
+                # from a Katana and a Hunting Knife instead.
+                if _kill_region == "Crislip's Home Saloon":
+                    _loose.append(And(Has("Machete"), Has("Katana"), Has("Hunting Knife"),
+                                      Has("Book [Blender]"), CanReachRegion("Paradise Plaza")))
+                if _loose:
+                    _armed = or_glitched(_armed, Or(*_loose) if len(_loose) > 1 else _loose[0])
+                _parts.append(_armed)
 
         return _parts[0] if len(_parts) == 1 else And(*_parts)
 
@@ -952,6 +987,17 @@ def set_rules(world) -> None:
                 _boxes = [r for r in _regions if r not in ITEM_SANITY_SAW_BLADE_SHELF]
                 _rule = Or(item_sanity_rule(list(ITEM_SANITY_SAW_BLADE_SHELF), ep_shutter, _jessie, _after_sean),
                            And(Has("Toolbox"), item_sanity_rule(_boxes, ep_shutter, _jessie, _after_sean)))
+            # Glitched: what lies in the Rooftop's and Entrance Plaza's
+            # layouts can be taken during the opening sequence, before any
+            # key or Jessie. Only the types the opening is known to hold.
+            if (_name in ITEM_SANITY_OPENING
+                    and any(r in ("Rooftop", "Entrance Plaza") for r in _regions)):
+                _rule = or_glitched(_rule, True_())
+            # Glitched: the Ceremonial Sword blended in Paradise Plaza from a
+            # Katana and a Bass Guitar, with no wait for Sean.
+            if _name == "Pick up Ceremonial Sword":
+                _rule = or_glitched(_rule, And(_jessie, CanReachRegion("Paradise Plaza"),
+                                               Has("Book [Blender]")))
             # Restricted Item Mode refuses a pickup of anything not sent yet
             # (ItemRestriction.lua), so the check needs the item as well.
             if world.options.restricted_item_mode:
@@ -1328,14 +1374,20 @@ def set_rules(world) -> None:
     # With Restricted Items or Car Keys the Tunnel alone is not enough to kill a
     # thousand, so the challenge takes the same rule as the Tunnel area check at
     # 1000 (points gate, plus the SMG under Restricted Items).
+    # Glitched: with a vehicle in the Tunnel or Leisure Park, any of the four
+    # total-kill counts can be driven up in that one area, so none of them
+    # waits on the rest of the mall or on Ending A.
+    _drive_kills = Or(_vehicle_in("Maintenance Tunnel"), _vehicle_in("Leisure Park"))
     if world.options.restricted_item_mode or world.options.car_keys:
-        world.set_rule(world.multiworld.get_location("Kill 1000 zombies", world.player), _area_kill_rule("Maintenance Tunnel", 1000))
+        world.set_rule(world.multiworld.get_location("Kill 1000 zombies", world.player), or_glitched(_area_kill_rule("Maintenance Tunnel", 1000), _drive_kills))
     else:
-        world.set_rule(world.multiworld.get_location("Kill 1000 zombies", world.player), CanReachRegion("Maintenance Tunnel"))
-    world.set_rule(world.multiworld.get_location("Kill 2000 zombies", world.player), And(CanReachRegion("Maintenance Tunnel"), CanReachRegion("North Plaza"), CanReachRegion("Entrance Plaza"), CanReachLocation("Kill 1000 zombies")))
-    world.set_rule(world.multiworld.get_location("Kill 5000 zombies", world.player), And(CanReachRegion("Maintenance Tunnel"), CanReachRegion("North Plaza"), CanReachRegion("Entrance Plaza"), CanReachRegion("Wonderland Plaza"), CanReachRegion("Al Fresca Plaza"), CanReachLocation("Kill 2000 zombies")))
-    world.set_rule(world.multiworld.get_location("Kill 10000 zombies", world.player), And(CanReachRegion("Maintenance Tunnel"), CanReachRegion("North Plaza"), CanReachRegion("Entrance Plaza"), CanReachRegion("Wonderland Plaza"), CanReachRegion("Al Fresca Plaza"), CanReachLocation("Kill 5000 zombies"), ending_a_rule))
-    world.set_rule(world.multiworld.get_location("Walk a quarter marathon", world.player), And(CanReachRegion("Leisure Park"), CanReachRegion("Al Fresca Plaza"), CanReachRegion("Wonderland Plaza"), CanReachRegion("North Plaza"), CanReachRegion("Entrance Plaza"), CanReachRegion("Food Court"), CanReachRegion("Paradise Plaza"), CanReachRegion("Seon's Food and Stuff"), CanReachRegion("Crislip's Home Saloon"), CanReachRegion("Colby's Movieland")))
+        world.set_rule(world.multiworld.get_location("Kill 1000 zombies", world.player), or_glitched(CanReachRegion("Maintenance Tunnel"), _drive_kills))
+    world.set_rule(world.multiworld.get_location("Kill 2000 zombies", world.player), or_glitched(And(CanReachRegion("Maintenance Tunnel"), CanReachRegion("North Plaza"), CanReachRegion("Entrance Plaza"), CanReachLocation("Kill 1000 zombies")), _drive_kills))
+    world.set_rule(world.multiworld.get_location("Kill 5000 zombies", world.player), or_glitched(And(CanReachRegion("Maintenance Tunnel"), CanReachRegion("North Plaza"), CanReachRegion("Entrance Plaza"), CanReachRegion("Wonderland Plaza"), CanReachRegion("Al Fresca Plaza"), CanReachLocation("Kill 2000 zombies")), _drive_kills))
+    world.set_rule(world.multiworld.get_location("Kill 10000 zombies", world.player), or_glitched(And(CanReachRegion("Maintenance Tunnel"), CanReachRegion("North Plaza"), CanReachRegion("Entrance Plaza"), CanReachRegion("Wonderland Plaza"), CanReachRegion("Al Fresca Plaza"), CanReachLocation("Kill 5000 zombies"), ending_a_rule), _drive_kills))
+    # Glitched: the distance adds up wherever Frank walks, so getting out of
+    # the Security Room and Rooftop is enough.
+    world.set_rule(world.multiworld.get_location("Walk a quarter marathon", world.player), or_glitched(And(CanReachRegion("Leisure Park"), CanReachRegion("Al Fresca Plaza"), CanReachRegion("Wonderland Plaza"), CanReachRegion("North Plaza"), CanReachRegion("Entrance Plaza"), CanReachRegion("Food Court"), CanReachRegion("Paradise Plaza"), CanReachRegion("Seon's Food and Stuff"), CanReachRegion("Crislip's Home Saloon"), CanReachRegion("Colby's Movieland")), CanReachRegion("Warehouse")))
     # A PP Bonus check now, so it is absent when that option is off. The
     # plates are shot down from the tables. Spitter Only spits them down at
     # extra range and needs no gun; every other mode needs access to one, for
@@ -1488,6 +1540,15 @@ def set_rules(world) -> None:
     _rpg_blend.append(Or(*[CanReachRegion(r) for r, tiers in ZOMBIE_KILL_TIERS.items()
                            if 100 in tiers.get("easy", [])]))
     _rpg_rule = And(*_rpg_blend)
+    # Glitched: the other recipe, a Propane Tank and a Handgun, both in Al
+    # Fresca Plaza and Colby's. Restricted Items still needs the Handgun and
+    # the Launcher sent.
+    _rpg_propane = [Has("Book [Blender]"),
+                    Or(CanReachRegion("Al Fresca Plaza"), CanReachRegion("Colby's Movieland"))]
+    if _restricted:
+        _rpg_propane += [Has("Handgun"), Has("Rocket Launcher")]
+    _rpg_propane.append(_rpg_blend[-1])
+    _rpg_rule = or_glitched(_rpg_rule, And(*_rpg_propane))
 
     if world.options.goal.value == 0:
         # Overtime is the other way to find one -- Ending S only, and naming
@@ -1525,6 +1586,19 @@ def set_rules(world) -> None:
             # and driving it over the ramp.
             _jump_alts.append(_drive_from("Sedan Key"))
         _jump_rule = Or(*_jump_alts) if len(_jump_alts) > 1 else _jump_alts[0]
+        # Glitched: a motorcycle from North Plaza, ridden down to Leisure
+        # Park's ramp. Cars cannot take that road under Door Randomizer.
+        if _cars_travel:
+            if world.options.split_keys:
+                _np_to_park = Or(Has("Leisure Park - North Plaza Key"),
+                                 And(Has("Food Court - Leisure Park Key"),
+                                     Has("Food Court - Wonderland Plaza Key"),
+                                     Has("North Plaza - Wonderland Plaza Key")))
+            else:
+                _np_to_park = And(Has("Leisure Park Key"), Has("North Plaza Key"))
+            _jump_rule = or_glitched(_jump_rule,
+                                     And(Has("Motorcycle Key"), CanReachRegion("North Plaza"),
+                                         CanReachRegion("Leisure Park"), _np_to_park))
 
         # Counts this high are only practical in the Tunnel, so it stays
         # required either way. What can satisfy it is what differs: any car
@@ -1611,7 +1685,8 @@ def set_rules(world) -> None:
     # Falling far enough is awkward to arrange at the start, so this one is
     # pushed behind the Warehouse instead of being an early-game filler
     # slot nobody can identify (#14).
-    world.set_rule(world.multiworld.get_location("Fall from a high height", world.player), CanReachRegion("Warehouse"))
+    # Glitched: the opening sequence has a drop high enough.
+    world.set_rule(world.multiworld.get_location("Fall from a high height", world.player), or_glitched(CanReachRegion("Warehouse"), True_()))
     # Ten zombies in novelty masks. The Ghoul mask is stocked in Entrance
     # Plaza, the other three in Paradise Plaza; either plaza has the zombies.
     if "Costume Party - Put novelty masks on 10 zombies" not in _dropped:
@@ -1627,17 +1702,38 @@ def set_rules(world) -> None:
     if "Fire 30 bullets" not in _dropped:
         _bullets_open = And(CanReachLocation("Meet Jessie in the Warehouse"),
                             Or(CanReachRegion("Paradise Plaza"), CanReachRegion("Entrance Plaza")))
+        # Glitched: any zone that stocks a gun, with that gun to fire, and no
+        # wait for Jessie. Restricted Items needs the gun sent as well; the
+        # rest finds one on the floor. A Machinegun blended from two SMGs is
+        # covered by the SMG itself.
+        _pistol_zones = ("Paradise Plaza", "Al Fresca Plaza", "Wonderland Plaza", "North Plaza")
+        _smg_zones = SMG_AREAS
+        _any_zone = sorted(set(_pistol_zones + _smg_zones))
+        if world.options.restricted_item_mode:
+            _gun_alts = [
+                And(Has("Handgun"), Or(*[CanReachRegion(r) for r in _pistol_zones])),
+                And(Or(Has("Shotgun"), Has("Sniper Rifle")), CanReachRegion("North Plaza")),
+            ]
+            if not world.options.door_randomizer:
+                _gun_alts.append(And(Has("Submachine Gun"), Or(*[CanReachRegion(r) for r in _smg_zones])))
+            _gun_loose = Or(*_gun_alts)
+        else:
+            _gun_loose = Or(*[CanReachRegion(r) for r in _any_zone])
         world.set_rule(world.multiworld.get_location("Fire 30 bullets", world.player),
+                       or_glitched(
                        And(_bullets_open,
                            Or(CanReachLocation("Fire 300 bullets"),
                               And(Has("Handgun"), Or(CanReachRegion("North Plaza"), CanReachRegion("Wonderland Plaza"), CanReachRegion("Paradise Plaza"), CanReachRegion("Al Fresca Plaza")))
                               if world.options.restricted_item_mode
-                              else Or(CanReachRegion("North Plaza"), CanReachRegion("Wonderland Plaza"), CanReachRegion("Paradise Plaza"), CanReachRegion("Al Fresca Plaza")))))
+                              else Or(CanReachRegion("North Plaza"), CanReachRegion("Wonderland Plaza"), CanReachRegion("Paradise Plaza"), CanReachRegion("Al Fresca Plaza")))),
+                       _gun_loose))
         world.set_rule(world.multiworld.get_location("Fire 300 bullets", world.player),
+                       or_glitched(
                        And(_bullets_open,
                            And(CanReachRegion("North Plaza"), Or(*[Has(g) for g in (("Handgun", "Shotgun", "Sniper Rifle") if world.options.door_randomizer else ("Handgun", "Submachine Gun", "Shotgun", "Sniper Rifle"))]))
                            if world.options.restricted_item_mode
-                           else Or(CanReachRegion("North Plaza"), Or(*[Has(g) for g in ("Handgun", "Submachine Gun", "Shotgun", "Sniper Rifle", "Heavy Machinegun", "Machinegun")]))))
+                           else Or(CanReachRegion("North Plaza"), Or(*[Has(g) for g in ("Handgun", "Submachine Gun", "Shotgun", "Sniper Rifle", "Heavy Machinegun", "Machinegun")]))),
+                       _gun_loose))
     # "Ride zombies for 50 feet" requires Zombie Ride only when that
     # skill is actually in the AP item pool. BuildItemPool adds skills
     # only when enable_skill_items is on AND vanilla_progression is
@@ -1840,17 +1936,20 @@ def set_rules(world) -> None:
     world.set_rule(world.multiworld.get_location("Photograph PP Sticker 24", world.player), CanReachRegion("Colby's Movieland"))
 
     # PP Stickers in Entrance Plaza -- behind the shutters (25-34), as are
-    # the EP survivors and Wayne's check further down. ep_shutter is
+    # the EP survivors and Wayne's check further down. Glitched: 25-30 and 33
+    # can be shot through the closed gates during the opening sequence, with
+    # no key (OPENING_STICKERS in DRWorld puts them in the Security Room).
+    # ep_shutter is
     # defined above, alongside the PP-bonus rules that also need it.
-    world.set_rule(world.multiworld.get_location("Photograph PP Sticker 25", world.player), ep_shutter)
-    world.set_rule(world.multiworld.get_location("Photograph PP Sticker 26", world.player), ep_shutter)
-    world.set_rule(world.multiworld.get_location("Photograph PP Sticker 27", world.player), ep_shutter)
-    world.set_rule(world.multiworld.get_location("Photograph PP Sticker 28", world.player), ep_shutter)
-    world.set_rule(world.multiworld.get_location("Photograph PP Sticker 29", world.player), ep_shutter)
-    world.set_rule(world.multiworld.get_location("Photograph PP Sticker 30", world.player), ep_shutter)
+    world.set_rule(world.multiworld.get_location("Photograph PP Sticker 25", world.player), or_glitched(ep_shutter, True_()))
+    world.set_rule(world.multiworld.get_location("Photograph PP Sticker 26", world.player), or_glitched(ep_shutter, True_()))
+    world.set_rule(world.multiworld.get_location("Photograph PP Sticker 27", world.player), or_glitched(ep_shutter, True_()))
+    world.set_rule(world.multiworld.get_location("Photograph PP Sticker 28", world.player), or_glitched(ep_shutter, True_()))
+    world.set_rule(world.multiworld.get_location("Photograph PP Sticker 29", world.player), or_glitched(ep_shutter, True_()))
+    world.set_rule(world.multiworld.get_location("Photograph PP Sticker 30", world.player), or_glitched(ep_shutter, True_()))
     world.set_rule(world.multiworld.get_location("Photograph PP Sticker 31", world.player), ep_shutter)
     world.set_rule(world.multiworld.get_location("Photograph PP Sticker 32", world.player), ep_shutter)
-    world.set_rule(world.multiworld.get_location("Photograph PP Sticker 33", world.player), ep_shutter)
+    world.set_rule(world.multiworld.get_location("Photograph PP Sticker 33", world.player), or_glitched(ep_shutter, True_()))
     world.set_rule(world.multiworld.get_location("Photograph PP Sticker 34", world.player), ep_shutter)
 
     # PP Stickers in Al Fresca Plaza
@@ -1985,9 +2084,12 @@ def set_rules(world) -> None:
     if not world.psycho_mode:  # dropped from Psycho seeds in create_region
         # 10,000 PP in one shot needs both camera books' PP bonuses, and any
         # part of the mall with zombies in it to photograph.
+        # Glitched: the opening sequence has a 10,000 PP shot that needs
+        # neither book. The Camera Item still applies.
         world.set_rule(world.multiworld.get_location("Get 10000 PP in one photo", world.player),
-                       And(Or(*[CanReachRegion(r) for r in ZOMBIE_KILL_TIERS]),
-                           Has("Book [Camera 1]"), Has("Book [Camera 2]")))
+                       or_glitched(And(Or(*[CanReachRegion(r) for r in ZOMBIE_KILL_TIERS]),
+                                       Has("Book [Camera 1]"), Has("Book [Camera 2]")),
+                                   True_()))
     # Fifty targets in one frame takes the Maintenance Tunnel's crowd.
     world.set_rule(world.multiworld.get_location("Get 50 targets in one photo", world.player),
                    CanReachRegion("Maintenance Tunnel"))
@@ -2037,6 +2139,11 @@ def set_rules(world) -> None:
         else:
             microwave_food = Or(CanReachRegion("Seon's Food and Stuff"),
                                 Has("Uncooked Pizza"), Has("Raw Meat"))
+        # Glitched: a frozen pizza from the Food Court stands in for Seon's.
+        microwave_food = or_glitched(
+            microwave_food,
+            And(CanReachRegion("Food Court"), Has("Uncooked Pizza")) if restricted_mode_on
+            else CanReachRegion("Food Court"))
 
         world.set_rule(world.multiworld.get_location("Use the Microwave in Jill's Sandwiches", world.player), And(CanReachRegion("Paradise Plaza"), microwave_food))
         world.set_rule(world.multiworld.get_location("Use the Microwave in Chris's Fine Foods", world.player), And(CanReachRegion("Food Court"), microwave_food))

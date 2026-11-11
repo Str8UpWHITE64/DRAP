@@ -549,9 +549,16 @@ class DRWorld(World):
     COLBYS_FROM_PARADISE = ("Photograph PP Sticker 15", "Photograph PP Sticker 16",
                             "Photograph PP Sticker 17")
 
+    # Stickers 25-30 and 33 can be photographed through the closed gates
+    # during the opening sequence (glitched logic only), so they are created
+    # in the Security Room and their rule still asks for the open shutters.
+    OPENING_STICKERS = tuple(f"Photograph PP Sticker {_n}" for _n in (25, 26, 27, 28, 29, 30, 33))
+
     def _region_of(self, loc_name, default):
         if loc_name in self.COLBYS_FROM_PARADISE and not self.door_locks_active:
             return "Paradise Plaza"
+        if loc_name in self.OPENING_STICKERS:
+            return "Security Room"
         return self.REGION_OVERRIDES.get(loc_name, default)
 
     def _region_table(self, region_name):
