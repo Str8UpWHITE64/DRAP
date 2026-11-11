@@ -16,6 +16,8 @@
 -- UNLOCK CONDITIONS (one deferral model). Event-class retried on the
 -- named event; poll-class retried each poll_deferred_retries() tick:
 --   activation   - AP not activated yet (event: on activate)
+--   prologue     - the Access Key only: waits for the end of the opening, not
+--                  for Jessie (poll: injected prologue_done)
 --   conflict     - another conflict-group member active (event: on member complete)
 --   main_block   - blocking main scoop active (event: on blocker complete)
 --   prereq       - prerequisite scoops not completed (event: on any completion)
@@ -73,6 +75,9 @@ local cfg = {
     now = function() return 0 end,
     check_flag = function(_) return nil end,   -- true/false/nil(unreadable)
     has_item = function(_) return false end,
+    -- True once the opening is over (the stairs are reached). Only the
+    -- Access Key reads it; every other scoop still waits for Meet Jessie.
+    prologue_done = function() return false end,
     scoop_survivors = {},      -- name -> { survivor stypes the scoop is about }
     -- Observed alive->dead only. Deliberately NOT the census KILLED verdict:
     -- that has a half-initialised branch, and a survivor wrongly called dead
@@ -581,8 +586,20 @@ function M.request_unlock(scoop_name)
     end
 
     if not ap_activated then
-        cfg.log(string.format("Activation deferred: '%s' -- waiting for Meet Jessie", scoop_name))
-        return false, "activation"
+        -- The Maintenance Tunnel Access Key (flag 2082) is the game's own gate
+        -- on the mall -> tunnel doors. It stays off through the Entrance
+        -- Plaza siege so Frank cannot walk out of it, but not until Jessie:
+        -- with Door Randomizer the way to her can lead through a tunnel door.
+        if scoop.category == "Special" then
+            if not cfg.prologue_done() then
+                poll_deferred[scoop_name] = "prologue"
+                cfg.log(string.format("Activation deferred: '%s' -- waiting for the end of the opening", scoop_name))
+                return false, "prologue"
+            end
+        else
+            cfg.log(string.format("Activation deferred: '%s' -- waiting for Meet Jessie", scoop_name))
+            return false, "activation"
+        end
     end
 
     if scoop.category ~= "Main" then
@@ -661,7 +678,9 @@ function M.poll_deferred_retries()
     for scoop_name, reason in pairs(poll_deferred) do
         if M.ap_received[scoop_name] and not M.received[scoop_name] then
             local ready = false
-            if reason == "flag_prereq" then
+            if reason == "prologue" then
+                ready = cfg.prologue_done()
+            elseif reason == "flag_prereq" then
                 ready = M.has_flag_prerequisites_met(scoop_name)
             elseif reason == "item" then
                 local item = cfg.item_requirements[scoop_name]
@@ -937,6 +956,11 @@ function M.deactivate_for_reload()
     end
     if cleared > 0 then
         cfg.log(string.format("Cleared %d side scoop unlocks for pre-Jessie state", cleared))
+    end
+    -- The Access Key does not wait for Jessie: hand it back to the poll.
+    for scoop_name in pairs(M.ap_received) do
+        local data = cfg.scoop_data[scoop_name]
+        if data and data.category == "Special" then poll_deferred[scoop_name] = "prologue" end
     end
 
     -- A pre-Jessie world is a NEW world: every survivor is back where they

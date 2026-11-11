@@ -536,9 +536,14 @@ class DRWorld(World):
     # in Paradise Plaza from the raincoat encounter but were filed under
     # Leisure Park, which made Leisure Park a requirement nothing asked for
     # (#65). Their rules already carry the cult requirement.
+    #
+    # The Maintenance Tunnel Key check is filed under the tunnel, but a player
+    # sent the Access Key opens that door without going down, so the check
+    # cannot require the tunnel's region. Its rule names both ways in.
     REGION_OVERRIDES = {
         "Photograph PP Sticker 98": "Paradise Plaza",
         "Photograph PP Sticker 99": "Paradise Plaza",
+        "Obtain Maintenance Tunnel Key": "Security Room",
     }
 
     # Stickers 15-17 can be photographed from Paradise Plaza through the

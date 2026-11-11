@@ -1879,6 +1879,17 @@ State.init({
         return (bridge and bridge.has_item_name and bridge.has_item_name(item_name)) == true
     end,
     on_unlock = apply_unlock_writes,
+    -- The opening is over once Frank is out of the Entrance Plaza siege:
+    -- flags 263 and 264 (the "past the stairs" pair the time freeze reads,
+    -- NEW_GAME_FLAGS) go on while he is still in the plaza, a minute or so
+    -- before the cutscene takes him back upstairs, so they are not enough
+    -- alone. Only an explicit true on both, and a known area that is not
+    -- the Entrance Plaza.
+    prologue_done = function()
+        if raw_check_flag(263) ~= true or raw_check_flag(264) ~= true then return false end
+        local area = get_current_area_index()
+        return area ~= nil and area ~= ENTRANCE_PLAZA_AREA_INDEX
+    end,
     on_state_changed = function() save_state() end,
     -- A pre-Jessie world on the same seed is a new world. The state machine
     -- reopens completed survivor scoops; the two modules that remember who
