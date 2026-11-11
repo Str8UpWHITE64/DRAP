@@ -552,7 +552,10 @@ class DRWorld(World):
     # Stickers 25-30 and 33 can be photographed through the closed gates
     # during the opening sequence (glitched logic only), so they are created
     # in the Security Room and their rule still asks for the open shutters.
-    OPENING_STICKERS = tuple(f"Photograph PP Sticker {_n}" for _n in (25, 26, 27, 28, 29, 30, 33))
+    OPENING_STICKERS = tuple(f"Photograph PP Sticker {_n}" for _n in (25, 26, 27, 28, 29, 30, 33)) + tuple(
+        f"Photograph Extra PP Sticker - Entrance Plaza - {_name}" for _name in (
+            "Everyone Luvs Books", "Bikezip", "Macaroon Sign", "Someone Check That Guy's Camera", "Golf Ball",
+            "Tennis Ball", "Basketball", "Gold Sphere", "Gryffindor Shield"))
 
     def _region_of(self, loc_name, default):
         if loc_name in self.COLBYS_FROM_PARADISE and not self.door_locks_active:

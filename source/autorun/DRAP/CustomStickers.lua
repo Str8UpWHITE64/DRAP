@@ -21,7 +21,7 @@
 --     unscaled, and a 0-point target gets the game's 999 floor, so the spare id's points are set to 1; DRAP adds none.
 --   * Uncollected stickers hold mMaxCount at 0xFFFF so the shared count never flips them; a detected one gets
 --     mMaxCount 0 and plays the game's own collected animation. The spare count is reset to 0 after each photo.
---   * Collected = the location is checked in the ledger. Collected stickers are not spawned again.
+--   * Collected = the location is checked in the ledger. Collected stickers are spawned too, with no photo target, and show greyed out.
 --   * Never move a spawned sticker by its transform; spawn it where it belongs.
 --
 -- One more sticker is always on, on every slot: a visible marker on the Rooftop vent (photo id 174, "Photograph
@@ -49,9 +49,12 @@ local HOLD_MAX = 0xFFFF
 -- the camera rate is still logged.
 local POINTS = 1
 local PP_BASE_FALLBACK = 5000
-local RESPAWN_SETTLE_S = 2.0     -- after an area change, before spawning
+local RESPAWN_SETTLE_S = 0.5     -- after an area change, before spawning
+local LOAD_QUIET_S = 0.5         -- and the area's Om set must have stayed loaded this long
 local FIND_TIMEOUT_S = 10.0      -- a requested sticker must appear within this
-local MAINT_INTERVAL_S = 0.5
+local OM_LIST_WAIT_S = 20.0      -- how long to wait for the area's Om list before using the player's folder
+local MAINT_INTERVAL_S = 0.5     -- steady state
+local FAST_INTERVAL_S = 0.1      -- while an area's stickers are still being spawned
 -- PP (the camera's percentage readout x 5000): getPpScoreRate = (share of the photo sphere's screen rect inside the
 -- frame) x (viewing-angle factor) x (size factor: 0 below a minimum size, partial up to the camera's good size).
 -- Keep the template's own sphere so frame coverage matches a vanilla sticker (a quarter-radius sphere sat
@@ -82,6 +85,9 @@ local live = {}
 local go_to_number = {}          -- GameObject address -> number
 local area_index, area_since = nil, 0
 local next_maint = 0
+local want_fast = false          -- some sticker of this area is not live yet
+local quiet_since = nil          -- since when the area's Om set has not been loading
+local area_timing = nil          -- per area change: when it was seen, when loading went quiet, first spawn
 local seal_ready = false
 local photo = { mode = nil, armed = false, stale = {} }
 local stats = { spawned = 0, respawned = 0, detected = 0, photos = 0, stale_skipped = 0 }
@@ -373,6 +379,9 @@ local function request_spawn(r)
     key:set_field("ClassName", sdk.create_managed_string(CLASS))
     local p = r.Pos
     local folder, where = om_folder()
+    -- The area's Om list is empty until the area has loaded its objects; a sticker put in the player's folder then
+    -- never shows. Wait for the list (a few seconds at most, for an area that really has none).
+    if where ~= "omlist" and os.clock() - area_since < OM_LIST_WAIT_S then return false, "wait" end
     local known = {}
     for _, c in ipairs(scene_stickers()) do local a = addr(c); if a then known[a] = true end end
     local ok, err = pcall(function()
@@ -402,6 +411,7 @@ local function finish_spawn(n, e, om, go)
     local attr = comp(go, "app.solid.character.SolidModelAttribute")
     if not attr then return false end
     local visual = e.row.Visual
+    if not visual and is_collected(e.row) then e.collected, e.born_collected = true, true end
     attr:set_field("mPhotoId", visual or SPARE_ID)
     attr:set_field("HavingUniqueEvent", 0)
     e.om, e.go, e.attr, e.addr = om, go, attr, addr(go)
@@ -434,7 +444,8 @@ local function settle(n, e)
         pc(function() attr:call("setSMAdd(System.Int32)", SPARE_ID) end)
     end
     -- every tick: a late setup (setSMAdd) puts the shared template list back, which would credit 164
-    e.hits_ok = own_hits(attr, e.row)
+    -- (a sticker collected before it spawned is no photo target at all: it only shows greyed out)
+    if e.born_collected then e.hits_ok = no_hits(attr) else e.hits_ok = own_hits(attr, e.row) end
     -- the sticker re-applies uOm13f.mStartAngle (Euler radians x = pitch, y = yaw, z = roll) whenever it changes
     -- collected state, so the row's orientation has to live there too, or it snaps to the default facing
     local r = e.row
@@ -462,6 +473,8 @@ local function maintain()
     if idx ~= area_index then
         area_index, area_since = idx, os.clock()
         live, go_to_number, doomed = {}, {}, {}
+        quiet_since = nil
+        area_timing = { quiet = nil, first = nil }
         return
     end
     for k, d in pairs(doomed) do
@@ -480,8 +493,20 @@ local function maintain()
             doomed[k] = nil
         end
     end
-    if os.clock() - area_since < RESPAWN_SETTLE_S then return end
-    if pc(function() return am:call("isOmSetLoading") end) == true then return end
+    if pc(function() return am:call("isOmSetLoading") end) == true then
+        -- a load drops what was requested before it, so nothing pending can still appear
+        quiet_since = nil
+        for n, e in pairs(live) do if e.state == "pending" then live[n] = nil end end
+        want_fast = true
+        return
+    end
+    local now = os.clock()
+    if not quiet_since then
+        quiet_since = now
+        if area_timing then area_timing.quiet = now - area_since end
+    end
+    if now - area_since < RESPAWN_SETTLE_S or now - quiet_since < LOAD_QUIET_S then want_fast = true; return end
+    want_fast = false
     local extras = false
     for _, e in pairs(live) do if not e.row.Visual then extras = true; break end end
     if extras then verify_scoop_points() end
@@ -490,17 +515,23 @@ local function maintain()
         if r.Number and r.Pos and area_index_of(r.Area) == idx then
             local e = live[r.Number]
             if e == nil then
-                if not is_collected(r) then
-                    local ok, err = request_spawn(r)
-                    if not ok then M.log("Spawn failed for custom sticker " .. tostring(r.Number) .. ": " .. tostring(err)) end
-                end
+                -- collected ones are spawned too, and show greyed out
+                local ok, err = request_spawn(r)
+                if not ok and err ~= "wait" then M.log("Spawn failed for custom sticker " .. tostring(r.Number) .. ": " .. tostring(err)) end
+                want_fast = true
             elseif e.state == "pending" then
+                want_fast = true
                 local om, go = find_spawned(e)
                 if om then
                     if finish_spawn(r.Number, e, om, go) and not r.Visual and not (seal_ready and scoop_ready) then ensure_seal_row(e.attr) end
+                    if area_timing and not area_timing.first then
+                        area_timing.first = os.clock() - area_since
+                        M.log(string.format("First custom sticker in %s %.2f s after the area change (Om set quiet after %s s)",
+                            tostring(r.Area), area_timing.first, area_timing.quiet and string.format("%.2f", area_timing.quiet) or "?"))
+                    end
                     M.log(string.format("Custom sticker %d spawned in %s (folder: %s)", r.Number, tostring(r.Area), e.folder))
                 elseif os.clock() - e.t > FIND_TIMEOUT_S then
-                    M.log("Custom sticker " .. tostring(r.Number) .. " never appeared; retrying")
+                    M.log("Custom sticker " .. tostring(r.Number) .. " never appeared (folder: " .. tostring(e.folder) .. "); retrying")
                     live[r.Number] = nil
                 end
             elseif e.state == "live" then
@@ -701,7 +732,10 @@ function M.on_frame()
     if next(live) ~= nil then pcall(watch_photo) end   -- a marker alone gives it no rows to match
     local now = os.clock()
     if now < next_maint then return end
-    next_maint = now + MAINT_INTERVAL_S
+    -- an area change is picked up within a tenth of a second, and an area still spawning is polled as fast
+    local am = area_mgr()
+    local idx = am and num(fld(am, "mAreaIndex"))
+    next_maint = now + ((want_fast or idx ~= area_index) and FAST_INTERVAL_S or MAINT_INTERVAL_S)
     local ok, err = pcall(maintain)
     if not ok then M.log("maintain error: " .. tostring(err)) end
 end
@@ -720,7 +754,7 @@ end
 
 rawset(_G, "drap_cstick_enable", function(on) debug_enabled = (on ~= false); return debug_enabled end)
 
--- Offline test, no seed or server: drap_extra_pp_stickers(true) turns the 40 table stickers on. They spawn in
+-- Offline test, no seed or server: drap_extra_pp_stickers(true) turns the table stickers on. They spawn in
 -- their own areas (now, and on every area load), a photo pays the PP and marks them collected in TEST_FILE, so they
 -- are not spawned again. drap_extra_pp_stickers(false) turns them off (already spawned ones stay until the area is left).
 rawset(_G, "drap_extra_pp_stickers", function(on)

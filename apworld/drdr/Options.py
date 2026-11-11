@@ -942,7 +942,7 @@ class PPStickersFiller(Toggle):
 
 class ExtraPPStickers(Toggle):
     """
-    Adds 40 extra PP stickers to the mall, in places the vanilla game has
+    Adds 100 extra PP stickers to the mall, in places the vanilla game has
     none. Each one is a check: photograph it the way you would a vanilla PP
     sticker. Each photo of one is worth only 1 PP, so they don't change your
     levels.

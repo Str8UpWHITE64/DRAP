@@ -305,7 +305,8 @@ LEVEL_POINTS_NO_CAMERA = {level: _no_camera_points(level) for level in LEVEL_POI
 CAMERA_ITEM = "Camera"
 CAMERA_LOCATIONS = frozenset(
     [f"Photograph PP Sticker {_n}" for _n in range(1, 101)]
-    + [f"Photograph Extra PP Sticker {_n}" for _n in range(1, 41)]
+    + [_loc.name for _tbl in location_tables.values() for _loc in _tbl
+       if _loc.category == DRLocationCategory.CUSTOM_STICKER]
     + [f"Photograph {_n} PP Stickers" for _n in range(10, 100, 10)]
     + [
         "Photograph all PP Stickers",
@@ -1908,13 +1909,6 @@ def set_rules(world) -> None:
     # PP Stickers
     # --------------------------------------------------------------------
     # PP Stickers Filler code (make all PP sticker checks excluded)
-    # Extra PP Stickers 3 and 20 can't be photographed where they stand. Until
-    # they are replaced they only hold filler, and keep their numbers.
-    if world.options.extra_pp_stickers:
-        for _n in (3, 20):
-            world.multiworld.get_location(f"Photograph Extra PP Sticker {_n}",
-                                          world.player).progress_type = LocationProgressType.EXCLUDED
-
     # With the Camera as an item, Photograph 8 psychopaths only holds filler.
     if world.options.camera_item and "Photograph 8 psychopaths" not in _dropped:
         world.multiworld.get_location("Photograph 8 psychopaths",
@@ -1925,8 +1919,8 @@ def set_rules(world) -> None:
             name = location.name
 
             # "Photograph PP Sticker 1" to "Photograph PP Sticker 100", and the
-            # extra ones ("Photograph Extra PP Sticker N")
-            if re.match(r"Photograph (Extra )?PP Sticker \d+", name):
+            # extra ones ("Photograph Extra PP Sticker - <Area> - <Name>")
+            if re.match(r"Photograph PP Sticker \d+", name) or name.startswith("Photograph Extra PP Sticker - "):
                 location.progress_type = LocationProgressType.EXCLUDED
                 continue
 
@@ -2081,6 +2075,27 @@ def set_rules(world) -> None:
 
     # PP Stickers in Rooftop
     world.set_rule(world.multiworld.get_location("Photograph PP Sticker 100", world.player), CanReachRegion("Rooftop"))
+
+    # Extra PP Stickers take their region's access (the default rule above),
+    # with two gates: the Entrance Plaza storefronts, and Carlito's Hideout,
+    # which opens with the escort in the vanilla story. Under ScoopSanity the
+    # mod opens the Hideout on its own, so only the region is needed there.
+    # The Entrance Plaza extras that can be photographed through the closed gates
+    # during the opening sequence are made in the Security Room (OPENING_STICKERS in
+    # DRWorld), like the vanilla ones: shutters in the normal logic, the Camera alone
+    # in glitched logic.
+    for _name in world.OPENING_STICKERS:
+        if world.options.extra_pp_stickers and _name.startswith("Photograph Extra PP Sticker - "):
+            world.set_rule(world.multiworld.get_location(_name, world.player), or_glitched(ep_shutter, True_()))
+    for _region, _gate in (
+            ("Entrance Plaza", ep_shutter),
+            ("Carlito's Hideout", None if world.options.scoop_sanity
+             else CanReachLocation("Escort Isabela to Carlito's Hideout and have a chat"))):
+        if _gate is None:
+            continue
+        for _spot in world.multiworld.get_region(_region, world.player).locations:
+            if _spot.category == DRLocationCategory.CUSTOM_STICKER:
+                world.set_rule(_spot, And(CanReachRegion(_region), _gate))
 
     # PP Sticker group access for the "Photograph N PP Stickers"
     # challenge rules. Each group becomes (count, regions, locations,
