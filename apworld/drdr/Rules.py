@@ -205,10 +205,12 @@ KILL_WEAPONS = {
     "Seon's Food and Stuff": [["Hunting Knife", "Queen"]],
     "Crislip's Home Saloon": [["Fire Ax", "Queen"],
                               ["loc:Kill Cliff", "Machete"]],
-    "Colby's Movieland":     [["Baseball Bat", "Queen"]],
-    # Nothing of note is stocked in the Warehouse, so it takes the North
-    # Plaza pair with the Queen on top, as the other small areas do.
-    "Warehouse":             [["Hunting Knife", "Queen"], ["Handgun", "Queen"]],
+    "Colby's Movieland":     [["Baseball Bat", "Queen"],
+                              ["Nightstick", "Queen"]],
+    # The Warehouse stocks a Hunting Knife and a Nightstick but no handgun,
+    # so it takes either with the Queen on top, as the other small areas do.
+    "Warehouse":             [["Hunting Knife", "Queen"],
+                              ["Nightstick", "Queen"]],
 }
 
 
@@ -348,6 +350,21 @@ def _glitched_level_points(level):
     half = LEVEL_PP[level - 1] / 2
     below = [up for up in range(2, level + 1) if LEVEL_PP[up - 1] <= half]
     return max(1, LEVEL_POINTS[below[-1]] if below else 1)
+
+
+# People that can be photographed for the survivor photo checks without being
+# one of the 48 survivors: the unsavable people of the opening sequence, and
+# Otis and Jessie, who are always in the Security Room.
+OPENING_PHOTO_SUBJECTS = 11
+SECURITY_ROOM_PHOTO_SUBJECTS = 2
+
+
+def _camera_from_the_start(world):
+    """True when the Camera Item is in the player's starting inventory."""
+    names = set(world.options.start_inventory.value)
+    names |= set(world.options.start_inventory_from_pool.value)
+    names |= {i.name for i in world.multiworld.precollected_items[world.player]}
+    return CAMERA_ITEM in names
 
 
 def camera_gate(world, spot, rule):
@@ -1564,7 +1581,6 @@ def set_rules(world) -> None:
     if "Hit 10 zombies with a parasol" not in _dropped:
         world.set_rule(world.multiworld.get_location("Hit 10 zombies with a parasol", world.player), (And(Or(CanReachRegion("Entrance Plaza"), CanReachRegion("Al Fresca Plaza"), CanReachRegion("Crislip's Home Saloon")), Has("Parasol")) if world.options.restricted_item_mode else Or(CanReachRegion("Entrance Plaza"), CanReachRegion("Al Fresca Plaza"), CanReachRegion("Crislip's Home Saloon"), And(Has("Parasol"), CanReachRegion("Paradise Plaza")))))
     world.set_rule(world.multiworld.get_location("Kill 50 cultists", world.player), And(CanReachRegion("Paradise Plaza"), CanReachLocation("Witness Sean in Paradise Plaza")))
-    world.set_rule(world.multiworld.get_location("Photograph 30 survivors", world.player), And(CanReachRegion("Leisure Park"), CanReachRegion("Al Fresca Plaza"), CanReachRegion("Wonderland Plaza"), CanReachRegion("North Plaza"), CanReachRegion("Entrance Plaza"), Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM")))
     # Needs survivors alive and willing to follow, which Psycho does
     # not allow. create_region drops these, so do not rule them either.
     if not world.psycho_mode:
@@ -1680,6 +1696,31 @@ def set_rules(world) -> None:
         if world.options.scoop_sanity:
             world.set_rule(world.multiworld.get_location("Encounter 10 survivors", world.player),
                            AtLeast(10, *_rescue_locs))
+
+    # Photograph 10 / 30 survivors count survivors the way the rescue ladder
+    # does: each survivor whose own check is reachable is one that can be
+    # photographed. That already holds the scoop item (ScoopSanity), the day
+    # and the area.
+    #
+    # Some people can be photographed without being among those: eleven in
+    # the opening sequence who cannot be saved, and Otis and Jessie, who are
+    # always in the Security Room. The eleven only count when the Camera is
+    # in hand during the opening, which means no Camera Item or one the
+    # player starts with. Otherwise it can arrive any time after, so only
+    # the two in the Security Room are counted.
+    _photo_locs = [CanReachLocation(_l) for _l in
+                   (world.ALL_KILL_LOCATIONS if world.psycho_mode
+                    else world.ALL_RESCUE_LOCATIONS)
+                   if _l not in _dropped]
+    _camera_start = (not world.options.camera_item) or _camera_from_the_start(world)
+    _photo_free = SECURITY_ROOM_PHOTO_SUBJECTS + (
+        OPENING_PHOTO_SUBJECTS if _camera_start else 0)
+    if "Photograph 30 survivors" not in _dropped:
+        world.set_rule(world.multiworld.get_location("Photograph 30 survivors", world.player),
+                       AtLeast(30 - _photo_free, *_photo_locs))
+    if _photo_free < 10 and "Photograph 10 survivors" not in _dropped:
+        world.set_rule(world.multiworld.get_location("Photograph 10 survivors", world.player),
+                       AtLeast(10 - _photo_free, *_photo_locs))
 
     # Challenge locations default to sphere 0 via the blanket rule above.
     # Falling far enough is awkward to arrange at the start, so this one is
