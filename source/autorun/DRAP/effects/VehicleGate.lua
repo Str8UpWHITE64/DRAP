@@ -14,6 +14,8 @@
 --                                                         Girl Hunting -- both
 --                                                         share the one key
 --   4     PREF_Vehicle_om009a_Hammer_Em4d   Convicts'     Leisure Park
+--   4     Vehicle_om009a_Hammer             Convicts'     Leisure Park, after
+--                                                         they die (ConvictHumvee)
 --   4     Vehicle_om009a_Hammer_EV          Humvee        Overtime -- NOT ours
 --
 -- Two blocks, because the prompt and the boarding are separate paths:
@@ -53,6 +55,8 @@ local KEY_FOR_NAME = {
     ["Vehicle_om009b_Bike"]               = "Motorcycle Key",
     -- Em4d is the convict enemy; this is their Leisure Park vehicle.
     ["PREF_Vehicle_om009a_Hammer_Em4d"]   = "Convict Humvee Key",
+    -- The parked Humvee ConvictHumvee leaves in Leisure Park after they die.
+    ["Vehicle_om009a_Hammer"]             = "Convict Humvee Key",
     -- Vehicle_om009a_Hammer_EV, the Overtime Humvee, is deliberately absent.
 }
 
