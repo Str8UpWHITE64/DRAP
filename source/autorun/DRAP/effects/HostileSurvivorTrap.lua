@@ -7,6 +7,8 @@
 local M = {}
 
 local Shared = require("DRAP/Shared")
+local PlayerReady = require("DRAP/PlayerReady")
+local BossFight = require("DRAP/BossFight")
 local log = Shared.create_logger("HostileSurvivorTrap")
 M.log = log
 
@@ -228,6 +230,16 @@ local function can_fire_now()
     if not player then return false, "player not in-game" end
 
     if in_sanctuary() then return false, "in sanctuary scene" end
+
+    -- Not in a cutscene, a load or a vehicle, and not during a psychopath
+    -- fight or the moments after one before its defeat scene. A psychopath's
+    -- defeat check arrives as the defeat scene starts; spawning into that
+    -- scene (Paul's explosion, then the autosave after it) took the game down.
+    if not PlayerReady.ready() then
+        return false, "player not ready (" .. tostring(PlayerReady.blocked_by()) .. ")"
+    end
+    local boss = BossFight.blocked_by()
+    if boss then return false, boss end
 
     if not area_settled() then
         return false, "just changed areas -- letting the player walk in"
