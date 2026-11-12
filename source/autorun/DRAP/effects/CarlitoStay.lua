@@ -41,6 +41,17 @@
 -- per slot and outlive both, so he is brought back whenever the case was
 -- done once.
 --
+-- Flow 320 loads his truck, but it waits in a hidden spot above the tunnel
+-- (y 50) until it "appears": its update raises the appear flag
+-- (Em55_VehicleOm99.mAppearFlag, the carito3appearCheck test) only once one
+-- of the five picked-up bomb flags (2066-2070) is on, and then puts him on
+-- the tunnel floor at the far end. In the case the first bomb pickup does it. In a new world after a Start
+-- Over none of them is on and no bomb is placed (that needs 296, the case
+-- running), so he would never show. When no bomb can be placed and none is
+-- picked up, one whose check was already sent is raised for the visit and
+-- turned off again on the way out, so no new check is sent and the world
+-- outside the tunnel is left as it was.
+--
 -- The check itself comes from 1284 (EventTracker's flag table): after the case
 -- his death scene does not play, because it also waits on 296, which the case
 -- clears when it ends.
@@ -55,6 +66,14 @@ local DEATH_SCENE_FLOW = 330          -- his death scene's own write
 local CASE_START_FLAG = 294           -- EV_EVENT33_0, The Last Resort opened
 local CASE_FINISH_FLAG = 839          -- EV_SCQ_FINISH07, The Last Resort
 local CARLITO_DEAD_FLAG = 1284        -- EV_CARLITO3_DIE
+local CASE_RUNNING_FLAG = 296         -- EV_EVENT35, the meeting; the bombs are placed only while it is on
+local BOMBS = {                       -- picked-up flag and its check, in the case's own order
+    { id = 2066, check = "Bomb Collector - Entrance Plaza Truck" },
+    { id = 2067, check = "Bomb Collector - North Plaza Truck" },
+    { id = 2068, check = "Bomb Collector - Al Fresca Plaza Truck" },
+    { id = 2069, check = "Bomb Collector - Wonderland Plaza Truck" },
+    { id = 2070, check = "Bomb Collector - Seon's Food and Stuff Truck" },
+}
 local ENDING_FLAG = 312
 local OVERTIME_FLOW = 1000            -- Overtime and later flows run from here up
 local CHECK_NAME = "Beat Drivin Carlito"
@@ -105,6 +124,23 @@ function M.restore_value(saved, current_flow)
     return saved.old
 end
 
+--- Which picked-up bomb flag to raise so his truck appears, or nil.
+--- b: { running = 296 on, picked = { [flag] = on }, sent = { [flag] = check sent } }
+--- Nothing while the case runs (its bombs are placed and the first pickup
+--- does it) or once any bomb is picked up; otherwise the first bomb whose
+--- check is already sent, so raising it sends nothing new.
+function M.bomb_to_raise(b)
+    if type(b) ~= "table" or b.running then return nil end
+    local picked, sent = b.picked or {}, b.sent or {}
+    for _, e in ipairs(BOMBS) do
+        if picked[e.id] then return nil end
+    end
+    for _, e in ipairs(BOMBS) do
+        if sent[e.id] then return e.id end
+    end
+    return nil
+end
+
 ------------------------------------------------------------
 -- Game access
 ------------------------------------------------------------
@@ -131,6 +167,12 @@ end
 local function flag(id)
     local efm = sdk.get_managed_singleton("app.solid.gamemastering.EventFlagsManager")
     return efm and Shared.safe(function() return efm:call("evFlagCheck", id) end) == true
+end
+
+local function set_flag(id, on)
+    local efm = sdk.get_managed_singleton("app.solid.gamemastering.EventFlagsManager")
+    if not efm then return false end
+    return pcall(function() efm:call(on and "evFlagOn" or "evFlagOff", id) end)
 end
 
 local function current_scene()
@@ -191,10 +233,50 @@ local function snapshot()
     }
 end
 
+local function bomb_state()
+    local L = ledger()
+    local ledger_ok = L ~= nil and L.is_init ~= nil and L.is_init()
+    local b = { running = flag(CASE_RUNNING_FLAG), picked = {}, sent = {} }
+    for _, e in ipairs(BOMBS) do
+        b.picked[e.id] = flag(e.id)
+        b.sent[e.id] = ledger_ok and L.is_checked(e.check) == true
+    end
+    return b
+end
+
+--- Lets his truck appear on a visit where no bomb can be picked up.
+local function raise_bomb(r, note)
+    if type(r.bomb) == "number" then
+        if not flag(r.bomb) then set_flag(r.bomb, true) end
+        return
+    end
+    local b = bomb_state()
+    local fid = M.bomb_to_raise(b)
+    if not fid then
+        if not b.running then
+            local any = false
+            for _, e in ipairs(BOMBS) do any = any or b.picked[e.id] end
+            if not any then
+                M.log("No bomb picked up and no bomb check sent: his truck appears once a bomb is picked up" .. note)
+            end
+        end
+        return
+    end
+    if set_flag(fid, true) then
+        r.bomb = fid
+        save_record(r)
+        M.log(string.format("Picked-up bomb flag %d on for the visit (its check was already sent), so his truck appears%s",
+            fid, note))
+    end
+end
+
 local function restore(why, note)
     note = note or ""
     local r = record or load_record()
     if not r then return end
+    if type(r.bomb) == "number" and not flag(CASE_RUNNING_FLAG) and set_flag(r.bomb, false) then
+        note = string.format(", picked-up bomb flag %d off again%s", r.bomb, note)
+    end
     local cur = get_flow()
     local v = M.restore_value(r, cur)
     if v and set_flow(v) then
@@ -242,6 +324,7 @@ function M.on_jump(dest, frames)
             M.log(string.format("Entering the tunnel: game flow %d -> %d for Drivin' Carlito%s",
                 s.flow, CARLITO_FLOW, note))
         end
+        raise_bomb(record, note)
     elseif record or load_record() then
         restore("door to " .. tostring(dest), note)
     end
