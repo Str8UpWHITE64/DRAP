@@ -15,6 +15,10 @@ end
 -- banner below is genuinely the first DRAP line in the file.
 local Logger = require("DRAP/Logger")
 
+-- Next, before any module registers a frame callback: a module that throws
+-- every frame must not stop the callbacks registered after it.
+require("DRAP/FrameGuard").install()
+
 local Activation = require("DRAP/Activation")
 local AP_BRIDGE = require("DRAP/Bridge")
 
@@ -1046,7 +1050,8 @@ _G.cap        = function(code) AP.TimeGate.set_time_cap(code) end
 _G.show_items = function() AP.GUI.show_window() end
 _G.hide_items = function() AP.GUI.hide_window() end
 
-log("Main script loaded.")
+log(string.format("Main script loaded (%d frame callbacks guarded).",
+    require("DRAP/FrameGuard").wrapped_count()))
 
 -- Get the whole startup block on disk now. If the game dies on the first
 -- frames, this is the part of the log that explains why.
