@@ -3213,9 +3213,9 @@
         "Complete Rescue the Professor"
       ],
       "description": {
-        "location": "Entrance Plaza",
-        "trigger": "Enter the Entrance Plaza",
-        "description": "Go to the door in Paradise Plaza that leads to Entrance Plaza"
+        "location": "Paradise Plaza",
+        "trigger": "Enter Paradise Plaza",
+        "description": "Head to Entrance Plaza through the door in Paradise Plaza."
       },
       "disp_flag": 2498,
       "disp_end_flag": 2544,

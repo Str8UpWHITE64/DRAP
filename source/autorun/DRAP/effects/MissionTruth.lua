@@ -134,9 +134,19 @@ local function objective_text(name)
     return desc.description or desc.trigger or ""
 end
 
+-- Missions whose game text is replaced by the description in the shared data.
+local OWN_TEXT = { ["Rescue the Professor"] = true }
+
 local function target_for_main(name)
     local d = State.data(name)
     local g = game_text[name]
+    -- The game's hint for these sends the player to the wrong place, so the
+    -- title stays the game's and the rest is the description from the data.
+    if g and OWN_TEXT[name] then
+        local loc = d and d.description and d.description.location or nil
+        local t = make_target(g.title, objective_text(name), loc, d and d.guide)
+        return t
+    end
     if g then
         return { title = g.title, hint = g.hint, combined = g.info,
                  area = d and d.guide and d.guide.area,
