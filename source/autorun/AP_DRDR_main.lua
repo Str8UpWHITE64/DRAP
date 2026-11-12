@@ -417,6 +417,7 @@ local function run_slot_connect(slot_data)
     local slot_key = slot .. "|" .. seed
     if last_slot_key and last_slot_key ~= slot_key then
         AP.NpcTracker.reset_world("slot change")
+        AP.effects.SurvivorScoopCompletion.reset_world()
     end
     last_slot_key = slot_key
 
@@ -884,6 +885,12 @@ local function try_reapply_if_ready()
                 AP.ScoopUnlocker.reset_for_new_game()
                 AP.EventTracker.reset_sent()
                 AP.NpcTracker.reset_world("new game")
+                -- The rescues SurvivorScoopCompletion remembers are the old
+                -- world's too. Left in place, the reapply below completes
+                -- every scoop whose roster was rescued last game, and A
+                -- Strange Group completed that way starts the cult respawn:
+                -- no Sean, no raincoat cutscene.
+                AP.effects.SurvivorScoopCompletion.reset_world()
             end
         else
             return  -- retry next frame; don't reapply against unsettled flags
