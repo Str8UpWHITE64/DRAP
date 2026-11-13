@@ -38,6 +38,15 @@
 --                    a flag keyed on the current scene always lands one
 --                    area late in both directions. The rows don't care
 --                    which way the player is walking.
+--   Seon's (1280):   not a cult area, the same lever. Its only zombie rows
+--                    are flow-gated: set 10 at flows 180..189 (Medicine
+--                    Run) and set 20 at 190..219 (until Girl Hunting moves
+--                    the flow to 220). Both are empty layouts, so after
+--                    Rescue the Professor Seon's stays empty until the
+--                    story moves on, and with no next main scoop it never
+--                    does. Under ScoopSanity both rows point at set 0, the
+--                    base layout (100 zombies), unless Medicine Run is
+--                    active; then Steven's store is left as the game has it.
 
 local Shared = require("DRAP/Shared")
 local State = require("DRAP/scoops/ScoopState")
@@ -54,6 +63,8 @@ local ZOMBIE_TYPE = 1        -- rEnemySetControlTable.ETableType: zombie rows
 local CULT_TYPE   = 2        -- ETableType.eCult: the cult rows
 local THEATER     = 1283     -- s503, the one area that keeps its cult rows
 local CULT_SCOOP  = "A Strange Group"
+local SEONS       = 1280     -- s500
+local MEDICINE_SCOOP = "Medicine Run"
 
 -- area -> how its cult-time zombie row is patched.
 --   to_set: point the row at that set. Theater: set 0, the base layout
@@ -66,6 +77,8 @@ local CULT_SCOOP  = "A Strange Group"
 --           the cult row gives the right density for the clock. The
 --           cultists come from their own sub-table and are not affected.
 -- flags: a row is taken when its "and" condition carries any of these.
+-- flows: instead of flags, a row is taken by its start flow; the value is
+--        the row's vanilla set, kept per row.
 -- The Food Court is the one area with a zombie row of its own for the
 -- Special Forces (set 9, gated 309): soldiers and next to no zombies
 -- (tester report). Hidden the same way, so the ladder stands under the
@@ -77,11 +90,12 @@ local AREAS = {
     -- sets 6009 and 9, both gated 309 (read 2026-09-24): soldiers and next
     -- to no zombies (#59). Its ladder is the same shape as the Food Court's.
     [256]  = { name = "Entrance Plaza",    hide = true, flags = { SF_FLAG } },
+    [SEONS] = { name = "Seon's Food and Stuff", to_set = 0, flows = { [180] = 10, [190] = 20 } },
 }
 
 local safe = Shared.safe
 
--- area -> { rows = {row objects}, original = set number or area, patched = bool }
+-- area -> { rows = {row objects}, original = set number or area, originals = per-row set (flow rows), patched = bool }
 local state = {}
 local table_scanned = false
 
@@ -128,7 +142,7 @@ local function scan_table()
     local n = safe(function() return list:call("get_Count") end) or 0
     if n == 0 then return false end
     for area, cfg in pairs(AREAS) do
-        state[area] = state[area] or { rows = {}, original = nil, patched = false }
+        state[area] = state[area] or { rows = {}, originals = {}, original = nil, patched = false }
     end
     for i = 0, n - 1 do
         local r = safe(function() return list:call("get_Item", i) end)
@@ -138,7 +152,16 @@ local function scan_table()
             if a and a ~= THEATER and t == CULT_TYPE and gated_on(r, { CULT_FLAG }) then
                 table.insert(cult_rows, { row = r, area = (a ~= 0) and a or nil })
             end
-            if a and AREAS[a] and t == ZOMBIE_TYPE and gated_on(r, AREAS[a].flags) then
+            local flow0 = AREAS[a or -1] and AREAS[a].flows
+                and tonumber(safe(function() return r:get_field("mStartGameFlowNo") end))
+            if a and AREAS[a] and AREAS[a].flows and t == ZOMBIE_TYPE and flow0 and AREAS[a].flows[flow0] then
+                -- The vanilla set is known per row, so a row already patched
+                -- earlier in the session is still restored correctly.
+                local st = state[a]
+                table.insert(st.rows, r)
+                st.originals[#st.rows] = AREAS[a].flows[flow0]
+                st.original = st.original or AREAS[a].flows[flow0]
+            elseif a and AREAS[a] and AREAS[a].flags and t == ZOMBIE_TYPE and gated_on(r, AREAS[a].flags) then
                 local st = state[a]
                 local field = AREAS[a].hide and "mAreaNo" or "mEmSetNo"
                 local v = tonumber(safe(function() return r:get_field(field) end))
@@ -195,8 +218,9 @@ local function apply(area, want_patched)
     if want_patched then to = cfg.hide and 0 or cfg.to_set else to = st.original end
     if to == nil then return end
     local ok_n = 0
-    for _, r in ipairs(st.rows) do
-        local ok = pcall(function() r:set_field(field, to) end)
+    for i, r in ipairs(st.rows) do
+        local v = (not want_patched and st.originals[i]) or to
+        local ok = pcall(function() r:set_field(field, v) end)
         if ok then ok_n = ok_n + 1 end
     end
     st.patched = want_patched
@@ -220,6 +244,16 @@ end
 
 local function want_theater()
     return not scoop_active(CULT_SCOOP)
+end
+
+--- Seon's: base layout after Rescue the Professor, except while Medicine
+--- Run is active. Without ScoopSanity the story moves the flow on as in
+--- the base game, so the rows stay as they are.
+local function want_seons()
+    local su = unlocker()
+    if not su then return false end
+    local ok, sanity = pcall(su.is_scoop_sanity_enabled)
+    return ok and sanity == true and not scoop_active(MEDICINE_SCOOP)
 end
 
 local function want_food_court()
@@ -250,6 +284,7 @@ function M.on_frame()
     apply(1283, want_theater())
     if AREAS[2560] then apply(2560, want_food_court()) end
     if AREAS[256] then apply(256, true) end
+    apply(SEONS, want_seons())
     apply_cult(want_cult_hidden())
 end
 
