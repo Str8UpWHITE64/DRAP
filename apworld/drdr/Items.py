@@ -663,6 +663,46 @@ progression_skills = {
 item_sanity_overpowered = frozenset(overpowered_items & item_sanity_required_items)
 
 
+def trap_weights(options):
+    """Weight per trap name: Trap Weights, with the older Enabled Traps list
+    still honoured (a trap missing from a non-default list gets 0). A trap
+    Trap Weights does not mention keeps weight 1."""
+    given = getattr(getattr(options, "trap_weights", None), "value", None) or {}
+    weights = {}
+    for item in _all_items:
+        if item.category == DRItemCategory.TRAP:
+            weights[item.name] = max(0, int(given.get(item.name, 1)))
+    legacy = getattr(options, "enabled_traps", None)
+    if legacy is not None and set(legacy.value) != set(legacy.default):
+        keep = set(legacy.value)
+        for name in weights:
+            if name not in keep:
+                weights[name] = 0
+    return weights
+
+
+def allocate_traps(random, traps, weights, count):
+    """Pick `count` traps in proportion to their weights. Each trap gets its
+    whole share first and the leftover slots go to the largest fractions, so
+    the mix follows the weights closely and a weight of 0 never appears."""
+    traps = [t for t in traps if weights.get(t.name, 0) > 0]
+    total = sum(weights[t.name] for t in traps)
+    if count <= 0 or total <= 0:
+        return []
+    picked = []
+    fractions = []
+    for t in traps:
+        share = count * weights[t.name] / total
+        whole = int(share)
+        picked.extend([t] * whole)
+        fractions.append((share - whole, random.random(), t))
+    fractions.sort(key=lambda f: (f[0], f[1]), reverse=True)
+    for _, _, t in fractions[:count - len(picked)]:
+        picked.append(t)
+    random.shuffle(picked)
+    return picked
+
+
 def BuildItemPool(random, count, options, excluded_scoop_names=(),
                   door_locks_active=False, start_key_names=()):
     """Build the item pool for this world.
@@ -817,13 +857,9 @@ def BuildItemPool(random, count, options, excluded_scoop_names=(),
     if (bool(getattr(getattr(options, "night_mode_enabled", None), "value", 0))
             or bool(getattr(getattr(options, "hardcore_zombies_enabled", None), "value", 0))):
         trapList = [item for item in trapList if item.name != "Night Trap"]
-    # Player's own list. An empty set means no traps at all, which is the same
-    # as a trap percentage of zero -- honoured rather than treated as "unset",
-    # because emptying the list is a deliberate thing to do.
-    _enabled_traps = getattr(options, "enabled_traps", None)
-    if _enabled_traps is not None:
-        _keep = set(_enabled_traps.value)
-        trapList = [item for item in trapList if item.name in _keep]
+    # Weight 0 keeps a trap out of the pool altogether.
+    _trap_weights = trap_weights(options)
+    trapList = [item for item in trapList if _trap_weights.get(item.name, 0) > 0]
     nonTrapFiller = [item for item in itemList if item.category in (
         DRItemCategory.MISC, DRItemCategory.WEAPON, DRItemCategory.CONSUMABLE,
         DRItemCategory.BUFF
@@ -1010,10 +1046,9 @@ def BuildItemPool(random, count, options, excluded_scoop_names=(),
     # seeing certain trap types (Hostile NPC Trap in particular).
     #
     # The two-bucket approach below makes trap_percentage mean what the
-    # docstring says it means. Trap slots are filled by cycling through a
-    # shuffled trapList, so every trap type appears at least once before
-    # any repeats -- this guarantees Hostile NPC Trap and the others all
-    # show up in the pool whenever the trap-slot count is >= len(trapList).
+    # docstring says it means. Trap slots are shared out by trap weight, so
+    # with equal weights every trap type shows up whenever the trap-slot
+    # count is >= len(trapList).
     trap_pct = int(getattr(options, "trap_percentage",
                             type("X", (), {"value": 25})()).value)
     remaining_count = max(0, remaining_count)
@@ -1023,15 +1058,10 @@ def BuildItemPool(random, count, options, excluded_scoop_names=(),
     )
     non_trap_slot_count = remaining_count - trap_slot_count
 
-    # Trap slots: round-robin through a shuffled trapList so each trap type
-    # gets equal representation (with a fresh shuffle on every full cycle).
+    # Trap slots: split between the traps in proportion to their weights.
     if trap_slot_count > 0 and trapList:
-        trap_cycle = []
-        for _ in range(trap_slot_count):
-            if not trap_cycle:
-                trap_cycle = list(trapList)
-                random.shuffle(trap_cycle)
-            item_pool.append(trap_cycle.pop())
+        item_pool.extend(allocate_traps(random, trapList, _trap_weights,
+                                        trap_slot_count))
 
     # Non-trap filler slots: shuffle once, walk in order, reshuffle on
     # wrap-around. This keeps the existing "unique-first, then duplicates"

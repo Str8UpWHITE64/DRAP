@@ -1,7 +1,7 @@
 import typing
 from dataclasses import dataclass
 import settings
-from Options import Visibility, Toggle, DefaultOnToggle, FreeText, Option, Range, Choice, ItemDict, DeathLink, PerGameCommonOptions, StartInventoryPool, OptionGroup, OptionSet
+from Options import Visibility, Toggle, DefaultOnToggle, FreeText, Option, Range, Choice, ItemDict, DeathLink, PerGameCommonOptions, StartInventoryPool, OptionGroup, OptionSet, OptionCounter
 from Options import ExcludeLocations, PriorityLocations, StartLocationHints
 from .Locations import location_tables, kill_sanity_location_groups
 
@@ -134,7 +134,7 @@ class TrapLink(Toggle):
     players with Trap Link on. When another game sends a trap, Dead Rising
     does the nearest thing it can: damage, poison, slowing down, a bonk,
     swearing, zombies, hostile survivors and so on. Names it has no match for
-    are ignored. Traps you removed from Enabled Traps are never applied.
+    are ignored. Traps with weight 0 in Trap Weights are never applied.
 
     A trap that arrived over the link is never sent on again. Type /traplink
     off in the client window to leave the link mid-session.
@@ -405,12 +405,16 @@ class ZombieKillTiers(Choice):
     default = 1
 
 
-class EnabledTraps(OptionSet):
+class TrapWeights(OptionCounter):
     """
-    Which traps can appear in the pool. Remove any you would rather not get.
+    How likely each trap is to turn up among the traps in the pool. Each
+    trap gets a weight: a trap with weight 4 appears about twice as often as
+    one with weight 2, and a trap with weight 0 never appears. They all
+    start at 1, which spreads them evenly.
 
-    Defaults to all of them. Emptying the list is the same as setting the trap
-    percentage to zero.
+    List only the traps you want to change; any trap you leave out keeps
+    weight 1. The number of traps overall is Trap Percentage. Setting every
+    weight to 0 is the same as a Trap Percentage of 0.
 
     Inventory:  Butterfingers (drops everything on the floor), Last Shot
                 (everything one hit from breaking), Where'd Your Inventory Go?
@@ -431,9 +435,50 @@ class EnabledTraps(OptionSet):
                 stay where they were; waits until after Jessie, never in
                 Overtime or while escorting Brad or Isabela).
 
-    Some traps drop out on their own regardless of this list: Convicts Respawn
-    is ScoopSanity-only, since it waits on a scoop item that does not otherwise
-    exist. Night is left out whenever Night Mode or Hardcore Zombies is on.
+    Some traps drop out on their own regardless of their weight: Convicts
+    Respawn is ScoopSanity-only, since it waits on a scoop item that does not
+    otherwise exist. Night is left out whenever Night Mode or Hardcore Zombies
+    is on. A trap with weight 0 is also never applied when it arrives over
+    Trap Link.
+    """
+    display_name = "Trap Weights"
+    min = 0
+    max = 1000
+    valid_keys = {
+        "Stomach Ache Trap",
+        "Zombait Trap",
+        "Skipped Leg Day Trap",
+        "Damage Player Trap",
+        "Hostile NPC Trap",
+        "Special Forces Trap",
+        "Convicts Respawn Trap",
+        "Butterfingers Trap",
+        "Last Shot Trap",
+        "Where'd Your Inventory Go? Trap",
+        "Bald Trap",
+        "Goddamnit, Donut! Trap",
+        "Boxers Trap",
+        "Skipped Arm Day Trap",
+        "Oops More Zombies Trap",
+        "Potty Mouth Trap",
+        "Bonk Trap",
+        "Tiny Trap",
+        "Giant Trap",
+        "1 HP Trap",
+        "Night Trap",
+        "Cardio Trap",
+        "Invisibility Trap",
+        "Knockout Gas Trap",
+        "Teleport Trap",
+    }
+    default = {name: 1 for name in valid_keys}
+
+
+class EnabledTraps(OptionSet):
+    """
+    Older way of choosing traps; use Trap Weights instead. If a yaml still
+    lists traps here, any trap not on the list gets weight 0, on top of Trap
+    Weights. Left alone (all traps) it changes nothing.
     """
     display_name = "Enabled Traps"
     valid_keys = {
@@ -1110,6 +1155,7 @@ class DROption(PerGameCommonOptions):
     enable_stat_items: EnableStatItems
     enable_extra_stat_buffs: EnableExtraStatBuffs
     vanilla_progression: VanillaProgression
+    trap_weights: TrapWeights
     enabled_traps: EnabledTraps
     trap_percentage: TrapPercentage
     hostile_survivor_count_min: HostileSurvivorCountMin
@@ -1182,6 +1228,7 @@ dr_option_groups = [
     OptionGroup(
         "Trap Settings",
         [
+            TrapWeights,
             EnabledTraps,
             TrapPercentage,
             HostileSurvivorCountMin,

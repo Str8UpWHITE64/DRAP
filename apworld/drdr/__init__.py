@@ -7,7 +7,7 @@ from Options import OptionError, item_and_loc_options
 
 from worlds.AutoWorld import World, WebWorld
 
-from .Items import DRItem, DRItemCategory, item_dictionary, key_item_names, item_descriptions, BuildItemPool, specialty_items, overpowered_items, progression_skills, microwave_food_items, challenge_tool_items, kill_filler_items, item_sanity_item_names, item_sanity_required_items, item_sanity_overpowered, KENT_DAYS, PROGRESSIVE_KENT, kent_is_progressive
+from .Items import DRItem, DRItemCategory, item_dictionary, key_item_names, item_descriptions, BuildItemPool, trap_weights, specialty_items, overpowered_items, progression_skills, microwave_food_items, challenge_tool_items, kill_filler_items, item_sanity_item_names, item_sanity_required_items, item_sanity_overpowered, KENT_DAYS, PROGRESSIVE_KENT, kent_is_progressive
 from .Locations import kill_sanity_location_groups
 from .Locations import (DRLocation, DRLocationCategory, location_tables,
                         location_dictionary, ZOMBIE_KILL_TIERS,
@@ -1258,8 +1258,9 @@ class DRWorld(World):
         damage_link_group = str(self.options.damage_link_group.value or "")
         knockback_link_enabled = bool(self.options.knockback_link.value)
         trap_link_enabled = bool(self.options.trap_link.value)
-        # Traps the player allowed in their yaml. TrapLink only applies those.
-        enabled_traps = sorted(self.options.enabled_traps.value)
+        # Traps the player left a weight on in their yaml. TrapLink only
+        # applies those; the Lua side still reads the list as enabled_traps.
+        enabled_traps = sorted(n for n, w in trap_weights(self.options).items() if w > 0)
         restricted_item_mode_enabled = bool(self.options.restricted_item_mode.value)
         door_randomizer_enabled = bool(self.options.door_randomizer.value)
         door_randomizer_mode = self.options.door_randomizer_mode.value
