@@ -577,6 +577,11 @@ _PICK_UP = "Pick up "
 item_sanity_item_names = frozenset(
     _e["location_name"][len(_PICK_UP):] for _e in ITEM_SANITY
     if _e["location_name"].startswith(_PICK_UP))
+# AP items an ItemSanity check asks the player to hold (Laser Sword, Real Mega
+# Buster, Queen). They have to be in the pool and visible to state.has in every
+# mode, not only Restricted.
+item_sanity_required_items = frozenset(
+    _n for _e in ITEM_SANITY for _n in _e.get("requires_items", ()))
 
 # DRItemCategory.WEAPON means "anything Frank can hold", not "weapon" -- the
 # frying pan, Kent's masks and Paul's fire extinguisher all sit in it. Spitter
@@ -651,6 +656,11 @@ overpowered_items = {
 progression_skills = {
     "Zombie Ride",
 }
+
+
+# With Exclude Overpowered Items on, the ItemSanity checks that wait for an
+# overpowered item are dropped and the item stays out of the pool.
+item_sanity_overpowered = frozenset(overpowered_items & item_sanity_required_items)
 
 
 def BuildItemPool(random, count, options, excluded_scoop_names=(),
@@ -751,6 +761,7 @@ def BuildItemPool(random, count, options, excluded_scoop_names=(),
     # ItemSanity + Restricted: a pickup check needs its item sent first, so
     # every item type that has a check goes in the pool, once. Names already
     # added above (specialty items, guaranteed items) are not doubled.
+    _drop_overpowered = bool(getattr(getattr(options, "exclude_overpowered_items", None), "value", 0))
     _item_sanity_restricted = (
         bool(getattr(getattr(options, "item_sanity", None), "value", 0))
         and bool(options.restricted_item_mode.value))
@@ -759,8 +770,24 @@ def BuildItemPool(random, count, options, excluded_scoop_names=(),
         for item_name in sorted(item_sanity_item_names):
             if item_name in _have or item_name not in item_dictionary:
                 continue
+            if _drop_overpowered and item_name in item_sanity_overpowered:
+                continue
             item_pool.append(item_dictionary[item_name])
             _have.add(item_name)
+            remaining_count = remaining_count - 1
+            included_itemcount = included_itemcount + 1
+
+    # ItemSanity without Restricted: the pickups that need an AP item (Laser
+    # Sword, Real Mega Buster, Queen) still have to find it in the pool.
+    if (bool(getattr(getattr(options, "item_sanity", None), "value", 0))
+            and not _item_sanity_restricted):
+        _have = {it.name for it in item_pool}
+        for item_name in sorted(item_sanity_required_items):
+            if item_name in _have or item_name not in item_dictionary:
+                continue
+            if _drop_overpowered and item_name in item_sanity_overpowered:
+                continue
+            item_pool.append(item_dictionary[item_name])
             remaining_count = remaining_count - 1
             included_itemcount = included_itemcount + 1
 

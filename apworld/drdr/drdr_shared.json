@@ -5309,6 +5309,23 @@
     {"location_name": "Pick up Nightstick", "item_numbers": [139], "regions": ["Warehouse", "Paradise Plaza", "Colby's Movieland", "Leisure Park", "North Plaza", "Crislip's Home Saloon", "Food Court", "Wonderland Plaza", "Al Fresca Plaza", "Seon's Food and Stuff", "Maintenance Tunnel", "Meat Processing Area"]},
     {"location_name": "Pick up Ceremonial Sword", "item_numbers": [195], "regions": ["Colby's Movieland After Sean"]},
     {"location_name": "Pick up Book [Brainwashing Tips]", "item_numbers": [68], "regions": ["Colby's Movieland After Sean"]},
-    {"location_name": "Pick up Hunk of Meat", "item_numbers": [257], "regions": ["Paradise Plaza", "Entrance Plaza", "Al Fresca Plaza", "Leisure Park", "Wonderland Plaza", "North Plaza", "Food Court"]}
+    {"location_name": "Pick up Hunk of Meat", "item_numbers": [257], "regions": ["Paradise Plaza", "Entrance Plaza", "Al Fresca Plaza", "Leisure Park", "Wonderland Plaza", "North Plaza", "Food Court"]},
+    {"location_name": "Pick up Golden Brown Pizza", "item_numbers": [111], "regions": ["Paradise Plaza", "Food Court", "Al Fresca Plaza"], "requires_locations": ["Pick up Uncooked Pizza"]},
+    {"location_name": "Pick up Well Done Steak", "item_numbers": [43], "regions": ["Paradise Plaza", "Food Court", "Al Fresca Plaza"], "requires_locations": ["Pick up Raw Meat"]},
+    {"location_name": "Pick up Laser Sword", "item_numbers": [12], "regions": [], "requires_items": ["Laser Sword"]},
+    {"location_name": "Pick up Mannequin Male Torso", "item_numbers": [84], "regions": [], "requires_locations": ["Pick up Mannequin Male"]},
+    {"location_name": "Pick up Mannequin Male Right Arm", "item_numbers": [85], "regions": [], "requires_locations": ["Pick up Mannequin Male"]},
+    {"location_name": "Pick up Mannequin Male Left Arm", "item_numbers": [86], "regions": [], "requires_locations": ["Pick up Mannequin Male"]},
+    {"location_name": "Pick up Mannequin Male Right Leg", "item_numbers": [87], "regions": [], "requires_locations": ["Pick up Mannequin Male"]},
+    {"location_name": "Pick up Mannequin Male Left Leg", "item_numbers": [88], "regions": [], "requires_locations": ["Pick up Mannequin Male"]},
+    {"location_name": "Pick up Mannequin Female Torso", "item_numbers": [90], "regions": [], "requires_locations": ["Pick up Mannequin Female"]},
+    {"location_name": "Pick up Mannequin Female Right Arm", "item_numbers": [91], "regions": [], "requires_locations": ["Pick up Mannequin Female"]},
+    {"location_name": "Pick up Mannequin Female Left Arm", "item_numbers": [92], "regions": [], "requires_locations": ["Pick up Mannequin Female"]},
+    {"location_name": "Pick up Mannequin Female Right Leg", "item_numbers": [93], "regions": [], "requires_locations": ["Pick up Mannequin Female"]},
+    {"location_name": "Pick up Mannequin Female Left Leg", "item_numbers": [94], "regions": [], "requires_locations": ["Pick up Mannequin Female"]},
+    {"location_name": "Pick up Machete", "item_numbers": [189], "regions": [], "requires_locations": ["Kill Cliff"]},
+    {"location_name": "Pick up Real Mega Buster", "item_numbers": [58], "regions": [], "requires_items": ["Real Mega Buster"]},
+    {"location_name": "Pick up Small Chainsaw", "item_numbers": [127], "regions": [], "requires_locations": ["Kill Adam"]},
+    {"location_name": "Pick up Queen", "item_numbers": [69], "regions": ["Paradise Plaza", "Colby's Movieland", "Leisure Park", "North Plaza", "Crislip's Home Saloon", "Food Court", "Wonderland Plaza", "Al Fresca Plaza", "Entrance Plaza", "Seon's Food and Stuff", "Maintenance Tunnel", "Warehouse"], "requires_items": ["Queen"]}
   ]
 }

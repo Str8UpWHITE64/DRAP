@@ -7,7 +7,7 @@ from Options import OptionError, item_and_loc_options
 
 from worlds.AutoWorld import World, WebWorld
 
-from .Items import DRItem, DRItemCategory, item_dictionary, key_item_names, item_descriptions, BuildItemPool, specialty_items, overpowered_items, progression_skills, microwave_food_items, challenge_tool_items, kill_filler_items, item_sanity_item_names, KENT_DAYS, PROGRESSIVE_KENT, kent_is_progressive
+from .Items import DRItem, DRItemCategory, item_dictionary, key_item_names, item_descriptions, BuildItemPool, specialty_items, overpowered_items, progression_skills, microwave_food_items, challenge_tool_items, kill_filler_items, item_sanity_item_names, item_sanity_required_items, item_sanity_overpowered, KENT_DAYS, PROGRESSIVE_KENT, kent_is_progressive
 from .Locations import kill_sanity_location_groups
 from .Locations import (DRLocation, DRLocationCategory, location_tables,
                         location_dictionary, ZOMBIE_KILL_TIERS,
@@ -371,6 +371,10 @@ class DRWorld(World):
             self.enabled_location_categories.add(DRLocationCategory.PP_BONUS)
         if self.item_sanity:
             self.enabled_location_categories.add(DRLocationCategory.ITEM_SANITY)
+        # Exclude Overpowered Items: no pickup check waits for one.
+        self._item_sanity_dropped_names = (
+            {"Pick up " + _n for _n in item_sanity_overpowered}
+            if self.item_sanity and self.options.exclude_overpowered_items else set())
 
         # PP-bonus entries whose requires_location predecessor isn't enabled
         # this seed (e.g. First Aid Kit needs "Clean up... Register 6!" which
@@ -860,6 +864,8 @@ class DRWorld(World):
                 if (location.category == DRLocationCategory.KILL_SANITY
                         and location.name in self._kill_sanity_excluded_names):
                     continue
+                if location.name in self._item_sanity_dropped_names:
+                    continue
                 new_location = DRLocation(
                     self.player,
                     location.name,
@@ -987,6 +993,9 @@ class DRWorld(World):
         elif (name in item_sanity_item_names and self.item_sanity
               and self.options.restricted_item_mode):
             # Its "Pick up" check waits for it.
+            item_classification = ItemClassification.progression
+        elif name in item_sanity_required_items and self.item_sanity:
+            # A "Pick up" check asks for it.
             item_classification = ItemClassification.progression
         elif name == "Queen" and self.options.scoop_sanity:
             # Gates queen spawning, so state.has must be able to see it.

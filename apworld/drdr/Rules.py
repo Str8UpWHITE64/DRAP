@@ -18,7 +18,8 @@ from rule_builder.rules import (
 from .DoorRandomization import AREA_NAMES, EMBEDDED_DOOR_DATA
 from .Locations import (DRLocationCategory, location_tables,
                         ZOMBIE_KILL_REGION_OF, ZOMBIE_KILL_TIERS, SURVIVOR_MILESTONES,
-                        kill_sanity_location_name, ITEM_SANITY_REGIONS)
+                        kill_sanity_location_name, ITEM_SANITY_REGIONS,
+                        ITEM_SANITY_REQUIRES_LOCATIONS, ITEM_SANITY_REQUIRES_ITEMS)
 from .shared_data import (
     AREA_KEY_NAMES, AP_TRIGGER_LOCATIONS,
     SCOOP_COMPLETION_MAP, SCOOP_EVENTS, SCOOP_REGION_REQUIREMENTS,
@@ -1000,7 +1001,16 @@ def set_rules(world) -> None:
                        And(Has("DAY2_06_AM"), Has("DAY2_11_AM"), Has("DAY3_00_AM"),
                            CanReachLocation("Kill Sean")))
         for _name, _regions in ITEM_SANITY_REGIONS.items():
-            _rule = item_sanity_rule(_regions, ep_shutter, _jessie, _after_sean)
+            if _name in world._item_sanity_dropped_names:
+                continue
+            _rule = (item_sanity_rule(_regions, ep_shutter, _jessie, _after_sean)
+                     if _regions else True_())
+            # Beside an area: the location a dish, part or drop comes from, and
+            # the AP items that stand in for a source the world does not offer.
+            _needs = ([CanReachLocation(_l) for _l in ITEM_SANITY_REQUIRES_LOCATIONS.get(_name, ())]
+                      + [Has(_i) for _i in ITEM_SANITY_REQUIRES_ITEMS.get(_name, ())])
+            if _needs:
+                _rule = And(_rule, *_needs) if _regions else And(*_needs)
             if world.options.restricted_item_mode and _name == ITEM_SANITY_SAW_BLADE:
                 _boxes = [r for r in _regions if r not in ITEM_SANITY_SAW_BLADE_SHELF]
                 _rule = Or(item_sanity_rule(list(ITEM_SANITY_SAW_BLADE_SHELF), ep_shutter, _jessie, _after_sean),

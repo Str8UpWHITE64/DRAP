@@ -1130,6 +1130,17 @@ location_tables["Item Sanity"] = [
 ITEM_SANITY_REGIONS: Dict[str, List[str]] = {
     _entry["location_name"]: list(_entry["regions"]) for _entry in ITEM_SANITY
 }
+# Pickups that also wait on something besides an area: another location
+# reached first (a cooked dish needs its raw food, a mannequin part its
+# mannequin, a drop its carrier) and AP items the player holds.
+ITEM_SANITY_REQUIRES_LOCATIONS: Dict[str, List[str]] = {
+    _entry["location_name"]: list(_entry["requires_locations"])
+    for _entry in ITEM_SANITY if _entry.get("requires_locations")
+}
+ITEM_SANITY_REQUIRES_ITEMS: Dict[str, List[str]] = {
+    _entry["location_name"]: list(_entry["requires_items"])
+    for _entry in ITEM_SANITY if _entry.get("requires_items")
+}
 
 # The area each kill location counts for. The region above is a neutral one,
 # so the name is the only place the area survives -- Rules.py needs it back.
