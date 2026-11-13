@@ -73,7 +73,7 @@ local target = nil               -- the main box: { title, hint, combined, area,
 
 local WAITING_TITLE = "Waiting for Mission"
 local WAITING_INFO = "Next mission will unlock once it is sent to you."
-local STUCK_INFO = "Missions you have received cannot be started until you can reach them."
+local STUCK_INFO = "Missions you have can't be reached yet."
 local JESSIE_TITLE = "Meet Jessie in the Warehouse"
 local JESSIE_INFO = "Head to the Warehouse and talk to Jessie."
 local START_TITLE = "Start a Mission"
@@ -402,13 +402,11 @@ local function main_target()
         if ao.running then return target_for_main(ao.running) end
         if #ao.startable == 1 then
             return make_target(START_TITLE, string.format(
-                "%s is ready to start. Press Start next to it in the"
-                .. " Scoops tab of the Archipelago window.", ao.startable[1]),
+                "%s is ready. Start it in the Scoops tab.", ao.startable[1]),
                 START_WHERE, nil)
         elseif #ao.startable > 1 then
             return make_target(START_TITLE, string.format(
-                "%d main missions are ready to start. Pick one in the"
-                .. " Scoops tab of the Archipelago window.", #ao.startable),
+                "%d scoops are ready. Start one in the Scoops tab.", #ao.startable),
                 START_WHERE, nil)
         end
         return goal_target() or waiting_target()
