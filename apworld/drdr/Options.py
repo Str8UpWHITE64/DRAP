@@ -39,20 +39,24 @@ class RestrictedItemMode(Toggle):
 
 class ItemSanity(Toggle):
     """
-    Picking up each kind of item for the first time is a check: the first
-    chair, the first Katana, the first carton of milk off a shelf, and so on.
-    About 160 checks. Each one only needs an area where that item is lying
-    around.
+    Picking up each item for the first time is a check: the first Chair, the
+    first Katana, and so on. Adds about 180 checks total.
 
-    Items are left as they are in the game: anything lying around can be
-    picked up as normal, and none are sent to you to spawn. Weapons and food
-    leave the item pool (unless Restricted Item Mode is on, see below).
-    Books and buffs stay, and the rest of the filler is KillSanity's
-    (Zombie Guts, Brains and Rotten Flesh).
+    If this mode is on, items cannot be manually spawned in. They must be
+    picked up wherever they are in the mall. Books are still sent and still
+    automatically provide their buff, but the actual book must be picked up
+    for their Itemsanity check. Instead of sending weapons, filler items
+    become the same as in KillSanity (Zombie Guts, Brains, Rotten Flesh).
 
     With Restricted Item Mode, every one of those items is back in the item
-    pool and a pickup check only counts once that item has been sent to you:
-    the game still refuses to let you pick up anything you have not received.
+    pool and you must wait for the item to be sent before you can pick it up.
+
+    Itemsanity Logic: Items only count as in logic in places where they always
+    spawn. Items found during the opening, food in the Security Room, drops from
+    Garbage Cans or Cardboard Boxes, and items carried by survivors are not
+    considered in the logic. However, players will be expected to know where the
+    items are, including hidden ones like the SMGs in various areas or the Real
+    Mega Buster and Laser Sword that can spawn in the Security Room.
 
     Cannot be combined with Spitter Only.
     """
@@ -238,23 +242,17 @@ class Goal(Choice):
               Overtime locations are removed from the pool, making for a shorter run.
 
     Savior:   Rescue a specified number of survivors (see "Savior Survivor Goal"
-              below). In ScoopSanity, there will not be any Main Scoop locations.
-              If ScoopSanity is off, then Ending S / Ending A locations still exist
-              but are filler-only and not the goal.
+              below). In ScoopSanity, there are no Main Scoop locations.
 
     Zombie Genocider:
               Kill 53,594 zombies spread across every area of the mall. Forces
               "Zombie Kill Tiers" to Genocide regardless of what it is set to.
-              Like Savior, ScoopSanity drops the Main Scoop locations. Without
-              ScoopSanity they remain as ordinary checks.
+              In ScoopSanity, there are no Main Scoop locations.
 
-    Psycho:   Kill a specified number of survivors (see "Psycho Kill Goal"
-              below). Survivors will turn hostile once they are encountered.
-              Only kills done by Frank count, not ones from zombies, so setting
-              the goal number below 48 leaves a bit of room for missed kills.
-              In ScoopSanity, there are no Main Scoops. If ScoopSanity is off,
-              the Ending S / Ending A locations still exist but are
-              filler-only and not the goal.
+    Psycho:   Kill a specified number of survivors (see "Psycho Kill Goal" below).
+              Survivors will turn hostile once they are encountered. Only kills by
+              Frank count, not ones from zombies, so setting the goal below 48 leaves
+              room for missed kills. In ScoopSanity, there are no Main Scoop locations.
     """
     display_name = "Goal"
     option_ending_s = 0
@@ -987,13 +985,14 @@ class PPStickersFiller(Toggle):
 
 class ExtraPPStickers(Toggle):
     """
-    Adds 100 extra PP stickers to the mall, in places the vanilla game has
-    none. Each one is a check: photograph it the way you would a vanilla PP
-    sticker. Each photo of one is worth only 1 PP, so they don't change your
-    levels.
+    Adds 100 extra PP stickers to the mall in places the vanilla game has
+    none. Photograph them the same way you would a vanilla PP sticker.
+    Each photo is worth only 1 PP.
 
     With Camera Item on, they need the Camera like every other photo check.
     With PP Stickers Filler on, they only hold filler too.
+
+    Each sticker's location name offers a hint of where they might be.
     """
     display_name = "Extra PP Stickers"
     default = False
@@ -1131,8 +1130,10 @@ class DROption(PerGameCommonOptions):
     scoopsanity_order: ScoopsanityOrder
     randomize_scoop_order: RandomizeScoopOrder
     main_scoops_any_order: MainScoopsAnyOrder
+    kent_scoop_order: KentScoopOrder
     zombie_kill_tiers: ZombieKillTiers
     kill_sanity: KillSanity
+    item_sanity: ItemSanity
     pp_bonus_locations: PpBonusLocations
     exclude_levels_above: ExcludeLevelsAbove
     exclude_rescues_above: ExcludeRescuesAbove
@@ -1144,7 +1145,6 @@ class DROption(PerGameCommonOptions):
     door_locks: DoorLocks
     randomize_rooftop_service_hallway_doors: RandomizeRooftopServiceHallwayDoors
     restricted_item_mode: RestrictedItemMode
-    item_sanity: ItemSanity
     car_keys: CarKeys
     camera_item: CameraItem
     split_keys: SplitKeys
@@ -1162,7 +1162,6 @@ class DROption(PerGameCommonOptions):
     hostile_survivor_count_max: HostileSurvivorCountMax
     cult_limited: CultLimited
     special_forces_mode: SpecialForcesMode
-    kent_scoop_order: KentScoopOrder
     spitter_only: SpitterOnly
     night_mode_enabled: NightModeEnabled
     hardcore_zombies_enabled: HardcoreZombiesEnabled
@@ -1186,6 +1185,7 @@ dr_option_groups = [
             KentScoopOrder,
             ZombieKillTiers,
             KillSanity,
+            ItemSanity,
             PpBonusLocations,
             ExcludeLevelsAbove,
             ExcludeRescuesAbove,
@@ -1207,7 +1207,6 @@ dr_option_groups = [
         "Item and Key Settings",
         [
             RestrictedItemMode,
-            ItemSanity,
             CarKeys,
             CameraItem,
             SplitKeys,
