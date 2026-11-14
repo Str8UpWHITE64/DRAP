@@ -2,6 +2,7 @@ from enum import IntEnum
 from typing import NamedTuple
 from BaseClasses import Item
 from Options import OptionError
+from .shared_data import ITEM_SANITY
 
 
 class DRItemCategory(IntEnum):
@@ -16,7 +17,7 @@ class DRItemCategory(IntEnum):
     SKILL = 8,         # 21 player-skill items (Useful)
     UPGRADE = 9,       # 6 progressive stat upgrades (Useful)
     BUFF = 10,         # 7 filler buff items (juice effects + Heal/Berserker/PP)
-    KILL_FILLER = 11,  # KillSanity's own filler; never in the ordinary pool
+    KILL_FILLER = 11,  # KillSanity's filler; in the ordinary pool only under ItemSanity
 
 
 class DRItemData(NamedTuple):
@@ -213,6 +214,10 @@ _all_items = [DRItemData(row[0], row[1], row[2]) for row in [
     # could register it and it was never obtainable -- while "Kill 100
     # zombies with an RPG" has always been a location.
     ("Rocket Launcher", 205, DRItemCategory.WEAPON),
+    # ItemSanity's two types the game lists but the pool never had: with
+    # Restricted Item Mode a pickup waits for its item, so they need one.
+    ("Potted Plant", 206, DRItemCategory.WEAPON),
+    ("Stepladder", 207, DRItemCategory.WEAPON),
     ("TV", 165, DRItemCategory.WEAPON),
     ("Vase", 166, DRItemCategory.WEAPON),
     ("Water Gun", 167, DRItemCategory.WEAPON),
@@ -347,8 +352,11 @@ _all_items = [DRItemData(row[0], row[1], row[2]) for row in [
     ("The Woman Left Behind", 3115, DRItemCategory.SCOOP),
     ("A Woman in Despair", 3116, DRItemCategory.SCOOP),
 
-    # Psychopath Scoops. 3200-3202 were Kent's three days, now Progressive
-    # Kent Scoop below; the ids stay retired.
+    # Psychopath Scoops. Kent's three days are one item each, with the ids
+    # they had before Progressive Kent Scoop.
+    ("Cut from the Same Cloth", 3200, DRItemCategory.SCOOP),
+    ("Photo Challenge", 3201, DRItemCategory.SCOOP),
+    ("Photographer's Pride", 3202, DRItemCategory.SCOOP),
     ("Cletus", 3203, DRItemCategory.SCOOP),
     ("The Convicts", 3204, DRItemCategory.SCOOP),
     ("Out of Control", 3205, DRItemCategory.SCOOP),
@@ -358,8 +366,8 @@ _all_items = [DRItemData(row[0], row[1], row[2]) for row in [
     ("Long Haired Punk", 3209, DRItemCategory.SCOOP),
     ("Mark of the Sniper", 3210, DRItemCategory.SCOOP),
     ("The Cult", 3211, DRItemCategory.SCOOP),
-    # Kent's three days come as copies of this under ScoopSanity: the Nth
-    # copy unlocks day N, so the days always arrive in order.
+    # Seeds made before the days were separate items carry three copies of
+    # this instead: the Nth copy unlocks day N. New seeds never place it.
     ("Progressive Kent Scoop", 3212, DRItemCategory.SCOOP),
 
     # Player skills (21) — handled by DRAP/effects/PlayerStats.lua
@@ -434,6 +442,37 @@ _all_items = [DRItemData(row[0], row[1], row[2]) for row in [
     ("Oops More Zombies Trap", 4084, DRItemCategory.TRAP),
     ("Potty Mouth Trap",    4085, DRItemCategory.TRAP),
 
+    # Knockback trap (DRAP/trackers/KnockbackLink.lua). Also the answer to the
+    # Bonk / Slip / Banana names arriving over TrapLink. Appended after 4086.
+    ("Bonk Trap",           4087, DRItemCategory.TRAP),
+
+    # 1 HP Trap (DRAP/effects/OneHpTrap.lua): Frank is left on one hit point.
+    ("1 HP Trap",           4088, DRItemCategory.TRAP),
+
+    # Knockout Gas Trap (DRAP/effects/GasTrap.lua): Frank is hit with the
+    # raincoat cultists' knockout powder for about 12 s.
+    ("Knockout Gas Trap",   4089, DRItemCategory.TRAP),
+
+    # Size traps (DRAP/effects/SizeTraps.lua).
+    ("Tiny Trap",           4090, DRItemCategory.TRAP),
+    ("Giant Trap",          4091, DRItemCategory.TRAP),
+
+    # Night Trap (DRAP/effects/NightTrap.lua): midnight for 30 s. Dropped from
+    # the pool when Night Mode (or Hardcore, which implies it) is on.
+    ("Night Trap",          4092, DRItemCategory.TRAP),
+
+    # Cardio Trap (DRAP/effects/PlayerBuffs.lua): twice the run speed for 30 s,
+    # the counterpart of Skipped Leg Day. Also the answer to TrapLink's Fast Trap.
+    ("Cardio Trap",         4093, DRItemCategory.TRAP),
+
+    # Invisibility Trap (DRAP/effects/InvisibleTrap.lua): Frank's model is
+    # hidden for 30 s. Render only; zombies still see him.
+    ("Invisibility Trap",   4094, DRItemCategory.TRAP),
+
+    # Teleport Trap (DRAP/effects/TeleportTrap.lua): Frank is sent to the
+    # Security Room and his followers stay where they were.
+    ("Teleport Trap",       4095, DRItemCategory.TRAP),
+
     # special_forces_mode = item. A scoop so it shows in the scoop list with
     # hover text; unlocking it sets flag 309 and the Overtime soldiers arrive.
     # It completes on BOTH of its checks, so the checks send them home.
@@ -465,6 +504,8 @@ _all_items = [DRItemData(row[0], row[1], row[2]) for row in [
     # The convicts' vehicle. Shares its RIDE_CAR_TYPE with the Overtime
     # Humvee, so the runtime tells them apart by GameObject name.
     ("Convict Humvee Key", 5014, DRItemCategory.LOCK),
+    # Camera Item: the shutter stays locked until this arrives.
+    ("Camera", 5015, DRItemCategory.LOCK),
 
     # KillSanity filler. One per kill location, most of them placed straight
     # back onto kill locations so the multiworld pool is not flooded. They do
@@ -521,12 +562,26 @@ specialty_items = {
     # the mall is open instead. Handgun/Shotgun/Submachine Gun are above.
     "Katana",
     "Hunting Knife",
+    "Nightstick",
     "Sledgehammer",
     "Machete",
     "Baseball Bat",
     "Fire Ax",
     "Small Chainsaw",
 }
+
+# ItemSanity with Restricted Item Mode: each "Pick up <item>" check waits for
+# that item to have been sent, so every item type with a check is in the pool
+# (and progression, which is what lets state.has see it).
+_PICK_UP = "Pick up "
+item_sanity_item_names = frozenset(
+    _e["location_name"][len(_PICK_UP):] for _e in ITEM_SANITY
+    if _e["location_name"].startswith(_PICK_UP))
+# AP items an ItemSanity check asks the player to hold (Laser Sword, Real Mega
+# Buster, Queen). They have to be in the pool and visible to state.has in every
+# mode, not only Restricted.
+item_sanity_required_items = frozenset(
+    _n for _e in ITEM_SANITY for _n in _e.get("requires_items", ()))
 
 # DRItemCategory.WEAPON means "anything Frank can hold", not "weapon" -- the
 # frying pan, Kent's masks and Paul's fire extinguisher all sit in it. Spitter
@@ -538,9 +593,15 @@ spitter_kept_weapons = {
     "Queen",
 }
 
-# Kent's days, in the order the Progressive Kent Scoop copies unlock them.
+# Kent's days. With Kent Scoop Order on progressive, the Nth Progressive Kent
+# Scoop copy unlocks day N; on random, each day is its own item.
 PROGRESSIVE_KENT = "Progressive Kent Scoop"
 KENT_DAYS = ["Cut from the Same Cloth", "Photo Challenge", "Photographer's Pride"]
+
+
+def kent_is_progressive(options) -> bool:
+    """True when Kent's days come as Progressive Kent Scoop copies."""
+    return bool(options.scoop_sanity) and options.kent_scoop_order.value == 0
 
 
 # Upgrades with nothing to improve once the weapons are gone. Melee is meant
@@ -597,8 +658,53 @@ progression_skills = {
 }
 
 
-def BuildItemPool(multiworld, count, options, excluded_scoop_names=(),
-                  door_locks_active=False):
+# With Exclude Overpowered Items on, the ItemSanity checks that wait for an
+# overpowered item are dropped and the item stays out of the pool.
+item_sanity_overpowered = frozenset(overpowered_items & item_sanity_required_items)
+
+
+def trap_weights(options):
+    """Weight per trap name: Trap Weights, with the older Enabled Traps list
+    still honoured (a trap missing from a non-default list gets 0). A trap
+    Trap Weights does not mention keeps weight 1."""
+    given = getattr(getattr(options, "trap_weights", None), "value", None) or {}
+    weights = {}
+    for item in _all_items:
+        if item.category == DRItemCategory.TRAP:
+            weights[item.name] = max(0, int(given.get(item.name, 1)))
+    legacy = getattr(options, "enabled_traps", None)
+    if legacy is not None and set(legacy.value) != set(legacy.default):
+        keep = set(legacy.value)
+        for name in weights:
+            if name not in keep:
+                weights[name] = 0
+    return weights
+
+
+def allocate_traps(random, traps, weights, count):
+    """Pick `count` traps in proportion to their weights. Each trap gets its
+    whole share first and the leftover slots go to the largest fractions, so
+    the mix follows the weights closely and a weight of 0 never appears."""
+    traps = [t for t in traps if weights.get(t.name, 0) > 0]
+    total = sum(weights[t.name] for t in traps)
+    if count <= 0 or total <= 0:
+        return []
+    picked = []
+    fractions = []
+    for t in traps:
+        share = count * weights[t.name] / total
+        whole = int(share)
+        picked.extend([t] * whole)
+        fractions.append((share - whole, random.random(), t))
+    fractions.sort(key=lambda f: (f[0], f[1]), reverse=True)
+    for _, _, t in fractions[:count - len(picked)]:
+        picked.append(t)
+    random.shuffle(picked)
+    return picked
+
+
+def BuildItemPool(random, count, options, excluded_scoop_names=(),
+                  door_locks_active=False, start_key_names=()):
     """Build the item pool for this world.
 
     excluded_scoop_names: iterable of scoop item names to omit from the pool
@@ -607,6 +713,9 @@ def BuildItemPool(multiworld, count, options, excluded_scoop_names=(),
 
     door_locks_active: keep the area keys in the pool under door
     randomization instead of dropping them as precollected.
+
+    start_key_names: keys Start With Every Door Key has precollected, left
+    out so filler takes their slots.
     """
     item_pool = []
     included_itemcount = 0
@@ -682,6 +791,46 @@ def BuildItemPool(multiworld, count, options, excluded_scoop_names=(),
         remaining_count = remaining_count - 1
         included_itemcount = included_itemcount + 1
 
+    # Both camera books gate "Get 10000 PP in one photo", so each has to exist.
+    for _book in ("Book [Camera 1]", "Book [Camera 2]"):
+        if _book not in (options.guaranteed_items.value or {}):
+            item_pool.append(item_dictionary[_book])
+            remaining_count = remaining_count - 1
+            included_itemcount = included_itemcount + 1
+
+    # ItemSanity + Restricted: a pickup check needs its item sent first, so
+    # every item type that has a check goes in the pool, once. Names already
+    # added above (specialty items, guaranteed items) are not doubled.
+    _drop_overpowered = bool(getattr(getattr(options, "exclude_overpowered_items", None), "value", 0))
+    _item_sanity_restricted = (
+        bool(getattr(getattr(options, "item_sanity", None), "value", 0))
+        and bool(options.restricted_item_mode.value))
+    if _item_sanity_restricted:
+        _have = {it.name for it in item_pool}
+        for item_name in sorted(item_sanity_item_names):
+            if item_name in _have or item_name not in item_dictionary:
+                continue
+            if _drop_overpowered and item_name in item_sanity_overpowered:
+                continue
+            item_pool.append(item_dictionary[item_name])
+            _have.add(item_name)
+            remaining_count = remaining_count - 1
+            included_itemcount = included_itemcount + 1
+
+    # ItemSanity without Restricted: the pickups that need an AP item (Laser
+    # Sword, Real Mega Buster, Queen) still have to find it in the pool.
+    if (bool(getattr(getattr(options, "item_sanity", None), "value", 0))
+            and not _item_sanity_restricted):
+        _have = {it.name for it in item_pool}
+        for item_name in sorted(item_sanity_required_items):
+            if item_name in _have or item_name not in item_dictionary:
+                continue
+            if _drop_overpowered and item_name in item_sanity_overpowered:
+                continue
+            item_pool.append(item_dictionary[item_name])
+            remaining_count = remaining_count - 1
+            included_itemcount = included_itemcount + 1
+
     itemList = [item for item in _all_items]
     lockList = [item for item in _all_items if item.category == DRItemCategory.LOCK]
     scoopList = [item for item in _all_items if item.category == DRItemCategory.SCOOP]
@@ -704,13 +853,13 @@ def BuildItemPool(multiworld, count, options, excluded_scoop_names=(),
     if not options.scoop_sanity:
         trapList = [item for item in trapList
                     if item.name != "Convicts Respawn Trap"]
-    # Player's own list. An empty set means no traps at all, which is the same
-    # as a trap percentage of zero -- honoured rather than treated as "unset",
-    # because emptying the list is a deliberate thing to do.
-    _enabled_traps = getattr(options, "enabled_traps", None)
-    if _enabled_traps is not None:
-        _keep = set(_enabled_traps.value)
-        trapList = [item for item in trapList if item.name in _keep]
+    # Night Mode already makes it night all run, so the trap has nothing to add.
+    if (bool(getattr(getattr(options, "night_mode_enabled", None), "value", 0))
+            or bool(getattr(getattr(options, "hardcore_zombies_enabled", None), "value", 0))):
+        trapList = [item for item in trapList if item.name != "Night Trap"]
+    # Weight 0 keeps a trap out of the pool altogether.
+    _trap_weights = trap_weights(options)
+    trapList = [item for item in trapList if _trap_weights.get(item.name, 0) > 0]
     nonTrapFiller = [item for item in itemList if item.category in (
         DRItemCategory.MISC, DRItemCategory.WEAPON, DRItemCategory.CONSUMABLE,
         DRItemCategory.BUFF
@@ -723,6 +872,18 @@ def BuildItemPool(multiworld, count, options, excluded_scoop_names=(),
         nonTrapFiller = [it for it in nonTrapFiller
                          if it.category != DRItemCategory.WEAPON
                          or it.name in spitter_kept_weapons]
+
+    # ItemSanity: nothing is spawned, so weapons and food would be dead
+    # items. Books and buffs act straight away and stay, once each; every
+    # other filler slot gets KillSanity's filler instead (see below).
+    item_sanity = bool(getattr(getattr(options, "item_sanity", None), "value", 0))
+    if item_sanity:
+        # With Restricted every book is already in the pool above, so only
+        # the buffs are left to add.
+        nonTrapFiller = [it for it in nonTrapFiller
+                         if it.category == DRItemCategory.BUFF
+                         or (it.name.startswith("Book [")
+                             and not _item_sanity_restricted)]
 
     # Strip overpowered filler entries when the option is on. Guaranteed
     # Items (added unconditionally above) and Restricted-mode specialty items
@@ -737,7 +898,7 @@ def BuildItemPool(multiworld, count, options, excluded_scoop_names=(),
 
     fillerList = nonTrapFiller + trapList
 
-    # Everything Overtime Progression Gating puts behind the multiworld. Their
+    # Everything Extra Overtime Keys puts behind the multiworld. Their
     # locations are Ending-S only, so the items have to be too, or the pool
     # outgrows the locations -- and with the gating off nothing enforces them,
     # so they would be items with nothing to open.
@@ -760,6 +921,8 @@ def BuildItemPool(multiworld, count, options, excluded_scoop_names=(),
     }
     car_keys_on = bool(getattr(options, "car_keys",
                                type("X", (), {"value": False})()).value)
+    camera_item_on = bool(getattr(options, "camera_item",
+                                  type("X", (), {"value": False})()).value)
 
     for lock in lockList:
         if lock.name in suppressant_names:
@@ -767,6 +930,10 @@ def BuildItemPool(multiworld, count, options, excluded_scoop_names=(),
         if lock.name in overtime_item_names                 and (options.goal.value != 0 or not overtime_gating_on):
             continue
         if lock.name in car_key_names and not car_keys_on:
+            continue
+        if lock.name == "Camera" and not camera_item_on:
+            continue
+        if lock.name in start_key_names:
             continue
         # Area keys are precollected under door randomization, and replaced by
         # the per-door keys under Split Keys
@@ -791,9 +958,13 @@ def BuildItemPool(multiworld, count, options, excluded_scoop_names=(),
 
     if options.scoop_sanity:
         excluded = set(excluded_scoop_names)
+        kent_progressive = kent_is_progressive(options)
         for scoop in scoopList:
-            # Kent's days go in below as Progressive Kent Scoop copies.
-            if scoop.name in KENT_DAYS or scoop.name == PROGRESSIVE_KENT:
+            # Kent's days are added below, as three Progressive Kent Scoop
+            # copies or as their own items, per the Kent Scoop Order option.
+            if scoop.name == PROGRESSIVE_KENT:
+                continue
+            if scoop.name in KENT_DAYS and kent_progressive:
                 continue
             # Skip "Out of Control" if door randomizer is also enabled (it's precollected for softlock prevention)
             if options.door_randomizer and scoop.name == "Out of Control":
@@ -806,19 +977,21 @@ def BuildItemPool(multiworld, count, options, excluded_scoop_names=(),
             item_pool.append(item)
             remaining_count = remaining_count - 1
             included_itemcount = included_itemcount + 1
-        for day in KENT_DAYS:
-            if day in excluded:
-                continue
-            item_pool.append(item_dictionary[PROGRESSIVE_KENT])
-            remaining_count = remaining_count - 1
-            included_itemcount = included_itemcount + 1
+        if kent_progressive:
+            for day in KENT_DAYS:
+                if day in excluded:
+                    continue
+                item_pool.append(item_dictionary[PROGRESSIVE_KENT])
+                remaining_count = remaining_count - 1
+                included_itemcount = included_itemcount + 1
 
 
     # Useful items: skills + stat upgrades. Quantity per stat depends on
     # whether extras are enabled. Modes:
     #   * vanilla_only    — neither skills nor stat upgrades added
     #   * replace         — full core pool (extras add more if enabled)
-    #   * extra_buffs_only — only the extra/over-vanilla pool added
+    #   * extra_buffs_only — only the extra/over-vanilla pool added, and only
+    #                        when enable_extra_stat_buffs is on
     progression_mode = getattr(options, "vanilla_progression",
                                type("X", (), {"value": 1})()).value
     # Match Options.py Choice: 0=vanilla_only, 1=replace, 2=extra_buffs_only
@@ -852,7 +1025,10 @@ def BuildItemPool(multiworld, count, options, excluded_scoop_names=(),
             if progression_mode == 1:   # replace
                 count_to_add = base + (extra if extras_enabled else 0)
             elif progression_mode == 2:   # extra_buffs_only
-                count_to_add = extra
+                # Only the over-vanilla extras, and only when they are
+                # switched on: with Enable Extra Stat Buffs off this pool is
+                # empty and the engine's level-ups are all Frank gets.
+                count_to_add = extra if extras_enabled else 0
             for _ in range(count_to_add):
                 item_pool.append(upg)
                 remaining_count -= 1
@@ -870,10 +1046,9 @@ def BuildItemPool(multiworld, count, options, excluded_scoop_names=(),
     # seeing certain trap types (Hostile NPC Trap in particular).
     #
     # The two-bucket approach below makes trap_percentage mean what the
-    # docstring says it means. Trap slots are filled by cycling through a
-    # shuffled trapList, so every trap type appears at least once before
-    # any repeats -- this guarantees Hostile NPC Trap and the others all
-    # show up in the pool whenever the trap-slot count is >= len(trapList).
+    # docstring says it means. Trap slots are shared out by trap weight, so
+    # with equal weights every trap type shows up whenever the trap-slot
+    # count is >= len(trapList).
     trap_pct = int(getattr(options, "trap_percentage",
                             type("X", (), {"value": 25})()).value)
     remaining_count = max(0, remaining_count)
@@ -883,29 +1058,33 @@ def BuildItemPool(multiworld, count, options, excluded_scoop_names=(),
     )
     non_trap_slot_count = remaining_count - trap_slot_count
 
-    # Trap slots: round-robin through a shuffled trapList so each trap type
-    # gets equal representation (with a fresh shuffle on every full cycle).
+    # Trap slots: split between the traps in proportion to their weights.
     if trap_slot_count > 0 and trapList:
-        trap_cycle = []
-        for _ in range(trap_slot_count):
-            if not trap_cycle:
-                trap_cycle = list(trapList)
-                multiworld.random.shuffle(trap_cycle)
-            item_pool.append(trap_cycle.pop())
+        item_pool.extend(allocate_traps(random, trapList, _trap_weights,
+                                        trap_slot_count))
 
     # Non-trap filler slots: shuffle once, walk in order, reshuffle on
     # wrap-around. This keeps the existing "unique-first, then duplicates"
     # property of the original algorithm.
-    if non_trap_slot_count > 0 and nonTrapFiller:
+    if item_sanity and non_trap_slot_count > 0:
         shuffled_filler = list(nonTrapFiller)
-        multiworld.random.shuffle(shuffled_filler)
+        random.shuffle(shuffled_filler)
+        once = shuffled_filler[:non_trap_slot_count]
+        item_pool.extend(once)
+        kill_filler = [item for item in _all_items
+                       if item.category == DRItemCategory.KILL_FILLER]
+        for i in range(non_trap_slot_count - len(once)):
+            item_pool.append(kill_filler[i % len(kill_filler)])
+    elif non_trap_slot_count > 0 and nonTrapFiller:
+        shuffled_filler = list(nonTrapFiller)
+        random.shuffle(shuffled_filler)
         filler_index = 0
         for _ in range(non_trap_slot_count):
             if filler_index >= len(shuffled_filler):
-                multiworld.random.shuffle(shuffled_filler)
+                random.shuffle(shuffled_filler)
                 filler_index = 0
             item_pool.append(shuffled_filler[filler_index])
             filler_index += 1
 
-    multiworld.random.shuffle(item_pool)
+    random.shuffle(item_pool)
     return item_pool

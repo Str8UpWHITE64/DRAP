@@ -44,17 +44,20 @@ local BALD_HAT       = 0
 local BAREFOOT       = 0
 local HEART_BOXERS   = 35
 
-local function notify(text)
+local function notify(name, detail)
     local Notify = package.loaded["DRAP/Notify"]
-    if Notify and Notify.send then
-        pcall(Notify.send, text, { duration = 5.0 })
+    if not Notify then return end
+    if detail and Notify.trap_fired then
+        pcall(Notify.trap_fired, name, detail, { duration = 5.0 })
+    elseif Notify.send then
+        pcall(Notify.send, name, { duration = 5.0 })
     end
 end
 
 local function dress_bald()
     if not CostumeRandomizer.set_part(PART_HAT, BALD_HAT) then return false end
     M.log("bald trap applied")
-    notify("Your hair is gone.")
+    notify("Bald Trap", "Celeste Players understand your pain")
     return true
 end
 
@@ -63,7 +66,7 @@ local function dress_donut()
     if not CostumeRandomizer.set_part(PART_BODY, HEART_BOXERS) then return false end
     CostumeRandomizer.set_part(PART_FOOT, BAREFOOT)
     M.log("donut trap applied -- heart boxers, barefoot")
-    notify("Goddamnit, Donut!")
+    notify("Goddamnit, Donut! Trap", "Mongo is appalled!")
     return true
 end
 
@@ -72,7 +75,7 @@ end
 local function dress_boxers()
     if not CostumeRandomizer.set_naked() then return false end
     M.log("boxers trap applied")
-    notify("You have been stripped to your boxers.")
+    notify("Boxers Trap", "Right down to your skivvies")
     return true
 end
 

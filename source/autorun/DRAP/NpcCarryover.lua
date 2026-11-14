@@ -38,6 +38,7 @@ local is_carry_over_method = nil
 -- just changes where they land. A warp is not a pair the engine accepts --
 -- isCarryOverNpc answers 0 for it -- so nothing carries them at all.
 local warp_carry_until = 0
+local warp_strand_until = 0     -- the reverse: answered FALSE (Teleport Trap)
 local WARP_CARRY_SECONDS = 3.0
 local npc_manager_td = nil
 
@@ -327,6 +328,9 @@ local function install_hooks()
                 if os.clock() <= warp_carry_until then
                     return sdk.to_ptr(1)
                 end
+                if os.clock() <= warp_strand_until then
+                    return sdk.to_ptr(0)
+                end
                 return retval
             end)
         end)
@@ -543,7 +547,43 @@ end)
 --- Call immediately before a warp; it lapses on its own.
 function M.begin_warp_carry()
     install_hooks()
+    warp_strand_until = 0
     warp_carry_until = os.clock() + WARP_CARRY_SECONDS
+end
+
+--- The opposite window, for the Teleport Trap: the engine is told no one
+--- carries, so followers stay in the area they were in. That is what a warp
+--- to an area pair the engine does not accept already does (measured, see
+--- warp_carry_until); this makes the Rooftop and Entrance Plaza, which do
+--- have a real door to the Security Room, behave the same.
+function M.begin_warp_strand()
+    install_hooks()
+    warp_carry_until = 0
+    warp_strand_until = os.clock() + WARP_CARRY_SECONDS
+end
+
+--- True while a loaded survivor's record is ESCORT (Brad). A warp must not
+--- take a scripted escort out of the area his scene is running in.
+--- @return boolean
+function M.escort_loaded()
+    local mgr = npc_mgr:get()
+    if not mgr then return false end
+    local list = Shared.safe(function() return mgr:get_field("NpcInfoList") end)
+    if not list then return false end
+    local count = Shared.get_collection_count(list) or 0
+    for i = 0, count - 1 do
+        local info = Shared.get_collection_item(list, i)
+        if info then
+            local state = Shared.safe(function() return Shared.to_int(info:get_field("mLiveState")) end)
+            if state == 8 and not record_is_dead(info) then
+                local stype = Shared.safe(function()
+                    return Shared.to_int(info:get_field("<Name>k__BackingField")) end)
+                local npc = stype and Shared.safe(function() return mgr:call("searchNpc", stype) end)
+                if npc ~= nil then return true end
+            end
+        end
+    end
+    return false
 end
 
 function M.carry_party_to(area, pos)

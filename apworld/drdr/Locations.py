@@ -4,6 +4,12 @@ from typing import Optional, NamedTuple, Dict, List
 from BaseClasses import Location, Region
 from .Items import DRItem
 from .shared_data import ZOMBIE_KILL_TIERS as SHARED_ZOMBIE_KILL_TIERS
+from .shared_data import ITEM_SANITY
+
+
+KILL_SANITY_BASE_ID = 1251000
+# After the last KillSanity id (1304593). Frozen like the KillSanity base.
+ITEM_SANITY_BASE_ID = 1310000
 
 
 class DRLocationCategory(IntEnum):
@@ -33,6 +39,15 @@ class DRLocationCategory(IntEnum):
     # far past the 1000-per-table slot, so it takes the ID range after
     # every other table.
     KILL_SANITY = 14
+    # Otis's first call in an area. One flag per call, read as a level.
+    OTIS_CALL = 15
+    # Custom PP stickers: DRAP's own stickers, placed from a survey of the mall
+    # (drdr_shared.json custom_stickers). Only with the Extra PP Stickers
+    # option.
+    CUSTOM_STICKER = 16
+    # ItemSanity: the first pickup of each item type (drdr_shared.json
+    # item_sanity). Only with the ItemSanity option.
+    ITEM_SANITY = 17
 
 
 class DRLocationData(NamedTuple):
@@ -100,9 +115,15 @@ class DRLocation(Location):
 
         # KillSanity is 53,594 entries in one table, so it sits after the
         # last ordinary slot and nothing may ever be appended behind it.
+        # The base is frozen (it equals base_id + 21 * table_offset today):
+        # deriving it from len(table_order) renumbered every kill id, in seeds
+        # already generated, whenever a region was added.
         output.update({location_data.name: id for id, location_data in
                        enumerate(location_tables["Kill Sanity"],
-                                 base_id + (table_offset * len(table_order)))})
+                                 KILL_SANITY_BASE_ID)})
+        output.update({location_data.name: id for id, location_data in
+                       enumerate(location_tables["Item Sanity"],
+                                 ITEM_SANITY_BASE_ID)})
 
         return output
 
@@ -121,6 +142,12 @@ location_tables = {
         DRLocationData("Ending A: Solve all of the cases and be on the helipad at 12pm", "Milk", DRLocationCategory.MAIN_SCOOP),
         # DRLocationData("Ending B: Don't solve all of the cases but be on the helipad at 12pm", "Milk", DRLocationCategory.MAIN_SCOOP),
         # DRLocationData("Ending C: Solve all of the cases but don't meet Isabela at 10am", "Milk", DRLocationCategory.MAIN_SCOOP),
+        # Appended: Extra PP Stickers (option extra_pp_stickers).
+        DRLocationData("Photograph Extra PP Sticker - Helipad - Behind Carlito", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Helipad - Windsock", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Helipad - Big H", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Helipad - That's Where I Left My Barrel of Sticks", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Helipad - One Man's Trash Is Another Man's Trash", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
 
     ],
 
@@ -162,10 +189,17 @@ location_tables = {
         # Overtime First Aid Kit cannot be confused with the story one,
         # which is also in Seon's.
         DRLocationData("Find the Coffee Filters", "Milk", DRLocationCategory.OVERTIME_SCOOP),
-        DRLocationData("Obtain Mall Map and Transceiver", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Obtain Mall Map and Transceiver", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Use All Microwaves", "Milk", DRLocationCategory.PP_BONUS),
         DRLocationData("Heat a pan on all stoves", "Milk", DRLocationCategory.PP_BONUS),
         DRLocationData("Psycho: Kill enough survivors to escape", "Victory", DRLocationCategory.EVENT),
+        # Appended: Extra PP Stickers (option extra_pp_stickers).
+        DRLocationData("Photograph Extra PP Sticker - Security Room - Blue Screen", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Security Room - Barnaby Closet", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Security Room - Vent", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Security Room - Nice Doodles, Brad", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Security Room - Lockers", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Security Room - Helipad Door", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
     ],
 
     "Rooftop": [
@@ -178,6 +212,10 @@ location_tables = {
 
         DRLocationData("Kill Jeff Meyer", "Milk", DRLocationCategory.KILL_SURVIVOR),
         DRLocationData("Kill Natalie Meyer", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        # Appended: Extra PP Stickers (option extra_pp_stickers).
+        DRLocationData("Photograph Extra PP Sticker - Rooftop - Elevator Button", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Rooftop - Side Entrance", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Rooftop - Vent Filter", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
     ],
 
     "Warehouse": [
@@ -186,6 +224,11 @@ location_tables = {
         DRLocationData("Meet Jessie in the Warehouse", "Milk", DRLocationCategory.MAIN_SCOOP),
         DRLocationData("Witness Special Forces 10pm day 3", "Milk", DRLocationCategory.MAIN_SCOOP),
 
+        # Appended: the first radio call Otis makes on entering the area.
+        DRLocationData("Answer Otis's Call in Warehouse", "Milk", DRLocationCategory.OTIS_CALL),
+        # Appended: Extra PP Stickers (option extra_pp_stickers).
+        DRLocationData("Photograph Extra PP Sticker - Warehouse - Upper Entrance", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Warehouse - Elevator Button", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
     ],
 
 
@@ -241,6 +284,16 @@ location_tables = {
         DRLocationData("Kill Jennifer Gorman", "Milk", DRLocationCategory.KILL_SURVIVOR),
         DRLocationData("Kill Tad Hawthorne", "Milk", DRLocationCategory.KILL_SURVIVOR),
         DRLocationData("Kill Simone Ravendark", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        # Appended: Extra PP Stickers (option extra_pp_stickers).
+        DRLocationData("Photograph Extra PP Sticker - Paradise Plaza - Boat Wheel", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Paradise Plaza - Jellyfish", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Paradise Plaza - Welcome Aboard Life Preserver", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Paradise Plaza - Balloon Smiley Face", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Paradise Plaza - Clocktower Painting", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Paradise Plaza - Whale's Blowhole", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Paradise Plaza - Those Aren't Real Constellations", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Paradise Plaza - Lady About Town", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Paradise Plaza - Who Brings an SMG to the Mall?", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
     ],
 
     "Entrance Plaza": [
@@ -285,6 +338,20 @@ location_tables = {
         DRLocationData("Kill Jolie Wu", "Milk", DRLocationCategory.KILL_SURVIVOR),
         DRLocationData("Kill Rachel Decker", "Milk", DRLocationCategory.KILL_SURVIVOR),
         DRLocationData("Kill Floyd Sanders", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        # Appended: Extra PP Stickers (option extra_pp_stickers).
+        DRLocationData("Photograph Extra PP Sticker - Entrance Plaza - Macaroon Sign", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Entrance Plaza - Everyone Luvs Books", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Entrance Plaza - Everyone Luvs Books German Poster", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Entrance Plaza - Lower Balloon Smiley Face", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Entrance Plaza - Someone Check That Guy's Camera", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Entrance Plaza - Basketball", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Entrance Plaza - Tennis Ball", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Entrance Plaza - Golf Ball", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Entrance Plaza - Fashion Fiesta", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Entrance Plaza - Mannequin Butt", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Entrance Plaza - Gold Sphere", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Entrance Plaza - Gryffindor Shield", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Entrance Plaza - Bikezip", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
     ],
 
     "Al Fresca Plaza": [
@@ -325,6 +392,12 @@ location_tables = {
         DRLocationData("Kill Burt Thompson", "Milk", DRLocationCategory.KILL_SURVIVOR),
         DRLocationData("Kill Leah Stein", "Milk", DRLocationCategory.KILL_SURVIVOR),
         DRLocationData("Kill Gordon Stalworth", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        # Appended: Extra PP Stickers (option extra_pp_stickers).
+        DRLocationData("Photograph Extra PP Sticker - Al Fresca Plaza - McHandy's Hardware", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Al Fresca Plaza - Riverfield Jewelry Necklace", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Al Fresca Plaza - What You Lookin' Up There For?", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Al Fresca Plaza - Feeling Hungry Billboard", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Al Fresca Plaza - Toys Gone Mad! Sign", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
     ],
 
     "Leisure Park": [
@@ -351,6 +424,11 @@ location_tables = {
         # ids come from list position.
         DRLocationData("Kill the convicts", "Milk", DRLocationCategory.PSYCHO_SCOOP),
         DRLocationData("Kill Sophie Richard", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        # Appended: Extra PP Stickers (option extra_pp_stickers).
+        DRLocationData("Photograph Extra PP Sticker - Leisure Park - Atomic Billboard", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Leisure Park - Food Court Mascot", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Leisure Park - Parking Sign", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Leisure Park - Ye Olde Toybox Billboard", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
     ],
 
     "Wonderland Plaza": [
@@ -421,6 +499,21 @@ location_tables = {
         DRLocationData("Kill Paul Carson", "Milk", DRLocationCategory.KILL_SURVIVOR),
         DRLocationData("Kill Leroy McKenna", "Milk", DRLocationCategory.KILL_SURVIVOR),
         DRLocationData("Kill Susan Walsh", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        # Appended: the first radio call Otis makes on entering the area.
+        DRLocationData("Answer Otis's Call in Wonderland Plaza", "Milk", DRLocationCategory.OTIS_CALL),
+        # Appended: Extra PP Stickers (option extra_pp_stickers).
+        DRLocationData("Photograph Extra PP Sticker - Wonderland Plaza - Toys Gone Mad! Sign", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Wonderland Plaza - Balloon Smiley Face", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Wonderland Plaza - Shoes of a Lifetime", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Wonderland Plaza - These Have Magic Healing Powers", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Wonderland Plaza - Lipstick", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Wonderland Plaza - Fanfare Fashion Dressing Room", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Wonderland Plaza - Greg's Secret Passage", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Wonderland Plaza - Sunglasses in the Urinal", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Wonderland Plaza - Bunny Tail", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Wonderland Plaza - Gryffindor Shield", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Wonderland Plaza - I Wouldn't Touch That If I Were You", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Wonderland Plaza - He Asked You Not to Take a Picture of Him", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
     ],
 
     "North Plaza": [
@@ -463,6 +556,18 @@ location_tables = {
         DRLocationData("Kill Brett Styles", "Milk", DRLocationCategory.KILL_SURVIVOR),
         DRLocationData("Kill Jonathan Picardson", "Milk", DRLocationCategory.KILL_SURVIVOR),
         DRLocationData("Kill Alyssa Laurent", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        # Appended: the first radio call Otis makes on entering the area.
+        DRLocationData("Answer Otis's Call in North Plaza", "Milk", DRLocationCategory.OTIS_CALL),
+        # Appended: Extra PP Stickers (option extra_pp_stickers).
+        DRLocationData("Photograph Extra PP Sticker - North Plaza - DVD/Video Sign", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - North Plaza - Bet Greg Has a Secret Passage Here Too", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - North Plaza - Under Construction Sign", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - North Plaza - Look at the Pretty Flowers in Leisure Park", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - North Plaza - Boxes to Carlito's Hideout", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - North Plaza - Is That Banjo?", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - North Plaza - Isn't That Where Isabela Almost Got Eaten?", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - North Plaza - Ew", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - North Plaza - Bet You Didn't Know You Could Enter From This Side", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
     ],
     "Seon's Food and Stuff": [
         # Events in Seon's Food and Stuff
@@ -479,7 +584,7 @@ location_tables = {
         # Overtime First Aid Kit cannot be confused with the story one,
         # which is also in Seon's.
         DRLocationData("Find the First Aid Kit", "Milk", DRLocationCategory.OVERTIME_SCOOP),
-        DRLocationData("Obtain First Aid Kit", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Obtain First Aid Kit", "Milk", DRLocationCategory.CHALLENGE),
     ],
     "Food Court": [
         # Events in Food Court
@@ -533,6 +638,12 @@ location_tables = {
         DRLocationData("Heat a pan on the Stove in Chris's Fine Foods", "Milk", DRLocationCategory.PP_BONUS),
         DRLocationData("Heat a pan on the Stove in That's a Spicy Meatball!", "Milk", DRLocationCategory.PP_BONUS),
         DRLocationData("Kill Gil Jiminez", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        # Appended: Extra PP Stickers (option extra_pp_stickers).
+        DRLocationData("Photograph Extra PP Sticker - Food Court - That's a Spicy Meatball", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Food Court - Meaty's Habanero Burger Sign", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Food Court - Chris's Giant Steak", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Food Court - Bull", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Food Court - El No A You Smoko", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
     ],
     "Crislip's Home Saloon": [
         # Events in Crislip's Home Saloon
@@ -542,6 +653,10 @@ location_tables = {
         # PP Stickers in Crislip's Home Saloon
         DRLocationData("Photograph PP Sticker 74", "Orange Juice", DRLocationCategory.PP_STICKER),
         DRLocationData("Photograph PP Sticker 75", "Uncooked Pizza", DRLocationCategory.PP_STICKER),
+        # Appended: Extra PP Stickers (option extra_pp_stickers).
+        DRLocationData("Photograph Extra PP Sticker - Crislip's Home Saloon - Cliff's Secret Passage", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Crislip's Home Saloon - Pot", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Crislip's Home Saloon - Map", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
     ],
 
     "Colby's Movieland": [
@@ -572,6 +687,16 @@ location_tables = {
         DRLocationData("Kill Nathan Crabbe", "Milk", DRLocationCategory.KILL_SURVIVOR),
         DRLocationData("Kill Ray Mathison", "Milk", DRLocationCategory.KILL_SURVIVOR),
         DRLocationData("Kill Cheryl Jones", "Milk", DRLocationCategory.KILL_SURVIVOR),
+        # Appended: Extra PP Stickers (option extra_pp_stickers).
+        DRLocationData("Photograph Extra PP Sticker - Colby's Movieland - Fox Poster", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Colby's Movieland - You Wouldn't Download a Car", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Colby's Movieland - Best Seat in the House", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Colby's Movieland - Where'd All the Seats Go?", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Colby's Movieland - Number 3 My Lord", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Colby's Movieland - Fire Exit Sign", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Colby's Movieland - Toilet Sign", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Colby's Movieland - How Old Do You Think That Popcorn Is?", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Colby's Movieland - Bet It's Out of Order", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
     ],
 
     "Maintenance Tunnel": [
@@ -594,7 +719,18 @@ location_tables = {
         DRLocationData("Bomb Collector - Al Fresca Plaza Truck", "Yogurt", DRLocationCategory.MAIN_SCOOP),
         DRLocationData("Bomb Collector - Wonderland Plaza Truck", "Apple", DRLocationCategory.MAIN_SCOOP),
         DRLocationData("Bomb Collector - Seon's Food and Stuff Truck", "Orange Juice", DRLocationCategory.MAIN_SCOOP),
-        DRLocationData("Obtain Maintenance Tunnel Key", "Milk", DRLocationCategory.PP_BONUS),
+        DRLocationData("Obtain Maintenance Tunnel Key", "Milk", DRLocationCategory.CHALLENGE),
+        # Appended: the first radio call Otis makes on entering the area.
+        DRLocationData("Answer Otis's Call in Maintenance Tunnel", "Milk", DRLocationCategory.OTIS_CALL),
+        # Appended: Extra PP Stickers (option extra_pp_stickers).
+        DRLocationData("Photograph Extra PP Sticker - Maintenance Tunnel - Seon's Food & Stuff Sign", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Maintenance Tunnel - Wonderland Plaza Sign", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Maintenance Tunnel - Food Court Sign", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Maintenance Tunnel - Al Fresca Plaza Sign", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Maintenance Tunnel - Entrance Plaza Sign", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Maintenance Tunnel - Paradise Plaza Sign", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Maintenance Tunnel - North Plaza Sign", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Maintenance Tunnel - Maintenance Tunnel Key", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
     ],
 
     # Off the Maintenance Tunnel and nothing else, so its key gates all four.
@@ -606,6 +742,10 @@ location_tables = {
         # PP Stickers in the Meat Processing Area
         DRLocationData("Photograph PP Sticker 95", "Uncooked Pizza", DRLocationCategory.PP_STICKER),
         DRLocationData("Photograph PP Sticker 96", "Milk", DRLocationCategory.PP_STICKER),
+        # Appended: Extra PP Stickers (option extra_pp_stickers).
+        DRLocationData("Photograph Extra PP Sticker - Meat Processing Area - Cuts of Beef Sign", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Meat Processing Area - Beef Round", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Meat Processing Area - Beef Chuck", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
     ],
 
     "Carlito's Hideout":[
@@ -635,6 +775,11 @@ location_tables = {
         DRLocationData("Give Isabela 2 Queens", "Milk", DRLocationCategory.OVERTIME_SCOOP),
         DRLocationData("Give Isabela 3 Queens", "Milk", DRLocationCategory.OVERTIME_SCOOP),
         DRLocationData("Give Isabela 4 Queens", "Milk", DRLocationCategory.OVERTIME_SCOOP),
+        # Appended: Extra PP Stickers (option extra_pp_stickers).
+        DRLocationData("Photograph Extra PP Sticker - Carlito's Hideout - Do Kids Even Know What These Are?", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Carlito's Hideout - And This Is Where I'd Put My Suppressants, If I Had Any!", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Carlito's Hideout - Exit", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
+        DRLocationData("Photograph Extra PP Sticker - Carlito's Hideout - There's a Second Exit?", "Orange Juice", DRLocationCategory.CUSTOM_STICKER),
     ],
 
     "Clock Tower Tunnel": [
@@ -717,13 +862,13 @@ location_tables = {
         DRLocationData("Change into 46 new outfits", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Encounter 10 survivors", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Encounter 50 survivors", "Milk", DRLocationCategory.CHALLENGE),
-        DRLocationData("Get 50 survivors to join", "Milk", DRLocationCategory.CHALLENGE),
+        DRLocationData("Get 48 survivors to join", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Kill 1000 zombies", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Kill 2000 zombies", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Kill 5000 zombies", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Kill 10000 zombies", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Kill 10 Special Forces", "Milk", DRLocationCategory.SPECIAL_FORCES_SCOOP),
-        DRLocationData("Destroy all of the wall plates in the Food Court", "Milk", DRLocationCategory.CHALLENGE),
+        DRLocationData("Destroy all of the wall plates in the Food Court", "Milk", DRLocationCategory.PP_BONUS),
         DRLocationData("Fire 30 bullets", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Fire 300 bullets", "Milk", DRLocationCategory.CHALLENGE),
         DRLocationData("Ride zombies for 50 feet", "Milk", DRLocationCategory.CHALLENGE),
@@ -974,6 +1119,28 @@ for _loc in location_tables["Kill Sanity"]:
     _area = _loc.name.split(" in ", 1)[1]
     kill_sanity_location_groups.setdefault(kill_sanity_group_name(_area), set()).add(_loc.name)
     kill_sanity_location_groups[KILL_SANITY_GROUP_ALL].add(_loc.name)
+
+# ItemSanity: one location per item type, in drdr_shared.json order so the
+# ids stay put. Like the kills it sits in a neutral region; Rules.py asks for
+# any of the areas that place the item.
+location_tables["Item Sanity"] = [
+    DRLocationData(_entry["location_name"], "Milk", DRLocationCategory.ITEM_SANITY)
+    for _entry in ITEM_SANITY
+]
+ITEM_SANITY_REGIONS: Dict[str, List[str]] = {
+    _entry["location_name"]: list(_entry["regions"]) for _entry in ITEM_SANITY
+}
+# Pickups that also wait on something besides an area: another location
+# reached first (a cooked dish needs its raw food, a mannequin part its
+# mannequin, a drop its carrier) and AP items the player holds.
+ITEM_SANITY_REQUIRES_LOCATIONS: Dict[str, List[str]] = {
+    _entry["location_name"]: list(_entry["requires_locations"])
+    for _entry in ITEM_SANITY if _entry.get("requires_locations")
+}
+ITEM_SANITY_REQUIRES_ITEMS: Dict[str, List[str]] = {
+    _entry["location_name"]: list(_entry["requires_items"])
+    for _entry in ITEM_SANITY if _entry.get("requires_items")
+}
 
 # The area each kill location counts for. The region above is a neutral one,
 # so the name is the only place the area survives -- Rules.py needs it back.

@@ -89,6 +89,19 @@ function M.area_graph()
     return (data and data.area_graph) or {}
 end
 
+-- Scene code -> readable name and engine area index (Shared.SCENE_INFO is
+-- built from this same section).
+function M.scenes()
+    ensure_loaded()
+    return (data and data.scenes) or {}
+end
+
+-- RIDE_CAR_TYPE enum name -> the vehicle's readable name.
+function M.vehicles()
+    ensure_loaded()
+    return (data and data.vehicles) or {}
+end
+
 function M.time_keys()
     ensure_loaded()
     return (data and data.time_keys) or {}
@@ -107,6 +120,20 @@ end
 function M.stickers()
     ensure_loaded()
     return (data and data.stickers) or {}
+end
+
+-- Custom PP stickers (DRAP/CustomStickers): { Number, LocationName, Area, Pos = {x,y,z}, Yaw, Pitch, Roll } (radians).
+-- Absent = none.
+function M.custom_stickers()
+    ensure_loaded()
+    return (data and data.custom_stickers) or {}
+end
+
+-- ItemSanity (DRAP/trackers/ItemSanity): { location_name, item_numbers = {...}, regions = {...} }, one per item type.
+-- Absent = none.
+function M.item_sanity()
+    ensure_loaded()
+    return (data and data.item_sanity) or {}
 end
 
 -- Scoop -> list of survivor display names that escape to the Security Room as part
@@ -140,13 +167,6 @@ end
 function M.overtime_items()
     ensure_loaded()
     return (data and data.overtime_items) or {}
-end
-
--- Main-case objective-pin indices (case -> scq_no/pos_tbl), the
--- redirect-FROM set MissionTruth rewrites at getSCQPosData.
-function M.main_case_guides()
-    ensure_loaded()
-    return (data and data.main_case_guides) or {}
 end
 
 -- Bundled survivor spawn positions (stype-string -> {name, x, y, z, area,

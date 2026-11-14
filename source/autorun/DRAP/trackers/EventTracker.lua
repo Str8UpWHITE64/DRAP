@@ -141,6 +141,19 @@ local TRACKED_EVENT_FLAGS = {
     [3462] = 'Camera Part [Brightness]',
     [3463] = 'Camera Part [Focus]',
 
+    -- Otis's first call in each area. The game's radio table names the flag
+    -- each call sets once it has played (mSuccessFlag, rows 1-7); it is in the
+    -- save and never cleared in play, so a call heard offline is picked up on
+    -- connect. The Entrance Plaza, Food Court and Seon's calls (2280, 2281,
+    -- 2284) are left out: they only play with 272 / 277 on, which DRAP does not
+    -- hold. Not 764-767 / 688-690: those are the same calls' "in progress"
+    -- markers and go off again when the area is left. Names must match
+    -- Locations.py.
+    [2279] = "Answer Otis's Call in Warehouse",
+    [2282] = "Answer Otis's Call in North Plaza",
+    [2283] = "Answer Otis's Call in Maintenance Tunnel",
+    [2285] = "Answer Otis's Call in Wonderland Plaza",
+
     -- The suppressant hand-in. This used to be watched as event id 131, which
     -- was never confirmed and is not this mission.
     [135]  = 'Scramble for a Suppressant',
@@ -149,6 +162,11 @@ local TRACKED_EVENT_FLAGS = {
     -- go through evFlagOn. Whatever the drone event uses does not: setting
     -- 316 by hand fires the completion, walking the event never does.
     [316]  = 'Frank sees a sick-ass RC Drone',
+
+    -- EV_CARLITO3_DIE, written by Drivin' Carlito's own death action. His
+    -- death scene (event 38) also needs 296, which is off once The Last
+    -- Resort is over, and DRAP/effects/CarlitoStay brings him back after it.
+    [1284] = 'Beat Drivin Carlito',
 
     -- SET_FLOW680, the one marker the Generator sets whichever way it
     -- was obtained. Its pickup flags only fire when taken off the floor,

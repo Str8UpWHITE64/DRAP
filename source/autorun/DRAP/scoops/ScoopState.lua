@@ -16,6 +16,8 @@
 -- UNLOCK CONDITIONS (one deferral model). Event-class retried on the
 -- named event; poll-class retried each poll_deferred_retries() tick:
 --   activation   - AP not activated yet (event: on activate)
+--   prologue     - the Access Key only: waits for the end of the opening, not
+--                  for Jessie (poll: injected prologue_done)
 --   conflict     - another conflict-group member active (event: on member complete)
 --   main_block   - blocking main scoop active (event: on blocker complete)
 --   prereq       - prerequisite scoops not completed (event: on any completion)
@@ -73,6 +75,9 @@ local cfg = {
     now = function() return 0 end,
     check_flag = function(_) return nil end,   -- true/false/nil(unreadable)
     has_item = function(_) return false end,
+    -- True once the opening is over (the stairs are reached). Only the
+    -- Access Key reads it; every other scoop still waits for Meet Jessie.
+    prologue_done = function() return false end,
     scoop_survivors = {},      -- name -> { survivor stypes the scoop is about }
     -- Observed alive->dead only. Deliberately NOT the census KILLED verdict:
     -- that has a half-initialised branch, and a survivor wrongly called dead
@@ -266,6 +271,20 @@ function M.is_item_deferred(scoop_name)
     return poll_deferred[scoop_name] == "item"
 end
 
+--- The item a received scoop is held back for, or nil.
+---
+--- Only answers for a scoop that tried to unlock and stopped at its item
+--- requirement, so a scoop held for something else first (Meet Jessie, a
+--- running conflict) is not blamed on the item. nil again as soon as the item
+--- is in hand, even before the per-frame retry has unlocked the scoop.
+function M.deferred_item(scoop_name)
+    if poll_deferred[scoop_name] ~= "item" then return nil end
+    if M.received[scoop_name] then return nil end
+    local item = cfg.item_requirements[scoop_name]
+    if item and not cfg.has_item(item) then return item end
+    return nil
+end
+
 function M.get_poll_deferred()
     return poll_deferred
 end
@@ -320,6 +339,31 @@ end
 function M.active_main_scoop()
     for _, name in ipairs(M.scoop_order) do
         if M.received[name] and not M.completed[name] then return name end
+    end
+    return nil
+end
+
+--- The running main scoop whether or not a scoop order is set. active_main_scoop
+--- walks the order, which is empty in a debug session (drap_activate_debug), so
+--- fall back to scanning the scoop data there.
+function M.running_main()
+    local active = M.active_main_scoop()
+    if active or scoop_order_set then return active end
+    for name, data in pairs(cfg.scoop_data) do
+        if data.category == "Main" and M.received[name] and not M.completed[name] then
+            return name
+        end
+    end
+    return nil
+end
+
+--- Why a manual (debug/console) unlock of main `scoop_name` must wait: another
+--- main is running. Same wording as main_scoop_blocker's. nil if it may start.
+function M.manual_main_blocker(scoop_name)
+    if M.received[scoop_name] then return nil end
+    local active = M.running_main()
+    if active and active ~= scoop_name then
+        return string.format("'%s' is still running", active)
     end
     return nil
 end
@@ -428,6 +472,9 @@ function M.activate_main_scoop(scoop_name)
     end
     cfg.log(string.format("Starting '%s' by player choice", scoop_name))
     M.request_unlock(scoop_name)
+    -- Saved now, not at the next completion: a restart before then would
+    -- otherwise forget which mission is running.
+    cfg.on_state_changed()
     return true, nil
 end
 
@@ -539,8 +586,20 @@ function M.request_unlock(scoop_name)
     end
 
     if not ap_activated then
-        cfg.log(string.format("Activation deferred: '%s' -- waiting for Meet Jessie", scoop_name))
-        return false, "activation"
+        -- The Maintenance Tunnel Access Key (flag 2082) is the game's own gate
+        -- on the mall -> tunnel doors. It stays off through the Entrance
+        -- Plaza siege so Frank cannot walk out of it, but not until Jessie:
+        -- with Door Randomizer the way to her can lead through a tunnel door.
+        if scoop.category == "Special" then
+            if not cfg.prologue_done() then
+                poll_deferred[scoop_name] = "prologue"
+                cfg.log(string.format("Activation deferred: '%s' -- waiting for the end of the opening", scoop_name))
+                return false, "prologue"
+            end
+        else
+            cfg.log(string.format("Activation deferred: '%s' -- waiting for Meet Jessie", scoop_name))
+            return false, "activation"
+        end
     end
 
     if scoop.category ~= "Main" then
@@ -619,7 +678,9 @@ function M.poll_deferred_retries()
     for scoop_name, reason in pairs(poll_deferred) do
         if M.ap_received[scoop_name] and not M.received[scoop_name] then
             local ready = false
-            if reason == "flag_prereq" then
+            if reason == "prologue" then
+                ready = cfg.prologue_done()
+            elseif reason == "flag_prereq" then
                 ready = M.has_flag_prerequisites_met(scoop_name)
             elseif reason == "item" then
                 local item = cfg.item_requirements[scoop_name]
@@ -641,6 +702,14 @@ function M.poll_deferred_retries()
             if M.received[scoop_name] then poll_deferred[scoop_name] = nil end
         end
     end
+    -- In the order the multiworld granted them, so scoops waiting on the same
+    -- item start in the order they arrived (Kent's day 1 before day 2 when
+    -- the Camera comes).
+    table.sort(to_retry, function(a, b)
+        local sa, sb = ap_receipt_seq[a] or math.huge, ap_receipt_seq[b] or math.huge
+        if sa ~= sb then return sa < sb end
+        return a < b
+    end)
     for _, scoop_name in ipairs(to_retry) do
         cfg.log(string.format("Deferred condition met -- retrying '%s' activation", scoop_name))
         -- Chain scoops re-enter via the chain so ordering rules hold.
@@ -649,7 +718,13 @@ function M.poll_deferred_retries()
             poll_deferred[scoop_name] = nil
             M.try_advance_chain()
         else
-            M.request_unlock(scoop_name)
+            local _, why = M.request_unlock(scoop_name)
+            -- Held now by a running scoop of its conflict group or a running
+            -- main. Those ask again when they complete, so stop polling it
+            -- here: it would retry every frame.
+            if why == "conflict" or why == "main_block" then
+                poll_deferred[scoop_name] = nil
+            end
         end
     end
 end
@@ -882,6 +957,11 @@ function M.deactivate_for_reload()
     if cleared > 0 then
         cfg.log(string.format("Cleared %d side scoop unlocks for pre-Jessie state", cleared))
     end
+    -- The Access Key does not wait for Jessie: hand it back to the poll.
+    for scoop_name in pairs(M.ap_received) do
+        local data = cfg.scoop_data[scoop_name]
+        if data and data.category == "Special" then poll_deferred[scoop_name] = "prologue" end
+    end
 
     -- A pre-Jessie world is a NEW world: every survivor is back where they
     -- started. Their scoops' completion was persisted with the seed, so
@@ -934,6 +1014,21 @@ function M.serialize()
     local order = {}
     for i, name in ipairs(M.scoop_order) do order[i] = name end
 
+    -- Any Order: the main scoop the player started. Nothing else brings it
+    -- back after the game restarts, so without it the running mission reads
+    -- as "ready to start" again and its flags are held off. A chain run
+    -- re-derives its current scoop from the order instead.
+    local running_list = {}
+    if cfg.any_order then
+        for name in pairs(M.received) do
+            local data = cfg.scoop_data[name]
+            if data and data.category == "Main" and not M.completed[name] then
+                table.insert(running_list, name)
+            end
+        end
+        table.sort(running_list)
+    end
+
     return {
         version = 2,
         ap_activated = ap_activated,
@@ -942,6 +1037,7 @@ function M.serialize()
         scoop_order = order,
         completed_scoops = completed_list,
         ap_received = ap_received_list,
+        running_mains = running_list,
     }
 end
 
@@ -983,6 +1079,19 @@ function M.restore(data)
             M.ap_received[name] = true
         end
         cfg.log(string.format("Restored %d AP received scoops", #data.ap_received))
+    end
+
+    -- After completed and ap_received, so a main finished or never held is
+    -- not brought back as running.
+    if data.running_mains then
+        for _, name in ipairs(data.running_mains) do
+            local scoop = cfg.scoop_data[name]
+            if scoop and scoop.category == "Main" and not M.completed[name]
+                and M.ap_received[name] then
+                M.received[name] = true
+                cfg.log(string.format("Restored running main scoop '%s'", name))
+            end
+        end
     end
 
     return true

@@ -256,6 +256,23 @@ end
 -- Hooks
 ------------------------------------------------------------
 
+-- SaveLoadStep values. StepRoutine[i] is the routine for step i (the dump's
+-- initStepRoutine lambdas line up: _4 is doRemoveDataWait, _15 is
+-- doErrorAutoSaveSuccess, _17/_18 are doErrorGameStart/End).
+local STEP_AUTO_SUCCESS_END = 15
+local STEP_AUTO_FAILURE_END = 16
+
+-- Dumps found inside a native hook, written on the next frame. Kept in C so
+-- hooks installed before a script reload still reach the drain.
+C.pending_dumps = C.pending_dumps or {}
+
+-- The manager's current step, read straight off the hooked instance.
+local function read_step(args)
+    local this = sdk.to_managed_object(args[2])
+    if not this then return nil end
+    return tonumber(this:get_field("_SaveLoadStepState"))
+end
+
 local function install_hooks()
     if C.installed then return true end
     local sdm_td = tdef(SDM_TYPE)
@@ -316,9 +333,22 @@ local function install_hooks()
     end)
 
     -- Failure/error path -- trigger points that flush the capture.
-    hook_pre_named("doErrorAutoSaveFailure", function()
+    --
+    -- doErrorAutoSaveFailure shares its machine code with doErrorSaveEnd,
+    -- the ordinary end of the system-save error path, so hooking one hooks
+    -- both (4 aliases at fn 1417f43e0). The step routine table runs it for
+    -- step 16 (autosave failed for good) and step 10 (system save end); only
+    -- 16 is a failure. The step field is read here, and the dump, which
+    -- calls into the game, waits for the next frame.
+    hook_pre_named("doErrorAutoSaveFailure", function(args)
+        local step = read_step(args)
+        if step ~= STEP_AUTO_FAILURE_END then
+            ring_push(string.format("    doErrorSaveEnd/shared (step=%s)",
+                enum_name(CACHE.step, step)))
+            return
+        end
         ring_push("!!! doErrorAutoSaveFailure")
-        dump_failure("doErrorAutoSaveFailure")
+        table.insert(C.pending_dumps, "doErrorAutoSaveFailure")
     end)
     hook_pre_named("doErrorSaveStart", function(args)
         local step = argint(args[3])
@@ -336,7 +366,10 @@ local function install_hooks()
         ring_push("!!! openSaveErrorDialog_PC")
         dump_failure("openSaveErrorDialog_PC")
     end)
-    hook_pre_named("doErrorAutoSaveSuccess", function()
+    -- Shares its code with its own step-15 routine only; the step check
+    -- keeps a direct call from logging a recovery that never happened.
+    hook_pre_named("doErrorAutoSaveSuccess", function(args)
+        if read_step(args) ~= STEP_AUTO_SUCCESS_END then return end
         ring_push("    doErrorAutoSaveSuccess (recovery ok)")
     end)
 
@@ -382,6 +415,11 @@ end
 ------------------------------------------------------------
 
 function M.on_frame()
+    if #C.pending_dumps > 0 then
+        local reasons = C.pending_dumps
+        C.pending_dumps = {}
+        for _, reason in ipairs(reasons) do dump_failure(reason) end
+    end
     if C.installed then return end
     if C.install_tries > MAX_INSTALL_TRIES then return end
     install_hooks()

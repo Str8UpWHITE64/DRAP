@@ -290,6 +290,25 @@ AP_REF.damage_link_override = nil
 AP_REF.on_damage_link_toggled = nil
 local tag_update_pending = false
 
+-- KnockbackLink and TrapLink follow the same pattern as DamageLink: nil
+-- follows the slot option, true/false is the player's in-session choice.
+AP_REF.knockback_link_override = nil
+AP_REF.trap_link_override = nil
+AP_REF.on_knockback_link_toggled = nil
+AP_REF.on_trap_link_toggled = nil
+
+function AP_REF.knockback_link_active()
+    if AP_REF.knockback_link_override ~= nil then return AP_REF.knockback_link_override end
+    local sd = AP_REF.last_slot_data
+    return type(sd) == "table" and sd.knockback_link == true
+end
+
+function AP_REF.trap_link_active()
+    if AP_REF.trap_link_override ~= nil then return AP_REF.trap_link_override end
+    local sd = AP_REF.last_slot_data
+    return type(sd) == "table" and sd.trap_link == true
+end
+
 function AP_REF.damage_link_active()
     if AP_REF.damage_link_override ~= nil then return AP_REF.damage_link_override end
     local sd = AP_REF.last_slot_data
@@ -321,8 +340,14 @@ local function build_tags(slot_data)
                 .. tostring(slot_data.damage_link_group or ""))
         end
 
-        if slot_data.knockback_link then
+        if AP_REF.knockback_link_active() then
             table.insert(tags, "KnockbackLink")
+        end
+
+        -- TrapLink's tag is exactly "TrapLink" -- the server only routes
+        -- other players' trap bounces to clients that carry it.
+        if AP_REF.trap_link_active() then
+            table.insert(tags, "TrapLink")
         end
         return tags
 end
@@ -337,11 +362,31 @@ function AP_REF.set_damage_link(on)
     end
 end
 
+--- Turn KnockbackLink on or off for this session (tag sent next frame).
+function AP_REF.set_knockback_link(on)
+    AP_REF.knockback_link_override = (on == true)
+    tag_update_pending = true
+    if AP_REF.on_knockback_link_toggled then
+        pcall(AP_REF.on_knockback_link_toggled, on == true)
+    end
+end
+
+--- Turn TrapLink on or off for this session (tag sent next frame).
+function AP_REF.set_trap_link(on)
+    AP_REF.trap_link_override = (on == true)
+    tag_update_pending = true
+    if AP_REF.on_trap_link_toggled then
+        pcall(AP_REF.on_trap_link_toggled, on == true)
+    end
+end
+
 local function set_slot_connected_handler(callback)
 	function slot_connected_handler(slot_data)
 		Logger.info("AP_REF", "slot connected: " .. tostring(AP_REF.APSlot))
         AP_REF.last_slot_data = slot_data
         AP_REF.damage_link_override = nil
+        AP_REF.knockback_link_override = nil
+        AP_REF.trap_link_override = nil
         AP_REF.APClient:ConnectUpdate(nil, build_tags(slot_data))
 		callback(slot_data)
 	end
@@ -501,6 +546,8 @@ local function DisplayClientCommand(line)
 	if command == "help" then
 		table.insert(textLog, {{text = "/help - this list"}})
 		table.insert(textLog, {{text = "/damagelink [on|off] - share damage with the multiworld; no argument toggles"}})
+		table.insert(textLog, {{text = "/knockbacklink [on|off] - share knockbacks with the multiworld; no argument toggles"}})
+		table.insert(textLog, {{text = "/traplink [on|off] - trade traps with the multiworld; no argument toggles"}})
 	elseif command == "damagelink" then
         local on
         if arg == "on" then on = true
@@ -512,6 +559,21 @@ local function DisplayClientCommand(line)
         end
         AP_REF.set_damage_link(on)
         table.insert(textLog, {{text = "DamageLink " .. (on and "on" or "off")
+            .. (AP_REF.APClient and " -- tags updated" or "")}})
+	elseif command == "knockbacklink" or command == "traplink" then
+        local is_trap = (command == "traplink")
+        local label = is_trap and "TrapLink" or "KnockbackLink"
+        local current = is_trap and AP_REF.trap_link_active() or AP_REF.knockback_link_active()
+        local on
+        if arg == "on" then on = true
+        elseif arg == "off" then on = false
+        elseif arg == "" then on = not current
+        else
+            table.insert(textLog, {{text = "Usage: /" .. command .. " [on|off]"}})
+            return
+        end
+        if is_trap then AP_REF.set_trap_link(on) else AP_REF.set_knockback_link(on) end
+        table.insert(textLog, {{text = label .. " " .. (on and "on" or "off")
             .. (AP_REF.APClient and " -- tags updated" or "")}})
 	else
 		table.insert(textLog, {{text = "Could not identify command "..command.."."}})

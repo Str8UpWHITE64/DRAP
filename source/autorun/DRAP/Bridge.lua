@@ -6,6 +6,7 @@ local AP_REF = require("AP_REF/core")
 local ItemEffects = require("DRAP/ItemEffects")
 local Ledger = require("DRAP/LocationLedger")
 local Activation = require("DRAP/Activation")
+local GameLog = require("DRAP/GameLog")
 
 local M = Shared.create_module("Bridge")
 
@@ -106,11 +107,18 @@ function M.send_goal_complete()
     if type(AP_REF.APClient.StatusUpdate) == "function" then
         local ok, err = pcall(AP_REF.APClient.StatusUpdate, AP_REF.APClient, CLIENT_GOAL)
         if ok then
-            M.log("Goal completion sent successfully!")
+            GameLog.goal_complete((_G.AP and _G.AP.GoalName) or "goal")
             return true
         else
             M.log.error("StatusUpdate failed: " .. tostring(err))
-            re.msg("Goal completion failed to send: " .. tostring(err))
+            -- Not re.msg: a modal message box stops the game until it is
+            -- dismissed, and this runs in the middle of the ending.
+            local ok_n, Notify = pcall(require, "DRAP/Notify")
+            if ok_n and Notify and Notify.error then
+                pcall(Notify.error, "Goal completion failed to send: " .. tostring(err)
+                    .. ".  Please post your logs in the Discord.",
+                    { duration = 10 })
+            end
         end
     else
         M.log("StatusUpdate method not found on APClient")
@@ -128,6 +136,34 @@ M.deathlink_enabled = false
 function M.set_deathlink_enabled(v)
     M.deathlink_enabled = (v == true)
     M.log("DeathLink enabled: " .. tostring(M.deathlink_enabled))
+end
+
+-- The name this slot goes by in the room, for the "source" of every link
+-- bounce. get_player_alias takes the slot NUMBER; given the slot name it
+-- raises. The second value says whether the name is really this slot's
+-- rather than the placeholder, which any client without a name shares.
+local FALLBACK_ALIAS = "DRDR Player"
+
+local function own_alias()
+    local c = AP_REF.APClient
+    if not c then return FALLBACK_ALIAS, false end
+    if c.get_player_number and c.get_player_alias then
+        local ok_n, n = pcall(c.get_player_number, c)
+        n = ok_n and math.tointeger(n) or nil
+        if n and n > 0 then
+            local ok_a, a = pcall(c.get_player_alias, c, n)
+            if ok_a and type(a) == "string" and a ~= "" and a ~= "Unknown" then
+                return Shared.clean_string(a), true
+            end
+        end
+    end
+    if c.get_slot then
+        local ok_s, s = pcall(c.get_slot, c)
+        if ok_s and type(s) == "string" and s ~= "" then
+            return Shared.clean_string(s), true
+        end
+    end
+    return FALLBACK_ALIAS, false
 end
 
 ------------------------------------------------------------
@@ -217,15 +253,7 @@ function M.send_shared_damage(points)
         if ok and t then now = math.floor(tonumber(t) or os.time()) end
     end
 
-    local my_alias = "DRDR Player"
-    if AP_REF.APClient.get_player_alias and AP_REF.APClient.get_slot then
-        local ok_slot, slot = pcall(AP_REF.APClient.get_slot, AP_REF.APClient)
-        if ok_slot and slot then
-            local ok_alias, alias = pcall(AP_REF.APClient.get_player_alias,
-                                          AP_REF.APClient, slot)
-            if ok_alias and alias then my_alias = Shared.clean_string(alias) end
-        end
-    end
+    local my_alias = own_alias()
 
     local payload = {
         time = now,
@@ -291,21 +319,13 @@ function M.send_knockback(x, y, z)
         if ok and t then now = math.floor(tonumber(t) or os.time()) end
     end
 
-    local my_alias = "DRDR Player"
-    if AP_REF.APClient.get_player_alias and AP_REF.APClient.get_slot then
-        local ok_slot, slot = pcall(AP_REF.APClient.get_slot, AP_REF.APClient)
-        if ok_slot and slot then
-            local ok_alias, alias = pcall(AP_REF.APClient.get_player_alias,
-                                          AP_REF.APClient, slot)
-            if ok_alias and alias then my_alias = Shared.clean_string(alias) end
-        end
-    end
+    local my_alias = own_alias()
 
     local payload = {
         time = now,
         uuid = get_damage_uuid(),
         source = my_alias,
-        cause = my_alias .. " got knocked about.",
+        cause = my_alias .. " got knocked back!",
         value = { x = x, y = y, z = z },
     }
 
@@ -317,6 +337,76 @@ function M.send_knockback(x, y, z)
         return true
     end
     M.log.error("KnockbackLink send failed: " .. tostring(err))
+    return false
+end
+
+------------------------------------------------------------
+-- TrapLink (protocol tag "TrapLink")
+------------------------------------------------------------
+-- {time, source, trap_name}. The protocol's own echo filter is source == our
+-- player name; the uuid is an extra field only this client reads, so a second
+-- DRAP client on the same name is filtered too.
+
+local TRAP_LINK_TAG = "TrapLink"
+
+M.traplink_enabled = false
+
+--- Called with the trap name and sender. Set by TrapLink.lua.
+M.on_trap_link = nil
+
+function M.set_traplink_enabled(v)
+    M.traplink_enabled = (v == true)
+    M.log("TrapLink enabled: " .. tostring(M.traplink_enabled))
+end
+
+function M.get_trap_link_tag() return TRAP_LINK_TAG end
+
+local function handle_trap_link(data)
+    if not M.traplink_enabled then return end
+    if damage_uuid and tostring(data["uuid"] or "") == damage_uuid then return end
+    -- A bounce under this slot's name is its own echo too, but only when the
+    -- name is really this slot's: the placeholder is shared by every client
+    -- that has none.
+    local source = data["source"]
+    local me, known = own_alias()
+    if known and source ~= nil and tostring(source) == me then return end
+
+    local name = data["trap_name"]
+    if type(name) ~= "string" then return end
+    M.log(string.format("TrapLink received: %s from %s", name, tostring(source)))
+    if M.on_trap_link then
+        pcall(M.on_trap_link, name, tostring(source or "someone"))
+    end
+end
+
+--- Broadcast one of our traps by its standard name.
+function M.send_trap_link(trap_name)
+    if not M.traplink_enabled then return false end
+    if not AP_REF.APClient then return false end
+    if not is_connected() then return false end
+    if type(trap_name) ~= "string" or trap_name == "" then return false end
+
+    local now = math.floor(os.time())
+    if AP_REF.APClient.get_server_time then
+        local ok, t = pcall(AP_REF.APClient.get_server_time, AP_REF.APClient)
+        if ok and t then now = math.floor(tonumber(t) or os.time()) end
+    end
+
+    local payload = {
+        time = now,
+        source = own_alias(),
+        trap_name = trap_name,
+        uuid = get_damage_uuid(),
+    }
+
+    if type(AP_REF.APClient.Bounce) ~= "function" then return false end
+    local ok, err = pcall(AP_REF.APClient.Bounce, AP_REF.APClient, payload,
+                          nil, nil, { TRAP_LINK_TAG })
+    if ok then
+        M.log("Sent TrapLink: " .. trap_name)
+        return true
+    end
+    M.log.error("TrapLink send failed: " .. tostring(err))
     return false
 end
 
@@ -344,14 +434,27 @@ local function handle_bounced(json_rows)
         return
     end
 
+    if has_tag(json_rows["tags"], TRAP_LINK_TAG) then
+        handle_trap_link(json_rows["data"] or {})
+        return
+    end
+
     if not M.deathlink_enabled then return end
     if not has_tag(json_rows["tags"], "DeathLink") then return end
 
     local data = json_rows["data"] or {}
+
+    -- This client's own death, echoed back by the server. A DeathLink from
+    -- another client has no uuid of ours and still goes through.
+    if damage_uuid and tostring(data["uuid"] or "") == damage_uuid then
+        M.log("DeathLink echo ignored")
+        return
+    end
+
     local source = data["source"] or data["player"] or "Unknown"
     local cause = data["cause"] or ("DeathLink from " .. tostring(source))
 
-    M.log("DeathLink received: " .. tostring(cause))
+    GameLog.deathlink("received", source, cause)
 
     if _G.AP and _G.AP.DeathLink and _G.AP.DeathLink.receive then
         pcall(_G.AP.DeathLink.receive, "DeathLink: " .. tostring(cause))
@@ -371,26 +474,19 @@ function M.send_deathlink(data)
         if ok and t then time_of_death = math.floor(tonumber(t) or os.time()) end
     end
 
-    local my_alias = "DRDR Player"
-    if AP_REF.APClient.get_player_alias and AP_REF.APClient.get_slot then
-        local ok_slot, slot = pcall(AP_REF.APClient.get_slot, AP_REF.APClient)
-        if ok_slot and slot then
-            local ok_alias, alias = pcall(AP_REF.APClient.get_player_alias, AP_REF.APClient, slot)
-            if ok_alias and alias then my_alias = Shared.clean_string(alias) end
-        end
-    end
-    my_alias = Shared.clean_string((data and data.source) or my_alias)
+    local my_alias = Shared.clean_string((data and data.source) or own_alias())
 
     local deathLinkData = {
         time = (data and data.time) or time_of_death,
         cause = (data and data.cause) or (my_alias .. " died."),
-        source = my_alias
+        source = my_alias,
+        uuid = get_damage_uuid(),
     }
 
     if type(AP_REF.APClient.Bounce) == "function" then
         local ok, err = pcall(AP_REF.APClient.Bounce, AP_REF.APClient, deathLinkData, nil, nil, { "DeathLink" })
         if ok then
-            M.log("Sent DeathLink: " .. tostring(deathLinkData.cause))
+            GameLog.deathlink("sent", nil, deathLinkData.cause)
             return true
         end
         M.log.error("DeathLink send failed: " .. tostring(err))
@@ -472,7 +568,7 @@ function M.check(loc_name)
         return false
     end
 
-    M.log("Sending location check: " .. tostring(loc_name))
+    M.log.debug("Sending location check: " .. tostring(loc_name))
 
     -- Record every check for resend-on-reconnect, even if the send fails
     if loc_name and Ledger.is_init() then
@@ -509,8 +605,8 @@ function M.check(loc_name)
 
     loc_id = tonumber(loc_id) or loc_id
     local ok, ret = pcall(AP_REF.APClient.LocationChecks, AP_REF.APClient, { loc_id })
-    M.log("LocationChecks ok=" .. tostring(ok))
-    if not ok then sync_needed = true end
+    M.log.debug("LocationChecks ok=" .. tostring(ok))
+    if ok then GameLog.checked(loc_name) else sync_needed = true end
     return ok
 end
 
@@ -975,6 +1071,22 @@ function M.has_local_check(loc_name)
     return PENDING_CHECKS[loc_name] == true
 end
 
+--- Is a slot connected whose ledger has not finished loading?
+---
+--- True between set_completed_checks_filename and load_completed_checks. A
+--- caller deciding "was this already done?" must not answer from an empty
+--- ledger in that window.
+function M.ledger_pending()
+    return ledger_slot ~= nil and not Ledger.is_init()
+end
+
+--- Was this goal location already sent by this player (ledger or this
+--- session's pending journal)? Local only: a server "collect" from another
+--- world's finish must not suppress an ending the player has not had.
+function M.is_goal_sent(loc_name)
+    return M.has_local_check(loc_name)
+end
+
 --- Has this check been recorded AT ALL this session, ledger or not?
 ---
 --- has_completed_check reads only the ledger, which does not exist until a
@@ -1209,6 +1321,20 @@ local kill_filler_counts = {}   -- name -> received, for the status command
 local kill_filler_batch = {}    -- name -> received this batch
 local received_dirty = false    -- received-items file needs writing
 
+--- The location an item came from, by name, for the "Received" line. Empty
+--- when the client cannot name it (a location from another game that the data
+--- package has not described).
+local function location_label(net_item, sender)
+    if not (AP_REF.APClient and net_item.location) then return nil end
+    local game = Shared.safe(function() return AP_REF.APClient:get_player_game(sender) end)
+    local name = Shared.safe(function()
+        return AP_REF.APClient:get_location_name(net_item.location, game)
+    end)
+    name = Shared.clean_string(name)
+    if name == "" or name:match("^Unknown") or name:match("^Location %d+$") then return nil end
+    return name
+end
+
 local function handle_net_item(net_item, is_replay)
     local item_id = net_item.item
     local sender = net_item.player
@@ -1228,12 +1354,14 @@ local function handle_net_item(net_item, is_replay)
         return
     end
 
-    M.log("Applying item index=" .. tostring(index) .. " id=" .. tostring(item_id) .. " (" .. item_name .. ") from " .. sender_name .. " (replay=" .. tostring(is_replay) .. ")")
+    M.log.debug("Applying item index=" .. tostring(index) .. " id=" .. tostring(item_id) .. " (" .. item_name .. ") from " .. sender_name .. " (replay=" .. tostring(is_replay) .. ")")
+    GameLog.received(item_name, sender_name, location_label(net_item, sender), is_replay)
 
     -- Look up the game item number from our registered mappings
     local game_item_no = ITEM_NAME_TO_GAME_NO[item_name]
 
-    if not is_replay then
+    if not is_replay and not net_item._recorded then
+        net_item._recorded = true  -- a retried item is not recorded twice
         table.insert(RECEIVED_ITEMS, {
             index = index,
             item_id = item_id,
@@ -1254,6 +1382,8 @@ local function handle_net_item(net_item, is_replay)
     local handled = ItemEffects.dispatch(net_item, item_name, sender_name, is_replay)
     if not handled then
         M.default_item_handler(net_item, item_name, sender_name)
+    else
+        GameLog.applied(item_name, is_replay)
     end
 
     -- Native in-game toast for the item-receive (skip replays -- those are
@@ -1268,6 +1398,14 @@ local function handle_net_item(net_item, is_replay)
             pcall(Notify.item_received, item_name, flags, sender_name, is_self)
         end
     end
+end
+
+-- An effect module that registers an item name replaces the per-item shim, so
+-- the shim cannot be what tells ItemRestriction to rescan. Do it once per
+-- batch here instead, whoever handled the items.
+local function rescan_restriction()
+    local ok, IR = pcall(require, "DRAP/ItemRestriction")
+    if ok and IR and IR.on_items_received then pcall(IR.on_items_received) end
 end
 
 -- Queue and return. This runs inside lua-apclientpp's C dispatch, so it does
@@ -1342,6 +1480,7 @@ function M.reapply_all_items()
         }
         handle_net_item(fake_net_item, true)
     end
+    rescan_restriction()
 end
 
 ------------------------------------------------------------
@@ -1364,12 +1503,33 @@ function M.on_frame()
             table.sort(queue, function(a, b)
                 return (a.index or 0) < (b.index or 0)
             end)
-            for _, queued in ipairs(queue) do
+            -- The cursor moves only after the handler succeeds. A throw puts
+            -- the failed item and the rest of the batch back on the queue for
+            -- the next frame (one bad item cannot silently drop the batch).
+            for i, queued in ipairs(queue) do
                 if queued.index and queued.index > last_item_index then
-                    last_item_index = queued.index
-                    handle_net_item(queued, false)
+                    local ok, err = pcall(handle_net_item, queued, false)
+                    if not ok then
+                        queued.attempts = (queued.attempts or 0) + 1
+                        M.log.error(string.format("Item index=%s failed (attempt %d): %s",
+                            tostring(queued.index), queued.attempts, tostring(err)))
+                        if queued.attempts >= 3 then
+                            -- Give up on this one item so it cannot wedge the queue.
+                            last_item_index = queued.index
+                        else
+                            for j = i, #queue do
+                                if queue[j].index and queue[j].index > last_item_index then
+                                    table.insert(pending_items, queue[j])
+                                end
+                            end
+                            break
+                        end
+                    else
+                        last_item_index = queued.index
+                    end
                 end
             end
+            rescan_restriction()
             if next(kill_filler_batch) then
                 local parts, total = {}, 0
                 for name, n in pairs(kill_filler_batch) do

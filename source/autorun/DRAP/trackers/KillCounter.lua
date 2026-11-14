@@ -19,6 +19,7 @@ local M = {}
 M.FOLD_SCENES = {
     s601 = "s600",   -- Meat Processing Area -> Maintenance Tunnel
     s401 = "s400",   -- Carlito's Hideout -> North Plaza
+    s231 = "s230",   -- Rooftop -> Warehouse (the Rooftop has no kill checks)
 }
 
 --- Build a counter.

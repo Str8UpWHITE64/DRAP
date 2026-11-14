@@ -7,14 +7,14 @@ from Options import OptionError, item_and_loc_options
 
 from worlds.AutoWorld import World, WebWorld
 
-from .Items import DRItem, DRItemCategory, item_dictionary, key_item_names, item_descriptions, BuildItemPool, specialty_items, progression_skills, microwave_food_items, challenge_tool_items, kill_filler_items, KENT_DAYS, PROGRESSIVE_KENT
+from .Items import DRItem, DRItemCategory, item_dictionary, key_item_names, item_descriptions, BuildItemPool, trap_weights, specialty_items, overpowered_items, progression_skills, microwave_food_items, challenge_tool_items, kill_filler_items, item_sanity_item_names, item_sanity_required_items, item_sanity_overpowered, KENT_DAYS, PROGRESSIVE_KENT, kent_is_progressive
 from .Locations import kill_sanity_location_groups
 from .Locations import (DRLocation, DRLocationCategory, location_tables,
                         location_dictionary, ZOMBIE_KILL_TIERS,
                         ZOMBIE_KILL_TIER_NAMES, zombie_kill_locations,
                         ZOMBIE_KILL_REGION_OF, KILL_SANITY_TOPS,
                         kill_sanity_location_name)
-from .Options import DROption, dr_option_groups, DRDRSettings
+from .Options import DROption, dr_option_groups, DRDRSettings, ScoopsanityOrder
 
 
 from .DoorRandomization import (
@@ -77,9 +77,7 @@ def _validate_shared_scoops() -> None:
             s.get("category") in ("Survivor", "Psychopath")
             or (s.get("category") == "Main" and s.get("chain_eligible"))
         )
-        # Kent's days arrive as Progressive Kent Scoop copies instead.
-        item = PROGRESSIVE_KENT if name in KENT_DAYS else name
-        if needs_item and item not in all_items:
+        if needs_item and name not in all_items:
             problems.append(f"scoop '{name}' is not an item in Items.py")
         event = s.get("completion_event")
         if event and event not in all_locations:
@@ -134,7 +132,7 @@ PSYCHO_EXCLUDED_LOCATIONS = {
     "Rescue 48 survivors",
     "Escort 8 survivors at once",
     "Frank the pimp",
-    "Get 50 survivors to join",
+    "Get 48 survivors to join",
     # The reliable 10,000 PP shot is Jeff and Natalie hugging on the rooftop,
     # and under Psycho they are targets, not a couple. No other spot has been
     # confirmed to give it consistently.
@@ -238,6 +236,10 @@ class DRWorld(World):
     location_name_groups = kill_sanity_location_groups
     item_name_groups = {}
     item_descriptions = item_descriptions
+    # Universal Tracker collects this into a copy of the player's state and
+    # shows whatever opens up as glitched logic. It is never in the pool, so
+    # a real generation never sees it.
+    glitches_item_name: ClassVar[str] = Rules.UT_GLITCHED
 
     def __init__(self, multiworld: MultiWorld, player: int):
         super().__init__(multiworld, player)
@@ -250,6 +252,15 @@ class DRWorld(World):
         self.scoop_order = []
 
     def generate_early(self):
+        # ItemSanity needs something to pick up. Restricted Item Mode is fine
+        # (a pickup check then waits for its item to be sent), but Spitter
+        # Only takes every weapon away.
+        self.item_sanity = bool(self.options.item_sanity.value)
+        if self.item_sanity and self.options.spitter_only:
+            raise OptionError(
+                f"{self.player_name}: item_sanity cannot be combined with "
+                "spitter_only. ItemSanity needs items to be picked up.")
+
         # Spitter Only turns two other options on, and both are read below, so
         # it has to come first.
         self.spitter_only = bool(self.options.spitter_only.value)
@@ -263,6 +274,21 @@ class DRWorld(World):
             # goal must not be able to ask for all 48.
             if self.options.number_of_survivors.value > SPITTER_MAX_SURVIVORS:
                 self.options.number_of_survivors.value = SPITTER_MAX_SURVIVORS
+
+        # Scoopsanity Order replaced two toggles. Old YAMLs still set those,
+        # so fold them in unless the new option was set. Downstream keeps
+        # reading the old attributes, now written from the one choice.
+        _order = self.options.scoopsanity_order
+        if _order.value == ScoopsanityOrder.option_shuffled:
+            if self.options.main_scoops_any_order:
+                _order.value = ScoopsanityOrder.option_any_order
+            elif not self.options.randomize_scoop_order:
+                _order.value = ScoopsanityOrder.option_vanilla
+        self.options.main_scoops_any_order.value = int(
+            _order.value == ScoopsanityOrder.option_any_order)
+        self.options.randomize_scoop_order.value = int(
+            _order.value == ScoopsanityOrder.option_shuffled)
+        self.early_scoop = None
 
         # Savior+ScoopSanity drops main scoops entirely — the player wins by
         # rescuing survivors, so main scoops would only advance unused state.
@@ -282,6 +308,9 @@ class DRWorld(World):
         self.enabled_location_categories.add(DRLocationCategory.LEVEL_UP)
         self.enabled_location_categories.add(DRLocationCategory.PP_STICKER)
         self.enabled_location_categories.add(DRLocationCategory.CAMERA_PART)
+        self.enabled_location_categories.add(DRLocationCategory.OTIS_CALL)
+        if self.options.extra_pp_stickers:
+            self.enabled_location_categories.add(DRLocationCategory.CUSTOM_STICKER)
         if self.main_scoops_enabled:
             self.enabled_location_categories.add(DRLocationCategory.MAIN_SCOOP)
         if self.options.goal.value == 0:  # Ending S
@@ -340,26 +369,33 @@ class DRWorld(World):
             self.enabled_location_categories.add(DRLocationCategory.KILL_SANITY)
         if self.options.pp_bonus_locations:
             self.enabled_location_categories.add(DRLocationCategory.PP_BONUS)
+        if self.item_sanity:
+            self.enabled_location_categories.add(DRLocationCategory.ITEM_SANITY)
+        # Exclude Overpowered Items: no pickup check waits for one.
+        self._item_sanity_dropped_names = (
+            {"Pick up " + _n for _n in item_sanity_overpowered}
+            if self.item_sanity and self.options.exclude_overpowered_items else set())
 
         # PP-bonus entries whose requires_location predecessor isn't enabled
         # this seed (e.g. First Aid Kit needs "Clean up... Register 6!" which
         # is MAIN_SCOOP-only). Filtered from both create_region and rule-build.
+        # Computed whatever the PP Bonus option says: First Aid Kit is a plain
+        # check on every seed now, and still needs its predecessor.
         self._pp_bonus_excluded_names: Set[str] = set()
-        if self.options.pp_bonus_locations:
-            for _entry in AP_TRIGGER_LOCATIONS:
-                _req = _entry.get("requires_location")
-                if not _req:
-                    continue
-                _req_data = location_dictionary.get(_req)
-                if not _req_data:
-                    # Predecessor isn't even in the static table -- bad data;
-                    # skip the entry to be safe.
-                    for _n in expand_trigger_location_names(_entry):
-                        self._pp_bonus_excluded_names.add(_n)
-                    continue
-                if _req_data.category not in self.enabled_location_categories:
-                    for _n in expand_trigger_location_names(_entry):
-                        self._pp_bonus_excluded_names.add(_n)
+        for _entry in AP_TRIGGER_LOCATIONS:
+            _req = _entry.get("requires_location")
+            if not _req:
+                continue
+            _req_data = location_dictionary.get(_req)
+            if not _req_data:
+                # Predecessor isn't even in the static table -- bad data;
+                # skip the entry to be safe.
+                for _n in expand_trigger_location_names(_entry):
+                    self._pp_bonus_excluded_names.add(_n)
+                continue
+            if _req_data.category not in self.enabled_location_categories:
+                for _n in expand_trigger_location_names(_entry):
+                    self._pp_bonus_excluded_names.add(_n)
 
         # The Space Rider does not run at night, so its PP bonus cannot be
         # earned in a seed that forces night. Hardcore implies night, same as
@@ -459,16 +495,18 @@ class DRWorld(World):
                 if _ut_order:
                     self.scoop_order = list(_ut_order)
                 elif not self.options.randomize_scoop_order:
-                    # Vanilla order, so Backup for Brad leads. set_rules gates
-                    # the Entrance Plaza shutter on the Brad escort in that
-                    # case, and the runtime lets the mission fire the cutscene.
+                    # Vanilla (or Any Order) lists the story order. The early
+                    # scoop is picked apart from the list so Any Order does
+                    # not always favour Backup for Brad.
                     self.scoop_order = list(MAIN_SCOOP_NAMES)
+                    if self.options.main_scoops_any_order:
+                        self.early_scoop = self.random.choice(self.scoop_order)
                 else:
                     # Backup for Brad may lead. It used to be swapped out of
-                    # the first slot because its mission holds the EP shutter
-                    # trigger shut, but the scoop can no longer start before
-                    # its regions are reachable, and until it starts the
-                    # trigger spot opens the shutters on its own.
+                    # the first slot because its mission kept the EP shutters
+                    # shut, but the scoop can no longer start before its
+                    # regions are reachable, and until it starts the flow
+                    # floor opens the shutters on its own.
                     scoop_order = list(MAIN_SCOOP_NAMES)
                     self.random.shuffle(scoop_order)
                     self.scoop_order = scoop_order
@@ -482,26 +520,67 @@ class DRWorld(World):
         if self.options.split_keys:
             self.multiworld.push_precollected(self.create_item("Maintenance Tunnel Access Key"))
 
-    
+        # Start With Every Door Key: the keys this mode would otherwise put in
+        # the pool. After the Split Keys clamp, so Door Locks gets area keys.
+        # Door Randomizer without Door Locks already gave them all above.
+        self.start_key_names = set()
+        if self.options.start_with_all_keys:
+            keys = list(SPLIT_KEY_NAMES if self.options.split_keys else AREA_KEY_NAMES)
+            keys.append("Maintenance Tunnel Access Key")
+            given = {item.name for item in self.multiworld.precollected_items[self.player]}
+            for key_name in keys:
+                if key_name not in given:
+                    self.multiworld.push_precollected(self.create_item(key_name))
+            self.start_key_names = set(keys)
+
+
     # Locations whose id table is not the region they are reached in. The id
     # is positional within its table, so the row stays where it is and only
     # the region it is created in moves. Stickers 98 and 99 are photographed
     # in Paradise Plaza from the raincoat encounter but were filed under
     # Leisure Park, which made Leisure Park a requirement nothing asked for
     # (#65). Their rules already carry the cult requirement.
+    #
+    # The Maintenance Tunnel Key check is filed under the tunnel, but a player
+    # sent the Access Key opens that door without going down, so the check
+    # cannot require the tunnel's region. Its rule names both ways in.
     REGION_OVERRIDES = {
         "Photograph PP Sticker 98": "Paradise Plaza",
         "Photograph PP Sticker 99": "Paradise Plaza",
+        "Obtain Maintenance Tunnel Key": "Security Room",
     }
+
+    # Stickers 15-17 can be photographed from Paradise Plaza through the
+    # theatre front (glitched logic only), so they are created there and
+    # their rule still asks for Colby's. Only while Paradise is the one way
+    # into Colby's: under Door Locks it is not, and the move would add a
+    # requirement.
+    COLBYS_FROM_PARADISE = ("Photograph PP Sticker 15", "Photograph PP Sticker 16",
+                            "Photograph PP Sticker 17")
+
+    # Stickers 25-30 and 33 can be photographed through the closed gates
+    # during the opening sequence (glitched logic only), so they are created
+    # in the Security Room and their rule still asks for the open shutters.
+    OPENING_STICKERS = tuple(f"Photograph PP Sticker {_n}" for _n in (25, 26, 27, 28, 29, 30, 33)) + tuple(
+        f"Photograph Extra PP Sticker - Entrance Plaza - {_name}" for _name in (
+            "Everyone Luvs Books", "Bikezip", "Macaroon Sign", "Someone Check That Guy's Camera", "Golf Ball",
+            "Tennis Ball", "Basketball", "Gold Sphere", "Gryffindor Shield"))
+
+    def _region_of(self, loc_name, default):
+        if loc_name in self.COLBYS_FROM_PARADISE and not self.door_locks_active:
+            return "Paradise Plaza"
+        if loc_name in self.OPENING_STICKERS:
+            return "Security Room"
+        return self.REGION_OVERRIDES.get(loc_name, default)
 
     def _region_table(self, region_name):
         rows = [loc for loc in location_tables[region_name]
-                if self.REGION_OVERRIDES.get(loc.name, region_name) == region_name]
+                if self._region_of(loc.name, region_name) == region_name]
         for table_name, table in location_tables.items():
             if table_name == region_name:
                 continue
             rows.extend(loc for loc in table
-                        if self.REGION_OVERRIDES.get(loc.name) == region_name)
+                        if self._region_of(loc.name, None) == region_name)
         return rows
 
     def create_regions(self):
@@ -529,7 +608,8 @@ class DRWorld(World):
             "Level Ups",
             "Challenges",
             "Zombie Kills",
-            "Kill Sanity"
+            "Kill Sanity",
+            "Item Sanity"
         ]})
 
         # Area pairs that a real door joins in the vanilla table. Under Door
@@ -663,6 +743,7 @@ class DRWorld(World):
         # written out in Rules.py so the prologue ones can skip the area.
         create_connection("Menu", "Zombie Kills")
         create_connection("Menu", "Kill Sanity")
+        create_connection("Menu", "Item Sanity")
 
 
     GOAL_LOCATIONS = {
@@ -773,7 +854,8 @@ class DRWorld(World):
             elif location.category in self.enabled_location_categories:
                 # Skip PP-bonus locations whose required predecessor wasn't
                 # created this seed (set populated in __init__ above).
-                if (location.category == DRLocationCategory.PP_BONUS
+                if (location.category in (DRLocationCategory.PP_BONUS,
+                                          DRLocationCategory.CHALLENGE)
                         and location.name in self._pp_bonus_excluded_names):
                     continue
                 if (location.category == DRLocationCategory.ZOMBIE_KILL
@@ -781,6 +863,8 @@ class DRWorld(World):
                     continue
                 if (location.category == DRLocationCategory.KILL_SANITY
                         and location.name in self._kill_sanity_excluded_names):
+                    continue
+                if location.name in self._item_sanity_dropped_names:
                     continue
                 new_location = DRLocation(
                     self.player,
@@ -865,9 +949,10 @@ class DRWorld(World):
         # their locations don't exist and their completion would only advance
         # story state the goal doesn't need.
         excluded_scoops = MAIN_SCOOP_NAMES if not self.main_scoops_enabled else ()
-        foo = BuildItemPool(self.multiworld, itempoolSize, self.options,
+        foo = BuildItemPool(self.random, itempoolSize, self.options,
                             excluded_scoop_names=excluded_scoops,
-                            door_locks_active=self.door_locks_active)
+                            door_locks_active=self.door_locks_active,
+                            start_key_names=self.start_key_names)
 
         for item in foo:
             itempool.append(self.create_item(item.name))
@@ -889,6 +974,10 @@ class DRWorld(World):
 
 
     def create_item(self, name: str) -> Item:
+        # Universal Tracker asks for its glitched-logic token by name. It has
+        # no id and only ever lives in the tracker's own state.
+        if name == self.glitches_item_name:
+            return DRItem(name, ItemClassification.progression, None, self.player)
         # Skills and stat-upgrade items get Useful classification — guaranteed
         # in the multiworld pool (when enabled) but not part of progression
         # logic. Buffs go to filler. Traps stay trap-classified.
@@ -901,6 +990,13 @@ class DRWorld(World):
             item_classification = ItemClassification.progression
         elif name in specialty_items and self.options.restricted_item_mode:
             item_classification = ItemClassification.progression
+        elif (name in item_sanity_item_names and self.item_sanity
+              and self.options.restricted_item_mode):
+            # Its "Pick up" check waits for it.
+            item_classification = ItemClassification.progression
+        elif name in item_sanity_required_items and self.item_sanity:
+            # A "Pick up" check asks for it.
+            item_classification = ItemClassification.progression
         elif name == "Queen" and self.options.scoop_sanity:
             # Gates queen spawning, so state.has must be able to see it.
             item_classification = ItemClassification.progression
@@ -908,6 +1004,9 @@ class DRWorld(World):
             # The RPG rule asks whether each blender ingredient is obtainable
             # in every mode -- "sent it OR can walk to it" without Restricted,
             # both with it -- so state.has must see them either way.
+            item_classification = ItemClassification.progression
+        elif name in ("Book [Camera 1]", "Book [Camera 2]"):
+            # "Get 10000 PP in one photo" needs both, in every mode.
             item_classification = ItemClassification.progression
         elif name == "Book [Blender]":
             # Both routes to "Kill 100 zombies with an RPG" go through it, and
@@ -933,6 +1032,10 @@ class DRWorld(World):
             # (Mirrors BuildItemPool: skills only join the pool when
             # enable_skill_items is on AND vanilla_progression == replace.)
             item_classification = ItemClassification.progression
+        elif name in overpowered_items:
+            # After the branches above, so the Rocket Launcher stays
+            # progression in Restricted Item Mode.
+            item_classification = ItemClassification.useful
         elif item_dictionary[name].category in useful_categories:
             item_classification = ItemClassification.useful
         elif item_dictionary[name].category == DRItemCategory.TRAP:
@@ -959,12 +1062,14 @@ class DRWorld(World):
         """
         # Security Room's stairs are never shuffled, so Rooftop Key is the
         # first gate under Door Locks too.
-        if not self.options.door_randomizer or self.door_locks_active:
+        if ((not self.options.door_randomizer or self.door_locks_active)
+                and "Rooftop Key" not in self.start_key_names):
             self.multiworld.early_items[self.player]["Rooftop Key"] = 1
 
         # scoop_order is empty for Savior+ScoopSanity (main scoops excluded).
         if self.options.scoop_sanity and self.scoop_order:
-            self.multiworld.early_items[self.player][self.scoop_order[0]] = 1
+            self.multiworld.early_items[self.player][
+                self.early_scoop or self.scoop_order[0]] = 1
 
         # KillSanity: pick this world's kill slots for the local share. The
         # placing happens in stage_pre_fill, pooled across every Dead Rising
@@ -989,14 +1094,17 @@ class DRWorld(World):
                   if getattr(w, "kill_fill_items", None)]
         if not worlds:
             return
+        # The first Dead Rising world's own random drives the shuffle, so a
+        # seed with a single Dead Rising slot never depends on other games.
+        rng = worlds[0].random
         items, slots, backup = [], [], []
         for w in worlds:
             items.extend(w.kill_fill_items)
             slots.extend(w.kill_fill_locations)
             backup.extend(w.kill_backup_locations)
-        multiworld.random.shuffle(items)
-        multiworld.random.shuffle(slots)
-        multiworld.random.shuffle(backup)
+        rng.shuffle(items)
+        rng.shuffle(slots)
+        rng.shuffle(backup)
         for item in items:
             placed = False
             while slots and not placed:
@@ -1018,6 +1126,11 @@ class DRWorld(World):
 
     def set_rules(self) -> None:
         Rules.set_rules(self)
+
+    def set_rule(self, spot, rule) -> None:
+        # Camera Item: a check that takes a photo also needs the Camera,
+        # whatever rule it is given and wherever that is set.
+        super().set_rule(spot, Rules.camera_gate(self, spot, rule))
 
 
     def _door_locks_area_graph(self) -> Dict[str, List[str]]:
@@ -1144,6 +1257,10 @@ class DRWorld(World):
         damage_link_enabled = bool(self.options.damage_link.value)
         damage_link_group = str(self.options.damage_link_group.value or "")
         knockback_link_enabled = bool(self.options.knockback_link.value)
+        trap_link_enabled = bool(self.options.trap_link.value)
+        # Traps the player left a weight on in their yaml. TrapLink only
+        # applies those; the Lua side still reads the list as enabled_traps.
+        enabled_traps = sorted(n for n, w in trap_weights(self.options).items() if w > 0)
         restricted_item_mode_enabled = bool(self.options.restricted_item_mode.value)
         door_randomizer_enabled = bool(self.options.door_randomizer.value)
         door_randomizer_mode = self.options.door_randomizer_mode.value
@@ -1159,6 +1276,7 @@ class DRWorld(World):
             if tiers[self.zombie_kill_tier]
         }
         pp_stickers_filler_enabled = bool(self.options.pp_stickers_filler.value)
+        extra_pp_stickers_enabled = bool(self.options.extra_pp_stickers.value)
         overtime_checks_filler_enabled = bool(self.options.overtime_checks_filler.value)
 
         # Player-stats / progression options (PlayerStats + PlayerBuffs +
@@ -1187,6 +1305,7 @@ class DRWorld(World):
         # 1 is vanilla; the Lua side clamps to the same maximum.
         zombie_spawn_multiplier = int(self.options.zombie_spawn_multiplier.value)
         car_keys_enabled = bool(self.options.car_keys.value)
+        camera_item_enabled = bool(self.options.camera_item.value)
 
         # Costume randomizer toggles. Body-first randomization rule (DLC
         # anchor overrides accessories, regular Body co-randomizes
@@ -1194,6 +1313,10 @@ class DRWorld(World):
         random_starting_costume = bool(self.options.random_starting_costume.value)
         costume_chaos_mode      = bool(self.options.costume_chaos_mode.value)
         dlc_outfits_enabled     = bool(self.options.dlc_outfits_enabled.value)
+        # Music Shuffle is cosmetic: the Lua seeds the shuffle from seed + slot.
+        music_shuffle = bool(self.options.music_shuffle.value)
+        infinity_drain = bool(self.options.infinity_drain.value)
+        infinity_drain_rate = int(self.options.infinity_drain_rate.value)
 
         # PP-bonus location toggle + the per-entry firing-rule data the Lua
         # side needs to convert MsgEvents fires into AP location checks.
@@ -1203,53 +1326,58 @@ class DRWorld(World):
         # we send a per-N list plus an all_location_name keyed off all_msg_no.
         pp_bonus_locations_enabled = bool(self.options.pp_bonus_locations.value)
         pp_bonus_trigger_data: List[Dict[str, Any]] = []
-        if pp_bonus_locations_enabled:
-            for _entry in AP_TRIGGER_LOCATIONS:
-                _names = expand_trigger_location_names(_entry)
-                if not _names:
-                    continue
-                # Skip entries whose required-predecessor location wasn't
-                # created this seed (matches the create_region filter).
-                # Lua wouldn't be able to resolve these names to AP IDs
-                # anyway -- pruning here saves the failed lookups.
-                if any(n in self._pp_bonus_excluded_names for n in _names):
-                    continue
-                _t = _entry.get("type")
-                _d: Dict[str, Any] = {
-                    "id":      _entry.get("id"),
-                    "list":    _entry.get("list"),
-                    "msg_no":  _entry.get("msg_no"),
-                    "type":    _t,
-                }
-                if _t == "single":
-                    _d["location_name"] = _entry.get("location_name")
-                elif _t == "counted":
-                    # Per-count names: index N-1 -> name for count N
-                    _max = int(_entry.get("max_count", 0))
-                    # The first _max items in _names are the per-count names
-                    # Instance entries have no counted names any more, so
-                    # there is nothing for Lua to fall back to -- and sending
-                    # one would name a location this seed does not have.
-                    _d["count_names"] = ([] if _entry.get("instances")
-                                         else _names[:_max])
-                    # The all-X name goes through whenever it is set: Lua
-                    # sends every instance once the all-X is out, whether the
-                    # game announced it (all_msg_no) or a challenge counter did.
-                    if _entry.get("all_msg_no") is not None:
-                        _d["all_msg_no"] = _entry["all_msg_no"]
-                    if _entry.get("all_location_name"):
-                        _d["all_location_name"] = _entry["all_location_name"]
-                    # Per-object positions, so Lua can name the one that was
-                    # actually used rather than counting. Passed through as-is;
-                    # the Lua side decides how to match on them.
-                    if _entry.get("instances"):
-                        _d["instances"] = _entry["instances"]
-                        _d["match"]     = _entry.get("match", "nearest")
-                        for _k in ("om_type", "method", "state_field",
-                                   "state_enum", "state_from"):
-                            if _entry.get(_k):
-                                _d[_k] = _entry[_k]
-                pp_bonus_trigger_data.append(_d)
+        # The three key-item pickups are ordinary checks on every seed; the
+        # rest of the table belongs to the PP Bonus option.
+        _always_on_triggers = {"todo_maint_key", "todo_mall_map", "todo_first_aid"}
+        for _entry in AP_TRIGGER_LOCATIONS:
+            if (not pp_bonus_locations_enabled
+                    and _entry.get("id") not in _always_on_triggers):
+                continue
+            _names = expand_trigger_location_names(_entry)
+            if not _names:
+                continue
+            # Skip entries whose required-predecessor location wasn't
+            # created this seed (matches the create_region filter).
+            # Lua wouldn't be able to resolve these names to AP IDs
+            # anyway -- pruning here saves the failed lookups.
+            if any(n in self._pp_bonus_excluded_names for n in _names):
+                continue
+            _t = _entry.get("type")
+            _d: Dict[str, Any] = {
+                "id":      _entry.get("id"),
+                "list":    _entry.get("list"),
+                "msg_no":  _entry.get("msg_no"),
+                "type":    _t,
+            }
+            if _t == "single":
+                _d["location_name"] = _entry.get("location_name")
+            elif _t == "counted":
+                # Per-count names: index N-1 -> name for count N
+                _max = int(_entry.get("max_count", 0))
+                # The first _max items in _names are the per-count names
+                # Instance entries have no counted names any more, so
+                # there is nothing for Lua to fall back to -- and sending
+                # one would name a location this seed does not have.
+                _d["count_names"] = ([] if _entry.get("instances")
+                                     else _names[:_max])
+                # The all-X name goes through whenever it is set: Lua
+                # sends every instance once the all-X is out, whether the
+                # game announced it (all_msg_no) or a challenge counter did.
+                if _entry.get("all_msg_no") is not None:
+                    _d["all_msg_no"] = _entry["all_msg_no"]
+                if _entry.get("all_location_name"):
+                    _d["all_location_name"] = _entry["all_location_name"]
+                # Per-object positions, so Lua can name the one that was
+                # actually used rather than counting. Passed through as-is;
+                # the Lua side decides how to match on them.
+                if _entry.get("instances"):
+                    _d["instances"] = _entry["instances"]
+                    _d["match"]     = _entry.get("match", "nearest")
+                    for _k in ("om_type", "method", "state_field",
+                               "state_enum", "state_from"):
+                        if _entry.get(_k):
+                            _d[_k] = _entry[_k]
+            pp_bonus_trigger_data.append(_d)
 
         slot_data = {
             "options": {
@@ -1262,8 +1390,11 @@ class DRWorld(World):
                 "damage_link": damage_link_enabled,
                 "damage_link_group": damage_link_group,
                 "knockback_link": knockback_link_enabled,
+                "trap_link": trap_link_enabled,
+                "enabled_traps": enabled_traps,
                 "restricted_item_mode": restricted_item_mode_enabled,
                 "spitter_only": self.spitter_only,
+                "item_sanity": self.item_sanity,
                 "door_randomizer": door_randomizer_enabled,
                 "door_randomizer_mode": door_randomizer_mode,
                 "scoop_sanity": scoop_sanity_enabled,
@@ -1294,11 +1425,16 @@ class DRWorld(World):
                 "hardcore_zombies_enabled": hardcore_zombies_enabled,
                 "zombie_spawn_multiplier": zombie_spawn_multiplier,
                 "car_keys": car_keys_enabled,
+                "camera_item": camera_item_enabled,
                 "random_starting_costume": random_starting_costume,
                 "costume_chaos_mode": costume_chaos_mode,
                 "dlc_outfits_enabled": dlc_outfits_enabled,
+                "music_shuffle": music_shuffle,
+                "infinity_drain": infinity_drain,
+                "infinity_drain_rate": infinity_drain_rate,
                 "pp_bonus_locations": pp_bonus_locations_enabled,
                 "pp_stickers_filler": pp_stickers_filler_enabled,
+                "extra_pp_stickers": extra_pp_stickers_enabled,
                 "overtime_checks_filler": overtime_checks_filler_enabled,
             },
             "goal": goal,
@@ -1309,8 +1445,11 @@ class DRWorld(World):
             "damage_link": damage_link_enabled,
             "damage_link_group": damage_link_group,
             "knockback_link": knockback_link_enabled,
+            "trap_link": trap_link_enabled,
+            "enabled_traps": enabled_traps,
             "restricted_item_mode": restricted_item_mode_enabled,
             "spitter_only": self.spitter_only,
+            "item_sanity": self.item_sanity,
             "door_randomizer": door_randomizer_enabled,
             "door_randomizer_mode": door_randomizer_mode,  # For Lua: 0 = chaos, 1 = paired
             "door_redirects": self.door_redirects if door_randomizer_enabled else {},
@@ -1342,7 +1481,8 @@ class DRWorld(World):
             "zombie_kill_thresholds": zombie_kill_thresholds,
             "scoop_order": self.scoop_order if scoop_sanity_enabled else {},
             # The Kent day each Progressive Kent Scoop copy unlocks, in order.
-            "kent_progression": KENT_DAYS if scoop_sanity_enabled else [],
+            # Empty: this seed sends each day as its own item.
+            "kent_progression": KENT_DAYS if kent_is_progressive(self.options) else [],
             # Player-stats slot data (read by Lua on slot connect)
             "vanilla_progression": vanilla_progression_value,
             "trap_percentage": trap_percentage,
@@ -1356,10 +1496,15 @@ class DRWorld(World):
             "hardcore_zombies_enabled": hardcore_zombies_enabled,
             "zombie_spawn_multiplier": zombie_spawn_multiplier,
             "car_keys": car_keys_enabled,
+            "camera_item": camera_item_enabled,
             "random_starting_costume": random_starting_costume,
             "costume_chaos_mode": costume_chaos_mode,
             "dlc_outfits_enabled": dlc_outfits_enabled,
+            "music_shuffle": music_shuffle,
+            "infinity_drain": infinity_drain,
+            "infinity_drain_rate": infinity_drain_rate,
             "pp_stickers_filler": pp_stickers_filler_enabled,
+            "extra_pp_stickers": extra_pp_stickers_enabled,
             "pp_bonus_locations": pp_bonus_locations_enabled,
             "pp_bonus_trigger_data": pp_bonus_trigger_data,
             "hints": hints,
@@ -1472,6 +1617,13 @@ class DRWorld(World):
     def write_spoiler(self, spoiler_handle) -> None:
         if self.options.scoop_sanity and self.scoop_order:
             player_name = self.multiworld.get_player_name(self.player)
+            if self.options.main_scoops_any_order:
+                spoiler_handle.write(
+                    f"\nScoopSanity Main Scoops, any order ({player_name}):\n")
+                for scoop_name in self.scoop_order:
+                    spoiler_handle.write(f"  {scoop_name}\n")
+                spoiler_handle.write(f"  Placed early: {self.early_scoop}\n")
+                return
             spoiler_handle.write(f"\nScoopSanity Main Scoop Order ({player_name}):\n")
             for i, scoop_name in enumerate(self.scoop_order):
                 spoiler_handle.write(f"  {i + 1}. {scoop_name}\n")

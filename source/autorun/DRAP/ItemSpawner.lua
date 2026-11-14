@@ -583,9 +583,17 @@ local function is_overtime_item(item_name)
     return overtime_names[item_name] == true
 end
 
+--- The Camera Item (CameraLock) unlocks the shutter. It is a lock like the
+--- keys, not something to spawn -- Frank always has the camera -- so it sits
+--- on the Keys tab instead of the spawnable items.
+local function is_lock_item(item_name)
+    return item_name == "Camera"
+end
+
 local function is_effect_item(item_name)
     if not item_name then return false end
     if is_overtime_item(item_name) then return true end
+    if is_lock_item(item_name) then return true end
 
     -- Filter out scoop/milestone event items handled by ScoopUnlocker
     local su = get_scoop_unlocker()
@@ -643,6 +651,7 @@ local function is_key_item(item_name)
     if not item_name then return false end
     if item_name == "Hockey Stick" then return false end
     if is_overtime_item(item_name) then return true end
+    if is_lock_item(item_name) then return true end
     return string.find(string.lower(item_name), "key", 1, true) ~= nil
 end
 

@@ -120,6 +120,48 @@ local function release_night_clock(gm)
         restore, restore / 108000))
 end
 
+------------------------------------------------------------
+-- Night Trap hold
+------------------------------------------------------------
+-- A short midnight for the Night Trap, separate from night_clock_armed (the
+-- YAML hold) so the one ending never takes the other's state with it. Unlike
+-- the YAML hold it also freezes time itself, because it has to work when time
+-- is running. What it owes back: the mClock it replaced, and mTimeAdd when it
+-- was the one that zeroed it.
+
+local trap_held_clock = nil     -- the mClock we replaced; nil when not holding
+local trap_time_add = nil       -- mTimeAdd to give back, nil when not ours
+
+local function trap_frozen_elsewhere()
+    return manual_freeze_enabled or cap_freeze_enabled
+end
+
+--- Keep the world at midnight: a cutscene, a load or the speed buttons will
+--- have moved it.
+local function enforce_trap_night(gm)
+    if trap_held_clock == nil or not gm then return end
+    if tonumber(gm.mTimeAdd) ~= 0 then gm.mTimeAdd = 0 end
+    if tonumber(gm.mClock) ~= NIGHT_CLOCK then gm.mClock = NIGHT_CLOCK end
+end
+
+--- Give the clock back, never earlier than the run start. Safe to call when
+--- not holding.
+--- @return number|nil the clock written, nil if there was nothing to give back
+local function release_trap_night()
+    if trap_held_clock == nil then return nil end
+    local restore = math.max(trap_held_clock, RUN_START_CLOCK)
+    local add = trap_time_add
+    trap_held_clock, trap_time_add = nil, nil
+    local gm = gm_mgr:get()
+    if not gm then return restore end
+    gm.mClock = restore
+    if add ~= nil and not trap_frozen_elsewhere() and tonumber(gm.mTimeAdd) == 0 then
+        gm.mTimeAdd = add
+    end
+    M.log(string.format("Night trap: clock released to %d (%.2fh)", restore, restore / 108000))
+    return restore
+end
+
 local function apply_gate_state()
     -- Don't interfere while turbo advance is running
     if turbo_active then return end
@@ -220,6 +262,7 @@ local function start_turbo()
     -- Before anything runs the clock forward. Turbo from midnight would cross
     -- the prologue's scheduled events at 35h and 36h on its way to the target.
     release_night_clock(gm_mgr:get())
+    release_trap_night()
 
     gts.SpeedUpTurboValue = TURBO_SPEED_VALUE
     gts:call("switchTimeSpeedMode(app.solid.gamemastering.GameTimeSpeedManager.Mode)", 2)
@@ -358,6 +401,33 @@ function M.set_night_clock(on)
     return night_clock_armed
 end
 
+--- Night Trap: hold midnight and freeze time until end_trap_night. Refused
+--- when the YAML hold owns the clock or the clock cannot be read.
+--- @return boolean started, number|nil replaced the mClock that is owed back
+function M.begin_trap_night()
+    if trap_held_clock ~= nil then return true, trap_held_clock end
+    if night_clock_armed or turbo_active then return false end
+    local gm = gm_mgr:get()
+    if not gm then return false end
+    local cur = tonumber(gm.mClock)
+    if cur == nil then return false end
+    -- Already midnight with nobody holding it: nothing real to give back.
+    if cur < RUN_START_CLOCK then cur = RUN_START_CLOCK end
+    local add = tonumber(gm.mTimeAdd)
+    trap_time_add = (add ~= nil and add ~= 0) and add or nil
+    trap_held_clock = cur
+    enforce_trap_night(gm)
+    M.log(string.format("Night trap: mClock %d -> %d (midnight), time frozen", cur, NIGHT_CLOCK))
+    return true, cur
+end
+
+--- Give the clock back. @return number|nil the clock restored
+function M.end_trap_night()
+    return release_trap_night()
+end
+
+function M.is_trap_night_held() return trap_held_clock ~= nil end
+
 --- Whether the clock is currently being held at midnight.
 function M.is_night_clock_held()
     return night_clock_armed and night_clock_held ~= nil
@@ -415,6 +485,9 @@ function M.set_game_time(day, hour, minute)
         M.log("set_game_time: no GameManager")
         return false
     end
+
+    -- A Night Trap still holding midnight would drag this write straight back.
+    release_trap_night()
 
     local target = clock_ticks(day, hour, minute)
     local before = tonumber(gm.mClock)
@@ -555,6 +628,9 @@ function M.on_frame()
     if not speed_up_unlock_hooked then
         pcall(speed_up_unlock_hook)
     end
+
+    -- Before the testing-mode exit: a trap that has started must also finish.
+    if trap_held_clock ~= nil then pcall(enforce_trap_night, gm_mgr:get()) end
 
     if testing_mode then return end
 

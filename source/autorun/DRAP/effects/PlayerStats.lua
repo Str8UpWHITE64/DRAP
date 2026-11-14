@@ -137,6 +137,9 @@ end
 -- where stat enforcement doesn't run.
 local god_run_level = nil
 
+-- Defined below; declared here so set_god_run_level resolves the local.
+local _target_values
+
 function M.set_god_run_level(level)
     god_run_level = tonumber(level)
     local psm = _psm()
@@ -144,6 +147,10 @@ function M.set_god_run_level(level)
     if god_run_level then
         pcall(function() psm:call("setPlayerRunLevel", god_run_level) end)
     else
+        if progression_mode == "extra_buffs_only" then
+            M.apply()   -- target needs the engine base, which only apply() reads
+            return
+        end
         local t = _target_values()
         pcall(function() psm:call("setPlayerRunLevel", t.run_level) end)
     end
@@ -164,18 +171,78 @@ local attack_override_saved = nil
 -- this floor instead of handing the player a working punch.
 local melee_floor = nil
 
--- Compute target value for each stat (baseline + delta).
-local function _target_values()
+-- Compute target value for each stat (base + delta). `base` is the L1
+-- BASELINE in replace mode; in extra_buffs_only it is the engine's own value
+-- with our previous deltas taken back out (see _ebo_bases).
+_target_values = function(base)
+    base = base or BASELINE
     return {
-        hp_max      = BASELINE.hp_max      + stat_deltas.hp_max,
+        hp_max      = base.hp_max      + stat_deltas.hp_max,
         attack_pct  = attack_override or melee_floor
-                      or (BASELINE.attack_pct + stat_deltas.attack_pct),
-        throw_power = BASELINE.throw_power + stat_deltas.throw_power,
+                      or (base.attack_pct + stat_deltas.attack_pct),
+        throw_power = base.throw_power + stat_deltas.throw_power,
         run_level   = god_run_level
-                      or (BASELINE.run_level + stat_deltas.run_level),
-        item_buff   = BASELINE.item_buff   + stat_deltas.item_buff,
+                      or (base.run_level + stat_deltas.run_level),
+        item_buff   = base.item_buff   + stat_deltas.item_buff,
         speed_mul   = BASELINE.speed_mul   + stat_deltas.speed_mul,
     }
+end
+
+------------------------------------------------------------
+-- extra_buffs_only: engine values are the base, AP deltas ride on top
+------------------------------------------------------------
+-- The engine saves whatever we wrote, so a stored value cannot tell "engine
+-- gain" from "our delta". For every stat we remember what we last wrote and
+-- the engine base it was built from. If the engine still holds exactly what we
+-- wrote, the base is the remembered one; if it holds anything else (a level-up,
+-- an older save loaded, another writer) that value IS the new engine base.
+-- Repeated apply() calls therefore never stack the deltas. Both maps are
+-- persisted with the player_stats section so a reload recognises its own writes.
+local ebo_written = {}   -- { [stat] = value we last wrote }
+local ebo_base    = {}   -- { [stat] = engine base that value was built from }
+
+local EBO_FIELD = {
+    hp_max = "PlayerVitalMax", attack_pct = "PlayerAttackPercent",
+    throw_power = "PlayerThrowPower", run_level = "PlayerRunLevel",
+    item_buff = "PlayerItemBuffMax", buttobi = "PlayerButtobiPercent",
+}
+local EBO_SETTER = {
+    hp_max = "setPlayerVitalMax", attack_pct = "setPlayerAttackPercent",
+    throw_power = "setPlayerThrowPower", run_level = "setPlayerRunLevel",
+    item_buff = "setPlayerItemBuffMax", buttobi = "setPlayerButtobiPercent",
+}
+
+local function _read_field(psm, name)
+    local v
+    pcall(function() v = psm:get_field(name) end)
+    return tonumber(v)
+end
+
+local function _ebo_base_of(k, cur)
+    if cur == nil then return nil end
+    local w = ebo_written[k]
+    if w ~= nil and ebo_base[k] ~= nil and math.abs(cur - w) < 0.5 then
+        return ebo_base[k]
+    end
+    return cur
+end
+
+-- Engine base for each stat (second return: the raw bases, nil where the
+-- field could not be read). An unreadable stat falls back to the L1 baseline
+-- for the target only and is not written.
+local function _ebo_bases(psm)
+    local b = {}
+    for k, f in pairs(EBO_FIELD) do
+        b[k] = _ebo_base_of(k, _read_field(psm, f))
+    end
+    local out = {
+        hp_max      = b.hp_max      or BASELINE.hp_max,
+        attack_pct  = b.attack_pct  or BASELINE.attack_pct,
+        throw_power = b.throw_power or BASELINE.throw_power,
+        run_level   = b.run_level   or BASELINE.run_level,
+        item_buff   = b.item_buff   or BASELINE.item_buff,
+    }
+    return out, b
 end
 
 -- Build the bitfield. Iterates SKILL_BY_NAME (string keys) rather than
@@ -281,7 +348,89 @@ function M.clear_attack_override()
     end
 end
 
+-- Skills the engine already granted plus ours. Never clears a bit.
+local function _write_skills_additive(psm, cur_bits)
+    cur_bits = cur_bits or 0
+    local bits = cur_bits | _skill_bitfield()
+    if bits == cur_bits then return end
+    pcall(function() psm:call("setPlayerSkill", bits) end)
+    pcall(function() psm:call("set_PlayerSkillBits", bits) end)
+    pcall(function() psm:set_field("PlayerSkill", bits) end)
+end
+
+local function _write_speed_table(t)
+    local scaled = {}
+    for i, v in ipairs(SPEED_TABLE_BASE) do scaled[i] = v * t.speed_mul end
+    _set_speed_table(scaled)
+end
+
+-- extra_buffs_only: engine base + AP deltas, written only where it differs.
+-- Returns true when the remembered write/base maps changed (caller persists).
+local function _apply_extra(psm, hpc)
+    local bases, raw = _ebo_bases(psm)
+    local t = _target_values(bases)
+
+    local want = {
+        hp_max = t.hp_max, attack_pct = t.attack_pct,
+        throw_power = t.throw_power, run_level = t.run_level,
+        item_buff = t.item_buff,
+    }
+    -- Knockback follows attack: the engine's own value plus 0.8 of our gain.
+    local butt_base = raw.buttobi
+    if butt_base == nil then
+        butt_base = math.floor(100 + 0.8 * (bases.attack_pct - 100) + 0.5)
+    end
+    want.buttobi = math.floor(butt_base + 0.8 * (t.attack_pct - bases.attack_pct) + 0.5)
+    local base_of = {
+        hp_max = bases.hp_max, attack_pct = bases.attack_pct,
+        throw_power = bases.throw_power, run_level = bases.run_level,
+        item_buff = bases.item_buff, buttobi = butt_base,
+    }
+
+    local changed = false
+    for k, v in pairs(want) do
+        if raw[k] ~= nil then
+            local cur = _read_field(psm, EBO_FIELD[k])
+            if cur ~= v then
+                pcall(function() psm:call(EBO_SETTER[k], v) end)
+            end
+            if ebo_written[k] ~= v or ebo_base[k] ~= base_of[k] then changed = true end
+            ebo_written[k] = v
+            ebo_base[k] = base_of[k]
+        end
+    end
+    if hpc and raw.hp_max ~= nil then
+        pcall(function() hpc:call("set_DefaultHitPoint", want.hp_max) end)
+    end
+
+    if stat_deltas.speed_mul ~= 0 then _write_speed_table(t) end
+
+    -- Skills: the engine's stay, ours are added.
+    _write_skills_additive(psm, _read_field(psm, "PlayerSkill"))
+    return changed
+end
+
+-- Hand the engine its own base back (our deltas taken out) so a level-up
+-- computes from clean values whether it sets or adds. apply() re-adds ours.
+local function _ebo_strip(psm)
+    for k, f in pairs(EBO_FIELD) do
+        local cur = _read_field(psm, f)
+        local base = _ebo_base_of(k, cur)
+        if cur ~= nil and base ~= nil and base ~= cur then
+            pcall(function() psm:call(EBO_SETTER[k], base) end)
+        end
+        if base ~= nil then
+            ebo_written[k] = base
+            ebo_base[k] = base
+        end
+    end
+end
+
 -- Write canonical DRAP state into the engine. Idempotent -- call any time.
+--
+-- Current HP is never refilled. It only rises by however much max HP rose
+-- (and is clamped to a lowered max), so a door, a save load or a grant cannot
+-- heal Frank -- the Infinity drain relies on that.
 function M.apply()
     -- Both callers are sdk.hooks, which fire whether or not the frame loop
     -- is gated, and load_save() can restore a mode from an earlier run.
@@ -297,44 +446,69 @@ function M.apply()
     local hpc = _hpc()
     if not psm then return end
 
-    local t = _target_values()
+    local old_max = _read_field(psm, "PlayerVitalMax")
+    local old_cur
+    pcall(function() old_cur = tonumber(psm:call("getVitalNew")) end)
 
-    -- HP -- both PSM (save state) AND live HitPointController (UI/combat)
-    if hpc then
-        pcall(function() hpc:call("set_DefaultHitPoint", t.hp_max) end)
-        pcall(function() hpc:call("set_CurrentHitPoint", t.hp_max) end)
+    local new_max
+    local changed = false
+    if progression_mode == "extra_buffs_only" then
+        changed = _apply_extra(psm, hpc)
+        new_max = ebo_written.hp_max
+    else
+        local t = _target_values()
+        new_max = t.hp_max
+
+        -- Max HP only; current HP is settled below.
+        if hpc then
+            pcall(function() hpc:call("set_DefaultHitPoint", t.hp_max) end)
+        end
+        pcall(function() psm:call("setPlayerVitalMax", t.hp_max) end)
+
+        -- Attack% + paired Buttobi (KB = 100 + 0.8 * (atk-100))
+        local kb = math.floor(100 + 0.8 * (t.attack_pct - 100) + 0.5)
+        pcall(function() psm:call("setPlayerAttackPercent", t.attack_pct) end)
+        pcall(function() psm:call("setPlayerButtobiPercent", kb) end)
+
+        -- Throw, run, item buff
+        pcall(function() psm:call("setPlayerThrowPower", t.throw_power) end)
+        pcall(function() psm:call("setPlayerRunLevel", t.run_level) end)
+        pcall(function() psm:call("setPlayerItemBuffMax", t.item_buff) end)
+
+        -- Speed multiplier scales the LevelSpeedMax table
+        _write_speed_table(t)
+
+        -- Skill bitfield -- write to all three engine storage paths (field,
+        -- setter method, property setter). Clear-then-write defends against
+        -- any setter that's accidentally OR-style. See player_stats.md.
+        local target_bits = _skill_bitfield()
+        pcall(function() psm:call("setPlayerSkill", 0) end)
+        pcall(function() psm:call("setPlayerSkill", target_bits) end)
+        pcall(function() psm:call("set_PlayerSkillBits", 0) end)
+        pcall(function() psm:call("set_PlayerSkillBits", target_bits) end)
+        pcall(function() psm:set_field("PlayerSkill", target_bits) end)
     end
-    pcall(function() psm:call("setPlayerVitalMax", t.hp_max) end)
-    pcall(function() psm:set_field("_PlayerVitalNew", t.hp_max) end)
-
-    -- Attack% + paired Buttobi (KB = 100 + 0.8 * (atk-100))
-    local kb = math.floor(100 + 0.8 * (t.attack_pct - 100) + 0.5)
-    pcall(function() psm:call("setPlayerAttackPercent", t.attack_pct) end)
-    pcall(function() psm:call("setPlayerButtobiPercent", kb) end)
-
-    -- Throw, run, item buff
-    pcall(function() psm:call("setPlayerThrowPower", t.throw_power) end)
-    pcall(function() psm:call("setPlayerRunLevel", t.run_level) end)
-    pcall(function() psm:call("setPlayerItemBuffMax", t.item_buff) end)
-
-    -- Speed multiplier scales the LevelSpeedMax table
-    local scaled = {}
-    for i, v in ipairs(SPEED_TABLE_BASE) do scaled[i] = v * t.speed_mul end
-    _set_speed_table(scaled)
-
-    -- Skill bitfield -- write to all three engine storage paths (field,
-    -- setter method, property setter). Clear-then-write defends against
-    -- any setter that's accidentally OR-style. See player_stats.md.
-    local target_bits = _skill_bitfield()
-    pcall(function() psm:call("setPlayerSkill", 0) end)
-    pcall(function() psm:call("setPlayerSkill", target_bits) end)
-    pcall(function() psm:call("set_PlayerSkillBits", 0) end)
-    pcall(function() psm:call("set_PlayerSkillBits", target_bits) end)
-    pcall(function() psm:set_field("PlayerSkill", target_bits) end)
 
     -- Refresh UI
     pcall(function() psm:set_field("<LevelUpdated>k__BackingField", true) end)
     pcall(function() psm:call("applyPlayerValue") end)
+
+    -- Current HP: what Frank had, plus the max-HP increase, clamped to max.
+    if old_cur ~= nil and old_cur > 0 and new_max ~= nil then
+        local want_cur = old_cur
+        if old_max ~= nil and new_max > old_max then
+            want_cur = want_cur + (new_max - old_max)
+        end
+        if want_cur > new_max then want_cur = new_max end
+        local now
+        pcall(function() now = tonumber(psm:call("getVitalNew")) end)
+        if now ~= want_cur then
+            if hpc then pcall(function() hpc:call("set_CurrentHitPoint", want_cur) end) end
+            pcall(function() psm:set_field("_PlayerVitalNew", want_cur) end)
+        end
+    end
+
+    if changed then M.save_state() end
 end
 
 -- Reset to vanilla L1 baseline (clears all deltas + skills)
@@ -439,6 +613,8 @@ function M.save_state()
         granted_skills = skill_names,
         stat_deltas    = stat_deltas,
         progression    = progression_mode,
+        ebo_written    = ebo_written,
+        ebo_base       = ebo_base,
     }
     -- Run ledger is the primary store; legacy standalone file is only a
     -- pre-connect fallback.
@@ -488,6 +664,19 @@ function M.load_save()
 
     if type(data.progression) == "string" then
         progression_mode = data.progression
+    end
+
+    -- What we last wrote on top of the engine's values (extra_buffs_only), so
+    -- the first apply() after a reload takes our own deltas back out.
+    ebo_written, ebo_base = {}, {}
+    if type(data.ebo_written) == "table" and type(data.ebo_base) == "table" then
+        for k in pairs(EBO_FIELD) do
+            local w, b = tonumber(data.ebo_written[k]), tonumber(data.ebo_base[k])
+            if w ~= nil and b ~= nil then
+                ebo_written[k] = w
+                ebo_base[k] = b
+            end
+        end
     end
 
     log(string.format("Loaded state: %d skills granted (deltas reset for rebuild), mode=%s",
@@ -594,12 +783,18 @@ local function _install_hooks()
             function(args)
                 if progression_mode == "replace" then
                     pre_snapshot = _capture_engine_values()
+                elseif progression_mode == "extra_buffs_only"
+                        and Activation.is_active() then
+                    local psm = _psm()
+                    if psm then _ebo_strip(psm) end
                 end
             end,
             function(retval)
                 if progression_mode == "replace" then
                     local post = _capture_engine_values()
                     _log_vanilla_overrides(pre_snapshot, post)
+                    M.apply()
+                elseif progression_mode == "extra_buffs_only" then
                     M.apply()
                 end
                 return retval
@@ -637,7 +832,12 @@ local function _install_skill_watchdog()
         cur = tonumber(cur)
         if cur == nil then return end
         local target = _skill_bitfield()
-        if cur == target then return end
+        if progression_mode == "extra_buffs_only" then
+            -- The engine owns skills here; only a missing AP-granted bit is drift.
+            if (cur & target) == target then return end
+        elseif cur == target then
+            return
+        end
 
         local key = string.format("%d:%d", cur, target)
         if key ~= _last_logged_drift then

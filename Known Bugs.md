@@ -33,11 +33,15 @@ This is a known bug in 1.1 and is being investigated. If the AP client shows you
 2) Stop the program, restart it, and connect to the AP
 3) Start a new save file and have it continue over the existing file, similar to the despawning bug issue.
 
-## Why Is "Kill Driving Carlito"/"Rescue Greg Simpson"/"Rescue Simone Ravendark" Listed As A Blacklisted Check In UT?
+## Why Is "Rescue Simone Ravendark" Listed As A Blacklisted Check In UT?
 
-"Kill Driving Carlito" is only available during The Last Resort. It is missable. If you are playing ScoopSanity, it is automatically blacklisted, contains a filler item, and can be ignored.
+Due to technical issues in 1.1, "Rescue Simone Ravendark" is blacklisted in all game modes. This check contains a filler item instead.
 
-Due to technical issues in 1.1, "Rescue Greg Simpson" is blacklisted in ScoopSanity and "Rescue Simone Ravendark" is blacklisted in all game modes. Both these checks contain filler items instead.
+## Drivin' Carlito After The Last Resort
+
+With ScoopSanity on, "Beat Drivin Carlito" is a normal check. If you finish The Last Resort without beating him, he is back in the Maintenance Tunnel the next time you go in, until you beat him, also after Save and Start Over or loading an older save. Once the ending is reached (Overtime included) he is gone for good.
+
+With ScoopSanity off, Drivin' Carlito works as in the normal game: he is only in the tunnel during The Last Resort. "Beat Drivin Carlito" is an excluded location there, so it never holds anything important, and it is still sent if you do beat him.
 
 ## I Grabbed The Maintenance Tunnel Access Key In The Maintenance Tunnel But I Still Logically Can't Access Another Area
 
@@ -68,11 +72,11 @@ The mod keeps a log of every play session. When you report something, **attach t
 Logs live in your game folder under:
 
 ```
-reframework/data/DRAP_Logs/
+reframework/data/DRAP/logs/
 ```
 
-Each session gets its own file, named for when you started the game — `drap_20260725_143012.log` — so opening the game again never erases the log from the run where the bug happened. If you're not sure which file you want, `latest.json` in that folder names the most recent one. Grab the log from the session where the problem occurred, not just the newest one.
+Each session gets its own file, named for when you started the game — `AP_2026-07-25_14-30-12.log` — so opening the game again never erases the log from the run where the bug happened. The ten newest keep their text; older ones are emptied. Grab the log from the session where the problem occurred, not just the newest one. Copying the file while the game is running is fine.
 
-You can also find the exact path in-game: open the Archipelago window and click the **Log** tab. It shows the file path along with a running count of any warnings and errors. Copying the file while the game is running is fine.
+Every line is plain text with areas, items and locations by name, for example `14:03:22.118 INFO  [items]  Received Wooden Sword from Player2`. A `STATE` line every five minutes, and right after you connect, shows where you were, the day and time, health, and your item and check counts. Debug lines are off by default; set `"debug_log": true` in `reframework/data/DRAP/log_config.json` to include them.
 
 If you're reporting a crash, send the log from the session that crashed — the last lines before it died are usually the useful part.

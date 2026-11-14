@@ -275,8 +275,15 @@ local function record_trigger(origin_code, jump_name, hitdata, li)
     if not x then return end
     local list = door_triggers[origin_code]
     if not list then list = {}; door_triggers[origin_code] = list end
+    local DR = AP and AP.DoorRandomizer
+    local real, door_id = jump_name, nil
+    if DR and DR.resolve_destination then
+        real, door_id = DR.resolve_destination("SCN_" .. origin_code, jump_name, hitdata)
+    end
     table.insert(list, {
         to = jump_name, x = x, y = y, z = z,
+        -- Where this door really leads, shuffled or not.
+        real = real or jump_name, door_id = door_id,
         radius = tonumber(Shared.safe(function() return hitdata:get_field("mRadius") end)) or 0,
         height = tonumber(Shared.safe(function() return hitdata:get_field("mHeight") end)) or 0,
     })
@@ -513,6 +520,71 @@ function M.can_reach_area(area_code, start_code)
         return true
     end
     return M.reachable_areas(start_code)[tostring(area_code)] == true
+end
+
+--- Every door as a real edge: { from, to } with the shuffle applied.
+local function real_door_edges()
+    local DV = AP and AP.DoorVisualizer
+    local DR = AP and AP.DoorRandomizer
+    local doors = DV and DV.vanilla_doors and DV.vanilla_doors() or {}
+    local redirects = DR and DR.get_redirects and DR.get_redirects() or {}
+    local edges = {}
+    for door_id, d in pairs(doors) do
+        local r = redirects[door_id]
+        local to = r and r.target_area and tostring(r.target_area) or d.to_area
+        edges[#edges + 1] = { from = d.from_area, to = SCENE_ALIASES[to] or to }
+    end
+    return edges
+end
+
+--- True when the game's own route across areas cannot be trusted: it walks its
+--- vanilla portal table, which knows nothing of shuffled or locked doors.
+function M.route_is_unreliable()
+    local DR = AP and AP.DoorRandomizer
+    if DR and DR.is_enabled and DR.is_enabled() then return true end
+    for _, e in ipairs(real_door_edges()) do
+        if door_is_locked(e.from, e.to) then return true end
+    end
+    return false
+end
+
+--- The door in `scene` to take towards `goal`, over the doors that are really
+--- there and open. Returns the door's trigger ({ x, y, z, real, ... }), false
+--- when no open way leads there, or nil when `goal` is no door's destination.
+function M.next_door(scene, goal, px, pz)
+    goal = SCENE_ALIASES[goal] or goal
+    local into = {}          -- destination -> areas with an open door to it
+    local known = false
+    for _, e in ipairs(real_door_edges()) do
+        if e.to == goal then known = true end
+        if not door_is_locked(e.from, e.to) then
+            into[e.to] = into[e.to] or {}
+            table.insert(into[e.to], e.from)
+        end
+    end
+    if not known then return nil end
+    local hops, queue, head = { [goal] = 0 }, { goal }, 1
+    while queue[head] do
+        local at = queue[head]; head = head + 1
+        for _, from in ipairs(into[at] or {}) do
+            if hops[from] == nil then
+                hops[from] = hops[at] + 1
+                queue[#queue + 1] = from
+            end
+        end
+    end
+    local best, best_hops, best_d2 = nil, math.huge, math.huge
+    for _, t in ipairs(M.door_triggers(scene)) do
+        local to = SCENE_ALIASES[t.real] or t.real
+        local h = hops[to]
+        if h and to ~= scene and not door_is_locked(scene, to) then
+            local d2 = (px and pz) and ((px - t.x) ^ 2 + (pz - t.z) ^ 2) or 0
+            if h < best_hops or (h == best_hops and d2 < best_d2) then
+                best, best_hops, best_d2 = t, h, d2
+            end
+        end
+    end
+    return best or false
 end
 
 function M.is_on_title_screen()

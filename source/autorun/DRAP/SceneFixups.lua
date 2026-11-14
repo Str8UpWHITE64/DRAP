@@ -9,6 +9,7 @@
 local M = {}
 
 local Shared = require("DRAP/Shared")
+local Activation = require("DRAP/Activation")
 local log = Shared.create_logger("SceneFixups")
 M.log = log
 
@@ -43,6 +44,44 @@ local AREA_S231 = 535   -- Rooftop (canonical "from-area" for the rescue cutscen
 -- the full retry budget. See scene_fixups.md.
 local get_escort_count
 
+-- The Security Room's door to Entrance Plaza (PREF_uOm114) reads "welded
+-- shut"; DRAP hides it. Returns true once it is hidden (or already was),
+-- false to keep waiting for the OmList.
+local function hide_sr_door()
+    local am = sdk.get_managed_singleton("app.solid.gamemastering.AreaManager")
+    if not am then return false end
+    local list
+    pcall(function() list = am:get_field("OmList") end)
+    if not list then return false end
+    local count
+    pcall(function() count = list:call("get_Count") end)
+    count = tonumber(count) or 0
+    if count == 0 then return false end
+
+    for i = 0, count - 1 do
+        local om
+        pcall(function() om = list:call("get_Item", i) end)
+        if om then
+            local td = om:get_type_definition()
+            local tname = (td and td:get_full_name()) or ""
+            if tname == "solid.MT2RE.uOm114" then
+                local go
+                pcall(function() go = om:call("get_GameObject") end)
+                if go then
+                    local shown = true
+                    pcall(function() shown = go:call("get_UpdateSelf") ~= false end)
+                    if not shown then return true end
+                    pcall(function() go:call("set_UpdateSelf", false) end)
+                    pcall(function() go:call("set_DrawSelf", false) end)
+                    log(string.format("s136: disabled uOm114 (OmList[%d])", i))
+                    return true
+                end
+            end
+        end
+    end
+    return false  -- keep waiting; OmList might not have populated yet
+end
+
 -- s136 (Security Room): disable the south-door barricade and, if the player
 -- arrived via an EP->s136 redirect with an escorted NPC, patch
 -- AreaManager.mAreaIndex/mOldAreaIndex so the rescue cutscene fires.
@@ -72,34 +111,19 @@ local function fixup_s136()
             AREA_S136, AREA_S231))
     end
 
-    -- Disable PREF_uOm114 barricade.
-    local list
-    pcall(function() list = am:get_field("OmList") end)
-    if not list then return false end
-    local count
-    pcall(function() count = list:call("get_Count") end)
-    count = tonumber(count) or 0
-    if count == 0 then return false end
+    return hide_sr_door()
+end
 
-    for i = 0, count - 1 do
-        local om
-        pcall(function() om = list:call("get_Item", i) end)
-        if om then
-            local td = om:get_type_definition()
-            local tname = (td and td:get_full_name()) or ""
-            if tname == "solid.MT2RE.uOm114" then
-                local go
-                pcall(function() go = om:call("get_GameObject") end)
-                if go then
-                    pcall(function() go:call("set_UpdateSelf", false) end)
-                    pcall(function() go:call("set_DrawSelf", false) end)
-                    log(string.format("s136: disabled uOm114 (OmList[%d])", i))
-                    return true
-                end
-            end
-        end
+-- Door-only re-run after a Security Room cutscene. A cutscene in the room
+-- builds a fresh door without a map load, so the load hook never sees it
+-- (harness SR-WELD-BASE: drawn again right after A Temporary Agreement's
+-- scene). The escort patch above belongs to arriving and must not run again.
+local function refix_s136_door()
+    local su = get_scoop_unlocker()
+    if not su or not su.is_ap_activated or not su.is_ap_activated() then
+        return true
     end
-    return false  -- keep waiting; OmList might not have populated yet
+    return hide_sr_door()
 end
 
 -- s100 (Entrance Plaza): when AP is active, register a DoorRandomizer
@@ -328,6 +352,9 @@ local function isabela_in_party()
     return false, nil
 end
 
+-- The Teleport Trap holds while she is in the party.
+M.isabela_in_party = isabela_in_party
+
 --- Tune the Rooftop arrival spot in game, and report whether she is detected.
 ---   drap_isabela_target()             -- read, plus the detection result
 ---   drap_isabela_target(x, y, z)      -- move the arrival point
@@ -516,9 +543,81 @@ local function fixup_s100()
     return true
 end
 
+-- Entrance Plaza's store fences are two meshes run by one GameFlowSwitcher
+-- (SCN_s100_FlowShutterDoors): every frame a mesh shows while flow <= its
+-- _EndFlow. Most stores end at 110. Everyone Luvs Books ends at 160, which the
+-- story passes at Rescue the Professor's Entrance Plaza scene (flow 170), and
+-- out-of-order missions drag flow back under it. The AP logic counts that store
+-- as open with the others, and four books are only placed there, so its fence
+-- ends at 110 as well. Flow itself stays put: enemy sets and layouts read it.
+-- Any connected slot, ScoopSanity or not: the logic says the same in both.
+-- The switcher is rebuilt on every load of the area, so this runs on each one.
+local BOOKSTORE_FENCE_END = 160
+local STORE_FENCE_END = 110
+
+local function open_bookstore_fence()
+    if not Activation.is_active() then return true end
+
+    local sm = sdk.get_native_singleton("via.SceneManager")
+    local smt = sdk.find_type_definition("via.SceneManager")
+    local scene
+    pcall(function() scene = sdk.call_native_func(sm, smt, "get_CurrentScene()") end)
+    local arr
+    pcall(function()
+        arr = scene:call("findComponents(System.Type)", sdk.typeof("app.solid.GameFlowSwitcher"))
+    end)
+    local n = 0
+    pcall(function() n = arr:get_size() end)
+    if n == 0 then return false end
+
+    for i = 0, n - 1 do
+        local list
+        pcall(function() list = arr:get_element(i):get_field("GameFlowParams") end)
+        local count = 0
+        pcall(function() count = tonumber(list:call("get_Count")) or 0 end)
+        if count == 0 then return false end
+        for j = 0, count - 1 do
+            pcall(function()
+                local param = list:call("get_Item", j)
+                if tonumber(param:get_field("_EndFlow")) == BOOKSTORE_FENCE_END then
+                    param:set_field("_EndFlow", STORE_FENCE_END)
+                    log("s100: Everyone Luvs Books fence now follows the other stores")
+                end
+            end)
+        end
+    end
+    return true
+end
+
+local function fixup_s100_all()
+    local fence_done = open_bookstore_fence()
+    return fixup_s100() and fence_done
+end
+
+--- ScoopSanity plus an activated session (connect or drap_activate_debug).
+local function hideout_redirect_wanted()
+    local su = get_scoop_unlocker()
+    return su ~= nil
+        and su.is_scoop_sanity_enabled and su.is_scoop_sanity_enabled()
+        and su.is_ap_activated and su.is_ap_activated()
+        or false
+end
+
 local function fixup_s504()
     local dr = _G.AP and _G.AP.DoorRandomizer
     if not dr or not dr.add_static_redirect then return true end
+
+    -- Only ScoopSanity under an active AP or debug session redirects the
+    -- exit; elsewhere the redirect and its toast would be false.
+    -- Drop one registered before the session went dormant.
+    if not hideout_redirect_wanted() then
+        if dr.remove_static_redirect then
+            for _, door_id in ipairs(HIDEOUT_EXIT_DOOR_IDS) do
+                pcall(dr.remove_static_redirect, door_id)
+            end
+        end
+        return true
+    end
 
     local existing = dr.get_static_redirects and dr.get_static_redirects() or {}
     if existing[HIDEOUT_EXIT_DOOR_IDS[1]] then return true end
@@ -534,7 +633,7 @@ end
 
 local FIXUPS = {
     SCN_s136 = fixup_s136,
-    SCN_s100 = fixup_s100,
+    SCN_s100 = fixup_s100_all,
     SCN_s504 = fixup_s504,
 }
 
@@ -628,6 +727,10 @@ end
 --- Park is expected rather than a surprise. Enter/exit edge, so walking away
 --- and back says it again.
 local function show_hideout_exit_toast()
+    if not hideout_redirect_wanted() then
+        near_hideout_exit = false
+        return
+    end
     local am = sdk.get_managed_singleton("app.solid.gamemastering.AreaManager")
     if not am then return end
     local path
@@ -668,11 +771,35 @@ local function show_hideout_exit_toast()
     log("player reached the hideout exit -- told about the redirect")
 end
 
+-- A Security Room cutscene rebuilds the door without a map load. PlayerReady
+-- already polls for cutscenes and loads; when the player gets control back in
+-- s136, queue the door again. Only that edge costs a managed read.
+local SR_DOOR_PENDING = "SCN_s136 door"
+local sr_was_ready = false
+
+local function watch_sr_door()
+    local pr = package.loaded["DRAP/PlayerReady"]
+    if not (pr and pr.ready) then return end
+    local ready = pr.ready(0.5) == true
+    if ready and not sr_was_ready and not pending.SCN_s136 then
+        local am = sdk.get_managed_singleton("app.solid.gamemastering.AreaManager")
+        local path
+        pcall(function() path = am:get_field("CurrentLevelPath") end)
+        if tostring(path or "") == "SCN_s136" then
+            log("s136: control back in the Security Room -- checking the Entrance Plaza door")
+            pending[SR_DOOR_PENDING] = refix_s136_door
+            frames_waited[SR_DOOR_PENDING] = 0
+        end
+    end
+    sr_was_ready = ready
+end
+
 local function install_frame_cb()
     if frame_cb_installed then return end
     re.on_frame(function()
         check_ap_state_transition()
         show_hideout_exit_toast()
+        watch_sr_door()
         if next(pending) == nil then return end
         for scene, fn in pairs(pending) do
             frames_waited[scene] = (frames_waited[scene] or 0) + 1
@@ -755,6 +882,9 @@ function M.apply_for_current_scene()
         log("Queued fixup for current scene: " .. cur)
     end
 end
+
+-- A slot connected while already standing in a fixup scene.
+Activation.on_activate(function() M.apply_for_current_scene() end)
 
 -- Console shortcuts for live debugging.
 _G.drap_list_s136_targets = function() return M.list_s136_targets() end

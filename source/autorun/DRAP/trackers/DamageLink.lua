@@ -31,8 +31,9 @@
 -- RECEIVING can kill, deliberately. It goes through PlayerBuffs, which knows
 -- the thing that makes this dangerous: addDamage taking HP to 0 leaves the
 -- player undead -- HP<=0 with no death and no respawn, needing a restart. So
--- a lethal amount damages down to the floor and then calls the game's own
--- playerDead(). The Damage Player Trap stays non-lethal; only this can kill.
+-- a lethal amount damages down to the floor and then DeathLink.kill_player
+-- (the Infinity death, playerDead() as fallback). The Damage Player Trap
+-- stays non-lethal; only this can kill.
 --
 -- THE LOOP that has to be avoided: a bounce is echoed back to its sender, and
 -- damage applied on receipt goes through addDamage like any other. Two guards
@@ -71,6 +72,12 @@ local damage_carry = 0
 -- damage would be broadcast straight back out.
 local applying_received = false
 
+-- Damage from a trap that arrived over TrapLink is not this player's to
+-- broadcast: every TrapLink player took the same trap, and each would send
+-- the damage on to the whole room. Until this passes, hits are measured and
+-- discarded rather than sent.
+local mute_until = 0
+
 -- Set by the hook when the PLAYER took a hit. The hook says WHEN and WHO;
 -- how much comes from the health bar on the next frame.
 --
@@ -85,6 +92,13 @@ local applying_received = false
 -- was requested before any clamping.
 local hit_fired = false
 local last_hp = nil
+
+-- HP taken on purpose that is not a hit: the Infinity drain's ticks and the
+-- Infinity death. apply_unshared books it here and the next measured drop is
+-- reduced by it, so it never goes out as damage. Stale after a second.
+local unshared_hp = 0
+local unshared_at = 0
+local UNSHARED_WINDOW = 1.0
 
 -- Raw argument values, for the watch log only.
 local watch_hits = {}
@@ -198,10 +212,16 @@ local function drain_damage(prev_hp, cur_hp)
     local hits = watch_hits
     watch_hits = {}
 
+    local drop = 0
+    if prev_hp and cur_hp and cur_hp < prev_hp then drop = prev_hp - cur_hp end
+    -- Booked HP comes off every drop, hit or not, so it is spent on the frame
+    -- it lands rather than waiting to shave a later real hit.
+    local skip = math.min(drop, unshared_hp)
+    unshared_hp = unshared_hp - skip
+    if os.clock() - unshared_at > UNSHARED_WINDOW then unshared_hp = 0 end
+
     local taken = 0
-    if fired and prev_hp and cur_hp and cur_hp < prev_hp then
-        taken = prev_hp - cur_hp
-    end
+    if fired then taken = drop - skip end
 
     if watching then
         for _, raw in ipairs(hits) do
@@ -211,6 +231,11 @@ local function drain_damage(prev_hp, cur_hp)
             M.log(string.format("  -> HP %s -> %s, took %d (%.2f of a point)",
                 tostring(prev_hp), tostring(cur_hp), taken, taken / HP_PER_POINT))
         end
+    end
+
+    if os.clock() < mute_until then
+        damage_carry = 0
+        return
     end
 
     if not enabled or taken <= 0 then return end
@@ -243,6 +268,44 @@ function M.set_enabled(on)
 end
 
 function M.is_enabled() return enabled end
+
+--- Do not send damage for the next `seconds`. Called as a TrapLink damage
+--- trap fires.
+function M.mute(seconds)
+    mute_until = math.max(mute_until, os.clock() + (tonumber(seconds) or 0))
+    damage_carry = 0
+end
+
+--- Run fn as damage this client deals itself and does not share: the hook
+--- ignores it and the HP it takes is booked off the next measured drop.
+--- @param fn function the damage call
+--- @param expected_hp number HP it is expected to take
+--- @return boolean true if fn ran without error
+function M.apply_unshared(fn, expected_hp)
+    local was = applying_received
+    applying_received = true
+    local ok = pcall(fn)
+    applying_received = was
+    local n = tonumber(expected_hp) or 0
+    if ok and n > 0 then
+        if os.clock() - unshared_at > UNSHARED_WINDOW then unshared_hp = 0 end
+        unshared_hp = unshared_hp + n
+        unshared_at = os.clock()
+    end
+    return ok
+end
+
+--- Send whole points as they are, outside the hit accounting. Used by the
+--- Infinity drain: one block per full bar drained.
+--- @return boolean true if it went out
+function M.send_points(points)
+    if not enabled then return false end
+    local Bridge = _G.AP and _G.AP.AP_BRIDGE
+    if Bridge and Bridge.send_shared_damage then
+        return Bridge.send_shared_damage(points) == true
+    end
+    return false
+end
 
 function M.on_frame()
     if not enabled and not watching then return end

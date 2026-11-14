@@ -2,7 +2,10 @@
 -- Tracks PP sticker captures using:
 --   1. EventFlagsManager.evFlagCheck() for stickers with valid FlagIDs
 --   2. AreaManager.OmList.mChecked for stickers without flags (FlagID = 0)
--- Authoritative flag-based tracking - no false positives
+-- Either hit is then confirmed by the photo itself: PhotoManager.mRating.mScoopTotalCount[PhotoID],
+-- the count the sticker reads to know it was collected. A sticker's flag is only the "unique event" its
+-- layout sets on collection, and other things can share it: sticker 97's is 3840 (EV_UNIQUE_ID_00, the
+-- Security Room layout), and that flag can come on in another area with no photo taken.
 
 local Shared = require("DRAP/Shared")
 local SharedData = require("DRAP/SharedData")
@@ -24,6 +27,7 @@ local CAPTURED_JSON_FILE = nil  -- Set via set_save_filename()
 
 local efm_mgr = M:add_singleton("efm", "app.solid.gamemastering.EventFlagsManager")
 local am_mgr = M:add_singleton("am", "app.solid.gamemastering.AreaManager")
+local pm_mgr = M:add_singleton("pm", "app.solid.gamemastering.PhotoManager")
 
 ------------------------------------------------------------
 -- Internal State
@@ -249,6 +253,26 @@ local function check_omlist(target_photo_id)
 end
 
 ------------------------------------------------------------
+-- Photo count via PhotoManager
+------------------------------------------------------------
+
+--- How many times the game has credited this photo id (u32[256], data at +0x20)
+--- @return number|nil nil when PhotoManager or its rating isn't there yet
+local function photo_count(photo_id)
+    local pm = pm_mgr:get()
+    if not pm then return nil end
+    local ok, v = pcall(function()
+        local arr = pm:get_field("mRating"):get_field("mScoopTotalCount")
+        return arr:read_dword(0x20 + 4 * photo_id)
+    end)
+    if ok then return Shared.to_int(v) end
+    return nil
+end
+
+-- photo ids already reported as "flag on, never photographed", so the log says it once
+local unconfirmed_logged = {}
+
+------------------------------------------------------------
 -- Data Loading
 ------------------------------------------------------------
 
@@ -319,7 +343,7 @@ end
 --- Check if a sticker is captured using the appropriate method
 --- @param photo_id number The PhotoID
 --- @return boolean|nil True if captured, false if not, nil if unknown
-local function is_sticker_captured(photo_id)
+local function is_sticker_hit(photo_id)
     local sticker = STICKER_DATA[photo_id]
     if not sticker then return nil end
 
@@ -339,6 +363,24 @@ local function is_sticker_captured(photo_id)
     end
 
     return nil
+end
+
+--- A flag or OmList hit only counts once the photo count agrees
+local function is_sticker_captured(photo_id)
+    local hit = is_sticker_hit(photo_id)
+    if hit ~= true then return hit end
+
+    local n = photo_count(photo_id)
+    if n == nil then return nil end  -- not readable yet: ask again next scan
+    if n > 0 then return true end
+
+    if not unconfirmed_logged[photo_id] then
+        unconfirmed_logged[photo_id] = true
+        local sticker = STICKER_DATA[photo_id]
+        M.log(string.format("PhotoId=%d: flag %s is on but the photo was never taken -- not sending %s",
+            photo_id, tostring(sticker and sticker.flag_id), tostring(sticker and sticker.name)))
+    end
+    return false
 end
 
 ------------------------------------------------------------

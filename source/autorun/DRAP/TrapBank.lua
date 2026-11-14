@@ -16,6 +16,7 @@
 
 local Shared = require("DRAP/Shared")
 local Ledger = require("DRAP/LocationLedger")
+local PlayerReady = require("DRAP/PlayerReady")
 
 local M = Shared.create_module("TrapBank")
 M:set_throttle(1.0)
@@ -44,6 +45,28 @@ local WORLD_SETTLE_SECONDS = 8.0
 local last_area_index = nil
 local world_ready_at = nil
 local was_in_game = false
+
+-- TrapLink. A trap another game sent is NOT an owed item: it never touches
+-- consumed[], lives only in memory, and is dropped if it cannot land soon.
+-- It drains through the same 30 s gate as everything else, ahead of banked
+-- item traps, and only while Frank is ready (PlayerReady).
+local LINK_QUEUE_MAX = 3          -- newest wins when full
+local LINK_EXPIRY_SECONDS = 120.0
+local LINK_WINDOW_SECONDS = 300.0
+local LINK_MAX_PER_WINDOW = 4     -- linked fires per window
+local LINK_SAME_TRAP_GAP = 60.0   -- the same trap twice, at least this far apart
+local linked = {}                 -- { name, source, at }
+local link_fires = {}             -- os.clock() of recent linked fires
+local link_last = {}              -- trap name -> last linked fire
+
+--- Set by TrapLink.lua. Called with the trap name after an ITEM trap paid out
+--- cleanly (never for a linked one), so it can be sent on.
+M.on_item_fired = nil
+--- Called just before a linked trap fires.
+M.on_link_fire = nil
+--- Return false to hold a linked trap back (e.g. the same timed effect is
+--- already running).
+M.link_gate = nil
 
 ------------------------------------------------------------
 -- Registration
@@ -118,6 +141,82 @@ end
 -- The bank
 ------------------------------------------------------------
 
+--- Queue a trap that arrived over TrapLink. Returns true if it was queued.
+function M.enqueue_link(item_name, source)
+    if not registry[item_name] then
+        M.log.warn("TrapLink: " .. tostring(item_name) .. " is not a registered trap")
+        return false
+    end
+    linked[#linked + 1] = { name = item_name, source = source, at = os.clock() }
+    while #linked > LINK_QUEUE_MAX do
+        local dropped = table.remove(linked, 1)
+        M.log(string.format("linked %s from %s dropped (queue full)",
+            dropped.name, tostring(dropped.source)))
+    end
+    M.log(string.format("linked %s from %s queued (%d waiting)",
+        item_name, tostring(source), #linked))
+    return true
+end
+
+function M.pending_links() return #linked end
+
+--- Testing: forget every pending linked trap and the rate history.
+function M.reset_links()
+    linked, link_fires, link_last = {}, {}, {}
+end
+
+local function try_linked(now)
+    for i = #linked, 1, -1 do
+        if now - linked[i].at > LINK_EXPIRY_SECONDS then
+            M.log(string.format("linked %s from %s expired",
+                linked[i].name, tostring(linked[i].source)))
+            table.remove(linked, i)
+        end
+    end
+    if #linked == 0 then return false end
+
+    for i = #link_fires, 1, -1 do
+        if now - link_fires[i] > LINK_WINDOW_SECONDS then table.remove(link_fires, i) end
+    end
+    if #link_fires >= LINK_MAX_PER_WINDOW then return false end
+    if not PlayerReady.ready() then return false end
+
+    for i, e in ipairs(linked) do
+        local last = link_last[e.name]
+        local spaced = not (last and (now - last) < LINK_SAME_TRAP_GAP)
+        local open = true
+        if spaced and M.link_gate then
+            local ok, v = pcall(M.link_gate, e.name)
+            open = ok and v ~= false
+        end
+        local entry = registry[e.name]
+        if spaced and open and entry then
+            local allowed = true
+            if entry.can_fire then
+                local ok, v = pcall(entry.can_fire)
+                allowed = ok and v ~= false
+            end
+            if allowed then
+                if M.on_link_fire then pcall(M.on_link_fire, e.name) end
+                local ok, fired = pcall(entry.fire)
+                if ok and fired ~= false then
+                    table.remove(linked, i)
+                    link_fires[#link_fires + 1] = now
+                    link_last[e.name] = now
+                    last_fire_at = now
+                    M.log(string.format("%s applied from TrapLink (%s)",
+                        entry.label, tostring(e.source)))
+                    return true
+                elseif not ok then
+                    M.log.warn(string.format(
+                        "linked %s failed to apply -- staying queued", entry.label))
+                end
+            end
+        end
+    end
+    return false
+end
+
 function M.banked(item_name)
     return math.max(0, received_count(item_name) - (consumed[item_name] or 0))
 end
@@ -164,6 +263,8 @@ function M.on_frame()
     end
     if (now - last_fire_at) < FIRE_INTERVAL_SECONDS then return end
 
+    if try_linked(now) then return end
+
     for _, name in ipairs(order) do
         if M.banked(name) > 0 then
             local entry = registry[name]
@@ -182,6 +283,7 @@ function M.on_frame()
                     last_fire_at = now
                     M.log(string.format("%s applied (%d still banked)",
                         entry.label, M.banked(name)))
+                    if M.on_item_fired then pcall(M.on_item_fired, name) end
                     return          -- one per interval
                 elseif not ok then
                     M.log.warn(string.format(

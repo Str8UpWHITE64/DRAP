@@ -35,6 +35,10 @@ local GRANTED = {}
 
 -- Known items from JSON (items we track for restriction)
 local KNOWN_ITEM_NUMBERS = {}  -- item_number -> true (only items with non-empty names)
+-- One AP item stands for every game number that shares its name (a Chair is
+-- ten of them, a Milk two). The bridge keeps only one number per name, so
+-- this is how receiving the item allows all of its forms.
+local NUMBERS_BY_NAME = {}     -- item name -> { item_no, ... }
 local known_items_loaded = false
 
 -- Track allowed item numbers (game item numbers the player can pick up)
@@ -67,6 +71,7 @@ local function load_known_items()
     end
 
     KNOWN_ITEM_NUMBERS = {}
+    NUMBERS_BY_NAME = {}
     local count = 0
 
     -- Only track items with a non-empty name -- those are the AP-tracked
@@ -77,6 +82,12 @@ local function load_known_items()
             local item_num = tonumber(def.item_number)
             if item_num then
                 KNOWN_ITEM_NUMBERS[item_num] = true
+                local group = NUMBERS_BY_NAME[def.name]
+                if not group then
+                    group = {}
+                    NUMBERS_BY_NAME[def.name] = group
+                end
+                group[#group + 1] = item_num
                 count = count + 1
             end
         end
@@ -96,6 +107,7 @@ end
 function M.reload_known_items()
     known_items_loaded = false
     KNOWN_ITEM_NUMBERS = {}
+    NUMBERS_BY_NAME = {}
     local success = load_known_items()
     M.log("reload_known_items() result: " .. tostring(success))
     return success
@@ -125,6 +137,23 @@ end
 -- Allowed Items Management
 ------------------------------------------------------------
 
+-- Items that turn into another item when they break. The new item appears in
+-- Frank's hands mid-swing, where the sweep cannot take it back safely,
+-- so receiving the whole item allows its broken form too. Game item numbers:
+-- Push Broom 8 -> Push Broom Handle 9, Mailbox 252 -> Mailbox Post 254.
+local BREAKS_INTO = {
+    [8]   = 9,
+    [252] = 254,
+}
+
+local function allow_broken_forms()
+    for whole, broken in pairs(BREAKS_INTO) do
+        if (ALLOWED_ITEM_COUNTS[whole] or 0) > 0 then
+            ALLOWED_ITEM_COUNTS[broken] = math.max(ALLOWED_ITEM_COUNTS[broken] or 0, 1)
+        end
+    end
+end
+
 --- Rebuilds the allowed item counts from AP bridge received items
 local function rebuild_allowed_items()
     ALLOWED_ITEM_COUNTS = {}
@@ -137,12 +166,19 @@ local function rebuild_allowed_items()
     local received = bridge.get_all_received_items()
     if not received then return end
 
+    load_known_items()
     for _, entry in ipairs(received) do
         local game_item_no = entry.game_item_no
-        if game_item_no then
+        local group = entry.item_name and NUMBERS_BY_NAME[entry.item_name]
+        if group then
+            for _, no in ipairs(group) do
+                ALLOWED_ITEM_COUNTS[no] = (ALLOWED_ITEM_COUNTS[no] or 0) + 1
+            end
+        elseif game_item_no then
             ALLOWED_ITEM_COUNTS[game_item_no] = (ALLOWED_ITEM_COUNTS[game_item_no] or 0) + 1
         end
     end
+    allow_broken_forms()
 end
 
 --- Rebuilds and folds in anything granted by hand. Called wherever the
@@ -152,6 +188,7 @@ local function rebuild_allowed_with_grants()
     for item_no in pairs(GRANTED) do
         ALLOWED_ITEM_COUNTS[item_no] = (ALLOWED_ITEM_COUNTS[item_no] or 0) + 1
     end
+    allow_broken_forms()
 end
 
 -- An item is allowed iff: restricted mode is off, OR the item is not a
@@ -836,6 +873,15 @@ function M.dump_known_items()
         M.log(string.format("  Known item #%d", item_no))
     end
     M.log(string.format("=== Total: %d known items ===", #sorted_items))
+end
+
+--- Whether a pickup of this item number is allowed right now. Everything is
+--- allowed while the mode is off. ItemSanity asks this so that a refused
+--- pickup never sends its check, whichever hook runs first.
+--- @param item_no number
+--- @return boolean
+function M.is_allowed(item_no)
+    return is_item_allowed(tonumber(item_no))
 end
 
 --- Checks if a specific item number is in the known list

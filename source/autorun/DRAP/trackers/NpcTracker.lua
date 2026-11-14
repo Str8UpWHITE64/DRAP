@@ -232,6 +232,75 @@ end
 local seen_alive = {}   -- npc_id -> true once observed alive
 local dead_now = {}     -- npc_id -> true, was alive and is now dead
 local killed_by_player = {}  -- npc_id -> true, WE did it
+local died_at = {}      -- npc_id -> os.clock() of the observed death
+local credited_at = {}  -- npc_id -> os.clock() of the player-kill credit
+
+------------------------------------------------------------
+-- Deaths the player set up
+------------------------------------------------------------
+-- The game's damage report names whoever hit the survivor last, so a target
+-- the player shot and a zombie finished is filed under the zombie and never
+-- counts (measured in game: Nick's death reads ENEMY, last attacker a zombie). A
+-- target who dies within HIT_WINDOW_S of the player hurting them counts as
+-- the player's kill.
+--
+-- "Hurting them" is an hp drop with Frank as the survivor's last attacker
+-- (NpcCondition.mpLastDamageAttacker, which the report is rebuilt from every
+-- frame). It is read straight from the condition: a non-lethal player hit
+-- leaves no row in the report at all. Only a drop counts, so an
+-- attacker field still naming Frank from a hit long ago never restarts the
+-- clock.
+local HIT_WINDOW_S = 10.0
+local player_hit_at = {}   -- npc_id -> os.clock() of the last player hit seen
+local last_hp = {}         -- npc_id -> hp on the previous tick
+
+------------------------------------------------------------
+-- Deaths the game ties together
+------------------------------------------------------------
+-- Killing Tonya kills Ross in the same frame, and the other way round. The
+-- game writes no player damage report for the partner, so only the one the
+-- player hit would be credited and the other's "Kill" check would never go
+-- out. The partner counts as the player's kill when they die within
+-- LINK_WINDOW_S of the one the player killed. A partner who dies on their
+-- own, or long before or after, is not credited.
+local LINKED_DEATHS = {
+    { "Tonya Waters", "Ross Folk" },
+}
+local LINK_WINDOW_S = 2.0
+
+local _partners = nil   -- npc_id -> { npc_id, ... }
+
+local function linked_partners(npc_id)
+    if not _partners then
+        if not survivor_json_loaded then return {} end
+        _partners = {}
+        for _, group in ipairs(LINKED_DEATHS) do
+            local ids = {}
+            for _, name in ipairs(group) do
+                local id = survivor_name_to_id[name]
+                if id then ids[#ids + 1] = id end
+            end
+            for _, a in ipairs(ids) do
+                _partners[a] = _partners[a] or {}
+                for _, b in ipairs(ids) do
+                    if a ~= b then table.insert(_partners[a], b) end
+                end
+            end
+        end
+    end
+    return _partners[npc_id] or {}
+end
+
+-- When the player's victim went down: their observed death, else the
+-- moment they were credited (a report can land before hp reads 0).
+local function kill_time(npc_id)
+    return died_at[npc_id] or credited_at[npc_id]
+end
+
+local function deaths_linked(a, b)
+    local ta, tb = kill_time(a), died_at[b]
+    return ta ~= nil and tb ~= nil and math.abs(ta - tb) <= LINK_WINDOW_S
+end
 
 ------------------------------------------------------------
 -- Kill attribution
@@ -252,6 +321,66 @@ local DAMAGE_STATUS_DEAD = 3
 local DAMAGE_STATUS_JUST_DIE = 4
 local ATTACKER_PLAYER = 1
 
+local function credit_player_kill(who, partner_of)
+    if killed_by_player[who] then return end
+    killed_by_player[who] = true
+    credited_at[who] = os.clock()
+    if partner_of then
+        M.log(string.format("%s was killed by the player (died with %s)",
+            survivor_id_to_friendly_name(who),
+            survivor_id_to_friendly_name(partner_of)))
+    else
+        M.log(string.format("%s was killed by the player",
+            survivor_id_to_friendly_name(who)))
+    end
+    if M.on_survivor_killed_by_player then
+        pcall(M.on_survivor_killed_by_player, who,
+              survivor_id_to_friendly_name(who))
+    end
+    for _, p in ipairs(linked_partners(who)) do
+        if dead_now[p] and deaths_linked(who, p) then
+            credit_player_kill(p, who)
+        end
+    end
+end
+
+--- What the damage-report poll does with a PLAYER kill report. Public so a
+--- test can credit a kill without landing a hit.
+function M.credit_player_kill(npc_id)
+    local id = tonumber(npc_id)
+    if id then credit_player_kill(id) end
+end
+
+local function player_object_address()
+    local pm = sdk.get_managed_singleton("app.solid.PlayerManager")
+    local go = pm and Shared.safe(function() return pm:call("get_CurrentPlayer") end)
+    return go and Shared.safe(function() return go:get_address() end)
+end
+
+local function last_attacker_address(mgr, npc_id)
+    local ctl = Shared.safe(function() return mgr:call("searchNpc", npc_id) end)
+    local cond = ctl and (Shared.safe(function() return ctl:call("get_NpcCondition") end)
+        or Shared.safe(function() return ctl:get_field("<NpcCondition>k__BackingField") end))
+    local la = cond and Shared.safe(function() return cond:call("get_mpLastDamageAttacker") end)
+    return la and Shared.safe(function() return la:get_address() end)
+end
+
+-- Called once per tick with each survivor's lowest hp. A drop with Frank as
+-- the last attacker is a player hit.
+local function note_player_hits(mgr, hp_now)
+    local player = nil
+    for npc_id, hp in pairs(hp_now) do
+        local before = last_hp[npc_id]
+        last_hp[npc_id] = hp
+        if before and hp < before and seen_alive[npc_id] then
+            player = player or player_object_address()
+            if player and last_attacker_address(mgr, npc_id) == player then
+                player_hit_at[npc_id] = os.clock()
+            end
+        end
+    end
+end
+
 local function poll_kill_attribution(mgr)
     local n = tonumber(Shared.safe(function()
         return mgr:call("getDamageEmotionNpcNum")
@@ -271,13 +400,7 @@ local function poll_kill_attribution(mgr)
                 and (status == DAMAGE_STATUS_DEAD
                      or status == DAMAGE_STATUS_JUST_DIE)
                 and not killed_by_player[who] then
-                killed_by_player[who] = true
-                M.log(string.format("%s was killed by the player",
-                    survivor_id_to_friendly_name(who)))
-                if M.on_survivor_killed_by_player then
-                    pcall(M.on_survivor_killed_by_player, who,
-                          survivor_id_to_friendly_name(who))
-                end
+                credit_player_kill(who)
             end
         end
     end
@@ -306,6 +429,30 @@ function M.player_kill_count()
     return n
 end
 
+--- Forget everything remembered about the last world: rescues, deaths and
+--- player kills. All of it is session-local, so after a new game, or a
+--- different slot in the same session, the first world's Psycho kills stayed
+--- in killed_by_player and the same survivor's second kill was swallowed as a
+--- repeat -- no "killed by the player", no "Kill <name>" check. Liveness
+--- rebuilds from the live records within a tick.
+function M.reset_world(reason)
+    local k, d = 0, 0
+    for _ in pairs(killed_by_player) do k = k + 1 end
+    for _ in pairs(dead_now) do d = d + 1 end
+    killed_by_player = {}
+    dead_now = {}
+    seen_alive = {}
+    died_at = {}
+    credited_at = {}
+    player_hit_at = {}
+    last_hp = {}
+    M.reset_rescued()
+    if k > 0 or d > 0 then
+        M.log(string.format("%s -- forgot %d player kill(s) and %d death(s)",
+            tostring(reason or "new world"), k, d))
+    end
+end
+
 local function record_is_alive(npc_info)
     local dead = nil
     pcall(function() dead = npc_info:call("isDead") end)
@@ -328,15 +475,37 @@ local function fold_liveness(npc_id, any_alive)
         seen_alive[npc_id] = true
         if dead_now[npc_id] then
             dead_now[npc_id] = nil
+            -- An earlier save brought them back: the kill is undone with the
+            -- death, or killing them again is never credited.
+            killed_by_player[npc_id] = nil
+            died_at[npc_id] = nil
+            credited_at[npc_id] = nil
+            player_hit_at[npc_id] = nil
             M.log(string.format("%s is alive again -- death retracted",
                 survivor_id_to_friendly_name(npc_id)))
         end
     elseif seen_alive[npc_id] and not dead_now[npc_id] then
         dead_now[npc_id] = true
+        died_at[npc_id] = os.clock()
         M.log(string.format("%s died", survivor_id_to_friendly_name(npc_id)))
         if M.on_survivor_died then
             pcall(M.on_survivor_died, npc_id,
                   survivor_id_to_friendly_name(npc_id))
+        end
+        -- Hurt by the player moments ago, finished by something else.
+        local hit = player_hit_at[npc_id]
+        if hit and not killed_by_player[npc_id]
+           and died_at[npc_id] - hit <= HIT_WINDOW_S then
+            M.log(string.format("%s died %.1fs after the player hurt them",
+                survivor_id_to_friendly_name(npc_id), died_at[npc_id] - hit))
+            credit_player_kill(npc_id)
+        end
+        -- The partner may already have been credited this tick or the last.
+        for _, p in ipairs(linked_partners(npc_id)) do
+            if killed_by_player[p] and deaths_linked(p, npc_id) then
+                credit_player_kill(npc_id, p)
+                break
+            end
         end
     end
 end
@@ -388,6 +557,7 @@ function M.on_frame()
 
     -- Iterate over NPCs
     local alive_this_tick = {}
+    local hp_this_tick = {}
     for i, npc_info in Shared.iter_collection(info_list) do
         if npc_info and ensure_baseinfo_fields(npc_info) then
             -- Get NPC ID
@@ -414,9 +584,19 @@ function M.on_frame()
 
                 alive_this_tick[npc_id] = (alive_this_tick[npc_id] or false)
                     or record_is_alive(npc_info)
+                if baseinfo_vital_field then
+                    local ok_hp, hp = pcall(baseinfo_vital_field.get_data,
+                                            baseinfo_vital_field, npc_info)
+                    hp = ok_hp and tonumber(hp) or nil
+                    if hp and (hp_this_tick[npc_id] == nil or hp < hp_this_tick[npc_id]) then
+                        hp_this_tick[npc_id] = hp
+                    end
+                end
             end
         end
     end
+
+    note_player_hits(mgr, hp_this_tick)
 
     for npc_id, any_alive in pairs(alive_this_tick) do
         fold_liveness(npc_id, any_alive)

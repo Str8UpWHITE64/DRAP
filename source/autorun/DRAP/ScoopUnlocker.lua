@@ -6,6 +6,7 @@ local SharedData = require("DRAP/SharedData")
 local State = require("DRAP/scoops/ScoopState")
 local FlagPolicies = require("DRAP/scoops/FlagPolicies")
 local Reconciler = require("DRAP/scoops/FlagReconciler")
+local ScoopFinish = require("DRAP/scoops/ScoopFinish")
 
 local M = Shared.create_module("ScoopUnlocker")
 
@@ -101,7 +102,7 @@ local function build_scoop_data()
                 chain_managed = e.chain_managed,  -- KentChain owns the flags
                 extra_disp_flags = e.extra_disp_flags,  -- 2nd box for pairs
                 description = e.description,   -- MissionTruth box text
-                guide = e.guide,              -- MissionTruth pin redirect
+                guide = e.guide,              -- MissionTruth directions
                 repurpose = e.repurpose,      -- borrowed-box text swap
             }
             if e.completion_event and e.lua_event_tracking ~= false then
@@ -245,7 +246,11 @@ end
 build_completion_flags()
 
 -- Mission byproduct flags cleared each cycle (only when owning mission is inactive).
--- Excludes: CONTROLLED_FLAGS, FLAG_BLACKLIST, case step/radio/SCQ flags (game recalculates).
+-- Excludes: CONTROLLED_FLAGS, FLAG_BLACKLIST, case step/radio flags (game
+-- recalculates), and every SCQ FINISH/SUCCESS flag: those are the game's
+-- record that a case finished, and clearing them made its row run again (see
+-- DRAP/scoops/ScoopFinish). The ones this table used to hold are still put
+-- back in Overtime (SCOOP_FINISH.OVERTIME_FLAGS).
 local CASCADE_FLAGS = {
     -- Backup for Brad
     [269]  = "Backup for Brad",
@@ -255,9 +260,6 @@ local CASCADE_FLAGS = {
     -- An Odd Old Man
     [270]  = "Backup for Brad",
     [271]  = "Backup for Brad",
-
-    -- Another Source
-    [2433] = "Another Source",
 
     -- Rescue the Professor (276 deliberately omitted -- managed in on_frame
     -- with area gating so the EP door is open when Professor isn't active)
@@ -269,28 +271,21 @@ local CASCADE_FLAGS = {
     [280]  = "Medicine Run",
     [281]  = "Medicine Run",
     [408]  = "Medicine Run",
-    [834]  = "Medicine Run",
     [1287] = "Medicine Run",
     [2192] = "Medicine Run",
-    [2434] = "Medicine Run",
-    [2435] = "Medicine Run",
 
     -- Girl Hunting
     [285]  = "Girl Hunting",
     [1288] = "Girl Hunting",
-    [2436] = "Girl Hunting",
-
-    -- A Promise to Isabela
-    [2437]  = "A Promise to Isabela",
 
     -- Santa Cabeza
     [295]  = "Santa Cabeza",
-    [2438] = "Santa Cabeza",
 
-    -- The Last Resort
+    -- The Last Resort. Not 1284 (Drivin' Carlito's death): his tunnel layout
+    -- needs it off, so clearing it would let him stand up again at the
+    -- health his save backup kept (0). See DRAP/effects/CarlitoStay.
     [296]  = "The Last Resort",
     [422]  = "The Last Resort",
-    [1284] = "The Last Resort",
     [297]  = "The Last Resort",
     [443]  = "The Last Resort",
     [298]  = "The Last Resort",
@@ -299,7 +294,6 @@ local CASCADE_FLAGS = {
     [452]  = "The Last Resort",
     [2193] = "The Last Resort",
     [2194] = "The Last Resort",
-    [2439] = "The Last Resort",
 
     -- Hideout
     [392]  = "Hideout",
@@ -308,7 +302,6 @@ local CASCADE_FLAGS = {
     [304]  = "The Butcher",
     [1285] = "The Butcher",
     [409]  = "The Butcher",
-    [2440] = "The Butcher",
 }
 
 -- Read-only aliases into DRAP/scoops/ScoopState (the pure state machine).
@@ -379,9 +372,28 @@ local overtime_off_since = nil
 -- the game's, and it replays a finished case whose record is off: the
 -- Hideout ending (#63, 301) and Jessie's Discovery in the Security Room
 -- (302), which soft-locked. On entering Overtime, once per session, every
--- completed main's completion flag goes back on, plus 301 and 355 (EV_EVS02),
--- which the Hideout ending sets, once 2322 is on.
+-- completed main's flags go back on, plus 301 and 355 (EV_EVS02), which the
+-- Hideout ending sets, once 2322 is on.
+--
+-- All of a main's flags, not just its completion: the game replays an event
+-- whose trigger is on and whose own record is off. Putting back 284 alone
+-- (Professor's Past's completion, Girl Hunting's start) with 285 still off
+-- replayed Girl Hunting in Seon's and then Isabela leaving (287), which took
+-- the Overtime items with her (RobaRising, 2026-10-08). Every flag a main
+-- owns is on in a vanilla Overtime save except these two of The Last
+-- Resort's, so they stay as they are.
 local OVERTIME_HIDEOUT_FLAGS = { 301, 355 }
+-- 276 is event 16's record (the walk into Entrance Plaza that opens Rescue
+-- the Professor) and 275 its trigger. The restore puts 275 back, and the EP
+-- door toggle held 276 off everywhere but Paradise Plaza, so walking in from
+-- Al Fresca in Overtime replayed the cutscene and reset the mall (RobaRising,
+-- 2026-10-13). Vanilla Overtime has 276 on; it goes back on here and the
+-- toggle stands down for Overtime.
+local OVERTIME_EP_DOOR_FLAG = 276
+local OVERTIME_LEAVE_OFF = {
+    [443] = true,  -- HAVING_BOM
+    [452] = true,  -- EVM37A_RIDE_OFF
+}
 local HIDEOUT_DONE_FLAG = 2322
 local overtime_story_restored = false
 
@@ -413,6 +425,18 @@ local function raw_set_flag_on(flag_id)
 end
 
 local function raw_set_flag_off(flag_id)
+    -- A scoop's FINISH or SUCCESS flag is never taken back: a cleared FINISH
+    -- makes the game run the scoop again (see DRAP/scoops/ScoopFinish). Every
+    -- clear in this file comes through here, so it is refused here. The only
+    -- way round is SCOOP_FINISH.reopen, for the two rows ScoopFinish.HELD_FOR
+    -- names.
+    if ScoopFinish.never_off(flag_id) then
+        if ScoopFinish.first_refusal(flag_id, "ScoopUnlocker") then
+            M.log(string.format(
+                "Left flag %d on: a scoop's FINISH/SUCCESS flag is never cleared", flag_id))
+        end
+        return false
+    end
     local efm = efm_mgr:get()
     if not efm then return false end
     local ok = pcall(function() efm:call("evFlagOff", flag_id) end)
@@ -518,12 +542,24 @@ end
 -- of M.on_frame so the engine's evFlagOn implementation has already run
 -- and we're not racing it.
 local pending_flag_clears = {}
+-- Scoop completions seen by the evFlagOn hook, applied on the next frame.
+local pending_completions = {}
+local pending_completions_set = {}
+-- Their location checks, sent on the same frame (see the Overtime gate there).
+local pending_checks = {}
+-- Main finishes the hook saw since the last drain, whether queued or not.
+local main_finishes_seen = 0
+-- Overtime started from the title menu (12-day entry), not by playing Day 3.
+local overtime_from_title = false
+-- FLAG_TRIGGERS the hook saw, applied on the frame (none in Overtime).
+local pending_triggers = {}
 
 -- ScoopSanity-only: hold the EP shutters open by flooring GAME FLOW.
 --
 -- The shutters are a function of game flow, the number cutscenes advance to
--- describe the mall's state. Measured: flow 130 opens them, and flow 150 keeps
--- them open while leaving Entrance Plaza's zombie density alone -- 130..140
+-- describe the mall's state. The stores' fence shows up to flow 110 (Everyone
+-- Luvs Books has its own, see SceneFixups), and flow 150 keeps them open while
+-- leaving Entrance Plaza's zombie density alone -- 130..140
 -- selects a sparse enemy set, 140..159 matches no flow-specific row so the
 -- normal day/night ladder applies.
 --
@@ -779,6 +815,7 @@ end
 local CULT_ON = { 326, 811, 1166, 2063 }
 local CULT_SCOOP = "The Cult"
 local STRANGE_GROUP_SCOOP = "A Strange Group"
+local CULT_CUTSCENE_CHECK = "Witness Sean in Paradise Plaza"
 local JENNIFER_START_FLAG = 2699   -- EV_SCQ_STARTBE, Jennifer Gorman's start
 local CULT_OFF = {
     783,                                      -- scoop start flags
@@ -1261,7 +1298,10 @@ local function build_reconciler_ctx()
         area = get_current_area_index(),
         hideout_area = HIDEOUT_AREA_INDEX,
         north_plaza_area = NORTH_PLAZA_AREA_INDEX,
+        paradise_area = PARADISE_PLAZA_AREA_INDEX,
+        world_stable = M.is_world_stable and M.is_world_stable() or false,
         check_flag = raw_check_flag,
+        never_off = ScoopFinish.never_off,
         in_grace = is_in_completion_grace,
         completed_this_session = completed_this_session,
         is_active = State.is_active,
@@ -1411,6 +1451,9 @@ local function install_hooks()
                                 == completion.scoop
                              or (owner and owner.flag_completion_event
                                  == completion.event))
+                    if finishes_scoop and owner and owner.category == "Main" then
+                        main_finishes_seen = main_finishes_seen + 1
+                    end
 
                     local ss_block = scoop_sanity_enabled
                                   and not State.is_endgame_reached()
@@ -1444,31 +1487,28 @@ local function install_hooks()
                             finishes_scoop and "COMPLETION" or "STEP",
                             flag_id, completion.event))
                         if finishes_scoop then
-                            M.complete_scoop(completion.scoop)
+                            -- Queued, not applied here: the Overtime start writes
+                            -- about fourteen completion flags in a burst on the
+                            -- loader thread, and completing scoops from inside
+                            -- the hook crashed SCQManager::checkQueStart. The
+                            -- frame drains it in arrival order.
+                            if not pending_completions_set[completion.scoop] then
+                                pending_completions_set[completion.scoop] = true
+                                pending_completions[#pending_completions + 1] = completion.scoop
+                            end
                         end
-                        if on_completion_detected_callback then
-                            pcall(on_completion_detected_callback,
-                                completion.event, flag_id, completion.scoop)
-                        end
+                        pending_checks[#pending_checks + 1] = {
+                            completion.event, flag_id, completion.scoop }
                     end
                 end
 
                 -- ScoopSanity-only: flag triggers, time skips, and controlled flag suppression
                 if scoop_sanity_enabled then
-                    local trigger = FLAG_TRIGGERS[flag_id]
-                    if trigger then
-                        if trigger.enable then
-                            for _, target in ipairs(trigger.enable) do
-                                raw_set_flag_on(target)
-                                M.log(string.format("Trigger: flag %d -> enabled %d", flag_id, target))
-                            end
-                        end
-                        if trigger.disable then
-                            for _, target in ipairs(trigger.disable) do
-                                raw_set_flag_off(target)
-                                M.log(string.format("Trigger: flag %d -> disabled %d", flag_id, target))
-                            end
-                        end
+                    -- Applied on the frame, not here: the title-menu Overtime
+                    -- start writes 355 in its burst, and this cleared the
+                    -- game's own 300 from the loader thread.
+                    if FLAG_TRIGGERS[flag_id] then
+                        pending_triggers[#pending_triggers + 1] = flag_id
                     end
 
                     local skip = ENDING_JUMP_TRIGGERS[flag_id]
@@ -1815,6 +1855,10 @@ local function brad_still_leaving()
     return nil
 end
 
+-- Scoop name -> AP item it waits for. Filled from slot_data (set_camera_item).
+-- A field, not a local: this chunk is at Lua's 200-local limit.
+M.item_requirements = {}
+
 State.init({
     scoop_data = SCOOP_DATA,
     conflict_groups = CONFLICT_GROUPS,
@@ -1825,7 +1869,7 @@ State.init({
     -- Hideout used to wait on "Carlito's Hideout Key" by name, which does not
     -- exist under Split Keys. Its required_regions already include Carlito's
     -- Hideout, and reaching that asks the right question in every mode.
-    item_requirements = {},
+    item_requirements = M.item_requirements,
     chain_final = "The Facts",
     log = M.log,
     now = os.clock,
@@ -1835,6 +1879,17 @@ State.init({
         return (bridge and bridge.has_item_name and bridge.has_item_name(item_name)) == true
     end,
     on_unlock = apply_unlock_writes,
+    -- The opening is over once Frank is out of the Entrance Plaza siege:
+    -- flags 263 and 264 (the "past the stairs" pair the time freeze reads,
+    -- NEW_GAME_FLAGS) go on while he is still in the plaza, a minute or so
+    -- before the cutscene takes him back upstairs, so they are not enough
+    -- alone. Only an explicit true on both, and a known area that is not
+    -- the Entrance Plaza.
+    prologue_done = function()
+        if raw_check_flag(263) ~= true or raw_check_flag(264) ~= true then return false end
+        local area = get_current_area_index()
+        return area ~= nil and area ~= ENTRANCE_PLAZA_AREA_INDEX
+    end,
     on_state_changed = function() save_state() end,
     -- A pre-Jessie world on the same seed is a new world. The state machine
     -- reopens completed survivor scoops; the two modules that remember who
@@ -1845,7 +1900,8 @@ State.init({
         local ssc = AP and AP.effects and AP.effects.SurvivorScoopCompletion
         if ssc and ssc.reset_world then pcall(ssc.reset_world) end
         local nt = AP and AP.NpcTracker
-        if nt and nt.reset_rescued then pcall(nt.reset_rescued) end
+        if nt and nt.reset_world then pcall(nt.reset_world, "new world")
+        elseif nt and nt.reset_rescued then pcall(nt.reset_rescued) end
     end,
     scoop_survivors = SharedData.scoop_survivors(),
     -- NpcTracker owns liveness: it already walks NpcInfoList every half
@@ -1920,6 +1976,7 @@ local function world_stable()
     return world_stable_since ~= nil
         and (os.clock() - world_stable_since) >= WORLD_STABLE_SECONDS
 end
+M.is_world_stable = world_stable
 
 function M.unlock_scoop(scoop_name)
     if not world_stable() then
@@ -2011,7 +2068,33 @@ end
 function M.complete_scoop(scoop_name)
     -- Chain advance, conflict-group advance, blocked-side retries, and
     -- persistence all happen inside the state machine.
-    return State.complete(scoop_name)
+    local done = State.complete(scoop_name)
+    -- Sean's death is what lets a rescued Jennifer finish The Cult.
+    if scoop_name == STRANGE_GROUP_SCOOP then
+        local ssc = AP and AP.effects and AP.effects.SurvivorScoopCompletion
+        if ssc then ssc.reapply() end
+        -- The cutscene is the only thing that sends this check, and it can't
+        -- play once Sean is dead. Send just the check if the player hasn't had
+        -- it: going through the tracker would also complete The Cult.
+        local bridge = AP and AP.AP_BRIDGE
+        if done and bridge and bridge.has_local_check
+                and not bridge.has_local_check(CULT_CUTSCENE_CHECK) then
+            M.log("Sean's scoop ended before the raincoat cutscene -- sending '"
+                .. CULT_CUTSCENE_CHECK .. "'")
+            bridge.check(CULT_CUTSCENE_CHECK)
+        end
+    end
+    return done
+end
+
+--- The Cult is its cutscene: Jennifer can be rescued before it plays, and
+--- completing the scoop then would take the cutscene's check away. Once Sean
+--- is dead the cutscene can't play, and her rescue is what is left of it.
+function M.rescue_completes_scoop(scoop_name)
+    if scoop_name == CULT_SCOOP then
+        return State.is_completed(STRANGE_GROUP_SCOOP)
+    end
+    return true
 end
 
 local ENDGAME_EVENTS = {
@@ -2215,6 +2298,32 @@ function M.reset_for_new_game()
     _logged_suppressions = {}
 
     State.reset_for_new_game()
+end
+
+--- Hand a scoop to the player the way an Archipelago receipt does: a main
+--- goes through the chain (or waits for Start in Any Order), so only one main
+--- runs at a time and a later one is queued behind the active one. Raw
+--- unlock_scoop does no such check -- request_unlock gates only side scoops
+--- against mains -- so the debug button used to start every main it was
+--- pressed on. unlock_all / unlock_category stay the deliberate force-all.
+function M.unlock_scoop_gated(scoop_name)
+    local data = SCOOP_DATA[scoop_name]
+    State.mark_ap_received(scoop_name)
+    if data and data.category == "Main" then
+        -- Works with no scoop order too (drap_activate_debug). Like Any
+        -- Order's Start, a refused main is not queued: it stays received and
+        -- the player unlocks it again once the running one is done.
+        local blocker = State.manual_main_blocker(scoop_name)
+        if blocker then
+            M.log(string.format("Refused to unlock '%s': %s", scoop_name, blocker))
+            return false, blocker
+        end
+        if State.is_scoop_order_set() then
+            State.try_advance_chain()
+            return State.has_received(scoop_name), nil
+        end
+    end
+    return M.unlock_scoop(scoop_name)
 end
 
 function M.unlock_category(category)
@@ -2533,6 +2642,17 @@ local kent_copy_day = {}    -- item index -> day number
 local kent_copies = 0
 
 --- The Kent days this seed plays, in unlock order (slot data).
+--- Camera Item: Kent's first scoop and Gun Shop Standoff wait for the Camera.
+--- Off, the Camera is not an item and nothing waits.
+function M.set_camera_item(on)
+    local need = (on == true) and "Camera" or nil
+    -- Kent's first two days are photoshoots. Day 3 is a fight and needs no
+    -- Camera, so it can run before them.
+    M.item_requirements["Cut from the Same Cloth"] = need
+    M.item_requirements["Photo Challenge"] = need
+    M.item_requirements["Gun Shop Standoff"] = need
+end
+
 function M.set_kent_progression(days)
     if type(days) == "table" and #days > 0 then
         kent_progression = {}
@@ -2734,7 +2854,7 @@ function M.draw_tab_content(debug)
         if ao and ao.remaining > 0 then quest_name = ao.running end
 
         if ao and ao.remaining > 0 and not ao.running then
-            imgui.text_colored("Current Quest: none started", COLOR_READY)
+            imgui.text_colored("No scoop started. Start one to see details.", COLOR_READY)
             if #ao.startable == 1 then
                 imgui.text_colored(string.format(
                     "  '%s' is ready. Press Start next to it below.",
@@ -2745,8 +2865,7 @@ function M.draw_tab_content(debug)
                     #ao.startable), COLOR_GO)
             elseif #ao.stuck > 0 then
                 imgui.text_colored(string.format(
-                    "  You have %d main scoop%s, but none can be started yet"
-                    .. " -- the list below says why.",
+                    "  You have %d main scoop%s, but none can be started yet.",
                     #ao.stuck, #ao.stuck == 1 and "" or "s"), COLOR_READY)
             else
                 imgui.text_colored(
@@ -2954,7 +3073,11 @@ function M.draw_tab_content(debug)
 
     for _, s in ipairs(status_list) do
         local show = true
-        local is_deferred = s.ap_item_received and (s.conflict_blocked or s.main_blocked)
+        -- Held for an item (the Camera, under Camera Item): listed as
+        -- deferred like a scoop held by a running one, rather than missing.
+        local waiting_item = s.ap_item_received and State.deferred_item(s.name) or nil
+        local is_deferred = s.ap_item_received
+            and (s.conflict_blocked or s.main_blocked or waiting_item ~= nil)
         if filter_category ~= "All" and s.category ~= filter_category then show = false end
         if show_only_received and not s.received and not is_deferred then show = false end
         if hide_completed and s.completed then show = false end
@@ -2989,6 +3112,9 @@ function M.draw_tab_content(debug)
                 color = COLOR_READY
             elseif s.conflict_blocked then
                 status_str = " - deferred (" .. tostring(s.conflict_blocker) .. " active)"
+                color = COLOR_READY
+            elseif waiting_item then
+                status_str = " - deferred (waiting for " .. waiting_item .. ")"
                 color = COLOR_READY
             elseif s.received then
                 -- Unlocked and out in the world: go do it. A main in a chain
@@ -3037,9 +3163,12 @@ function M.draw_tab_content(debug)
                     end
                 end
 
-                if imgui.button("Unlock##" .. s.name) then
-                    State.mark_ap_received(s.name)
-                    M.unlock_scoop(s.name)
+                local manual_block = s.category == "Main"
+                    and State.manual_main_blocker(s.name) or nil
+                if manual_block then
+                    imgui.text_colored("[wait: " .. manual_block .. "]", COLOR_BLOCKED)
+                elseif imgui.button("Unlock##" .. s.name) then
+                    M.unlock_scoop_gated(s.name)
                 end
                 imgui.same_line()
 
@@ -3125,13 +3254,143 @@ function M.draw_tab_content(debug)
     imgui.end_child_window()
 end
 
+-- Scoop finishes the game cannot make without a free SCQMove slot, made
+-- through its own SCQManager.finishSCQ. The rules live in
+-- DRAP/scoops/ScoopFinish; this is the engine side. One table rather than new
+-- locals: this file's main chunk is at Lua's 200-local limit.
+local SCOOP_FINISH = {
+    INTERVAL = 0.5,
+    -- The game's SCQ loop counts as running while SCQManager.moveListQue has
+    -- run this recently. It runs every frame unless something pauses it, a
+    -- Case File screen among them.
+    LOOP_SECONDS = 0.25,
+    next_check = 0,
+    loop_seen = nil,
+    hooked = false,
+    hook_failed = false,
+    was_active = false,
+    -- A body to take away after a late finish (EnemyKindID), by scoop: Kent
+    -- on day 3, Paul, Cletus. See SCOOP_FINISH.bodies.
+    BODY_KIND = { [34] = 0x45, [39] = 0x47, [163] = 0x4F },
+    -- Main-case flags CASCADE_FLAGS used to clear while their owner was not
+    -- active. Nothing clears them now, but a save made before can still have
+    -- them off, so Overtime puts them back for finished mains with the rest of
+    -- the story (restore_overtime_story).
+    OVERTIME_FLAGS = {
+        [834] = "Medicine Run", [2434] = "Medicine Run", [2435] = "Medicine Run",
+        [2436] = "Girl Hunting", [2437] = "A Promise to Isabela",
+        [2438] = "Santa Cabeza", [2439] = "The Last Resort", [2440] = "The Butcher",
+    },
+}
+M:add_singleton("scq", "app.solid.gamemastering.SCQManager")
+
+do
+    -- Main scoops by the flag that completes them: A Temporary Agreement's
+    -- 273 is also the flag case 1 ends on, and The Last Resort completes on
+    -- case 7's own FINISH.
+    local main_completion_flags = {}
+    for flag_id, row in pairs(COMPLETION_FLAGS) do
+        local data = row.scoop and SCOOP_DATA[row.scoop]
+        if data and data.category == "Main"
+                and (COMPLETION_EVENT_TO_SCOOP[row.event] == row.scoop
+                     or data.flag_completion_event == row.event) then
+            main_completion_flags[flag_id] = row.scoop
+        end
+    end
+    ScoopFinish.configure({
+        exempt_flags = CULT_OFF,   -- the cult respawn clears these on purpose
+        scoop_data = SCOOP_DATA,
+        main_completion_flags = main_completion_flags,
+    })
+end
+
+-- The hook only notes the time; nothing managed is called from inside it.
+-- moveListQue has an address of its own (no folded aliases).
+function SCOOP_FINISH.install_loop_hook()
+    if SCOOP_FINISH.hooked or SCOOP_FINISH.hook_failed then return end
+    local td = sdk.find_type_definition("app.solid.gamemastering.SCQManager")
+    local m = td and td:get_method("moveListQue")
+    local ok = m ~= nil and pcall(sdk.hook, m,
+        function() SCOOP_FINISH.loop_seen = os.clock() end,
+        function(retval) return retval end)
+    if ok then
+        SCOOP_FINISH.hooked = true
+    else
+        SCOOP_FINISH.hook_failed = true
+        M.log("Scoop finish: could not watch SCQManager.moveListQue -- a main case"
+            .. " will not wait for a Case File screen to close")
+    end
+end
+
+function SCOOP_FINISH.loop_running(now)
+    if not SCOOP_FINISH.hooked then return true end
+    return SCOOP_FINISH.loop_seen ~= nil
+        and now - SCOOP_FINISH.loop_seen <= SCOOP_FINISH.LOOP_SECONDS
+end
+
+--- The game's own finish: FINISH (and SUCCESS when asked), nothing if FINISH
+--- is already on. It needs no slot. Frame thread only.
+function SCOOP_FINISH.finish(scq_no, success)
+    local mgr = M:get_singleton("scq")
+    local scq = mgr and mgr:get()
+    if not scq then return false end
+    return pcall(function()
+        scq:call("finishSCQ(System.Byte, System.Boolean)", scq_no, success == true)
+    end)
+end
+
+--- Opens a held case row for the mission running on it (ScoopFinish.HELD_FOR
+--- says why that's allowed). Deliberately not raw_set_flag_off, which keeps
+--- refusing these flags for everything else.
+function SCOOP_FINISH.reopen(row, mission)
+    local efm = efm_mgr:get()
+    if not efm then return false end
+    local ok = pcall(function()
+        efm:call("evFlagOff", row.success)
+        efm:call("evFlagOff", row.finish)
+    end)
+    M.log(string.format("Scoop finish: scoop %d reopened for '%s' (FINISH %d, SUCCESS %d off) -- %s",
+        row.scq, mission, row.finish, row.success, ok and "ok" or "failed"))
+    return ok
+end
+
+--- Gives back the SCQMove slot a row holds, if it holds one. A survivor row in
+--- a slot whose END goes on is read by the game's SCQ loop as "you met them,
+--- left them and the scoop ran out": it sets the health of a survivor who is
+--- not with Frank (and not JOIN, RESTRAINT or CONFINE) to 0, the Security
+--- Room's included. A load gives the old half-finished rows their slots again,
+--- so ending one with its slot still held empties the health of everyone
+--- already delivered. With END on, a row without a slot never takes one.
+--- @return number how many slot entries were freed
+function SCOOP_FINISH.free_slot(tbl)
+    local mgr = M:get_singleton("scq")
+    local scq = mgr and mgr:get()
+    if not scq then return 0 end
+    local list = Shared.safe(function() return scq:get_field("mScqMoveList") end)
+    if not list then return 0 end
+    local freed = 0
+    for _, m in Shared.iter_collection(list) do
+        local rno = m and Shared.safe(function() return m:get_field("rno") end)
+        local at = m and Shared.safe(function() return m:get_field("tblNo") end)
+        if m and tonumber(rno) and tonumber(rno) ~= 0 and tonumber(at) == tbl then
+            if pcall(function() m:set_field("rno", 0) end) then freed = freed + 1 end
+        end
+    end
+    return freed
+end
+
 -- The Last Resort finishes on 839 (EV_SCQ_FINISH07), which the game raises
 -- with the cutscene on leaving the tunnels for Leisure Park. Sometimes it
 -- plays the cutscene and never raises 839: measured 2026-09-25, all five
 -- bomb trucks and the cutscene's 298/318/319 on, 839 off, and the evFlagOn
 -- hook never saw it. Another player's only came after three reloads. Once
--- everything the game would have checked is true, raise 839 the way the game
--- does, and the hook completes the scoop as usual.
+-- everything the game would have checked is true, finish the case the way the
+-- game does (839 and its SUCCESS, 2439), and the hook completes the scoop as
+-- usual.
+-- The game pauses its SCQ loop while a Case File screen is open and finishes
+-- the case itself when the player presses Accept, so nothing is raised while
+-- the loop is paused. ScoopFinish's own rule covers this case too; this stays
+-- as a second net.
 local LAST_RESORT = "The Last Resort"
 local LAST_RESORT_FINISH_FLAG = 839
 local LAST_RESORT_CUTSCENE_FLAG = 298          -- EV_EVENT37_A1, the exit cutscene
@@ -3152,6 +3411,7 @@ local function last_resort_fallback()
         and received_scoops[LAST_RESORT] and not completed_scoops[LAST_RESORT]
         and not currently_unlocking
         and world_stable()
+        and (not ScoopFinish.is_enabled() or SCOOP_FINISH.loop_running(now))
     if ready then
         local scene = get_current_scene()
         ready = scene ~= nil and scene:find(LAST_RESORT_SCENE) ~= nil
@@ -3174,74 +3434,243 @@ local function last_resort_fallback()
     last_resort_ready_since = nil
     M.log(string.format(
         "'%s': all five bombs in and the exit cutscene played, but flag %d never"
-        .. " went on -- raising it", LAST_RESORT, LAST_RESORT_FINISH_FLAG))
+        .. " went on -- finishing the case", LAST_RESORT, LAST_RESORT_FINISH_FLAG))
+    local row = ScoopFinish.row_of(LAST_RESORT_FINISH_FLAG)
+    if ScoopFinish.is_enabled() and row and SCOOP_FINISH.finish(row.scq, true) then
+        return
+    end
     raw_set_flag_on(LAST_RESORT_FINISH_FLAG)
 end
 
--- A psychopath's death normally comes with his scoop's FINISH/SUCCESS flags
--- (and some a TIMEOUT flag) in the same frame. Now and then the game sets
--- the death flag and skips the rest, and the psychopath stays standing at
--- zero health (Cliff 2026-09-29; Paul's double 2026-09-10). Across every
--- flag trace on record the rest never came at all in most of those. After a
--- short dwell, raise what the game should have. Pairs are measured from the
--- traces, not names. Kent is left to KentChain, and Sean to the cult
--- respawn, which clears his death and finish flags on purpose (CULT_OFF);
--- the main-scoop psychopaths get no finish flags at their deaths even in
--- vanilla.
-local PSYCHO_FINISH = {
-    { die = 1293, flags = { 846, 2446, 1172 } },            -- Cliff
-    { die = 1295, flags = { 848, 2448 } },                  -- Adam
-    { die = 1296, flags = { 849, 2449 } },                  -- Jo
-    { die = 1297, flags = { 850, 2450 } },                  -- Paul
-    { die = 1302, flags = { 874, 2474 } },                  -- Cletus
-    { die = 453,  flags = { 872 } },                        -- the convicts, all three
-}
-local PSYCHO_FINISH_WAIT_SECONDS = 3.0
-local psycho_finish_missing_since = {}
-local psycho_finish_next_check = 0
+-- A late finish does not take away a body the area has already placed again.
+-- A psychopath whose finish never came is placed at every area entry, and at
+-- the end of every event (his own death scene included), with the 0 HP saved
+-- at his death, so he stands at his start spot until the next area load (Paul
+-- beside his survivor self, Kent beside his own corpse). So after a late
+-- finish, hide any body of that kind at 0 HP for a while. Never one with
+-- health left, and survivor Paul is an NPC, not an enemy, so he is never
+-- matched.
+-- His dying body is also at 0 HP until his death scene ends and the area
+-- swaps it for the corpse on the floor. So nothing is hidden before that
+-- scene has come and gone, or, when no scene plays (a save loaded in that
+-- state), before HIDE_AFTER_SECONDS have passed since the finish was due.
+-- sweep: kind -> { expires = os.clock, since = os.clock the finish was first
+-- due, scene = a scene has played since }
+SCOOP_FINISH.bodies = { SWEEP_SECONDS = 120, HIDE_AFTER_SECONDS = 3.0, sweep = {} }
 
-local function psycho_finish_fallback()
-    local now = os.clock()
-    if now < psycho_finish_next_check then return end
-    psycho_finish_next_check = now + 0.5
-    if not (scoop_sanity_enabled and State.is_activated())
-        or State.is_endgame_reached() or not world_stable() then
-        psycho_finish_missing_since = {}
+function SCOOP_FINISH.bodies.event_playing()
+    local etm = sdk.get_managed_singleton("app.solid.gamemastering.EventTimelineManager")
+    return etm and Shared.safe(function() return etm:call("isEventPlaying") end) == true
+end
+
+function SCOOP_FINISH.bodies.scene_enemies()
+    local sm = sdk.get_native_singleton("via.SceneManager")
+    local smt = sdk.find_type_definition("via.SceneManager")
+    local scene = sm and Shared.safe(function()
+        return sdk.call_native_func(sm, smt, "get_CurrentScene()") end)
+    local arr = scene and Shared.safe(function()
+        return scene:call("findComponents(System.Type)",
+            sdk.typeof("app.solid.enemy.EnemyController")) end)
+    local out = {}
+    if not arr then return out end
+    local n = Shared.safe(function() return arr:get_size() end) or 0
+    for i = 0, n - 1 do out[#out + 1] = Shared.safe(function() return arr:get_element(i) end) end
+    return out
+end
+
+-- Called from on_frame (never from a hook).
+function SCOOP_FINISH.bodies.hide(now)
+    local sweep = SCOOP_FINISH.bodies.sweep
+    if not next(sweep) then return end
+    -- Not during a scene: the death scene itself may still be showing him.
+    if SCOOP_FINISH.bodies.event_playing() then
+        for _, s in pairs(sweep) do s.scene = true end
         return
     end
-    for _, row in ipairs(PSYCHO_FINISH) do
-        local missing = raw_check_flag(row.die) == true
-            and raw_check_flag(row.flags[1]) == false
-        if not missing then
-            psycho_finish_missing_since[row.die] = nil
-        else
-            -- A dwell, so the game's own finish always gets the first chance.
-            psycho_finish_missing_since[row.die] = psycho_finish_missing_since[row.die] or now
-            if now - psycho_finish_missing_since[row.die] >= PSYCHO_FINISH_WAIT_SECONDS then
-                psycho_finish_missing_since[row.die] = nil
-                M.log(string.format("psychopath death flag %d is on but the game never"
-                    .. " finished its scoop -- raising %s", row.die,
-                    table.concat(row.flags, ", ")))
-                for _, fid in ipairs(row.flags) do
-                    if raw_check_flag(fid) == false then raw_set_flag_on(fid) end
-                end
+    for _, c in ipairs(SCOOP_FINISH.bodies.scene_enemies()) do
+        local kind = c and Shared.safe(function() return c:call("get_KindID") end)
+        local kind_n = kind and tonumber(tostring(kind))
+        local s = kind_n and sweep[kind_n]
+        if s and (s.scene or now - s.since >= SCOOP_FINISH.bodies.HIDE_AFTER_SECONDS) then
+            local hpc = Shared.safe(function() return c:call("get_HitPoint") end)
+            local hp = hpc and Shared.safe(function()
+                return hpc:get_field("<CurrentHitPoint>k__BackingField") end)
+            local go = Shared.safe(function() return c:call("get_GameObject") end)
+            if hp ~= nil and tonumber(hp) <= 0 and go
+                and Shared.safe(function() return go:call("get_DrawSelf") end) ~= false then
+                Shared.safe(function()
+                    go:call("set_DrawSelf", false)
+                    go:call("set_UpdateSelf", false)
+                end)
+                M.log(string.format("hid psychopath body (kind 0x%X, 0 HP) left standing after"
+                    .. " a late scoop finish", kind_n))
             end
         end
     end
+    for kind, s in pairs(sweep) do
+        if now >= s.expires then sweep[kind] = nil end
+    end
+end
+
+-- Hideout's scene starts from door 517's own code: uOm111.excepDoorSearchTrg
+-- does nothing but check that case 8 is running and start event 41, with no
+-- check that it has already played, so each time the door opens after a room
+-- load the scene plays again. Flag 2321 (EV_CASE_8_2) comes on with the scene
+-- and stays on. Skipping the method once it's on leaves the door itself alone:
+-- opening and closing are handled elsewhere. The address is not folded. The
+-- hook only reads a value the frame tick keeps, and calls nothing managed.
+SCOOP_FINISH.door = { SCENE_FLAG = 2321, played = false, skipped = 0, logged = 0 }
+
+function SCOOP_FINISH.door.install()
+    local door = SCOOP_FINISH.door
+    if door.hooked then return end
+    door.hooked = true
+    local td = sdk.find_type_definition("solid.MT2RE.uOm111")
+    local m = td and td:get_method("excepDoorSearchTrg")
+    local ok = m ~= nil and pcall(sdk.hook, m,
+        function()
+            if door.played then
+                door.skipped = door.skipped + 1
+                return sdk.PreHookResult.SKIP_ORIGINAL
+            end
+        end,
+        function(retval) return retval end)
+    if not ok then
+        M.log("Hideout door: could not watch door 517 -- its scene can play again")
+    end
+end
+
+--- Frame side: what the hook reads, and the log line it can't write itself.
+function SCOOP_FINISH.door.tick()
+    local door = SCOOP_FINISH.door
+    door.install()
+    local v = raw_check_flag(door.SCENE_FLAG)
+    if v ~= nil then door.played = scoop_sanity_enabled and v end
+    if door.skipped ~= door.logged then
+        door.logged = door.skipped
+        M.log("Hideout door: scene already played, left as a plain door")
+    end
+end
+
+--- Called from on_frame (never from a hook).
+function SCOOP_FINISH.tick()
+    local now = os.clock()
+    if now < SCOOP_FINISH.next_check then return end
+    SCOOP_FINISH.next_check = now + SCOOP_FINISH.INTERVAL
+    SCOOP_FINISH.door.tick()
+    local active = scoop_sanity_enabled and State.is_activated()
+        and not State.is_endgame_reached() and world_stable()
+    if not active then
+        -- The title, a load or Overtime: the next session starts from nothing.
+        if SCOOP_FINISH.was_active then ScoopFinish.reset() end
+        SCOOP_FINISH.was_active = false
+        ScoopFinish.tick({ active = false })
+        return
+    end
+    SCOOP_FINISH.was_active = true
+    SCOOP_FINISH.install_loop_hook()
+
+    -- One read per flag per pass; nil (unreadable) is kept as "?".
+    local seen = {}
+    local function check(fid)
+        local v = seen[fid]
+        if v == nil then
+            v = raw_check_flag(fid)
+            if v == nil then v = "?" end
+            seen[fid] = v
+        end
+        if v == "?" then return nil end
+        return v
+    end
+
+    for _, row in ipairs(ScoopFinish.rows_to_reopen({
+        check = check,
+        is_running = function(name)
+            return State.has_received(name) and not State.is_completed(name)
+        end,
+    })) do
+        SCOOP_FINISH.reopen(row, ScoopFinish.HELD_FOR[row.scq])
+        seen[row.finish], seen[row.success] = false, false
+    end
+
+    local finish = ScoopFinish.tick({
+        check = check,
+        now = now,
+        active = true,
+        loop_running = SCOOP_FINISH.loop_running(now),
+        is_completed = State.is_completed,
+        held = function(scq)
+            local kc = _G.AP and _G.AP.effects and _G.AP.effects.KentChain
+            return kc ~= nil and kc.holds_row ~= nil and kc.holds_row(scq) == true
+        end,
+    })
+    for _, f in ipairs(finish) do
+        local row = f.row
+        local ok
+        if f.direct then
+            local freed = SCOOP_FINISH.free_slot(row.tbl)
+            if freed > 0 then
+                M.log(string.format("Scoop finish: scoop %d held a slot -- freed it first", row.scq))
+            end
+            ok = raw_set_flag_on(row.finish)
+        else
+            ok = SCOOP_FINISH.finish(row.scq, f.success)
+        end
+        -- A finish that keeps not taking is retried quietly after the first
+        -- few, with one line to say so.
+        if f.attempt <= ScoopFinish.MAX_QUICK_ATTEMPTS then
+            M.log(string.format(
+                "Scoop finish: scoop %d (FINISH %d%s) still unfinished after %.1f s (%s) -- %s",
+                row.scq, row.finish,
+                (f.success and row.success ~= 0) and (", SUCCESS " .. row.success) or "",
+                now - f.since, f.reason, ok and (f.direct and "set its FINISH flag" or "finished it through finishSCQ")
+                    or "finishSCQ failed"))
+        elseif f.attempt == ScoopFinish.MAX_QUICK_ATTEMPTS + 1 then
+            M.log(string.format(
+                "Scoop finish: scoop %d (FINISH %d) is still unfinished after %d finishSCQ calls"
+                .. " (%s) -- trying again every %d s", row.scq, row.finish,
+                ScoopFinish.MAX_QUICK_ATTEMPTS, f.reason, ScoopFinish.RETRY_SECONDS))
+        end
+        local kind = SCOOP_FINISH.BODY_KIND[row.scq]
+        if ok and kind then
+            -- A repeat finish keeps the first sighting and any scene seen.
+            local s = SCOOP_FINISH.bodies.sweep[kind]
+            if not s then
+                s = { since = f.since, scene = false }
+                SCOOP_FINISH.bodies.sweep[kind] = s
+            end
+            s.expires = now + SCOOP_FINISH.bodies.SWEEP_SECONDS
+        end
+    end
+    SCOOP_FINISH.bodies.hide(now)
 end
 
 --- Put back the story flags the 72 hours cleared (see OVERTIME_HIDEOUT_FLAGS).
 local function restore_overtime_story()
-    local want = {}
+    local wanted = {}
+    local function finished_main(name)
+        local data = name and SCOOP_DATA[name]
+        return data and data.category == "Main" and completed_scoops[name]
+    end
+    for flag_id, name in pairs(CONTROLLED_FLAGS) do
+        if finished_main(name) then wanted[flag_id] = true end
+    end
+    for flag_id, name in pairs(CASCADE_FLAGS) do
+        if finished_main(name) then wanted[flag_id] = true end
+    end
+    for flag_id, name in pairs(SCOOP_FINISH.OVERTIME_FLAGS) do
+        if finished_main(name) then wanted[flag_id] = true end
+    end
     for flag_id, row in pairs(COMPLETION_FLAGS) do
-        local data = row.scoop and SCOOP_DATA[row.scoop]
-        if data and data.category == "Main" and completed_scoops[row.scoop]
-                and COMPLETION_EVENT_TO_SCOOP[row.event] == row.scoop then
-            want[#want + 1] = flag_id
-        end
+        if finished_main(row.scoop) then wanted[flag_id] = true end
     end
     if raw_check_flag(HIDEOUT_DONE_FLAG) == true then
-        for _, fid in ipairs(OVERTIME_HIDEOUT_FLAGS) do want[#want + 1] = fid end
+        for _, fid in ipairs(OVERTIME_HIDEOUT_FLAGS) do wanted[fid] = true end
+    end
+    wanted[OVERTIME_EP_DOOR_FLAG] = true
+    local want = {}
+    for fid in pairs(wanted) do
+        if not OVERTIME_LEAVE_OFF[fid] then want[#want + 1] = fid end
     end
     table.sort(want)
 
@@ -3269,6 +3698,72 @@ function M.on_frame()
         end
     end
 
+    -- Apply completions and checks the evFlagOn hook queued (see the hook for
+    -- why). Mains cannot be played in Overtime, so with 312 on a main's
+    -- completion is the game's, not the player's: the 12-day title entry
+    -- writes every main as finished in one burst. Those are neither completed
+    -- nor sent. Seeing one before the restore has run is what marks an
+    -- Overtime started from the title menu; a Day 3 ending writes none.
+    -- 312 unreadable (a load) holds the queue for a later frame.
+    local ot_now = raw_check_flag(OVERTIME_FLAG)
+    if ot_now ~= nil and (#pending_completions > 0 or #pending_checks > 0
+            or main_finishes_seen > 0 or #pending_triggers > 0) then
+        local function is_main(name)
+            local data = name and SCOOP_DATA[name]
+            return data and data.category == "Main"
+        end
+        if ot_now and main_finishes_seen > 0 and not overtime_story_restored
+                and not overtime_from_title then
+            overtime_from_title = true
+            M.log("Overtime started from the title menu -- its finished mains"
+                .. " are the game's own; no checks, no story flag restore")
+        end
+        main_finishes_seen = 0
+        local checks, batch = pending_checks, pending_completions
+        pending_checks, pending_completions, pending_completions_set = {}, {}, {}
+        local dropped = 0
+        local triggers = pending_triggers
+        pending_triggers = {}
+        for _, fid in ipairs(triggers) do
+            local trigger = FLAG_TRIGGERS[fid]
+            if trigger and not ot_now and not State.is_endgame_reached() then
+                for _, target in ipairs(trigger.enable or {}) do
+                    raw_set_flag_on(target)
+                    M.log(string.format("Trigger: flag %d -> enabled %d", fid, target))
+                end
+                for _, target in ipairs(trigger.disable or {}) do
+                    raw_set_flag_off(target)
+                    M.log(string.format("Trigger: flag %d -> disabled %d", fid, target))
+                end
+            end
+        end
+        -- A title-menu Overtime earns nothing from the burst: it also writes
+        -- rows with no scoop (Backup for Brad's 270, Ending A's 312, Memories,
+        -- Greg's passage), and those checks went out unearned.
+        for _, c in ipairs(checks) do
+            if overtime_from_title
+                    or (ot_now and is_main(c[3] or COMPLETION_EVENT_TO_SCOOP[c[1]])) then
+                dropped = dropped + 1
+            elseif on_completion_detected_callback then
+                pcall(on_completion_detected_callback, c[1], c[2], c[3])
+            end
+        end
+        for _, scoop in ipairs(batch) do
+            if ot_now and is_main(scoop) then
+                dropped = dropped + 1
+            else
+                local ok, err = pcall(M.complete_scoop, scoop)
+                if not ok then
+                    M.log(string.format("complete_scoop('%s') failed: %s", scoop, tostring(err)))
+                end
+            end
+        end
+        if dropped > 0 then
+            M.log(string.format("Overtime: ignored %d completion(s) and check(s)"
+                .. " the game wrote with flag 312 on", dropped))
+        end
+    end
+
     -- Overtime first, so nothing below writes a flag in the frame it begins.
     if Shared.is_in_game() then
         local ot = raw_check_flag(OVERTIME_FLAG)
@@ -3281,13 +3776,22 @@ function M.on_frame()
             end
             if not overtime_story_restored then
                 overtime_story_restored = true
-                restore_overtime_story()
+                -- The restore puts back what DRAP's 72 hours switched off.
+                -- A title-menu Overtime had no 72 hours: the game set its
+                -- story the vanilla way, and the restore's start/success
+                -- markers on top of that crashed SCQManager.checkQueStart.
+                if overtime_from_title then
+                    M.log("Overtime from the title menu: story flag restore skipped")
+                else
+                    restore_overtime_story()
+                end
             end
         elseif ot == false and State.is_endgame_reached() then
             overtime_off_since = overtime_off_since or os.clock()
             if os.clock() - overtime_off_since >= OVERTIME_OFF_CONFIRM_SECONDS then
                 overtime_off_since = nil
                 overtime_story_restored = false
+                overtime_from_title = false
                 State.set_endgame_reached(false)
                 M.log("Flag 312 off in a loaded save -- back in the 72 hours, enforcement resumes")
                 save_state()
@@ -3302,14 +3806,18 @@ function M.on_frame()
 
     if Shared.is_in_game() then
         last_resort_fallback()
-        psycho_finish_fallback()
+        SCOOP_FINISH.tick()
     end
 
     -- Process flag clears scheduled from the evFlagOn pre-hook. The one-frame
     -- delay lets the engine's evFlagOn body finish so the clear sticks.
+    -- Not in Overtime: the title-menu start writes every main's completion
+    -- before endgame is set, and with ScoopSanity on the guard queues a clear
+    -- for each one -- a finished case the game would then replay.
     if next(pending_flag_clears) then
         for fid, _ in pairs(pending_flag_clears) do
-            if raw_check_flag(fid) then
+            if ot_now == false and not State.is_endgame_reached()
+                    and raw_check_flag(fid) then
                 raw_set_flag_off(fid)
                 if verbose_logging then
                     M.log(string.format(
@@ -3398,7 +3906,8 @@ function M.on_frame()
     -- When professor is active: one-time disable of 276, then hands-off so
     -- the game can re-enable it during the completion cutscene.
     -- When professor is NOT active: enable 276 in Paradise Plaza, disable elsewhere.
-    if State.is_activated() and efm_mgr:get() then
+    -- Not in Overtime: the restore leaves 276 on there (OVERTIME_EP_DOOR_FLAG).
+    if State.is_activated() and efm_mgr:get() and not State.is_endgame_reached() then
         local professor_flag_on = raw_check_flag(275)
         local professor_done = completed_scoops["Rescue the Professor"]
         local professor_active = professor_flag_on and not professor_done
@@ -3449,7 +3958,7 @@ re.on_frame(function()
     M.on_frame()
 end)
 
-_G.scoop_unlock     = function(name) return M.unlock_scoop(name) end
+_G.scoop_unlock     = function(name) return M.unlock_scoop_gated(name) end
 _G.scoop_complete   = function(name) return M.complete_scoop(name) end
 _G.scoop_unlock_all = function() return M.unlock_all() end
 _G.scoop_enforce    = function() M.force_enforce() end

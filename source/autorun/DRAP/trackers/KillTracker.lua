@@ -15,6 +15,7 @@
 
 local Shared = require("DRAP/Shared")
 local Counter = require("DRAP/trackers/KillCounter")
+local VehicleKills = require("DRAP/trackers/VehicleKills")
 
 local M = Shared.create_module("KillTracker")
 
@@ -39,6 +40,8 @@ local last_scene = nil
 -- Vehicle kills per area, shown beside the area counts. Every vehicle kill
 -- also goes through addZombieKillNum, so it is already in the area count
 -- and the checks; this only says how many of those were with a vehicle.
+-- Cars and the motorcycle only, the same rule as the vehicle challenges
+-- (VehicleKills.lua): the game also files bicycle kills as vehicle kills.
 -- Measured 2026-09-24: a vehicle-only pass made 24 addZombieKillNum calls,
 -- 19 of them also addZombieVehicleKillNum (the rest were deaths the game
 -- did not credit to the car). Kept in the same ledger section, local only.
@@ -493,6 +496,7 @@ local function on_kill()
 end
 
 local function on_vehicle_kill()
+    if not VehicleKills.counts_now() then return end
     local region = counter.region_for(current_scene())
     if not region then return end
     vehicle_counts[region] = (vehicle_counts[region] or 0) + 1

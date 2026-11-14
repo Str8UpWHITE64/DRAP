@@ -14,14 +14,17 @@ end
 -- First, so the session log is open before any module can log into it and the
 -- banner below is genuinely the first DRAP line in the file.
 local Logger = require("DRAP/Logger")
-Logger.info("DRAP", string.format("DRAP %s starting -- session log: %s",
-    Logger.VERSION, Logger.get_path() or "console only (file open failed)"))
+
+-- Next, before any module registers a frame callback: a module that throws
+-- every frame must not stop the callbacks registered after it.
+require("DRAP/FrameGuard").install()
 
 local Activation = require("DRAP/Activation")
 local AP_BRIDGE = require("DRAP/Bridge")
 
 AP = AP or {}
 AP.Activation       = Activation
+AP.GameLog          = require("DRAP/GameLog")
 AP.AP_BRIDGE        = AP_BRIDGE
 AP.ItemSpawner      = require("DRAP/ItemSpawner")
 AP.ItemRestriction  = require("DRAP/ItemRestriction")
@@ -34,8 +37,11 @@ AP.LevelTracker     = require("DRAP/trackers/LevelTracker")
 AP.EventTracker     = require("DRAP/trackers/EventTracker")
 AP.NpcTracker       = require("DRAP/trackers/NpcTracker")
 AP.PPStickerTracker = require("DRAP/trackers/PPStickerTracker")
+AP.CustomStickers = require("DRAP/CustomStickers")
 AP.AchievementTracker = require("DRAP/trackers/AchievementTracker")
 AP.KillTracker      = require("DRAP/trackers/KillTracker")
+AP.VehicleKills     = require("DRAP/trackers/VehicleKills")
+AP.ItemSanity       = require("DRAP/trackers/ItemSanity")
 AP.SaveSlot         = require("DRAP/SaveSlot")
 AP.SaveDiagnostics  = require("DRAP/SaveDiagnostics")
 AP.SteamStore       = require("DRAP/SteamStore")
@@ -52,14 +58,8 @@ AP.GUI               = require("DRAP/GUI")
 AP.Notify            = require("DRAP/Notify")
 AP.MsgEvents         = require("DRAP/MsgEvents")
 
--- Debug modules. Noisy output (per-flag prints) and JSON persistence inside
--- EventFlagExplorer gate themselves on GUI's "Debug Mode" checkbox.
-AP.EventFlagExplorer = require("DRAP/debug/EventFlagExplorer")
--- FlagTraceRecorder self-registers its own re.on_frame (it must keep
--- recording during cutscenes, where the isInGame-gated loop below stops).
-AP.FlagTraceRecorder = require("DRAP/debug/FlagTraceRecorder")
--- Console-only: reads state the flag trace cannot see.
-AP.StateProbe = require("DRAP/debug/StateProbe")
+-- Debug modules (EventFlagExplorer, FlagTraceRecorder, StateProbe) live in
+-- a local dev package that is never released.
 
 local Shared = require("DRAP/Shared")
 local SharedData = require("DRAP/SharedData")
@@ -134,6 +134,7 @@ AP.effects.SaviorGoalEffects          = require("DRAP/effects/SaviorGoalEffects"
 AP.effects.EndingSequence             = require("DRAP/effects/EndingSequence")
 AP.effects.EscortVoice                = require("DRAP/effects/EscortVoice")
 AP.effects.PsychoGoalEffects          = require("DRAP/effects/PsychoGoalEffects")
+AP.effects.PsychoKillPP               = require("DRAP/effects/PsychoKillPP")
 AP.effects.PsychoHostility            = require("DRAP/effects/PsychoHostility")
 AP.effects.BookSkills                 = require("DRAP/effects/BookSkills")
 AP.effects.BookGuards                 = require("DRAP/effects/BookGuards")
@@ -141,19 +142,37 @@ AP.effects.NpcSaveGuard               = require("DRAP/effects/NpcSaveGuard")
 AP.effects.ConvictRespawnTrap         = require("DRAP/effects/ConvictRespawnTrap")
 AP.effects.InventoryTraps             = require("DRAP/effects/InventoryTraps")
 AP.effects.CostumeTraps               = require("DRAP/effects/CostumeTraps")
+AP.effects.BonkTrap                   = require("DRAP/effects/BonkTrap")
+AP.effects.SizeTraps                  = require("DRAP/effects/SizeTraps")
+AP.effects.InvisibleTrap              = require("DRAP/effects/InvisibleTrap")
+AP.effects.GasTrap                    = require("DRAP/effects/GasTrap")
+AP.effects.OneHpTrap                  = require("DRAP/effects/OneHpTrap")
+AP.effects.NightTrap                  = require("DRAP/effects/NightTrap")
+AP.effects.TeleportTrap               = require("DRAP/effects/TeleportTrap")
 AP.effects.SpecialForces              = require("DRAP/effects/SpecialForces")
 AP.effects.SpitterMode                = require("DRAP/effects/SpitterMode")
 AP.TrapBank                           = require("DRAP/TrapBank")
+AP.TrapLink                           = require("DRAP/TrapLink")
 AP.effects.KentChain                  = require("DRAP/effects/KentChain")
+AP.effects.CarlitoStay                = require("DRAP/effects/CarlitoStay")
+AP.effects.LastResortMeeting          = require("DRAP/effects/LastResortMeeting")
 AP.effects.CultZombieLayout           = require("DRAP/effects/CultZombieLayout")
+AP.effects.SeanItems                   = require("DRAP/effects/SeanItems")
+AP.effects.PharmacyKey                 = require("DRAP/effects/PharmacyKey")
+AP.effects.NorthPlazaBike              = require("DRAP/effects/NorthPlazaBike")
+AP.effects.ConvictHumvee              = require("DRAP/effects/ConvictHumvee")
 AP.effects.PartyHudGuard              = require("DRAP/effects/PartyHudGuard")
 AP.effects.PlayerStats                = require("DRAP/effects/PlayerStats")
 AP.effects.PlayerBuffs                = require("DRAP/effects/PlayerBuffs")
 AP.effects.HostileSurvivorTrap        = require("DRAP/effects/HostileSurvivorTrap")
 AP.effects.ZombieEffects              = require("DRAP/effects/ZombieEffects")
 AP.effects.VehicleGate                = require("DRAP/effects/VehicleGate")
+AP.effects.CameraLock                 = require("DRAP/effects/CameraLock")
 AP.effects.UnlockItemSpawns           = require("DRAP/effects/UnlockItemSpawns")
 AP.effects.CostumeRandomizer          = require("DRAP/effects/CostumeRandomizer")
+AP.effects.MusicShuffle               = require("DRAP/effects/MusicShuffle")
+AP.effects.MusicLog                   = require("DRAP/effects/MusicLog")
+AP.effects.InfinityDrain              = require("DRAP/effects/InfinityDrain")
 AP.effects.AP_LocationTriggers        = require("DRAP/effects/AP_LocationTriggers")
 AP.effects.PpBonusMatch               = require("DRAP/effects/PpBonusMatch")
 AP.effects.DoorPromptOverlay          = require("DRAP/effects/DoorPromptOverlay")
@@ -174,13 +193,24 @@ AP.effects.HostileSurvivorTrap.register()
 AP.effects.ConvictRespawnTrap.register()
 AP.effects.InventoryTraps.register()
 AP.effects.CostumeTraps.register()
+AP.effects.BonkTrap.register()
+AP.effects.SizeTraps.register()
+AP.effects.InvisibleTrap.register()
+AP.effects.GasTrap.register()
+AP.effects.OneHpTrap.register()
+AP.effects.NightTrap.register()
+AP.effects.TeleportTrap.register()
+AP.TrapLink.init()
 AP.effects.ZombieEffects.register()
 AP.effects.VehicleGate.register()
+AP.effects.CameraLock.register()
 AP.effects.UnlockItemSpawns.register()
 AP.effects.CostumeRandomizer.register()
 AP.effects.AP_LocationTriggers.register()
 AP.effects.DoorPromptOverlay.register()
 AP.effects.OvertimeItemGate.register()
+AP.effects.CarlitoStay.register()
+AP.effects.LastResortMeeting.register()
 
 -- Per-scene fixups (e.g. disable s136 safe-room barricade once Jessie is met
 -- under ScoopSanity). Hooks AreaManager.onLoadMapEvent.
@@ -193,7 +223,7 @@ AP.SceneFixups.register()
 -- Achievement pop-ups are their own event, not a counted save field, so they
 -- arrive already resolved to a location name.
 AP.AchievementTracker.on_location_earned = function(loc_name)
-    AP_BRIDGE.check(loc_name)
+    return AP_BRIDGE.check(loc_name)
 end
 
 AP.LevelTracker.on_level_changed = function(old_level, new_level)
@@ -207,6 +237,9 @@ end
 -- Hook Wiring: Event Tracker
 ------------------------------------------------------------
 
+-- Locations already sent by a scoop completion this session (see on_tracked_location)
+local COMPLETION_SENT = {}
+
 AP.EventTracker.on_tracked_location = function(desc, source, raw_id, extra)
     -- Don't send checks if ScoopUnlocker is currently enabling flags
     -- (This prevents false completions when we unlock a mission)
@@ -215,8 +248,14 @@ AP.EventTracker.on_tracked_location = function(desc, source, raw_id, extra)
         return
     end
 
-    log(string.format("Tracked location: %s", tostring(desc)))
-    AP.AP_BRIDGE.check(desc)
+    -- A psycho kill is seen twice: ScoopUnlocker's die flag (e.g. 1292) and the defeat
+    -- scene's event number (event 70 for Kent) a moment later. Send it once.
+    if COMPLETION_SENT[desc] then
+        log.debug(string.format("Tracked location: %s (already sent by its scoop completion)", tostring(desc)))
+    else
+        log(string.format("Tracked location: %s", tostring(desc)))
+        AP.AP_BRIDGE.check(desc)
+    end
 
     -- Forward events to ScoopUnlocker for milestone/chain tracking
     if AP.ScoopUnlocker and AP.ScoopUnlocker.on_event_tracked then
@@ -255,6 +294,10 @@ AP.NpcTracker.on_survivor_killed_by_player = function(npc_id, friendly_name)
     end
     log(string.format("Survivor killed: %s", tostring(friendly_name)))
     AP_BRIDGE.check(string.format("Kill %s", friendly_name))
+    -- Nobody can be rescued under Psycho, so the kill pays the rescue PP.
+    if AP.effects.PsychoKillPP then
+        pcall(AP.effects.PsychoKillPP.on_survivor_killed, npc_id, friendly_name)
+    end
     if AP.effects.PsychoGoalEffects then
         AP.effects.PsychoGoalEffects.on_survivor_killed(friendly_name)
     end
@@ -289,6 +332,12 @@ AP.PPStickerTracker.on_sticker_event_taked = function(location_name, item_number
     AP_BRIDGE.check(location_name)
 end
 
+-- Custom PP stickers: our own stickers, recognised by the photographed object
+AP.CustomStickers.on_check = function(location_name, number)
+    log(string.format("Custom PP sticker photographed: %s (#%s)", tostring(location_name), tostring(number)))
+    AP_BRIDGE.check(location_name)
+end
+
 ------------------------------------------------------------
 -- Hook Wiring: ScoopUnlocker
 ------------------------------------------------------------
@@ -298,6 +347,7 @@ end
 AP.ScoopUnlocker.set_completion_callback(function(event_desc, flag_id, scoop_name)
     log(string.format("Scoop completion detected: '%s' (flag %d, scoop '%s')",
         tostring(event_desc), flag_id or 0, tostring(scoop_name)))
+    if event_desc then COMPLETION_SENT[event_desc] = true end
     AP_BRIDGE.check(event_desc)
 end)
 
@@ -335,6 +385,8 @@ end
 -- Slot Connection Handler
 ------------------------------------------------------------
 
+local last_slot_key = nil   -- slot|seed of the last connect this session
+
 local function extract_seed(slot_data)
     local raw = slot_data and (slot_data.seed_name or slot_data.seed or slot_data.seed_id) or "unknown"
     return Shared.clean_string(raw)
@@ -357,7 +409,22 @@ local function run_slot_connect(slot_data)
     local slot = Shared.clean_string(AP_BRIDGE.AP_REF.APSlot or "unknown")
     local seed = extract_seed(slot_data)
 
-    log("Slot connected: slot=" .. slot .. " seed=" .. seed)
+    do
+        local client = AP_BRIDGE.AP_REF.APClient
+        local number = client and Shared.safe(function() return client:get_player_number() end)
+        local players = client and Shared.safe(function() return client:get_players() end)
+        AP.GameLog.connected(seed, slot, number, type(players) == "table" and #players or nil)
+    end
+
+    -- Another slot in the same session is another world: what NpcTracker
+    -- remembers of the last one (kills above all) must not leak into it. A
+    -- reconnect to the same slot keeps it, since those survivors are still dead.
+    local slot_key = slot .. "|" .. seed
+    if last_slot_key and last_slot_key ~= slot_key then
+        AP.NpcTracker.reset_world("slot change")
+        AP.effects.SurvivorScoopCompletion.reset_world()
+    end
+    last_slot_key = slot_key
 
     -- Before any of the restore below: the mod is dormant until here, and
     -- everything that follows expects to be running for real.
@@ -398,10 +465,16 @@ local function run_slot_connect(slot_data)
     AP.ItemRestriction.set_enabled(restricted_item_mode_enabled)
     log("Restricted Item Mode enabled=" .. tostring(restricted_item_mode_enabled))
 
+    -- ItemSanity: pickups are the checks, and nothing is spawned. The apworld
+    -- refuses it together with Restricted Item Mode.
+    local item_sanity_enabled = (type(slot_data) == "table" and slot_data.item_sanity == true)
+    AP.ItemSanityEnabled = item_sanity_enabled
+    AP.ItemSanity.set_enabled(item_sanity_enabled)
+
     -- If hard mode is enabled, disable the item spawner's spawn functionality
-    if restricted_item_mode_enabled and AP.ItemSpawner.set_spawning_disabled then
+    if (restricted_item_mode_enabled or item_sanity_enabled) and AP.ItemSpawner.set_spawning_disabled then
         AP.ItemSpawner.set_spawning_disabled(true)
-        log("Item spawning disabled due to hard mode")
+        log("Item spawning disabled (" .. (item_sanity_enabled and "ItemSanity" or "hard mode") .. ")")
     end
 
     -- DamageLink. The tag went on at ConnectUpdate; this arms the detection
@@ -436,6 +509,37 @@ local function run_slot_connect(slot_data)
         AP.KnockbackLink.apply_received(value, source)
     end
     log("KnockbackLink enabled=" .. tostring(knockback_link_enabled))
+    -- /knockbacklink in the client window flips the tag; this flips the rest.
+    AP_BRIDGE.AP_REF.on_knockback_link_toggled = function(on)
+        AP.KnockbackLinkEnabled = on
+        AP.KnockbackLink.set_enabled(on)
+        AP_BRIDGE.set_knockbacklink_enabled(on)
+        log("KnockbackLink " .. (on and "on" or "off") .. " (client command)")
+    end
+
+    -- TrapLink. The traps the yaml allows gate what a foreign trap may do.
+    local trap_link_enabled = (type(slot_data) == "table" and slot_data.trap_link == true)
+    AP.TrapLinkEnabled = trap_link_enabled
+    AP.TrapLink.set_enabled_traps(type(slot_data) == "table" and slot_data.enabled_traps or nil)
+    AP.TrapLink.set_enabled(trap_link_enabled)
+    AP_BRIDGE.set_traplink_enabled(trap_link_enabled)
+    AP_BRIDGE.on_trap_link = function(name, source)
+        AP.TrapLink.receive(name, source)
+    end
+    log("TrapLink enabled=" .. tostring(trap_link_enabled))
+    -- /traplink in the client window flips the tag; this flips the rest.
+    AP_BRIDGE.AP_REF.on_trap_link_toggled = function(on)
+        AP.TrapLinkEnabled = on
+        AP.TrapLink.set_enabled(on)
+        AP_BRIDGE.set_traplink_enabled(on)
+        log("TrapLink " .. (on and "on" or "off") .. " (client command)")
+    end
+
+    -- Infinity Mode's health drain. Off unless the slot asks; offline there
+    -- is no slot, so the game stays vanilla.
+    AP.effects.InfinityDrain.setup(
+        type(slot_data) == "table" and slot_data.infinity_drain == true,
+        type(slot_data) == "table" and slot_data.infinity_drain_rate or nil)
 
     -- Spitter Only. Arrives with restricted_item_mode already forced on by
     -- the apworld, so the pickup half above is what stops the player picking
@@ -447,6 +551,7 @@ local function run_slot_connect(slot_data)
     -- helicopter requirement so the soldiers still leave.
     AP.ScoopUnlocker.set_spitter_only_enabled(spitter_only_enabled)
     AP.ScoopUnlocker.set_kent_progression(type(slot_data) == "table" and slot_data.kent_progression or nil)
+    AP.ScoopUnlocker.set_camera_item(type(slot_data) == "table" and slot_data.camera_item == true)
     log("Spitter Only enabled=" .. tostring(spitter_only_enabled))
 
     -- Door Randomizer option
@@ -502,7 +607,8 @@ local function run_slot_connect(slot_data)
     AP.Goal = goal
     local goal_names = { [0] = "Ending S", [1] = "Ending A", [2] = "Savior",
                          [3] = "Zombie Genocider", [4] = "Psycho" }
-    log("Goal: " .. (goal_names[goal] or tostring(goal)))
+    AP.GoalName = goal_names[goal] or tostring(goal)
+    log("Goal: " .. AP.GoalName)
 
     -- Overtime suppressant gating. Ending S only, because that is the only
     -- goal whose seed carries the eight items -- and every Ending S seed,
@@ -631,6 +737,17 @@ local function run_slot_connect(slot_data)
             type(slot_data) == "table" and slot_data.car_keys == true)
     end
 
+    -- Extra PP Stickers (custom stickers): off unless the slot asks.
+    if AP.CustomStickers then
+        AP.CustomStickers.setup(type(slot_data) == "table" and slot_data.extra_pp_stickers == true)
+    end
+
+    -- Camera Item: the shutter waits on the Camera. Off plays as vanilla.
+    if AP.effects.CameraLock then
+        AP.effects.CameraLock.setup(
+            type(slot_data) == "table" and slot_data.camera_item == true)
+    end
+
     -- Costume randomizer toggles (3 independent options):
     --   * random_starting_costume : one randomized outfit at session start
     --   * costume_chaos_mode      : re-randomize on every area transition
@@ -649,6 +766,13 @@ local function run_slot_connect(slot_data)
         })
         log(string.format("Costume randomizer: starting=%s chaos=%s dlc=%s",
             tostring(starting), tostring(chaos), tostring(dlc)))
+    end
+
+    -- Music Shuffle: cosmetic, seeded from seed + slot so a reconnect hears
+    -- the same soundtrack. The table write itself happens on the frame.
+    if AP.effects.MusicShuffle then
+        AP.effects.MusicShuffle.setup(
+            type(slot_data) == "table" and slot_data.music_shuffle == true, seed, slot)
     end
 
     -- PP-bonus AP location triggers. Slot data carries the per-entry mapping
@@ -710,6 +834,14 @@ local function run_slot_connect(slot_data)
 
     -- (Bridge persistence — received items, completed checks, sticker save
     -- file — is initialized at the TOP of this handler, before any consumer.)
+
+    AP.GameLog.config(AP_BRIDGE.AP_REF.APHost, slot, string.format(
+        "goal %s, DeathLink %s, DamageLink %s, TrapLink %s, ScoopSanity %s",
+        AP.GoalName, deathlink_enabled and "on" or "off",
+        damage_link_enabled and "on" or "off", trap_link_enabled and "on" or "off",
+        scoop_sanity_enabled and "on" or "off"))
+    AP.GameLog.reset_watch()
+    AP.GameLog.state()
 end
 
 --- The AP callback proper: capture the slot data and get off the client's
@@ -729,6 +861,7 @@ local new_game_checked = false
 
 local function on_enter_game()
     log("Entered gameplay")
+    AP.GameLog.reset_watch()
     pending_reapply = true
     new_game_checked = false
 end
@@ -751,10 +884,18 @@ local function try_reapply_if_ready()
         local ng = AP.ScoopUnlocker.is_new_game()
         if ng ~= nil then
             new_game_checked = true
+            AP.GameLog.session_entered(ng == true)
             if ng then
                 log("New game detected -- resetting side scoop progress")
                 AP.ScoopUnlocker.reset_for_new_game()
                 AP.EventTracker.reset_sent()
+                AP.NpcTracker.reset_world("new game")
+                -- The rescues SurvivorScoopCompletion remembers are the old
+                -- world's too. Left in place, the reapply below completes
+                -- every scoop whose roster was rescued last game, and A
+                -- Strange Group completed that way starts the cult respawn:
+                -- no Sean, no raincoat cutscene.
+                AP.effects.SurvivorScoopCompletion.reset_world()
             end
         else
             return  -- retry next frame; don't reapply against unsettled flags
@@ -785,6 +926,7 @@ local function try_reapply_if_ready()
     end
 
     pending_reapply = false
+    AP.GameLog.state()
 end
 
 ------------------------------------------------------------
@@ -827,11 +969,15 @@ re.on_frame(function()
         -- thing protecting an AP save loaded offline. Leave them outside.
         safe_on_frame(AP.effects.NpcSaveGuard, "NpcSaveGuard")
         safe_on_frame(AP.effects.PartyHudGuard, "PartyHudGuard")
+        -- One more: a save redirect left by an earlier session (Reset
+        -- Scripts, or a run that never connected) is cleaned here too.
+        safe_on_frame(AP.SaveSlot, "SaveSlot")
         was_in_game = now_in_game
         return
     end
 
     -- Update all modules
+    safe_on_frame(AP.GameLog,          "GameLog")
     safe_on_frame(AP.ItemSpawner,      "ItemSpawner")
     safe_on_frame(AP.ItemRestriction,  "ItemRestriction")
     safe_on_frame(AP.DoorSceneLock,    "DoorSceneLock")
@@ -842,6 +988,8 @@ re.on_frame(function()
     safe_on_frame(AP.effects.SpitterMode, "SpitterMode")
     safe_on_frame(AP.DamageLink,       "DamageLink")
     safe_on_frame(AP.KnockbackLink,    "KnockbackLink")
+    safe_on_frame(AP.VehicleKills,     "VehicleKills")
+    safe_on_frame(AP.ItemSanity,       "ItemSanity")
     safe_on_frame(AP.ChallengeTracker, "ChallengeTracker")
     safe_on_frame(AP.LevelTracker,     "LevelTracker")
     safe_on_frame(AP.AchievementTracker, "AchievementTracker")
@@ -851,23 +999,31 @@ re.on_frame(function()
     safe_on_frame(AP.DeathLink,        "DeathLink")
     safe_on_frame(AP.AP_BRIDGE,        "AP_BRIDGE")
     safe_on_frame(AP.PPStickerTracker, "PPStickerTracker")
+    safe_on_frame(AP.CustomStickers,   "CustomStickers")
     safe_on_frame(AP.SaveSlot,         "SaveSlot")
     safe_on_frame(AP.SaveDiagnostics,  "SaveDiagnostics")
     safe_on_frame(AP.effects.BookGuards, "BookGuards")
     safe_on_frame(AP.effects.NpcSaveGuard, "NpcSaveGuard")
     safe_on_frame(AP.TrapBank, "TrapBank")
+    safe_on_frame(AP.effects.NightTrap, "NightTrap")
     safe_on_frame(AP.effects.InventoryTraps, "InventoryTraps")
     safe_on_frame(AP.effects.KentChain, "KentChain")
+    safe_on_frame(AP.effects.CarlitoStay, "CarlitoStay")
+    safe_on_frame(AP.effects.LastResortMeeting, "LastResortMeeting")
     safe_on_frame(AP.effects.CultZombieLayout, "CultZombieLayout")
+    safe_on_frame(AP.effects.SeanItems, "SeanItems")
+    safe_on_frame(AP.effects.PharmacyKey, "PharmacyKey")
+    safe_on_frame(AP.effects.NorthPlazaBike, "NorthPlazaBike")
+    safe_on_frame(AP.effects.ConvictHumvee, "ConvictHumvee")
     safe_on_frame(AP.effects.PsychoHostility, "PsychoHostility")
     safe_on_frame(AP.effects.SpecialForces, "SpecialForces")
+    safe_on_frame(AP.effects.MusicShuffle, "MusicShuffle")
+    safe_on_frame(AP.effects.MusicLog, "MusicLog")
+    safe_on_frame(AP.effects.InfinityDrain, "InfinityDrain")
     -- Re-arms the spawn multiplier when a new area's layout appears; the
     -- instantinateZombies pre-hook fires too early to catch it.
     safe_on_frame(AP.effects.ZombieEffects, "ZombieEffects")
     safe_on_frame(AP.effects.PartyHudGuard, "PartyHudGuard")
-
-    -- Debug modules
-    safe_on_frame(AP.EventFlagExplorer, "EventFlagExplorer")
 
     -- Enter-game edge detection
     if now_in_game and not was_in_game then
@@ -896,7 +1052,8 @@ _G.cap        = function(code) AP.TimeGate.set_time_cap(code) end
 _G.show_items = function() AP.GUI.show_window() end
 _G.hide_items = function() AP.GUI.hide_window() end
 
-log("Main script loaded.")
+log(string.format("Main script loaded (%d frame callbacks guarded).",
+    require("DRAP/FrameGuard").wrapped_count()))
 
 -- Get the whole startup block on disk now. If the game dies on the first
 -- frames, this is the part of the log that explains why.

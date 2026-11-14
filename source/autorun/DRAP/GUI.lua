@@ -101,6 +101,21 @@ local function draw_window()
 
     imgui.separator()
 
+    -- Replay the ending once the goal is already sent. Nothing is re-sent.
+    do
+        local ok, Ending = pcall(require, "DRAP/effects/EndingSequence")
+        if ok and Ending and Ending.can_play_manually then
+            local status = Ending.manual_status and Ending.manual_status()
+            if status then
+                imgui.text_colored(status, 0xFF88CCFF)
+            elseif Ending.can_play_manually() then
+                if imgui.button("Play ending") then
+                    pcall(Ending.play_ending_manually)
+                end
+            end
+        end
+    end
+
     -- Tab content
     if active_tab == "Items" then
         if ItemSpawner and ItemSpawner.draw_tab_content then
@@ -173,9 +188,10 @@ re.on_draw_ui(function()
     local dbg_changed, dbg_val = imgui.checkbox("Debug Mode", debug_mode)
     if dbg_changed then
         debug_mode = dbg_val
-        -- DEBUG records always reach the file; this decides whether they also
-        -- appear in the script console while debugging live.
+        -- DEBUG lines reach the log file and the script console only while
+        -- Debug Mode is ticked.
         Logger.set_console_level(debug_mode and "DEBUG" or "INFO")
+        Logger.set_debug(debug_mode)
         -- Arm the mod so the frame loop actually runs its modules. Without
         -- this, offline testing sees a dormant mod: no trackers, no deaths
         -- observed, no checks. Deliberately not undone when debug goes back

@@ -4,6 +4,9 @@ Outputs into tools/release_out/:
   DRAP_<version>.zip  -- extract straight into the game install folder
   drdr.apworld        -- goes into Archipelago's custom_worlds
 
+The zip also carries source/natives as natives/ at the game root (loose asset
+overrides; see below).
+
 The zip carries source/autorun as reframework/autorun AND source/data as
 reframework/data. Both halves are required: SharedData reads drdr_shared.json
 from the data folder at runtime, DoorRandomizer reads drdr_doors.json and
@@ -22,9 +25,13 @@ object-lifetime tracking breaks and the Lua heap gets corrupted (garbled log
 output, and worse). Diagnosed 2026-07-25 -- see
 docs/reframework/features/logging.md.
 """
+import hashlib
 import json
 import os
 import re
+import subprocess
+import sys
+import time
 import zipfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -96,6 +103,103 @@ def build_apworld():
     return dst
 
 
+DLL_SHA_PREFIX = "4598ad78"          # lua-apclientpp built against Lua 5.4.3
+MANIFEST_CONTAINER_VERSION = 7
+FORBIDDEN_IN_ZIP = ("DRAP_dev", "DRAP_DevControl", "devctl", "/probes/", "/debug/", "__pycache__",
+                    ".pyc", ".git/", "investigation/", "source/dev")
+# Strings no shipped Lua file may carry: they would require a dev file the zip
+# does not have.
+DEV_REFS_IN_LUA = ("DRAP/debug/", "DRAP_dev", "k.debug")
+
+
+def dev_problems(names, read):
+    """Nothing from the dev package is in the zip, and nothing in the
+    shipped Lua points at it. `names` are zip entries, `read(name)` their bytes."""
+    bad = []
+    for n in names:
+        if any(f in "/" + n for f in FORBIDDEN_IN_ZIP):
+            bad.append(f"dev file in zip: {n}")
+        if n.startswith("reframework/autorun/") and n.endswith(".lua"):
+            text = read(n).decode("utf-8", errors="replace")
+            for ref in DEV_REFS_IN_LUA:
+                if ref in text:
+                    bad.append(f"{n}: refers to dev package ({ref!r})")
+    return bad
+REQUIRED_IN_ZIP = (
+    "dinput8.dll", "lua-apclientpp.dll", "re2_fw_config.txt",
+    "reframework/autorun/AP_DRDR_main.lua",
+    "reframework/data/drdr_shared.json",
+    "reframework/data/drdr_doors.json",
+)
+
+
+def release_test(zpath, version, allow_dirty=False):
+    """Check the finished zip the way a player's install would meet it.
+
+    Catches the failures this project has shipped: a zip without
+    reframework/data (a mod that loads and registers nothing), source files
+    that were never committed, a wrong client DLL, and a require()
+    that points at a file the zip does not carry. Returns a list of problems.
+    """
+    bad = []
+    with zipfile.ZipFile(zpath) as z:
+        names = z.namelist()
+        nameset = set(names)
+        for req in REQUIRED_IN_ZIP:
+            if req not in nameset:
+                bad.append(f"missing from zip: {req}")
+        for top in ("reframework/autorun/", "reframework/data/", "natives/"):
+            if not any(n.startswith(top) for n in names):
+                bad.append(f"no files under {top}")
+        bad += dev_problems(names, z.read)
+
+        # Both copies of the shared data, and the zip's copy, must agree.
+        if "reframework/data/drdr_shared.json" in nameset:
+            with open(SHARED_PY, "rb") as f:
+                if z.read("reframework/data/drdr_shared.json") != f.read():
+                    bad.append("zip drdr_shared.json differs from the apworld copy")
+
+        if "lua-apclientpp.dll" in nameset:
+            blob = z.read("lua-apclientpp.dll")
+            if not hashlib.sha256(blob).hexdigest().startswith(DLL_SHA_PREFIX):
+                bad.append("lua-apclientpp.dll sha is not the Lua 5.4.3 build")
+            if b"$LuaVersion: Lua 5.4.3" not in blob:
+                bad.append("lua-apclientpp.dll does not embed Lua 5.4.3")
+
+        with open(os.path.join(REPO, "apworld", "drdr", "archipelago.json"), encoding="utf-8") as f:
+            manifest = json.load(f)
+        if manifest.get("version") != MANIFEST_CONTAINER_VERSION:
+            bad.append(f"manifest container version is {manifest.get('version')}, "
+                       f"not {MANIFEST_CONTAINER_VERSION}")
+
+        # Every require("DRAP/...") in shipped Lua resolves to a shipped file.
+        for n in names:
+            if not (n.startswith("reframework/autorun/") and n.endswith(".lua")):
+                continue
+            text = z.read(n).decode("utf-8", errors="replace")
+            for mod in set(re.findall(r'require\(\s*"((?:DRAP|AP_REF)/[^"]+)"', text)):
+                if f"reframework/autorun/{mod}.lua" not in nameset:
+                    bad.append(f"{n}: require({mod!r}) is not in the zip")
+
+    # A clean checkout must build this same zip: every shipped source file is
+    # tracked and unmodified at HEAD.
+    try:
+        out = subprocess.run(
+            ["git", "status", "--porcelain", "--", "source", ":(exclude)source/dev",
+             "tools/music",
+             "tools/migrate", "dinput8.dll", "lua-apclientpp.dll",
+             "re2_fw_config.txt", "THIRD-PARTY-LICENSES.md", "LICENSE",
+             "apworld"],
+            cwd=REPO, capture_output=True, text=True, check=True).stdout
+        for line in out.splitlines():
+            msg = f"not committed: {line.strip()}"
+            if not allow_dirty or line.startswith("??"):
+                bad.append(msg)
+    except (OSError, subprocess.CalledProcessError) as e:
+        bad.append(f"could not run git status: {e}")
+    return bad
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     version = world_version()
@@ -106,6 +210,7 @@ def main():
     zpath = os.path.join(OUT, f"DRAP_{version}.zip")
     autorun = os.path.join(REPO, "source", "autorun")
     data = os.path.join(REPO, "source", "data")
+    natives = os.path.join(REPO, "source", "natives")
     with zipfile.ZipFile(zpath, "w", zipfile.ZIP_DEFLATED) as z:
         z.write(os.path.join(REPO, "dinput8.dll"), "dinput8.dll")
         z.write(os.path.join(REPO, "lua-apclientpp.dll"), "lua-apclientpp.dll")
@@ -116,6 +221,27 @@ def main():
         migrate = os.path.join(REPO, "tools", "migrate")
         for f in ("Migrate Old AP Saves.bat", "Migrate-OldAPSaves.ps1"):
             z.write(os.path.join(migrate, f), f)
+        # Music Builder: adds the player's own songs to the game's music as new
+        # tracks (nothing vanilla is replaced); Music Shuffle plays them only
+        # when connected. Next to DRDR.exe, where it finds the paks and
+        # natives/. Ships no audio and no ffmpeg; the script finds the
+        # player's own ffmpeg.
+        music = os.path.join(REPO, "tools", "music")
+        for f in ("DRAP Music Builder.bat", "DRAP Music Uninstall.bat",
+                  "DRAP-MusicBuilder.ps1"):
+            z.write(os.path.join(music, f), f)
+        # The Linux (Proton) twin: a python3 builder and two sh launchers.
+        # LF line endings whatever the checkout uses (a CRLF shebang does not
+        # run), and the executable bit set so a file manager can run them.
+        for f in ("DRAP Music Builder.sh", "DRAP Music Uninstall.sh",
+                  "drap_music_builder.py"):
+            with open(os.path.join(music, f), "rb") as fh:
+                body = fh.read().replace(b"\r\n", b"\n")
+            info = zipfile.ZipInfo(f, date_time=time.localtime(os.path.getmtime(os.path.join(music, f)))[:6])
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.external_attr = (0o100755 << 16)
+            info.create_system = 3          # unix, so the mode bits are honoured
+            z.writestr(info, body)
         for root, dirs, files in os.walk(autorun):
             for f in files:
                 full = os.path.join(root, f)
@@ -132,6 +258,31 @@ def main():
                 full = os.path.join(root, f)
                 arc = "reframework/data/" + os.path.relpath(full, data).replace(os.sep, "/")
                 z.write(full, arc)
+        # Turns REFramework's loose-file loader on (it is off by default, so
+        # without this the natives/ overrides below never load). Measured
+        # 2026-10-11: a config holding only this key is accepted and REFramework
+        # fills every other setting with its defaults. Extracting over an
+        # existing config replaces it, so their other REFramework settings
+        # reset; see docs/BACKLOG.md. Lua cannot do this itself (its io is
+        # sandboxed to reframework/data).
+        z.write(os.path.join(REPO, "re2_fw_config.txt"), "re2_fw_config.txt")
+        # Loose asset overrides (PP sticker logo) sit beside reframework/ at
+        # the game root, where REFramework's LooseFileLoader looks. They are
+        # only read when LooseFileLoader_Enabled=true in re2_fw_config.txt.
+        if os.path.isdir(natives):
+            for root, dirs, files in os.walk(natives):
+                for f in files:
+                    full = os.path.join(root, f)
+                    arc = "natives/" + os.path.relpath(full, natives).replace(os.sep, "/")
+                    z.write(full, arc)
+
+    problems = release_test(zpath, version, allow_dirty="--allow-dirty" in sys.argv)
+    if problems:
+        os.remove(zpath)    # a failed build must not leave a zip to ship
+        print("RELEASE TEST FAILED:")
+        for p in problems:
+            print("  -", p)
+        raise SystemExit(1)
 
     entries = len(zipfile.ZipFile(zpath).namelist())
     print(f"built {os.path.basename(zpath)} ({entries} entries, world {version})")

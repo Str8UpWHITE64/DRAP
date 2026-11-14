@@ -1,10 +1,17 @@
 -- DRAP/Logger.lua
--- Per-session log file sink. See docs/reframework/features/logging.md.
+-- Per-session log file sink.
 --
 -- Every module logs through Shared.create_logger(), which funnels here. This
 -- module mirrors each line to the script console (as before) and appends it to
--- a timestamped file under reframework/data/DRAP_Logs/, one file per launch so
--- yesterday's evidence survives today's session.
+-- a timestamped file under reframework/data/DRAP/logs/, one file per launch so
+-- yesterday's evidence survives today's session. The ten newest are kept.
+--
+-- A line reads "14:03:22.118 INFO  [items]  Received Wooden Sword from Player2".
+-- The category is one of start, config, conn, items, checks, state, death, goal
+-- or error where the line fits one; any other module logs under its own
+-- lower-case name. DEBUG lines are dropped unless debug logging is on, either
+-- by "debug_log": true in reframework/data/DRAP/log_config.json or through the
+-- Debug Mode checkbox for the current session.
 --
 -- Load order note: nothing in DRAP may be required from this file. Shared.lua
 -- requires Logger, and Shared is the first require in every other module, so a
@@ -47,7 +54,8 @@ end
 -- Tunables
 ------------------------------------------------------------
 
-local LOG_DIR = "DRAP_Logs"
+local LOG_DIR = "DRAP/logs"
+local CONFIG_PATH = "DRAP/log_config.json"
 
 -- A module that throws inside on_frame produces the same line 60x/second.
 -- Consecutive identical lines collapse into a "repeated N times" rollup, which
@@ -63,9 +71,8 @@ local MAX_LINES_PER_SECOND = 300
 -- continues after the cap; only the file stops growing.
 local MAX_FILE_BYTES = 32 * 1024 * 1024
 
--- Session files kept in DRAP_Logs before older ones are pruned (best effort --
--- see prune_old_logs).
-local KEEP_SESSIONS = 20
+-- Session files that keep their text; older ones are emptied (see prune_old_logs).
+local KEEP_SESSIONS = 10
 
 -- Lines held in memory for the GUI's Log tab.
 local RECENT_LINES = 200
@@ -75,13 +82,14 @@ local RECENT_LINES = 200
 ------------------------------------------------------------
 
 local S = {
-    stamp = nil,           -- "20260725_143012"
+    stamp = nil,           -- "2026-07-25_14-30-12"
     path = nil,            -- relative path actually opened, or nil
     handle = nil,
     start_clock = os.clock(),
+    start_time = os.time(),
     start_date = os.date("%Y-%m-%d %H:%M:%S"),
 
-    file_min = Logger.LEVELS.DEBUG,     -- everything reaches the file
+    file_min = Logger.LEVELS.INFO,      -- DEBUG only when debug logging is on
     console_min = Logger.LEVELS.INFO,   -- console stays as noisy as it was
 
     bytes = 0,
@@ -154,10 +162,9 @@ Logger.scrub = scrub
 -- File Setup
 ------------------------------------------------------------
 
---- Writes DRAP_Logs/latest.json, a one-glance pointer at the newest session
---- for bug reports. It also brings the directory into existence: json.dump_file
---- creates missing parent directories (this is how AP_DRDR_Items/ appears on a
---- fresh install) whereas plain io.open does not.
+--- Writes DRAP/logs/latest.json, a one-glance pointer at the newest session.
+--- It also brings the directory into existence: json.dump_file creates missing
+--- parent directories whereas plain io.open does not.
 --- @param log_name string|nil Bare filename of this session's log
 --- @return boolean True if the write succeeded
 local function write_dir_pointer(log_name)
@@ -189,13 +196,13 @@ local function open_if_free(path)
 end
 
 --- Opens the session file, appending a numeric suffix when the name is taken.
---- Prefers DRAP_Logs/; falls back to the data root if the directory can't be
+--- Prefers DRAP/logs/; falls back to the data root if the directory can't be
 --- created (older REFramework build, read-only data dir), which is where every
 --- other DRAP file already lands.
 --- @return file|nil handle
 --- @return string|nil path
 local function open_session_file()
-    local base = "drap_" .. S.stamp
+    local base = "AP_" .. S.stamp
     local dir_ready = write_dir_pointer(nil)
 
     for _, prefix in ipairs(dir_ready and { LOG_DIR .. "/", "" } or { "" }) do
@@ -213,20 +220,15 @@ local function open_session_file()
     return nil, nil
 end
 
---- Best-effort retention. os.remove is not part of REFramework's io sandbox, so
---- on some builds it resolves against the game's working directory and simply
---- fails -- harmless, because the guarded pattern below can only ever name a
---- DRAP session log. The outcome is verified against fs.glob and reported in
---- the header, so a no-op shows up as "prune unsupported" rather than silence.
+--- Lists the session logs on disk, oldest first.
 --- @return table Array of session-log paths, newest last
 local function list_session_logs()
     if type(fs) ~= "table" and type(fs) ~= "userdata" then return {} end
 
     -- fs.glob takes a std::regex, not a Lua pattern, and REFramework reports
-    -- paths with the platform separator. Try the backslash form first (matching
-    -- the probes in investigation/) and fall back to the forward-slash form.
-    local files
-    for _, rx in ipairs({ [[DRAP_Logs\\drap_.*\.log]], [[DRAP_Logs/drap_.*\.log]] }) do
+    -- paths with the platform separator. Try the backslash form first and fall
+    -- back to the forward-slash form.
+    for _, rx in ipairs({ [[DRAP\\logs\\AP_.*\.log]], [[DRAP/logs/AP_.*\.log]] }) do
         local ok, res = pcall(fs.glob, rx)
         if ok and type(res) == "table" and #res > 0 then
             files = res
@@ -237,9 +239,9 @@ local function list_session_logs()
 
     local names = {}
     for _, f in ipairs(files) do
-        -- Filenames embed a sortable %Y%m%d_%H%M%S stamp, so lexical order is
-        -- chronological order.
-        if type(f) == "string" and f:match("drap_%d+_%d+.*%.log$") then
+        -- Filenames embed a sortable %Y-%m-%d_%H-%M-%S stamp, so lexical order
+        -- is chronological order.
+        if type(f) == "string" and f:match("AP_%d%d%d%d%-%d%d%-%d%d_%d%d%-%d%d%-%d%d.*%.log$") then
             names[#names + 1] = f
         end
     end
@@ -249,25 +251,41 @@ end
 
 Logger.list_session_logs = list_session_logs
 
+--- Keeps the newest `keep` session logs. REFramework's Lua has no os.remove,
+--- so an older log cannot be deleted; it is emptied instead, which frees its
+--- space and leaves a zero-byte file under its dated name.
 --- @param keep number How many of the newest sessions to retain
---- @return number removed
---- @return number remaining
+--- @return number emptied
+--- @return number kept Sessions that still hold their text
 local function prune_old_logs(keep)
     local names = list_session_logs()
     local current = S.path and S.path:match("([^/\\]+)$")
 
-    local removed = 0
-    for i = 1, #names - keep do
+    local emptied, kept = 0, 0
+    for i = #names, 1, -1 do
         -- Separator style can differ between fs.glob and our own path, so
         -- protect the open file by basename rather than by full path.
         local base = names[i]:match("([^/\\]+)$")
-        if base ~= current and pcall(os.remove, names[i]) then
-            removed = removed + 1
+        if base == current or (#names - i) < keep then
+            kept = kept + 1
+        else
+            local f = io.open(names[i], "rb")
+            local has_text = false
+            if f then
+                has_text = f:read(1) ~= nil
+                f:close()
+            end
+            if has_text then
+                local w = io.open(names[i], "w")
+                if w then w:close(); emptied = emptied + 1 end
+            end
         end
     end
 
-    return removed, #list_session_logs()
+    return emptied, kept
 end
+
+Logger.prune = prune_old_logs
 
 ------------------------------------------------------------
 -- Raw Emit
@@ -352,7 +370,33 @@ local function push_recent(text)
     S.recent[S.recent_head] = text
 end
 
---- Formats one record: wall clock, elapsed seconds, level, tag, message.
+-- Categories a line may carry. Anything else logs under its module's own
+-- lower-case name; the two aliases fold the connection layer into "conn".
+local STANDARD_CATEGORIES = {
+    start = true, config = true, conn = true, items = true, checks = true,
+    state = true, death = true, goal = true, error = true,
+}
+local CATEGORY_ALIAS = { ap_ref = "conn" }
+
+--- @param tag string
+--- @return string Category for the bracket column
+local function category_of(tag)
+    local c = tostring(tag):lower()
+    return CATEGORY_ALIAS[c] or c
+end
+
+Logger.STANDARD_CATEGORIES = STANDARD_CATEGORIES
+
+--- Wall clock with milliseconds, derived from the monotonic clock so the
+--- fraction is real while the date part still follows the system clock.
+--- @return string "HH:MM:SS.mmm"
+local function stamp_now()
+    local t = S.start_time + (os.clock() - S.start_clock)
+    local whole = math.floor(t)
+    return string.format("%s.%03d", os.date("%H:%M:%S", whole), math.floor((t - whole) * 1000))
+end
+
+--- Formats one record: "HH:MM:SS.mmm LEVEL [category]  message".
 --- @param level number
 --- @param tag string
 --- @param msg string
@@ -374,16 +418,10 @@ local function format_line(level, tag, msg)
     if S.main_thread and t ~= "?" and t ~= S.main_thread then
         S.offthread = S.offthread + 1
         S.threads_seen[t] = (S.threads_seen[t] or 0) + 1
-        marker = " !THREAD:" .. t
+        marker = "!THREAD:" .. t .. " "
     end
 
-    return string.format("%s  +%09.3f  %s  [%s]%s %s",
-        os.date("%H:%M:%S"),
-        os.clock() - S.start_clock,
-        label,
-        tag,
-        marker,
-        msg)
+    return string.format("%s %s [%s]  %s%s", stamp_now(), label, category_of(tag), marker, msg)
 end
 
 --- Writes a record to file + GUI buffer, and to the console when the level
@@ -698,11 +736,37 @@ local function probe(fn, ...)
     return "n/a"
 end
 
---- Opens the file and writes the header block. Runs once, at require time.
+--- Reads the logging switches. A missing or unreadable file means defaults:
+--- DEBUG lines off. The file is created on first run so there is a place to
+--- turn them on.
+local function read_config()
+    local debug_on = false
+    if type(json) == "table" or type(json) == "userdata" then
+        local ok, cfg = pcall(json.load_file, CONFIG_PATH)
+        if ok and type(cfg) == "table" then
+            debug_on = cfg.debug_log == true
+        elseif ok and cfg == nil then
+            pcall(json.dump_file, CONFIG_PATH, { debug_log = false }, 4)
+        end
+    end
+    S.file_min = debug_on and Logger.LEVELS.DEBUG or Logger.LEVELS.INFO
+    return debug_on
+end
+
+--- Turns DEBUG lines in the file on or off for the rest of this session. The
+--- saved switch in log_config.json is untouched.
+--- @param on boolean
+function Logger.set_debug(on)
+    S.file_min = on and Logger.LEVELS.DEBUG or Logger.LEVELS.INFO
+end
+
+--- Opens the file and writes the opening lines. Runs once, at require time.
 local function start_session()
-    S.stamp = os.date("%Y%m%d_%H%M%S")
+    S.stamp = os.date("%Y-%m-%d_%H-%M-%S")
     S.window_start = os.clock()
     S.last_flush = os.clock()
+
+    local debug_on = read_config()
 
     local handle, path = open_session_file()
     S.handle = handle
@@ -713,33 +777,20 @@ local function start_session()
         return
     end
 
-    local removed, remaining = prune_old_logs(KEEP_SESSIONS)
+    local emptied, kept = prune_old_logs(KEEP_SESSIONS)
 
-    local head = {
-        "============================================================",
-        " Dead Rising Archipelago (DRAP) session log",
-        "============================================================",
-        " started        : " .. S.start_date,
-        " session file   : " .. path,
-        " DRAP version   : " .. Logger.VERSION,
-        " game           : " .. probe(reframework and reframework.get_game_name, reframework),
-        " REFramework    : " .. probe(reframework and reframework.get_commit_hash, reframework)
-                             .. " / " .. probe(reframework and reframework.get_tag, reframework),
-        " RF build       : " .. probe(reframework and reframework.get_build_date, reframework)
-                             .. " " .. probe(reframework and reframework.get_build_time, reframework),
-        " TDB version    : " .. probe(sdk and sdk.get_tdb_version),
-        " retention      : " .. (removed > 0
-                                    and string.format("pruned %d, %d session(s) kept", removed, remaining)
-                                 or string.format("prune unsupported on this build, %d session(s) kept", remaining)),
-        "------------------------------------------------------------",
-        " Columns: wall-clock  +elapsed-seconds  LEVEL  [Module] message",
-        " Attach this whole file to bug reports.",
-        "============================================================",
-        "",
-    }
-    handle:write(table.concat(head, "\n") .. "\n")
-    handle:flush()
-    S.bytes = 0  -- the header is overhead, not part of the growth budget
+    local rf = probe(reframework and reframework.get_tag, reframework)
+    local rf_hash = probe(reframework and reframework.get_commit_hash, reframework)
+    Logger.info("start", string.format(
+        "DRAP %s started. Game %s, REFramework %s (%s), TDB %s, apworld %s expected",
+        Logger.VERSION,
+        probe(reframework and reframework.get_game_name, reframework),
+        rf, rf_hash:sub(1, 8),
+        probe(sdk and sdk.get_tdb_version),
+        Logger.VERSION))
+    Logger.info("start", string.format("Log file %s, %d kept%s%s", path, kept,
+        emptied > 0 and string.format(", %d older emptied", emptied) or "",
+        debug_on and ", debug lines on" or ""))
 end
 
 -- Every DRAP module requires Shared, and Shared requires this file, so a throw

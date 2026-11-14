@@ -8,6 +8,7 @@
 -- have left these checks unobtainable for returning players.
 
 local Shared = require("DRAP/Shared")
+local Ledger = require("DRAP/LocationLedger")
 
 local M = Shared.create_module("AchievementTracker")
 
@@ -43,7 +44,14 @@ local by_value = {}          -- challenge int -> AP location name
 local hook_installed = false
 local resolve_failed = false
 
---- Assigned by AP_DRDR_main.lua; called with the AP location name.
+-- Unlock fires again for an achievement already held (Photojournalist, on
+-- every photo). The hook only queues; on_frame sends each location once.
+local queued = {}            -- AP location names waiting for the next frame
+local sent = {}              -- AP location name -> true once the send succeeded
+
+--- Assigned by AP_DRDR_main.lua; called with the AP location name. Returns
+--- true when the check went out, so a dropped or failed send is retried on
+--- the next unlock.
 M.on_location_earned = nil
 
 ------------------------------------------------------------
@@ -112,10 +120,7 @@ local function install_hook()
         function(retval)
             local loc = pending and by_value[pending] or nil
             pending = nil
-            if loc and M.on_location_earned then
-                M.log(string.format("Achievement unlocked -> %s", loc))
-                pcall(M.on_location_earned, loc)
-            end
+            if loc then queued[#queued + 1] = loc end
             return retval
         end)
 
@@ -134,7 +139,28 @@ end
 
 -- The achievement types aren't loaded at script load, so setup retries on
 -- frame until they are.
+local function drain_queue()
+    if #queued == 0 then return end
+    local batch = queued
+    queued = {}
+    for _, loc in ipairs(batch) do
+        -- The server already has it (after a reload, or a collect). Nothing
+        -- to send, but the player did earn it now: record it as theirs, or
+        -- a scoop that completes on it never sees it done.
+        if not sent[loc] and Ledger.is_init() and Ledger.is_acked(loc) then
+            Ledger.record(loc, "check")
+            sent[loc] = true
+        end
+        if not sent[loc] and M.on_location_earned then
+            M.log(string.format("Achievement unlocked -> %s", loc))
+            local ok, res = pcall(M.on_location_earned, loc)
+            if ok and res then sent[loc] = true end
+        end
+    end
+end
+
 function M.on_frame()
+    drain_queue()
     if hook_installed or resolve_failed then return end
     if next(by_value) == nil then
         if not resolve_enum() then return end

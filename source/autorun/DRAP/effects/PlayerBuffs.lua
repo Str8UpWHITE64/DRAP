@@ -47,6 +47,9 @@ local DAMAGE_HP_FLOOR = 1000
 local BERSERKER_ATTACK_PCT = 1000
 -- Skipped Leg Day Trap multiplier on LevelSpeedMax
 local SLOW_TRAP_MULT = 0.5
+-- Cardio Trap multiplier on LevelSpeedMax. God mode runs the same table at 5.0,
+-- so 2.0 (the sheet's "2x speed") is well inside what the engine accepts.
+local CARDIO_TRAP_MULT = 2.0
 
 -- Skipped Arm Day: attack percent while the trap runs. 1 is the floor rather
 -- than 0 -- zero attack risks a divide in the damage maths, and 1% already
@@ -307,7 +310,7 @@ re.on_frame(function()
         local now = os.clock()
         if now - god_last_tick >= GOD_TICK_SECONDS then
             god_last_tick = now
-            -- NoDamage covers grab immunity (Alex) -- no juice needed.
+            -- NoDamage covers grab immunity -- no juice needed.
             _set_invincible(true)                        -- area loads may reset
             _set_speed_table(GOD_SPEED)                  -- level-ups rewrite it
             _set_god_run(GOD_RUN_LEVEL)                  -- ditto run level
@@ -401,7 +404,7 @@ function M.stomach_ache(sec)
     sec = sec or 60
     if _trigger_juice(JUICE.STOMACH_ACHE, sec) then
         log("Stomach Ache Trap fired")
-        _notify_trap("Stomach Ache Trap", string.format("Periodic damage for %ds", sec))
+        _notify_trap("Stomach Ache Trap", string.format("Your tummy hurts for %ds", sec))
     end
 end
 
@@ -460,7 +463,7 @@ end
 --- HP to 0 leaves the player undead -- HP<=0 with no death or respawn, which
 --- needs a restart. DamageLink is meant to be able to kill, so the last hit
 --- goes through the game's own death instead of through HP: damage down to
---- the floor, then playerDead().
+--- the floor, then DeathLink.kill_player().
 ---
 --- @param amount integer HP to remove
 --- @param reason string for the death log if it lands
@@ -589,7 +592,7 @@ function M.arm_day_trap(sec)
         function() return true end,
         function()
             PlayerStats.set_attack_override(ARM_DAY_ATTACK_PCT)
-            _notify_trap("You skipped arm day.")
+            _notify_trap("Skipped Arm Day Trap", "Your attacks are feeble")
             log(string.format("Skipped Arm Day Trap: attack %d%% for %.0fs",
                 ARM_DAY_ATTACK_PCT, sec))
         end,
@@ -623,7 +626,7 @@ function M.zombie_swarm_trap(sec)
             local entry = _timed_effects[NAME]
             local base = (entry and tonumber(entry.saved)) or 1
             Zombies.set_spawn_multiplier(base * ZOMBIE_TRAP_FACTOR)
-            _notify_trap("Oops, more zombies.")
+            _notify_trap(NAME, "More zombies spawned around you!")
             log(string.format("%s: %dx -> %dx for %.0fs", NAME, base,
                 base * ZOMBIE_TRAP_FACTOR, sec))
         end,
@@ -643,15 +646,25 @@ function M.potty_mouth_trap(sec)
     local now = os.clock()
     _potty.until_at = now + sec
     _potty.next_at = now          -- first one immediately
-    _notify_trap("Frank has some choice words.")
+    _notify_trap("Potty Mouth Trap", "Watch your mouth, Frank!")
     log(string.format("Potty Mouth Trap: barking for %.0fs", sec))
 end
 
-function M.slow_trap(sec, multiplier)
-    sec = tonumber(sec) or DEFAULT_TIMED_DURATION
-    multiplier = tonumber(multiplier) or SLOW_TRAP_MULT
+-- Skipped Leg Day and Cardio share one mechanism: scale the LevelSpeedMax
+-- table captured at start, put the capture back at expiry. They must not
+-- overlap, or the second would capture the first's scaled table and "restore"
+-- to it, so whichever is already running makes the other decline (it stays
+-- banked, or expires if it arrived over TrapLink).
+local SPEED_TRAPS = { "Skipped Leg Day Trap", "Cardio Trap" }
 
-    _start_timed("Skipped Leg Day Trap", sec,
+local function _speed_trap(name, sec, multiplier, notify_text)
+    for _, other in ipairs(SPEED_TRAPS) do
+        if other ~= name and M.is_trap_active(other) then
+            log(string.format("%s declined: %s is running", name, other))
+            return false
+        end
+    end
+    _start_timed(name, sec,
         function()
             -- capture current LevelSpeedMax values
             local ms = _move_setting()
@@ -672,16 +685,15 @@ function M.slow_trap(sec, multiplier)
         end,
         function()
             -- apply: scale baseline by multiplier
-            local saved = _timed_effects["Skipped Leg Day Trap"]
-                          and _timed_effects["Skipped Leg Day Trap"].saved
+            local saved = _timed_effects[name] and _timed_effects[name].saved
             local base = saved or VANILLA_SPEED_TABLE
             local scaled = {}
             for i, v in ipairs(base) do scaled[i] = v * multiplier end
             _set_speed_table(scaled)
             local psm = _psm()
             if psm then pcall(function() psm:call("applyPlayerValue") end) end
-            log(string.format("Skipped Leg Day Trap: %gx speed for %.1fs", multiplier, sec))
-            _notify_trap("Skipped Leg Day Trap", string.format("%gx speed for %.0fs", multiplier, sec))
+            log(string.format("%s: %gx speed for %.1fs", name, multiplier, sec))
+            _notify_trap(name, notify_text or string.format("%gx speed for %.0fs", multiplier, sec))
         end,
         function(saved)
             -- restore
@@ -689,6 +701,25 @@ function M.slow_trap(sec, multiplier)
             local psm = _psm()
             if psm then pcall(function() psm:call("applyPlayerValue") end) end
         end)
+    return true
+end
+
+function M.slow_trap(sec, multiplier)
+    sec = tonumber(sec) or DEFAULT_TIMED_DURATION
+    multiplier = tonumber(multiplier) or SLOW_TRAP_MULT
+    return _speed_trap("Skipped Leg Day Trap", sec, multiplier)
+end
+
+--- Cardio Trap: the speed-up counterpart of Skipped Leg Day. Frank runs at
+--- twice his normal pace for 30 s. Waits for PlayerReady so the window is not
+--- spent in a cutscene or a load.
+function M.cardio_trap(sec, multiplier)
+    sec = tonumber(sec) or DEFAULT_TIMED_DURATION
+    multiplier = tonumber(multiplier) or CARDIO_TRAP_MULT
+    local Shared = package.loaded["DRAP/Shared"] or require("DRAP/Shared")
+    local PlayerReady = package.loaded["DRAP/PlayerReady"] or require("DRAP/PlayerReady")
+    if not Shared.is_in_game() or not PlayerReady.ready() then return false end
+    return _speed_trap("Cardio Trap", sec, multiplier)
 end
 
 ------------------------------------------------------------
@@ -701,6 +732,16 @@ function M.get_active_timed_effects()
         out[name] = entry.expires_at - os.clock()
     end
     return out
+end
+
+--- Whether a timed trap is running right now. TrapLink uses it to decline a
+--- repeat rather than stack one on top of itself.
+function M.is_trap_active(name)
+    local now = os.clock()
+    local e = _timed_effects[name]
+    if e and e.expires_at and e.expires_at > now then return true end
+    if name == "Potty Mouth Trap" and now < _potty.until_at then return true end
+    return false
 end
 
 function M.cancel_all_timed_effects()
@@ -734,6 +775,7 @@ function M.register()
             end },
         -- Custom traps
         { name = "Skipped Leg Day Trap",          fn = M.slow_trap },
+        { name = "Cardio Trap",        fn = M.cardio_trap },
         { name = "Damage Player Trap", fn = M.player_damage },
         { name = "Skipped Arm Day Trap", fn = M.arm_day_trap },
         { name = "Oops More Zombies Trap", fn = M.zombie_swarm_trap },
@@ -745,10 +787,13 @@ function M.register()
     -- Buffs keep firing immediately -- they are a gift, and holding one back
     -- to drip-feed it later would just be annoying.
     local TrapBank = require("DRAP/TrapBank")
+    -- Speed traps return false when they decline; the rest return nothing.
+    local SPEED_DECLINES = { ["Skipped Leg Day Trap"] = true, ["Cardio Trap"] = true }
     local TRAPS = {
         ["Stomach Ache Trap"]  = true,
         ["Zombait Trap"]       = true,
         ["Skipped Leg Day Trap"]          = true,
+        ["Cardio Trap"]        = true,
         ["Damage Player Trap"] = true,
         ["Skipped Arm Day Trap"] = true,
         ["Oops More Zombies Trap"] = true,
@@ -758,7 +803,11 @@ function M.register()
     for _, item in ipairs(items) do
         if TRAPS[item.name] then
             trap_n = trap_n + 1
-            TrapBank.register(item.name, { fire = function() item.fn() end })
+            local declines = SPEED_DECLINES[item.name]
+            TrapBank.register(item.name, { fire = function()
+                local r = item.fn()
+                if declines and r == false then return false end
+            end })
             -- Registered with ItemEffects too, purely so the arrival is
             -- logged where every other item's is. It does no work.
             ItemEffects.register(item.name, {
@@ -794,6 +843,7 @@ _G.drap_buff_heal         = function(a) M.heal(a) end
 _G.drap_buff_berserker    = function(s) M.berserker_mode(s) end
 _G.drap_buff_pp_boost     = function(a) M.pp_boost(a) end
 _G.drap_trap_slow         = function(s, m) M.slow_trap(s, m) end
+_G.drap_trap_cardio      = function(s, m) M.cardio_trap(s, m) end
 _G.drap_trap_damage       = function(a) M.player_damage(a) end
 
 _G.drap_trap_armday  = function(sec) M.arm_day_trap(sec) end

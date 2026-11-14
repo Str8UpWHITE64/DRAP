@@ -224,6 +224,9 @@ local VANILLA_DOORS = {
     ["SCN_sa00|s900|door0"] = {from_area = "sa00", to_area = "s900", door_no = 0},
 }
 
+--- Every passable door: door id -> { from_area, to_area, door_no }.
+function M.vanilla_doors() return VANILLA_DOORS end
+
 ------------------------------------------------------------
 -- JSON Serialization Helpers
 ------------------------------------------------------------

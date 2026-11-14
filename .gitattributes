@@ -1,0 +1,3 @@
+# Linux launchers and the Linux music builder must keep LF line endings.
+*.sh text eol=lf
+tools/music/drap_music_builder.py text eol=lf

@@ -183,11 +183,18 @@ function M.apply_for_slot(slot_name, seed)
     if _is_player_in_session() then
         -- The engine's storage state is sticky to the previous mount;
         -- every save this session will fail. Make it unmissable.
-        M.log("WARNING: connecting to AP mid-session; saves will fail until restart.")
-        pcall(re.msg,
-            "DRAP: Connected to Archipelago mid-game.\n"
-            .. "Saving will FAIL for the rest of this session.\n"
-            .. "Restart Dead Rising Deluxe Remaster, then connect from the title screen.")
+        M.log.warn("connecting to AP mid-session; saves will fail until restart.")
+        -- A toast, never re.msg: that is a modal Windows message box, and it
+        -- holds the game thread until someone clicks OK. Behind a fullscreen
+        -- window nobody can, so a mid-game connect froze the game
+        -- (connecting in the Overtime Hideout).
+        local ok_n, Notify = pcall(require, "DRAP/Notify")
+        if ok_n and Notify and Notify.warn then
+            pcall(Notify.warn,
+                "Connected mid-game: saving will FAIL this session. "
+                .. "Restart the game and connect from the title screen.",
+                { duration = 12 })
+        end
     end
 
     if apply_mount_redirect(slot_name, seed) then
