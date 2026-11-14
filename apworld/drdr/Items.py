@@ -752,9 +752,21 @@ def BuildItemPool(random, count, options, excluded_scoop_names=(),
     # Sets have no stable order between processes and the pool is shuffled
     # at the end, so iterating one unsorted gave the same seed a different
     # item pool on another run.
-    if options.guaranteed_items.value:
-        for item_name in sorted(options.guaranteed_items.value):
-            item = item_dictionary[item_name]
+    #
+    # Guaranteed Items gives the count set. A count of 0 is the same as not
+    # listing the item. Items the pool needs on its own (keys, scoops,
+    # Progressive Kent Scoop, skills, upgrades, the Restricted specialty
+    # list, Queen, Blender, the camera books) keep their normal amount and
+    # the total is the larger of that and the count; everything else comes
+    # out at exactly the count, because the filler leaves guaranteed names
+    # out. The guaranteed copies are always added in full: if they outnumber
+    # the free slots the filler just gets none.
+    guaranteed = {name: int(n) for name, n
+                  in dict(options.guaranteed_items.value or {}).items()
+                  if int(n) > 0}
+    for item_name in sorted(guaranteed):
+        item = item_dictionary[item_name]
+        for _ in range(guaranteed[item_name]):
             item_pool.append(item)
             included_itemcount = included_itemcount + 1
     remaining_count = count - included_itemcount
@@ -785,18 +797,16 @@ def BuildItemPool(random, count, options, excluded_scoop_names=(),
     # Book [Blender] is the one thing both RPG routes need, and on any goal
     # without Overtime it is the only route -- so one has to exist in every
     # mode, the same reasoning as the Queen above.
-    if "Book [Blender]" not in (options.guaranteed_items.value or {}):
-        item = item_dictionary["Book [Blender]"]
-        item_pool.append(item)
-        remaining_count = remaining_count - 1
-        included_itemcount = included_itemcount + 1
+    item = item_dictionary["Book [Blender]"]
+    item_pool.append(item)
+    remaining_count = remaining_count - 1
+    included_itemcount = included_itemcount + 1
 
     # Both camera books gate "Get 10000 PP in one photo", so each has to exist.
     for _book in ("Book [Camera 1]", "Book [Camera 2]"):
-        if _book not in (options.guaranteed_items.value or {}):
-            item_pool.append(item_dictionary[_book])
-            remaining_count = remaining_count - 1
-            included_itemcount = included_itemcount + 1
+        item_pool.append(item_dictionary[_book])
+        remaining_count = remaining_count - 1
+        included_itemcount = included_itemcount + 1
 
     # ItemSanity + Restricted: a pickup check needs its item sent first, so
     # every item type that has a check goes in the pool, once. Names already
@@ -896,6 +906,9 @@ def BuildItemPool(random, count, options, excluded_scoop_names=(),
                type("X", (), {"value": False})()).value:
         nonTrapFiller = [it for it in nonTrapFiller if it.name not in overpowered_items]
 
+    # The guaranteed count is exact, so the filler adds no more of those.
+    nonTrapFiller = [it for it in nonTrapFiller if it.name not in guaranteed]
+    trapList = [it for it in trapList if it.name not in guaranteed]
     fillerList = nonTrapFiller + trapList
 
     # Everything Extra Overtime Keys puts behind the multiworld. Their
@@ -1034,6 +1047,19 @@ def BuildItemPool(random, count, options, excluded_scoop_names=(),
                 remaining_count -= 1
                 included_itemcount += 1
 
+    # Guaranteed Items versus what the blocks above add on their own: the
+    # blocks keep their normal amount (logic counts copies of some of them),
+    # and a guaranteed count only adds beyond that, so the total is the larger
+    # of the two. The guaranteed copies went in first; take back as many as
+    # the blocks added again.
+    for _name in sorted(guaranteed):
+        _item = item_dictionary[_name]
+        _block = sum(1 for it in item_pool if it is _item) - guaranteed[_name]
+        for _ in range(min(_block, guaranteed[_name])):
+            item_pool.remove(_item)
+            remaining_count = remaining_count + 1
+            included_itemcount = included_itemcount - 1
+
     # Exclude Overpowered Items off: one of each overpowered item is always in
     # the pool, whatever the filler rolls. Anything already added above
     # (guaranteed items, Restricted specialty, ItemSanity) is not doubled, and
@@ -1090,7 +1116,10 @@ def BuildItemPool(random, count, options, excluded_scoop_names=(),
     # wrap-around. This keeps the existing "unique-first, then duplicates"
     # property of the original algorithm.
     if item_sanity and non_trap_slot_count > 0:
-        shuffled_filler = list(nonTrapFiller)
+        # Once each: anything already in the pool (the Overpowered books,
+        # for one) is not dealt a second time.
+        _in_pool = {it.name for it in item_pool}
+        shuffled_filler = [it for it in nonTrapFiller if it.name not in _in_pool]
         random.shuffle(shuffled_filler)
         once = shuffled_filler[:non_trap_slot_count]
         item_pool.extend(once)
