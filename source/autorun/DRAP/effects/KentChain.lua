@@ -79,6 +79,7 @@ local function has_handoff_token(name)
 end
 
 local KENT_STYPE = 32
+local KENT_LIVE_SLEEP = 9         -- NpcBaseInfo live state SLEEP
 -- Debounce between the desired day changing and the arm, so the completing
 -- day's ceremony writes land first.
 local SETTLE_SECONDS = 3.0
@@ -510,6 +511,19 @@ local function reset_npc_record(remove_mode, pos)
             end
         end)
         if info then
+            -- An asleep record (live 9) is no use to the day being armed. The
+            -- scheduler's appear places Kent from it once, but the record stays
+            -- asleep, and with the appear flag on no later entry places him
+            -- again: Kent gone after one loading zone. Arms happen outside
+            -- Paradise Plaza, so no actor stands behind it, and removing it
+            -- lets the appear make a fresh record, as on a first arm.
+            if not remove_mode then
+                local live = Shared.to_int(Shared.safe(function() return info:get_field("mLiveState") end))
+                local level = current_level() or ""
+                if live == KENT_LIVE_SLEEP and not level:find(PARADISE_SCENE, 1, true) then
+                    remove_mode = true
+                end
+            end
             if remove_mode then
                 local removed = pcall(function()
                     mgr:call("removeInformation(app.solid.npc.NpcBaseInfo)", info)
@@ -518,7 +532,7 @@ local function reset_npc_record(remove_mode, pos)
                     removed = pcall(function() mgr:call("removeInformation", info) end)
                 end
                 if removed then
-                    M.log("removed Kent's day-3 aftermath record (fresh placement next entry)")
+                    M.log("removed Kent's old record (fresh placement next entry)")
                     return
                 end
             end
@@ -766,7 +780,7 @@ end
 -- awake, and a re-entry places him from it AND from the appear: two Kents.
 -- Outside Paradise, before the shoot, the record goes back to sleep, the
 -- state the first entry found it in. Same move as Brad's escort record.
-local LIVE_STATE_SLEEP = 9
+local LIVE_STATE_SLEEP = KENT_LIVE_SLEEP
 local record_rested_logged = false
 local function rest_record_outside(name)
     if name ~= "Photo Challenge" then return end
