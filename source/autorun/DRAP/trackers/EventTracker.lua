@@ -154,6 +154,20 @@ local TRACKED_EVENT_FLAGS = {
     [2283] = "Answer Otis's Call in Maintenance Tunnel",
     [2285] = "Answer Otis's Call in Wonderland Plaza",
 
+    -- Psychopath deaths. Their defeat scenes are watched as event numbers
+    -- above, but an event number is only ever seen as it happens: a kill made
+    -- while the mod was not watching (not connected yet, a crash, a skipped
+    -- scene shorter than the poll) was lost for good, and the scoop never
+    -- completed. The die flags are written by the death itself and kept in the
+    -- save, so reading them as levels sends the kill on the next session.
+    -- Left out: Sean (1294), whose death flag ScoopUnlocker clears for the
+    -- cult, and Kent (1292), whom KentChain owns.
+    [1293] = 'Kill Cliff',
+    [1295] = 'Kill Adam',
+    [1296] = 'Kill Jo',
+    [1297] = 'Defeat Paul',
+    [1302] = 'Kill Cletus',
+
     -- The suppressant hand-in. This used to be watched as event id 131, which
     -- was never confirmed and is not this mission.
     [135]  = 'Scramble for a Suppressant',

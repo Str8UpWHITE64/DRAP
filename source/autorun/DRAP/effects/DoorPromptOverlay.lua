@@ -382,6 +382,28 @@ local function locked_key_for(origin_code, dest_code)
     return nil
 end
 
+-- One line per door the hint names, so a report of "it asked for a key I
+-- have" can be read from the log: which door, which key, and whether that
+-- key has arrived. Received but still locked is the bug the report means,
+-- and is a warning; the plain case is what the player saw on screen.
+local _hint_logged = nil
+
+local function log_key_hint(scene, dest_code, key)
+    local bridge = _G.AP and _G.AP.AP_BRIDGE
+    local held = (bridge and bridge.has_item_name and bridge.has_item_name(key)) == true
+    local tag = tostring(scene) .. ">" .. tostring(dest_code) .. ">" .. tostring(key)
+        .. ">" .. tostring(held)
+    if _hint_logged == tag then return end
+    _hint_logged = tag
+    if held then
+        log.warn(string.format("key hint: %s -> %s needs %s, which has been received -- the door should be open",
+            tostring(scene), tostring(dest_code), key))
+    else
+        log(string.format("key hint: %s -> %s needs %s (not received)",
+            tostring(scene), tostring(dest_code), key))
+    end
+end
+
 local function show_nearby_door()
     if next(_state.anchors_by_scene) == nil then return end
     -- Nothing at all during the Opening, not just the key part: redirects
@@ -432,6 +454,7 @@ local function show_nearby_door()
 
     -- Say what it wants, not just where it goes.
     if key then
+        log_key_hint(scene, NAME_TO_SCENE_CODE[anchor.to], key)
         -- Purple, not the green used for the destination in this same toast:
         -- two bold greens read as one phrase. Purple is the AP progression
         -- color, which is what a key is.
