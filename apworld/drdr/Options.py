@@ -961,9 +961,9 @@ class ExcludeOverpoweredItems(Toggle):
       * Real Mega Buster            (high-damage ranged weapon)
       * Rocket Launcher             (high-damage explosive weapon)
 
-    Disabled by default. Players who want these items to remain in
-    rotation should leave it off; players who want a more balanced run
-    should enable it.
+    Disabled by default. With it off, one of each of these items is always
+    in the item pool (more may turn up as filler). Players who want a more
+    balanced run should enable it.
 
     Note: items explicitly listed under Guaranteed Items are still added
     even when this option is on, since that's an explicit user override.

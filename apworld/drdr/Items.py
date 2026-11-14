@@ -635,9 +635,9 @@ challenge_tool_items = {
     "Sniper Rifle",
 }
 
-# Items widely considered overpowered. Removed from the filler pool when
-# Options.exclude_overpowered_items is on. Guaranteed-items overrides still
-# win — listing one here AND in Guaranteed Items will keep it in the pool.
+# Items widely considered overpowered. With Options.exclude_overpowered_items
+# on they are kept out of the pool (filler and the guarantee below); Guaranteed
+# Items still win. With it off, BuildItemPool puts one of each in the pool.
 overpowered_items = {
     "Book [Infinite Durability]",  # weapons never break
     "Book [Martial Arts]",          # massively-boosted unarmed damage
@@ -1033,6 +1033,29 @@ def BuildItemPool(random, count, options, excluded_scoop_names=(),
                 item_pool.append(upg)
                 remaining_count -= 1
                 included_itemcount += 1
+
+    # Exclude Overpowered Items off: one of each overpowered item is always in
+    # the pool, whatever the filler rolls. Anything already added above
+    # (guaranteed items, Restricted specialty, ItemSanity) is not doubled, and
+    # the random filler may still add more. Done here so the count is exact
+    # and the guarantee never takes more slots than are left. Weapons are
+    # skipped where they would be dead items: Spitter Only (unless kept) and
+    # ItemSanity without Restricted, where nothing spawns.
+    if not _drop_overpowered:
+        _have = {it.name for it in item_pool}
+        for item_name in sorted(overpowered_items):
+            if item_name in _have or remaining_count <= 0:
+                continue
+            item = item_dictionary[item_name]
+            if item.category == DRItemCategory.WEAPON:
+                if spitter_only and item_name not in spitter_kept_weapons:
+                    continue
+                if item_sanity and not _item_sanity_restricted:
+                    continue
+            item_pool.append(item)
+            _have.add(item_name)
+            remaining_count = remaining_count - 1
+            included_itemcount = included_itemcount + 1
 
     # Fill remaining filler slots. trap_percentage controls what fraction of
     # those slots become traps; the rest are random non-trap fillers.
