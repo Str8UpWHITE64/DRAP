@@ -665,7 +665,7 @@ local function main_menu()
 			imgui.same_line()
 			if imgui.button("Cancel") then
 				disconnect_client = true
-				table.insert(textLog, {{ text = "Connect cancelled." }})
+				table.insert(textLog, {{ text = "Connect canceled." }})
 			end
 		else
 			if imgui.button("Connect") then

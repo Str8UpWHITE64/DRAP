@@ -60,17 +60,17 @@ The in-game AP Client has 4 tabs: **Items**, **Keys**, **Scoops**, and **Doors**
 
 ## Understanding the AP Client **Scoops** tab
 
-The in-game AP Client is powerful and informative, if not a little confusing at tomes. **Scoops** is the most important tab while playing, as it tells you what Scoops are available and the triggers for them. For Main Story:
+The in-game AP Client is powerful and informative, if not a little confusing at times. **Scoops** is the most important tab while playing, as it tells you what Scoops are available and the triggers for them. For Main Story:
 
 - LIGHT BLUE is the trigger for the current Main Story mission
-- GREY means the Scoop is completed
+- GRAY means the Scoop is completed
 - RED means you do not have the Scoop unlocked
 - BLUE means you have the Scoop unlocked but it is not your current Scoop
 - GREEN means you have the Scoop unlocked and it is your current Scoop
 
 Beneath the Main Story, you can see all other Side Quests you have currently available. These have different color meanings, as well as an additional color:
 
-- GREY means completed
+- GRAY means completed
 - BLUE means it's an active Psychopath quest
 - GREEN means it's an active Side Quest where you have to rescue a survivor
 - MINT (a light teal-green) means you have this Side Quest, however it is deferred until the completion of the indicated Scoop, or until you receive the indicated item (with the Camera Item option on, Cut from the Same Cloth and Gun Shop Standoff wait for the Camera)
@@ -83,7 +83,7 @@ You are able to click "Done" on your Side Quests. DO NOT DO THIS unless the Scoo
 
 The **Items** tab represents two things: your ability to spawn items if you don't have *Restricted Items* enabled, and your ability to interact with items if you do have *Restricted Items* enabled. Let's say, for example, you are sent a Baseball Bat.
 
-- If you do not have *Restricted Items* enabled, you can the item in the **Items** tab and then click "Spawn Item" to spawn one item near you in your world (Note: please see the [Known Bugs](https://github.com/Str8UpWHITE64/DRAP/blob/main/Known%20Bugs.md) document before spawning items in your world)
+- If you do not have *Restricted Items* enabled, you can select the item in the **Items** tab and then click "Spawn Item" to spawn one item near you in your world (Note: please see the [Known Bugs](https://github.com/Str8UpWHITE64/DRAP/blob/main/Known%20Bugs.md) document before spawning items in your world)
 - If you have *Restricted Items* enabled, you can now pick up the item if it already exists in the world. However, you can not spawn the item via the **Items** tab.
 
 <img width="1292" height="972" alt="Items Tab" src="https://github.com/user-attachments/assets/85be7bd8-d8e0-43c0-a546-a1ffd46d7abd" />

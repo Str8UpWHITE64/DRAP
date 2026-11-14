@@ -16,7 +16,7 @@ These include:
 - Level Ups
 - Challenges
 
-I have implemented door locking and time locking.  This means that in order to go to any areas past the Security Room, you will need to get a key for it.  That means, if you are playing solo and cant get to the Rooftop, you likely can do some checks in the Entrance Plaza in the opening sequence. Which leads to:
+I have implemented door locking and time locking.  This means that in order to go to any areas past the Security Room, you will need to get a key for it.  That means, if you are playing solo and can't get to the Rooftop, you likely can do some checks in the Entrance Plaza in the opening sequence. Which leads to:
 
 It is possible to soft lock yourself, so don't be hesitant to start the game over on top of your current progress to focus on side missions. When you start a new game, any items you received over the run will be granted again at the start.
 
@@ -44,7 +44,7 @@ Currently, there is only one goal, to get Ending S and beat Brock. We may add mo
     └── data                    (scoop/item/survivor data the mod reads at runtime)
 ```
 > **Extract both folders.** `reframework/data` is not optional — without it the mod loads but registers no items and finds no scoop data.
-> **If you already have your own REFramework installed, let the zip overwrite it.** REFramework only learned about Dead Rising in **v1.5.8** (25 Oct 2024) — the `DD2.zip` build. Anything older loads and looks fine, but it cannot find one of the engine functions it needs to track object lifetimes, and the result is memory corruption: garbled text in the console, and occasional wrong behaviour or crashes that are impossible to trace. If you want to supply your own, use v1.5.8 or newer.
+> **If you already have your own REFramework installed, let the zip overwrite it.** REFramework only learned about Dead Rising in **v1.5.8** (25 Oct 2024) — the `DD2.zip` build. Anything older loads and looks fine, but it cannot find one of the engine functions it needs to track object lifetimes, and the result is memory corruption: garbled text in the console, and occasional wrong behavior or crashes that are impossible to trace. If you want to supply your own, use v1.5.8 or newer.
 > **Let the zip overwrite `re2_fw_config.txt`.** It turns on REFramework's loose-file loader, which DRAP needs for the PP sticker logo, and it resets your other REFramework settings to defaults. If you keep your own config, set `LooseFileLoader_Enabled=true` in it instead.
 
 2. Download `drdr.apworld` from the Releases page and place it into your Archipelago `custom_worlds` folder.
@@ -74,7 +74,7 @@ The main story scoops are in their normal order, but time-lock items are added t
 - There are two main ways items are handled in this mod: Granted items and Restricted items.  This is determined by the options selected in your APWorld YAML file.
   - Granted items show up in the AP Items window (see below) and can be spawned at any time.  These items are added to the list of items You have received from the APWorld, and can be spawned at any time.
   - Restricted items are items that You are allowed to pick up in the world after You have received them from the APWorld.  These items will show up in the AP Items window, but You cannot spawn them.  Instead, You must find them in the world like normal.  If You haven't gotten the item from the APWorld yet, You will not be able to pick it up in the world.
-- Door locks and time locks gate your progress.  If You can't get to an area, You likely need to find the key for it. If You notice time isn't progressing towards a main scoop, You likely need an item.  Time-locks are sent on connection for ScoopSanity, and missions are sent to You as items.  DoorSanity also grants all door-locks on first connection.
+- Door locks and time locks gate your progress.  If You can't get to an area, You likely need to find the key for it. If You notice time isn't progressing toward a main scoop, You likely need an item.  Time-locks are sent on connection for ScoopSanity, and missions are sent to You as items.  DoorSanity also grants all door-locks on first connection.
 - With DoorSanity enabled, You can generate a map HTML file with each of the door redirections.  You can find this in the "Doors" section of the Archipelago window.
 - If you disconnect while playing, you will send challenge and level locations on reconnect.
 - To open the ItemSpawner window, go into the REFramework window, scroll down to "Script Generated UI" and check "Show AP Items Window".  This will open a new window where you can spawn items you have received from the APWorld, view your scoop statuses, your keys to areas, and generate your DoorSanity HTML file.
@@ -92,7 +92,7 @@ Add this to your yaml to turn it on (it's off by default):
 When you connect to your seed, the game's music is shuffled in two groups:
 
 - **Mall Music:** the songs on the mall's PA speakers.
-- **Action Music:** psychopath fights, story and event music.
+- **Action Music:** psychopath fights, story, and event music.
 
 Songs only swap within their own group, so the PA always sounds like the PA. The shuffle is the same every time you connect to the same seed. When you aren't connected, or the option is off, the game plays its normal music.
 
@@ -119,11 +119,11 @@ Your songs are **added** to the game; none of the game's own music is changed. T
    DEAD RISING DELUXE REMASTER
    └── DRAP Music
        ├── Mall Music      songs for the mall's PA speakers
-       └── Action Music    fight, story and event music
+       └── Action Music    fight, story, and event music
    ```
 4. **Add your songs.** Put audio files (`mp3`, `ogg`, `flac`, `wav`, `m4a`, `opus`, `wma`, `aac`) in those two folders. Subfolders are fine.
-   - Each seed uses up to **8 Mall songs**, one for each area with PA speakers: Entrance Plaza, Paradise Plaza, Wonderland Plaza, North Plaza, Al Fresca Plaza, Seon's, Crislip's and Colby's Movieland.
-   - Each seed uses up to **21 Action songs**, one for each fight, story or event cue.
+   - Each seed uses up to **8 Mall songs**, one for each area with PA speakers: Entrance Plaza, Paradise Plaza, Wonderland Plaza, North Plaza, Al Fresca Plaza, Seon's, Crislip's, and Colby's Movieland.
+   - Each seed uses up to **21 Action songs**, one for each fight, story, or event cue.
    - Each song is used at most once per seed. If you add fewer songs than there are slots, the rest play the game's own music. If you add more, each seed picks a different set.
 5. **With the game closed**, double-click `DRAP Music Builder.bat` again. It lists each song as it adds it, usually in under a minute; longer songs and bigger folders take a little longer. When it finishes, the window says:
    ```
@@ -147,7 +147,7 @@ The Windows `.bat` files don't run on Linux. Use the two `.sh` files instead; th
    sh "DRAP Music Builder.sh"
    ```
    Run it once to create the song folders, put your songs in them, then run it again, exactly as in steps 3-5 above. To remove your songs, run `sh "DRAP Music Uninstall.sh"`.
-5. **Volume, changing songs and the log file** work the same as on Windows.
+5. **Volume, changing songs, and the log file** work the same as on Windows.
 
 #### Changing your songs
 

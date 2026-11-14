@@ -303,7 +303,7 @@ local function facts_target()
         info, to = FACTS_LEGS[scene].info, FACTS_LEGS[scene].to
     else
         to = scene and next_hop(scene, FACTS_ROUTE_START) or nil
-        info = "Head to Paradise Plaza, then the Warehouse and the Rooftop, to reach the Security Room."
+        info = "Go through Paradise Plaza to the Warehouse, and then go to the Security Room."
     end
     local area = to and Shared.SCENE_INFO and Shared.SCENE_INFO[to]
     local where = area and area.name or "Paradise Plaza"

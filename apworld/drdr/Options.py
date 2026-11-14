@@ -45,13 +45,13 @@ class ItemSanity(Toggle):
     If this mode is on, items cannot be manually spawned in. They must be
     picked up wherever they are in the mall. Books are still sent and still
     automatically provide their buff, but the actual book must be picked up
-    for their Itemsanity check. Instead of sending weapons, filler items
-    become the same as in KillSanity (Zombie Guts, Brains, Rotten Flesh).
+    for their ItemSanity check. Instead of sending weapons, filler items
+    become the same as in KillSanity (Zombie Guts, Brains, and Rotten Flesh).
 
     With Restricted Item Mode, every one of those items is back in the item
     pool and you must wait for the item to be sent before you can pick it up.
 
-    Itemsanity Logic: Items only count as in logic in places where they always
+    ItemSanity Logic: Items only count as in logic in places where they always
     spawn. Items found during the opening, food in the Security Room, drops from
     Garbage Cans or Cardboard Boxes, and items carried by survivors are not
     considered in the logic. However, players will be expected to know where the
@@ -122,7 +122,7 @@ class KnockbackLink(Toggle):
     """
     Share being knocked about with the rest of the multiworld. Getting thrown
     sends the knockback out; a knockback from another player staggers Frank,
-    knocks him down or sends him flying, picked at random.
+    knocks him down, or sends him flying, picked at random.
 
     It carries no damage of its own -- this shares being staggered, not being
     hurt. Turn DamageLink on as well if you want both.
@@ -134,7 +134,7 @@ class KnockbackLink(Toggle):
 class TrapLink(Toggle):
     """
     Share traps with the rest of the multiworld, the Trap Link protocol that
-    Sonic Adventure 2, Super Mario World and others already speak.
+    Sonic Adventure 2, Super Mario World, and others already speak.
 
     When one of your traps goes off, its standard name is sent out for other
     players with Trap Link on. When another game sends a trap, Dead Rising
@@ -152,7 +152,7 @@ class TrapLink(Toggle):
 class SpitterOnly(Toggle):
     """
     This mode limits Frank to Spitfire only. Other weapons are removed from
-    the item pool; skills, stats, keys, traps and healing items stay.
+    the item pool; skills, stats, keys, traps, and healing items stay.
 
     Turning this on also forces Restricted Item Mode and ScoopSanity on, and
     the Savior goal is capped at 47 survivors, since Paul cannot be rescued
@@ -393,7 +393,7 @@ class ZombieKillTiers(Choice):
     nightmare: 1000 in the main plazas and Food Court, 500 in small stores and
                Warehouse, 2000 in Leisure Park, 5000 in the Maintenance Tunnel.
     genocide:  2000 in main plazas and Food Court, 1000 in small stores and
-               Warehouse, 10000 in Leisure Park, 27594 in the Maintenance tunnel
+               Warehouse, 10000 in Leisure Park, 27594 in the Maintenance Tunnel
                (bringing the total to 53594 kills -- the Zombie Genocider count).
     """
     display_name = "Zombie Kill Tiers"
@@ -540,12 +540,12 @@ class SpecialForcesMode(Choice):
 class KentScoopOrder(Choice):
     """
     How Kent's three psychopath scoops (Cut from the Same Cloth, Photo
-    Challenge and Photographer's Pride) reach you. This only matters with
+    Challenge, and Photographer's Pride) reach you. This only matters with
     ScoopSanity.
 
     progressive: the default. Three copies of Progressive Kent Scoop are in
                  the item pool. The first unlocks Kent's day 1, the second
-                 day 2 and the third day 3, so you always play his days in
+                 day 2, and the third day 3, so you always play his days in
                  order.
     separate:    each of Kent's days is its own item, so they reach you in
                  whatever order the seed places them. Day 3 can come before
@@ -769,7 +769,7 @@ class ZombieSpawnMultiplier(Range):
     1 is vanilla and 5 is the maximum. At 5 an area that normally holds a
     hundred zombies will hold roughly five hundred.
 
-    This costs performance. Every extra zombie is more to draw, animate and
+    This costs performance. Every extra zombie is more to draw, animate, and
     path, so higher values are not recommended on lower-end machines. If the
     frame rate suffers, lower the value.
     """
@@ -813,7 +813,7 @@ class CameraItem(Toggle):
     still raise it and aim, but the shutter will not fire.
 
     Every check that needs a photo then needs the Camera: the PP Stickers and
-    their milestones, the photo challenges and Kent's photoshoots. Without
+    their milestones, the photo challenges, and Kent's photoshoots. Without
     ScoopSanity, Kent's later days wait on his earlier shoots, so they need
     it too. With ScoopSanity, Kent's first two days and Gun Shop Standoff
     wait for the Camera before they start.
@@ -888,7 +888,7 @@ class PpBonusLocations(DefaultOnToggle):
     """
     Adds extra AP location checks tied to PP-bonus events that DRAP detects
     via the MsgEvents watcher. (Obtain Mall Map and Transceiver, Obtain
-    Maintenance Tunnel Key and Obtain First Aid Kit are ordinary checks on
+    Maintenance Tunnel Key, and Obtain First Aid Kit are ordinary checks on
     every seed and are not part of this option.)
 
     Single-fire checks:
@@ -944,7 +944,7 @@ class MusicShuffle(Toggle):
     once per seed, and any slots left over play the game's own music.
 
     Only while connected to this seed; offline the game plays its normal
-    music. Cosmetic only: it changes no items, locations or logic.
+    music. Cosmetic only: it changes no items, locations, or logic.
     """
     display_name = "Music Shuffle"
     default = False
@@ -1054,7 +1054,7 @@ class StartWithAllKeys(Toggle):
     the Maintenance Tunnel Access Key. With Door Randomizer on the keys are
     already given at the start; with Door Locks as well, this opens the locks.
 
-    Car Keys, the Camera and the Extra Overtime Keys are not door keys and
+    Car Keys, the Camera, and the Extra Overtime Keys are not door keys and
     stay in the pool.
     """
     display_name = "Start With Every Door Key"

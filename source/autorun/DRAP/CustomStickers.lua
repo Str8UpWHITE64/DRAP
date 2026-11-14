@@ -598,12 +598,12 @@ local function shot_geometry(e, cam)
 end
 local function describe_shot(g)
     if not g then return "" end
-    return string.format("%.1f m away, %d deg off its face (full up to %d, none past %d), %d deg off centre", g.dist,
+    return string.format("%.1f m away, %d deg off its face (full up to %d, none past %d), %d deg off center", g.dist,
         math.floor(g.off_face + 0.5), math.floor(g.full + 0.5), math.floor(g.zero + 0.5), math.floor(g.off_centre + 0.5))
 end
 local function miss_hint(g, rate)
     if not g then return "" end
-    if g.off_centre > 15 then return "off centre: put it in the middle of the frame" end
+    if g.off_centre > 15 then return "off center: put it in the middle of the frame" end
     if g.off_face > g.zero then return "too steep: stand more in front of its face" end
     if g.off_face > g.full then return "steep: only part marks, stand more in front of its face" end
     if (rate or 0) <= 0 and g.dist > 6 then return "too far: move closer" end
