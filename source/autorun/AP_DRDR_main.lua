@@ -590,6 +590,13 @@ local function run_slot_connect(slot_data)
     AP.SplitKeysEnabled = split_keys_enabled
     if AP.DoorSceneLock then
         AP.DoorSceneLock.set_split_keys_enabled(split_keys_enabled)
+        -- Setting the option locks every split door again, and a reconnect
+        -- comes back through here mid-game: the server's item replay is all
+        -- below last_item_index and the enter-game reapply does not run, so
+        -- every key already held stayed listed but its door stayed shut. The
+        -- received items are loaded at the top of this handler, so reopen
+        -- their doors now.
+        AP.effects.SplitKeyEffects.reapply()
     end
     AP.ScoopUnlocker.set_split_keys_enabled(split_keys_enabled)
     log("Split Keys enabled=" .. tostring(split_keys_enabled))
