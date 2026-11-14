@@ -57,6 +57,8 @@ class ItemSanity(Toggle):
     considered in the logic. However, players will be expected to know where the
     items are, including hidden ones like the SMGs in various areas or the Real
     Mega Buster and Laser Sword that can spawn in the Security Room.
+    The Real Mega Buster and Laser Sword only spawn in the Security Room once
+    their item is received.
 
     Cannot be combined with Spitter Only.
     """
