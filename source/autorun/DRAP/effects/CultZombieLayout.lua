@@ -47,6 +47,14 @@
 --                    does. Under ScoopSanity both rows point at set 0, the
 --                    base layout (100 zombies), unless Medicine Run is
 --                    active; then Steven's store is left as the game has it.
+--   Entrance Plaza (256): the same again. Its zombie row for flows 160..179
+--                    selects set 30, the small crowd under Barnaby that
+--                    Rescue the Professor plays against. Image in the
+--                    Monitor leaves the flow at 160, so until Rescue the
+--                    Professor is finished that crowd is all the plaza
+--                    has. Under ScoopSanity the row is hidden unless
+--                    Rescue the Professor is active, and the plaza falls
+--                    through to its day/night ladder.
 
 local Shared = require("DRAP/Shared")
 local State = require("DRAP/scoops/ScoopState")
@@ -65,6 +73,8 @@ local THEATER     = 1283     -- s503, the one area that keeps its cult rows
 local CULT_SCOOP  = "A Strange Group"
 local SEONS       = 1280     -- s500
 local MEDICINE_SCOOP = "Medicine Run"
+local EP_STORY    = "ep_story" -- Entrance Plaza's second entry in AREAS
+local PROFESSOR_SCOOP = "Rescue the Professor"
 
 -- area -> how its cult-time zombie row is patched.
 --   to_set: point the row at that set. Theater: set 0, the base layout
@@ -79,6 +89,8 @@ local MEDICINE_SCOOP = "Medicine Run"
 -- flags: a row is taken when its "and" condition carries any of these.
 -- flows: instead of flags, a row is taken by its start flow; the value is
 --        the row's vanilla set, kept per row.
+-- area:  the area, for an entry that is not keyed by it (an area with rows
+--        under two different rules).
 -- The Food Court is the one area with a zombie row of its own for the
 -- Special Forces (set 9, gated 309): soldiers and next to no zombies
 -- (tester report). Hidden the same way, so the ladder stands under the
@@ -91,11 +103,14 @@ local AREAS = {
     -- to no zombies (#59). Its ladder is the same shape as the Food Court's.
     [256]  = { name = "Entrance Plaza",    hide = true, flags = { SF_FLAG } },
     [SEONS] = { name = "Seon's Food and Stuff", to_set = 0, flows = { [180] = 10, [190] = 20 } },
+    [EP_STORY] = { name = "Entrance Plaza (story row)", area = 256, hide = true, flows = { [160] = 30 } },
 }
+
+local function area_of(key) return AREAS[key].area or key end
 
 local safe = Shared.safe
 
--- area -> { rows = {row objects}, original = set number or area, originals = per-row set (flow rows), patched = bool }
+-- AREAS key -> { rows = {row objects}, original = set number or area, originals = per-row value (flow rows), patched = bool }
 local state = {}
 local table_scanned = false
 
@@ -152,26 +167,36 @@ local function scan_table()
             if a and a ~= THEATER and t == CULT_TYPE and gated_on(r, { CULT_FLAG }) then
                 table.insert(cult_rows, { row = r, area = (a ~= 0) and a or nil })
             end
-            local flow0 = AREAS[a or -1] and AREAS[a].flows
-                and tonumber(safe(function() return r:get_field("mStartGameFlowNo") end))
-            if a and AREAS[a] and AREAS[a].flows and t == ZOMBIE_TYPE and flow0 and AREAS[a].flows[flow0] then
-                -- The vanilla set is known per row, so a row already patched
-                -- earlier in the session is still restored correctly.
-                local st = state[a]
-                table.insert(st.rows, r)
-                st.originals[#st.rows] = AREAS[a].flows[flow0]
-                st.original = st.original or AREAS[a].flows[flow0]
-            elseif a and AREAS[a] and AREAS[a].flags and t == ZOMBIE_TYPE and gated_on(r, AREAS[a].flags) then
-                local st = state[a]
-                local field = AREAS[a].hide and "mAreaNo" or "mEmSetNo"
-                local v = tonumber(safe(function() return r:get_field(field) end))
-                table.insert(st.rows, r)
-                if st.original == nil then st.original = v end
+            if a and t == ZOMBIE_TYPE then
+                local flow0 = tonumber(safe(function() return r:get_field("mStartGameFlowNo") end))
+                local set0 = tonumber(safe(function() return r:get_field("mEmSetNo") end))
+                for key, cfg in pairs(AREAS) do
+                    local st, area = state[key], area_of(key)
+                    local vanilla = cfg.flows and flow0 and cfg.flows[flow0]
+                    -- A hidden flow row sits at area 0 (a script reset
+                    -- re-scanned); its flow and set still name it.
+                    local hidden = vanilla and cfg.hide and a == 0 and set0 == vanilla
+                    if vanilla and (a == area or hidden) then
+                        -- The vanilla value is known per row, so a row already
+                        -- patched earlier in the session is still restored
+                        -- correctly.
+                        local v = cfg.hide and area or vanilla
+                        table.insert(st.rows, r)
+                        st.originals[#st.rows] = v
+                        st.original = st.original or v
+                        if hidden or (not cfg.hide and set0 == cfg.to_set) then st.patched = true end
+                    elseif cfg.flags and a == area and gated_on(r, cfg.flags) then
+                        local field = cfg.hide and "mAreaNo" or "mEmSetNo"
+                        local v = tonumber(safe(function() return r:get_field(field) end))
+                        table.insert(st.rows, r)
+                        if st.original == nil then st.original = v end
+                    end
+                end
             end
         end
     end
-    for area, st in pairs(state) do
-        local cfg = AREAS[area]
+    for key, st in pairs(state) do
+        local cfg, area = AREAS[key], area_of(key)
         -- A row already carrying the patch value (a probe wrote it earlier
         -- in the session, or a script reset re-scanned) must not be taken
         -- as the original, or "restore" would keep the patch.
@@ -246,6 +271,16 @@ local function want_theater()
     return not scoop_active(CULT_SCOOP)
 end
 
+--- Entrance Plaza: the ladder after Image in the Monitor, except while
+--- Rescue the Professor is active. Without ScoopSanity the story moves the
+--- flow on as in the base game, so the row stays as it is.
+local function want_entrance_plaza()
+    local su = unlocker()
+    if not su then return false end
+    local ok, sanity = pcall(su.is_scoop_sanity_enabled)
+    return ok and sanity == true and not scoop_active(PROFESSOR_SCOOP)
+end
+
 --- Seon's: base layout after Rescue the Professor, except while Medicine
 --- Run is active. Without ScoopSanity the story moves the flow on as in
 --- the base game, so the rows stay as they are.
@@ -285,6 +320,7 @@ function M.on_frame()
     if AREAS[2560] then apply(2560, want_food_court()) end
     if AREAS[256] then apply(256, true) end
     apply(SEONS, want_seons())
+    apply(EP_STORY, want_entrance_plaza())
     apply_cult(want_cult_hidden())
 end
 
