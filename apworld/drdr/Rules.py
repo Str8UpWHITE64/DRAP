@@ -564,7 +564,20 @@ ITEM_SANITY_AFTER_SEAN = "Colby's Movieland After Sean"
 ITEM_SANITY_OPENING = frozenset(
     "Pick up " + _n for _n in (
         "HDTV", "Bench", "2 x 4", "Baseball Bat", "Garbage Can", "Snack", "Shotgun",
-        "Lead Pipe", "Potted Plant Bamboo", "Sign", "Potted Plant"))
+        "Apple", "Coffee Creamer", "Lead Pipe", "Potted Plant Bamboo", "Sign", "Potted Plant"))
+
+
+# Types the opening sequence hands out wherever their normal areas are: the
+# Snack by the bats in Entrance Plaza, the Shotgun from the Entrance Plaza
+# fight, and the Apple and Coffee Creamer in the Security Room once Jessie is
+# met. The check counts the first pickup of the type, wherever it happens.
+ITEM_SANITY_OPENING_ANYWHERE = frozenset(
+    "Pick up " + _n for _n in ("Snack", "Shotgun", "Apple", "Coffee Creamer"))
+
+# A mannequin's parts break off it when it is hit enough, so glitched logic
+# does not need the whole mannequin in hand, only its area.
+ITEM_SANITY_MANNEQUINS = frozenset(
+    ("Pick up Mannequin Male", "Pick up Mannequin Female"))
 
 
 def item_sanity_rule(regions, ep_shutter, jessie, after_sean=None):
@@ -1020,8 +1033,21 @@ def set_rules(world) -> None:
             # layouts can be taken during the opening sequence, before any
             # key or Jessie. Only the types the opening is known to hold.
             if (_name in ITEM_SANITY_OPENING
-                    and any(r in ("Rooftop", "Entrance Plaza") for r in _regions)):
+                    and (_name in ITEM_SANITY_OPENING_ANYWHERE
+                         or any(r in ("Rooftop", "Entrance Plaza") for r in _regions))):
                 _rule = or_glitched(_rule, True_())
+            # Glitched: a part breaks off its mannequin by hitting it, so the
+            # mannequin's own pickup (and the item Restricted wants for it)
+            # is not needed, only its area.
+            _parents = [_l for _l in ITEM_SANITY_REQUIRES_LOCATIONS.get(_name, ())
+                        if _l in ITEM_SANITY_MANNEQUINS]
+            if _parents and not _regions:
+                _loose = [item_sanity_rule(ITEM_SANITY_REGIONS[_p], ep_shutter, _jessie, _after_sean)
+                          for _p in _parents]
+                _loose += [CanReachLocation(_l) for _l in ITEM_SANITY_REQUIRES_LOCATIONS[_name]
+                           if _l not in ITEM_SANITY_MANNEQUINS]
+                _loose += [Has(_i) for _i in ITEM_SANITY_REQUIRES_ITEMS.get(_name, ())]
+                _rule = or_glitched(_rule, And(*_loose))
             # Glitched: the Ceremonial Sword blended in Paradise Plaza from a
             # Katana and a Bass Guitar, with no wait for Sean.
             if _name == "Pick up Ceremonial Sword":
