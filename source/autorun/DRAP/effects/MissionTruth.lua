@@ -114,6 +114,13 @@ local GAME_TEXT = {
 }
 local game_text = {}              -- mission -> { title, info, hint }, read on the frame thread
 
+-- Hints that replace the game's own, for the two missions whose hint does not
+-- say where to go.
+local HINT_OVERRIDE = {
+    ["Hideout"] = "Enter the Security Room, then head to Carlito's Hideout in North Plaza with Isabela.",
+    ["Backup for Brad"] = "Head to the Food Court to defeat Carlito, then escort Brad to the book store in Entrance Plaza.",
+}
+
 --- The game's text without its clock: missions do not run to the game's schedule
 --- here. The START line goes whole, a time inside a sentence goes from the
 --- sentence, and the bomb count goes from the one hint that does not follow it.
@@ -675,6 +682,7 @@ local function load_game_text(mm)
                 local s = unit and guid_text(nth_raw(unit, ref[2]))
                 if s and s ~= "" then out[role] = strip_times(s) end
             end
+            if out.hint and HINT_OVERRIDE[name] then out.hint = HINT_OVERRIDE[name] end
             if out.title and out.info and out.hint then game_text[name] = out else missing = missing + 1 end
         end
     end
