@@ -664,20 +664,13 @@ item_sanity_overpowered = frozenset(overpowered_items & item_sanity_required_ite
 
 
 def trap_weights(options):
-    """Weight per trap name: Trap Weights, with the older Enabled Traps list
-    still honoured (a trap missing from a non-default list gets 0). A trap
-    Trap Weights does not mention keeps weight 1."""
+    """Weight per trap name from Trap Weights. A trap Trap Weights does not
+    mention keeps weight 1."""
     given = getattr(getattr(options, "trap_weights", None), "value", None) or {}
     weights = {}
     for item in _all_items:
         if item.category == DRItemCategory.TRAP:
             weights[item.name] = max(0, int(given.get(item.name, 1)))
-    legacy = getattr(options, "enabled_traps", None)
-    if legacy is not None and set(legacy.value) != set(legacy.default):
-        keep = set(legacy.value)
-        for name in weights:
-            if name not in keep:
-                weights[name] = 0
     return weights
 
 

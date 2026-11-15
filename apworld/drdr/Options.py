@@ -474,43 +474,6 @@ class TrapWeights(OptionCounter):
     default = {name: 1 for name in valid_keys}
 
 
-class EnabledTraps(OptionSet):
-    """
-    Older way of choosing traps; use Trap Weights instead. If a yaml still
-    lists traps here, any trap not on the list gets weight 0, on top of Trap
-    Weights. Left alone (all traps) it changes nothing.
-    """
-    display_name = "Enabled Traps"
-    valid_keys = {
-        "Stomach Ache Trap",
-        "Zombait Trap",
-        "Skipped Leg Day Trap",
-        "Damage Player Trap",
-        "Hostile NPC Trap",
-        "Special Forces Trap",
-        "Convicts Respawn Trap",
-        "Butterfingers Trap",
-        "Last Shot Trap",
-        "Where'd Your Inventory Go? Trap",
-        "Bald Trap",
-        "Goddamnit, Donut! Trap",
-        "Boxers Trap",
-        "Skipped Arm Day Trap",
-        "Oops More Zombies Trap",
-        "Potty Mouth Trap",
-        "Bonk Trap",
-        "Tiny Trap",
-        "Giant Trap",
-        "1 HP Trap",
-        "Night Trap",
-        "Cardio Trap",
-        "Invisibility Trap",
-        "Knockout Gas Trap",
-        "Teleport Trap",
-    }
-    default = frozenset(valid_keys)
-
-
 class SpecialForcesMode(Choice):
     """
     Puts the Special Forces in the mall prior to Overtime.
@@ -1158,7 +1121,6 @@ class DROption(PerGameCommonOptions):
     enable_extra_stat_buffs: EnableExtraStatBuffs
     vanilla_progression: VanillaProgression
     trap_weights: TrapWeights
-    enabled_traps: EnabledTraps
     trap_percentage: TrapPercentage
     hostile_survivor_count_min: HostileSurvivorCountMin
     hostile_survivor_count_max: HostileSurvivorCountMax
@@ -1230,7 +1192,6 @@ dr_option_groups = [
         "Trap Settings",
         [
             TrapWeights,
-            EnabledTraps,
             TrapPercentage,
             HostileSurvivorCountMin,
             HostileSurvivorCountMax,
