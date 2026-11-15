@@ -495,7 +495,8 @@ PP_STICKER_GROUPS = [
     (3, ["Seon's Food and Stuff"], []),                                           # Stickers 83-85
     (2, ["Crislip's Home Saloon"], []),                                           # Stickers 74-75
     (10, ["Entrance Plaza"], ["Escort Brad to see Dr Barnaby"]),                  # Stickers 25-34
-    (7, ["Maintenance Tunnel"], []),                                              # Stickers 90-96
+    (5, ["Maintenance Tunnel"], []),                                              # Stickers 90-94
+    (2, ["Meat Processing Area"], []),                                            # Stickers 95-96
     (2, ["Paradise Plaza"], ["Get grabbed by the raincoats"]),                    # Stickers 98-99
 ]
 
