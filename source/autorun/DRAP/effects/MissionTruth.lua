@@ -1434,6 +1434,46 @@ end
 local frame_installed = false
 local last_tick = 0
 
+-- message.get can come back into this module: in a tester's game the lookup in
+-- update_side_times ran the frame callback again from inside the call, which
+-- read the text again, and so on until the stack ran out. Only one pass of the
+-- box work runs at a time; a pass that comes in while one is running is dropped
+-- (the next frame does it).
+local busy = false
+local reentries = 0
+
+local function run_once(fn, ...)
+    if busy then
+        reentries = reentries + 1
+        if reentries == 1 then log("box update re-entered from inside a game call; skipped") end
+        return
+    end
+    busy = true
+    local ok, err = pcall(fn, ...)
+    busy = false
+    if not ok then log("box update failed: " .. tostring(err)) end
+end
+
+local function frame_tick()
+    local now = os.clock()
+    if now - last_tick < 0.5 then return end
+    last_tick = now
+    -- Runs with the module off too: handing back can outlast the switch.
+    if own_handback_since then
+        pcall(finish_own_handback, now - own_handback_since > 30)
+    end
+    if not enabled then return end
+    local mm = sdk.get_managed_singleton(MM_T)
+    if mm then pcall(load_game_text, mm) end
+    pcall(M.refresh)
+    -- Re-assert every 2 s, in case a load rebuilds a table. The cost is
+    -- a few field reads.
+    if target and now - last_apply > 2.0 then
+        last_apply = now
+        pcall(apply)
+    end
+end
+
 function M.init(deps)
     scoop_unlocker = deps and deps.scoop_unlocker
     repurposed = {}
@@ -1462,25 +1502,7 @@ function M.init(deps)
     side_times = {}
     if not frame_installed then
         frame_installed = true
-        re.on_frame(function()
-            local now = os.clock()
-            if now - last_tick < 0.5 then return end
-            last_tick = now
-            -- Runs with the module off too: handing back can outlast the switch.
-            if own_handback_since then
-                pcall(finish_own_handback, now - own_handback_since > 30)
-            end
-            if not enabled then return end
-            local mm = sdk.get_managed_singleton(MM_T)
-            if mm then pcall(load_game_text, mm) end
-            pcall(M.refresh)
-            -- Re-assert every 2 s, in case a load rebuilds a table. The cost is
-            -- a few field reads.
-            if target and now - last_apply > 2.0 then
-                last_apply = now
-                pcall(apply)
-            end
-        end)
+        re.on_frame(function() run_once(frame_tick) end)
     end
     log("initialized")
 end
@@ -1491,8 +1513,7 @@ function M.set_enabled(on)
     enabled = on
     if on then
         ensure_msg_hook()
-        M.refresh()
-        pcall(apply)
+        run_once(function() M.refresh(); pcall(apply) end)
         log("enabled")
     else
         target = nil
@@ -1512,7 +1533,7 @@ _G.drap_mt_state = function()
     local out = {
         main_rows = count(main_rows), main_tables = count(main_tables), survivor_rows = count(survivor_rows),
         units = count(owned_guids), rows_repointed = count(row_orig), tables_repointed = count(table_orig),
-        sets = count(set_orig), hits = hook_hits, misses = hook_misses,
+        sets = count(set_orig), hits = hook_hits, misses = hook_misses, reentries = reentries,
         game_text = count(game_text), own_saved = own_saved ~= nil,
         title = target and target.title, hint = target and target.hint, area = target and target.area,
     }
