@@ -4,7 +4,7 @@ If this is your first time playing the Dead Rising Deluxe Remaster AP, please re
 
 ## Additional Tools
 
-Before playing, please consider installing [Universal Tracker](https://github.com/FarisTheAncient/Archipelago/releases?q=Tracker) and/or the [PopTracker](https://github.com/RazgrizEast/dead-rising-poptracker-razgriz/releases) made by Razgriz. Certain locations have logic for spawning items or are available in the opening earlier than one may expect. These tools, alongside the in-game AP Client, are helpful in knowing what you are able to do while playing. 
+Before playing, please consider installing [Universal Tracker](https://github.com/FarisTheAncient/Archipelago/releases?q=Tracker) and/or the [PopTracker pack](https://github.com/RazgrizEast/dead-rising-poptracker-razgriz) made by Razgriz. Certain locations have logic for spawning items or are available in the opening earlier than one may expect. These tools, alongside the in-game AP Client, are helpful in knowing what you are able to do while playing. 
 
 A minor note before beginning: the launcher for the AP is found in the game, not in the Archipelago Launcher program. This, alongside the AP Client, can be pulled up and hidden by pressing a key on your keyboard (Default: Insert Key)
 
@@ -26,13 +26,15 @@ In Ending A and Ending S, your objective is to complete 13 story missions, retur
 12. Jessie's Discovery
 13. The Butcher
 
+The Zombie Genocider and Psycho goals work differently again: you kill a set number of zombies, or a set number of survivors. The `goal` option lists all five goals.
+
 Savior, on the other hand, only requires you to bring a certain number of survivors back to the Security Room. You can ignore the Main Scoops, as they only have filler items.
 
 Please read the [Known Bugs](https://github.com/Str8UpWHITE64/DRAP/blob/main/Known%20Bugs.md) document should you encounter a bug with survivors unloading.
 
 ## What is *Restricted Items*?
 
-*Restricted Items* is a setting in DRDR AP that prevents you from picking up an item until it has been sent to you. For example, if you are sent "Baseball Bat" then you are able to pick up Baseball Bats. If *Restricted Items* is disabled, then you have no restrictions on items you can interact with.
+*Restricted Items* (`restricted_item_mode`) is a setting in DRDR AP that prevents you from picking up an item until it has been sent to you. For example, if you are sent "Baseball Bat" then you are able to pick up Baseball Bats. If *Restricted Items* is disabled, then you have no restrictions on items you can interact with.
 
 To see what items have been sent to you, check the in-game AP Client **Items** tab (explained further down).
 
@@ -46,17 +48,16 @@ If you do not play with ScoopSanity, the Main Scoops will have to be completed i
 
 *Door Randomizer* how doors are linked together. The door from Wonderland Plaza to Food Court could instead take you to the door from Paradise Plaza to Warehouse, while the door from Food Court to Wonderland Plaza could take you to the door from North Plaza to Crislip's Home Saloon. You can generate a map of the linked doors in the **Doors** tab of the AP client, explained further down.
 
-*Note: DRDR AP 1.1 does not support the /get_logical_path function in UT.*
 
 ## Ignore the in-game Mission HUD
 
-The in-game HUD is, as of 1.1, does not necessarily reflect what your current Scoop/Objective is. Only rely on the AP Client **Scoops** tab to know what comes next.
+The in-game HUD does not always reflect what your current Scoop/Objective is. Only rely on the AP Client **Scoops** tab to know what comes next.
 
 <img width="1404" height="579" alt="Ignore vs Listen" src="https://github.com/user-attachments/assets/342be872-e4fe-40d5-bc24-bfaba170431e" />
 
 ## AP Client Tabs meaning
 
-The in-game AP Client has 4 tabs: **Items**, **Keys**, **Scoops**, and **Doors**. **Keys** shows you the keys you have. **Doors** creates an interactable .html file of the door links, which can be found in `steamapps\common\DEAD RISING DELUXE REMASTER\reframework\data`. The other tabs need a bit more thorough explanation.
+The in-game AP Client has these tabs: **Items**, **Keys**, **Books**, **Scoops**, and **Doors**, plus a **Kills** tab when you play with zombie kill checks. **Keys** shows you the keys you have, and **Books** shows the skill books you have received. **Doors** creates an interactable .html file of the door links, which can be found in `steamapps\common\DEAD RISING DELUXE REMASTER\reframework\data`. The other tabs need a bit more thorough explanation.
 
 ## Understanding the AP Client **Scoops** tab
 
@@ -83,7 +84,7 @@ You are able to click "Done" on your Side Quests. DO NOT DO THIS unless the Scoo
 
 The **Items** tab represents two things: your ability to spawn items if you don't have *Restricted Items* enabled, and your ability to interact with items if you do have *Restricted Items* enabled. Let's say, for example, you are sent a Baseball Bat.
 
-- If you do not have *Restricted Items* enabled, you can select the item in the **Items** tab and then click "Spawn Item" to spawn one item near you in your world (Note: please see the [Known Bugs](https://github.com/Str8UpWHITE64/DRAP/blob/main/Known%20Bugs.md) document before spawning items in your world)
+- If you do not have *Restricted Items* or *ItemSanity* enabled, you can select the item in the **Items** tab and then click "Spawn Item" to spawn one item near you in your world (Note: please see the [Known Bugs](https://github.com/Str8UpWHITE64/DRAP/blob/main/Known%20Bugs.md) document before spawning items in your world)
 - If you have *Restricted Items* enabled, you can now pick up the item if it already exists in the world. However, you can not spawn the item via the **Items** tab.
 
 <img width="1292" height="972" alt="Items Tab" src="https://github.com/user-attachments/assets/85be7bd8-d8e0-43c0-a546-a1ffd46d7abd" />
@@ -100,7 +101,7 @@ You have to stand way further back than you'd think to be able to take those pho
 
 ## Despawning Survivors
 
-There is a known bug that Survivors in your party will not respawn should you load a save. This is being investigated and a fix will hopefully be implemented in a future update. If you encounter this bug, please read the [Known Bugs](https://github.com/Str8UpWHITE64/DRAP/blob/main/Known%20Bugs.md)  document to implement a workaround.
+Survivors in your party used to fail to respawn when you loaded a save. That has been fixed, but if you still see it, please read the [Known Bugs](https://github.com/Str8UpWHITE64/DRAP/blob/main/Known%20Bugs.md)  document to implement a workaround.
 
 ## If you encounter a glitch
 
@@ -117,5 +118,5 @@ DRDR can be an intimidating AP to play at first. The HUD isn't entirely clear on
 - restricted_item_mode: Disabled
 - cult_limited: Enabled
 - start_inventory_from_pool: Rooftop Key: 1, Warehouse Key: 1
-- start_hints: Paradise Plaza Key, Entrance Plaza Key, Al Fresca Plaza Key, Leisure Park Key, Maintenance Tunnel Key, Maintenance Tunnel Access Key
+- start_location_hints: Paradise Plaza Key, Entrance Plaza Key, Al Fresca Plaza Key, Leisure Park Key, Maintenance Tunnel Key, Maintenance Tunnel Access Key
 - exclude_locations: Escort 8 survivors at once, Frank the pimp, Photograph 30 survivors, Encounter 50 survivors, Get 48 survivors to join, Save 50 survivors, Kill 8 psychopaths, Photograph 8 psychopaths, Photograph 70 PP Stickers, Photograph 80 PP Stickers, Photograph 90 PP Stickers, Photograph all PP Stickers, Change into 46 new outfits

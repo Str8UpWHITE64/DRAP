@@ -3,7 +3,7 @@ DRDR AP, much like all APs, has some jank on the backend to make it work. This m
 
 ## My HUD Says I'm Supposed To Do A Scoop But It's Not Letting Me
 
-Ignore the HUD missions. Open up the in-game AP Client to see what scoop you need to do.
+The in-game HUD mission list does not always match your current scoop. Open the in-game AP Client and check the **Scoops** tab to see what you need to do.
 
 ## I'm Playing ScoopSanity And I Got Entrance Plaza Key Before Paradise Plaza
 
@@ -23,19 +23,15 @@ You need to unlock the scoops to be able to complete them. A green scoop means i
 
 ## I Reloaded A Save And My Survivors Didn't Spawn
 
-This is a known major bug and unfortunately we don't have a fix for it at this time. However there is a workaround; start a new save file and have it continue over the existing file. All the unlocked non-Main Scoops will respawn in their original locations. All your progression in Main Scoops as well as unlocks are carried over in this file. Blitz through the opening sequence through "Meet Jessie In The Warehouse" and you should be able to resume gameplay with all Survivors respawned in their original locations.
+Survivors disappearing after a reload was a major bug in earlier versions, and the cause has since been fixed. If it still happens to you, please report it with your log. The workaround is the same as before: start a new save file and have it continue over the existing file. All the unlocked non-Main Scoops will respawn in their original locations. All your progression in Main Scoops as well as unlocks are carried over in this file. Blitz through the opening sequence through "Meet Jessie In The Warehouse" and you should be able to resume gameplay with all Survivors respawned in their original locations.
 
 ## I finished a mission but the cutscene didn't trigger
 
-This is a known bug in 1.1 and is being investigated. If the AP client shows you having completed the check and the **Scoops** tab shows you are on the next task, then Don't Worry About It. However if the Scoop doesn't show as completed, there are 3 workarounds for this. Please try them in order.
+This can still happen. If the AP client shows you having completed the check and the **Scoops** tab shows you are on the next task, then you don't need to do anything. However if the Scoop doesn't show as completed, there are 3 workarounds for this. Please try them in order.
 
 1) Reload your latest save
 2) Stop the program, restart it, and connect to the AP
-3) Start a new save file and have it continue over the existing file, similar to the despawning bug issue.
-
-## Why Is "Rescue Simone Ravendark" Listed As A Blacklisted Check In UT?
-
-Due to technical issues in 1.1, "Rescue Simone Ravendark" is blacklisted in all game modes. This check contains a filler item instead.
+3) Start a new save file and have it continue over the existing file, as described above for survivors that did not spawn.
 
 ## Drivin' Carlito After The Last Resort
 
@@ -61,9 +57,9 @@ You completed multiple Scoops which take place in the Security Room. Congrats, y
 
 Leave the Security Room, enter Paradise Plaza, then return to the Security Room via the Warehouse and Rooftops.
 
-# I Can't Spawn Items From The AP Client Item List
+## I Can't Spawn Items From The AP Client Item List
 
-Spawning items is by far the most buggy part of this mod.  When spawning items using the AP Items Window, try not to spam the spawn button.  Wait a few seconds after spawning an item before spawning another one.  If you do spawn multiple items quickly, you increase your chances of the game crashing.
+Spawning items is by far the most buggy part of this mod. With ItemSanity or Restricted Item Mode on, the spawn button is turned off on purpose: pick the items up in the world instead. Otherwise, when spawning items using the AP Items Window, try not to spam the spawn button.  Wait a few seconds after spawning an item before spawning another one.  If you do spawn multiple items quickly, you increase your chances of the game crashing.
 
 ## Reporting a Bug
 
@@ -75,7 +71,7 @@ Logs live in your game folder under:
 reframework/data/DRAP/logs/
 ```
 
-Each session gets its own file, named for when you started the game — `AP_2026-07-25_14-30-12.log` — so opening the game again never erases the log from the run where the bug happened. The ten newest keep their text; older ones are emptied. Grab the log from the session where the problem occurred, not just the newest one. Copying the file while the game is running is fine.
+Each session gets its own file, named for when you started the game — `AP_<date>_<time>.log` — so opening the game again never erases the log from the run where the bug happened. The ten newest keep their text; older ones are emptied. Grab the log from the session where the problem occurred, not just the newest one. Copying the file while the game is running is fine.
 
 Every line is plain text with areas, items and locations by name, for example `14:03:22.118 INFO  [items]  Received Wooden Sword from Player2`. A `STATE` line every five minutes, and right after you connect, shows where you were, the day and time, health, and your item and check counts. Debug lines are off by default; set `"debug_log": true` in `reframework/data/DRAP/log_config.json` to include them.
 

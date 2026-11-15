@@ -59,3 +59,12 @@ apworld/drdr.apworld
 # Vendored release binaries (see tools/build_release.py)
 !/dinput8.dll
 !/lua-apclientpp.dll
+
+# docs/ holds private working files. Only the pages named here are public.
+docs/*
+!docs/ABOUT.md
+!docs/GETTING_STARTED.md
+!docs/MUSIC.md
+!docs/OPTIONS.md
+!docs/SAVES.md
+!docs/TROUBLESHOOTING.md
